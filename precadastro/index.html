@@ -234,29 +234,17 @@
 </div>
 <canvas class="confetti" id="confetti" aria-hidden="true"></canvas>
 
-<script>
+<script type="module">
+import { api as dados } from '../src/api';
+
 (() => {
   const $ = (id) => document.getElementById(id);
   const reduz = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const pad = (n) => String(n).padStart(3, '0');
 
-  /* ---------- API (mesmo servidor do aplicativo oficial) ---------- */
-  async function api(path, body) {
-    let res;
-    try {
-      res = await fetch('/api' + path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {});
-    } catch {
-      throw new Error('Sem conexão com o servidor. Tente novamente.');
-    }
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.erro || 'Não foi possível concluir. Tente novamente.');
-    return data;
-  }
-  async function me(token) {
-    const res = await fetch('/api/app/me', { headers: { Authorization: 'Bearer ' + token } });
-    if (!res.ok) throw new Error('Não foi possível carregar seu cadastro.');
-    return res.json();
-  }
+  /* ---------- dados (mesma base do aplicativo oficial) ---------- */
+  const api = (path, body) => dados(path, body ? { method: 'POST', body } : {});
+  const me = () => dados('/app/me');
 
   /* ---------- prova social ---------- */
   api('/public/afilhados').then(({ total }) => {

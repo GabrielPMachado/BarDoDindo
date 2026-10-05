@@ -1,0 +1,172 @@
+rules_version = '2';
+
+// Regras do Bar do Dindo. Não há servidor: tudo o que o app e o CRM podem ler ou gravar é decidido aqui.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* ---------- equipe (CRM) ---------- */
+    function logado() { return request.auth != null; }
+    function caminho(col, id) { return /databases/$(database)/documents/$(col)/$(id); }
+    function daEquipe() {
+      return logado() && exists(caminho('usuarios', request.auth.uid))
+        && get(caminho('usuarios', request.auth.uid)).data.status == 'Ativo';
+    }
+    function funcao() {
+      return get(caminho('funcoes', get(caminho('usuarios', request.auth.uid)).data.funcaoId)).data;
+    }
+    // a função Administrador (de sistema) tem acesso total, inclusive a áreas criadas depois
+    function nivel(area) {
+      return funcao().get('sistema', false) == true ? 'edit' : funcao().get('permissoes', {}).get(area, 'none');
+    }
+    function podeVer(area) { return daEquipe() && nivel(area) in ['view', 'edit']; }
+    function podeEditar(area) { return daEquipe() && nivel(area) == 'edit'; }
+
+    // área (permissão) de cada coleção de cadastro do CRM
+    function areas() {
+      return {
+        'metas': 'dir',
+        'colaboradores': 'rh', 'ferias': 'rh',
+        'projetos': 'dp', 'estoque': 'dp', 'materiais': 'dp',
+        'terceirizados': 'adm', 'fornecedores': 'adm', 'contratos': 'adm',
+        'receitas': 'fin', 'despesas': 'fin',
+        'reservas': 'atd', 'consumos': 'atd', 'resgates': 'atd',
+        'criacao': 'mkt', 'midias': 'mkt', 'produtos': 'mkt', 'recompensas': 'mkt',
+        'trabalhista': 'jur', 'consultoria': 'jur',
+        'qualidade': 'fis', 'naoconformidades': 'fis'
+      };
+    }
+    match /{col}/{id} {
+      allow read: if col in areas() && podeVer(areas()[col]);
+      allow write: if col in areas() && podeEditar(areas()[col]);
+    }
+
+    /* ---------- primeiro acesso ---------- */
+    // o primeiro administrador, a função Administrador e a marca de "configurado" são gravados juntos, uma única vez
+    function primeiroAcesso() {
+      return logado()
+        && !exists(caminho('meta', 'setup')) && existsAfter(caminho('meta', 'setup'))
+        && getAfter(caminho('usuarios', request.auth.uid)).data.funcaoId == 'admin';
+    }
+    match /meta/setup {
+      allow read: if true;
+      allow create: if primeiroAcesso();
+    }
+
+    match /usuarios/{uid} {
+      allow read: if logado() && (request.auth.uid == uid || daEquipe());
+      allow create: if podeEditar('cfg') || (request.auth.uid == uid && primeiroAcesso());
+      allow update: if podeEditar('cfg')
+        || (logado() && request.auth.uid == uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ultimoAcesso']));
+      allow delete: if podeEditar('cfg') && request.auth.uid != uid;
+    }
+
+    match /funcoes/{id} {
+      allow read: if daEquipe();
+      allow create: if (podeEditar('cfg') && request.resource.data.get('sistema', false) != true)
+        || (id == 'admin' && primeiroAcesso());
+      allow update: if podeEditar('cfg') && resource.data.get('sistema', false) != true && request.resource.data.get('sistema', false) != true;
+      allow delete: if podeEditar('cfg') && resource.data.get('sistema', false) != true;
+    }
+
+    match /config/{id} {
+      allow read: if true;
+      allow write: if podeEditar('cfg');
+    }
+
+    /* ---------- cópias com dados reduzidos ---------- */
+    // cardápio público (sem custo nem margem dos produtos)
+    match /cardapio/{id} {
+      allow read: if true;
+      allow write: if podeEditar('mkt');
+    }
+    // nomes para vincular registros, visíveis a toda a equipe (sem salários nem contatos)
+    match /ref_colaboradores/{id} {
+      allow read: if daEquipe();
+      allow write: if podeEditar('rh');
+    }
+    match /ref_fornecedores/{id} {
+      allow read: if daEquipe();
+      allow write: if podeEditar('adm');
+    }
+
+    /* ---------- acessos cruzados entre áreas ---------- */
+    // o Financeiro calcula a folha a partir do cadastro do RH
+    match /colaboradores/{id} {
+      allow read: if podeVer('fin');
+    }
+    // o Atendimento lança consumo com os preços do cadastro de produtos
+    match /produtos/{id} {
+      allow read: if podeVer('atd');
+    }
+    // o lançamento de consumo (Atendimento) gera e estorna a própria receita
+    match /receitas/{id} {
+      allow create: if podeEditar('atd') && request.resource.data.consumoId is string;
+      allow delete: if podeEditar('atd') && resource.data.get('consumoId', null) != null;
+    }
+
+    /* ---------- afilhados (aplicativo) ---------- */
+    function novoCliente() {
+      return logado() && !exists(caminho('clientes', request.auth.uid)) && existsAfter(caminho('clientes', request.auth.uid));
+    }
+    // contador que dá o número sequencial de afilhado: só anda de um em um, junto com um cadastro novo
+    match /meta/contadores {
+      allow read: if true;
+      allow create: if request.resource.data.clientes == 1 && novoCliente();
+      allow update: if request.resource.data.clientes == resource.data.clientes + 1 && novoCliente();
+    }
+    match /clientes/{uid} {
+      allow read: if logado() && (request.auth.uid == uid || podeVer('atd') || podeVer('mkt'));
+      allow create: if logado() && request.auth.uid == uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.numero == getAfter(caminho('meta', 'contadores')).data.clientes
+        && existsAfter(caminho('saldos', uid));
+      allow update: if logado() && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nome', 'telefone', 'foto']);
+    }
+
+    // saldo de pontos usado para validar resgates: quem credita é a equipe; o cliente só debita junto com um voucher
+    match /saldos/{uid} {
+      allow read: if logado() && (request.auth.uid == uid || podeVer('atd') || podeVer('mkt'));
+      allow create: if logado() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['acumulados', 'usados', 'ultimoResgate'])
+        && request.resource.data.acumulados == 0 && request.resource.data.usados == 0;
+      allow write: if podeEditar('atd');
+      allow update: if logado() && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usados', 'ultimoResgate'])
+        && request.resource.data.ultimoResgate != resource.data.ultimoResgate
+        && !exists(caminho('resgates', request.resource.data.ultimoResgate))
+        && getAfter(caminho('resgates', request.resource.data.ultimoResgate)).data.clienteUid == uid
+        && request.resource.data.usados == resource.data.usados + getAfter(caminho('resgates', request.resource.data.ultimoResgate)).data.custo
+        && request.resource.data.usados <= resource.data.acumulados;
+    }
+
+    match /recompensas/{id} {
+      allow read: if resource.data.status == 'Ativa';
+    }
+
+    match /reservas/{id} {
+      allow read: if logado() && resource.data.clienteUid == request.auth.uid;
+      allow create: if logado() && request.resource.data.clienteUid == request.auth.uid
+        && exists(caminho('clientes', request.auth.uid))
+        && request.resource.data.status == 'Pendente' && request.resource.data.origem == 'Aplicativo';
+      allow update: if logado() && resource.data.clienteUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'atualizadoEm'])
+        && request.resource.data.status == 'Cancelada pelo cliente'
+        && resource.data.status in ['Pendente', 'Confirmada'];
+    }
+
+    match /consumos/{id} {
+      allow read: if (logado() && resource.data.clienteUid == request.auth.uid) || podeVer('mkt');
+    }
+
+    match /resgates/{id} {
+      allow read: if (logado() && resource.data.clienteUid == request.auth.uid) || podeVer('mkt');
+      allow create: if logado() && request.resource.data.clienteUid == request.auth.uid
+        && request.resource.data.status == 'Disponível'
+        && get(caminho('recompensas', request.resource.data.recompensaId)).data.status == 'Ativa'
+        && request.resource.data.custo == get(caminho('recompensas', request.resource.data.recompensaId)).data.custo
+        && request.resource.data.custo > 0
+        && getAfter(caminho('saldos', request.auth.uid)).data.ultimoResgate == id;
+    }
+  }
+}
