@@ -199,7 +199,7 @@ export function Layout({ children, onChangePassword }: { children: ReactNode; on
             <span className={`live__dot ${lastSync && Date.now() - lastSync.getTime() < 10000 ? 'is-on' : ''}`} />
             {lastSync ? `Ao vivo · ${lastSync.toLocaleTimeString('pt-BR')}` : 'Conectando…'}
           </div>
-          <AtividadesButton onOpenPanel={() => painel.setAberto(true)} />
+          <AtividadesButton onOpenPanel={painel.abrir} />
           <div className="user">
             <button className="user__btn" onClick={() => setMenu((m) => !m)} aria-expanded={menu}>
               <span className="user__avatar">{initials(usuario?.nome ?? '')}</span>
@@ -221,7 +221,7 @@ export function Layout({ children, onChangePassword }: { children: ReactNode; on
       </div>
 
       {ctx && <ContextMenu menu={ctx} pinned={isPinned(ctx.path)} onPin={() => toggle(ctx.path)} onClose={() => setCtx(null)} />}
-      {painel.aberto && <PainelAtualizacoes onClose={() => painel.setAberto(false)} />}
+      {painel.aberto && <PainelAtualizacoes piscar={painel.piscar} onClose={painel.fechar} />}
     </div>
   );
 }
