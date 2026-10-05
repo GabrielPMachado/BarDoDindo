@@ -208,7 +208,7 @@ export function AtividadesButton({ onOpenPanel }: { onOpenPanel: () => void }) {
 
   return (
     <div className="activity-pop" ref={ref}>
-      <button className={`topbar-btn ${open ? 'is-open' : ''}`} onClick={toggle} aria-expanded={open} aria-label="Atualizações" title="Atualizações">
+      <button className={`topbar-btn ${open ? 'is-open' : ''} ${novas.length && !open ? 'has-new' : ''}`} onClick={toggle} aria-expanded={open} aria-label="Atualizações" title="Atualizações">
         <History size={18} />
         {novas.length > 0 && <span className="topbar-btn__badge">{novas.length > 99 ? '99+' : novas.length}</span>}
       </button>
