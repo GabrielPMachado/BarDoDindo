@@ -89,10 +89,10 @@ export function useAtividades() {
   return { items, loading, seen, novas, marcarVistas };
 }
 
-function Linha({ a, nova, onOpen }: { a: Atividade; nova: boolean; onOpen: (a: Atividade) => void }) {
+function Linha({ a, nova, piscar, onOpen }: { a: Atividade; nova: boolean; piscar: boolean; onOpen: (a: Atividade) => void }) {
   return (
     <li>
-      <button className={`activity ${nova ? 'is-new' : ''}`} onClick={() => onOpen(a)} title="Abrir a página deste registro">
+      <button className={`activity ${nova ? 'is-new' : ''} ${nova && piscar ? 'is-blink' : ''}`} onClick={() => onOpen(a)} title="Abrir a página deste registro">
         <span className="activity__avatar">{initials(a.usuarioNome)}</span>
         <span className="activity__body">
           <span className="activity__text">
@@ -110,7 +110,9 @@ function Linha({ a, nova, onOpen }: { a: Atividade; nova: boolean; onOpen: (a: A
   );
 }
 
-function Lista({ items, seen, onOpen, empty }: { items: Atividade[]; seen: string; onOpen: (a: Atividade) => void; empty: string }) {
+function Lista({ items, seen, onOpen, empty, piscar = false }: {
+  items: Atividade[]; seen: string; onOpen: (a: Atividade) => void; empty: string; piscar?: boolean;
+}) {
   const { usuario } = useSession();
   if (!items.length) return <p className="activity-empty muted">{empty}</p>;
   return (
@@ -119,7 +121,7 @@ function Lista({ items, seen, onOpen, empty }: { items: Atividade[]; seen: strin
         <section key={g.dia}>
           <h3 className="activity-day">{g.dia}</h3>
           <ul className="activity-list">
-            {g.items.map((a) => <Linha key={a.id} a={a} nova={a.criadoEm > seen && a.usuarioId !== usuario?.id} onOpen={onOpen} />)}
+            {g.items.map((a) => <Linha key={a.id} a={a} nova={a.criadoEm > seen && a.usuarioId !== usuario?.id} piscar={piscar} onOpen={onOpen} />)}
           </ul>
         </section>
       ))}
@@ -127,8 +129,11 @@ function Lista({ items, seen, onOpen, empty }: { items: Atividade[]; seen: strin
   );
 }
 
-/** Painel completo de atualizações, com filtros por área e por pessoa. */
-export function PainelAtualizacoes({ onClose }: { onClose: () => void }) {
+/**
+ * Painel completo de atualizações, com filtros por área e por pessoa.
+ * `piscar`: só quando o painel abre sozinho ao carregar o sistema (primeiro acesso ou F5).
+ */
+export function PainelAtualizacoes({ onClose, piscar = false }: { onClose: () => void; piscar?: boolean }) {
   const { items, seen, novas, marcarVistas } = useAtividades();
   const navigate = useNavigate();
   const [area, setArea] = useState('');
@@ -172,7 +177,7 @@ export function PainelAtualizacoes({ onClose }: { onClose: () => void }) {
         </div>
       </div>
       <div className="activity-scroll">
-        <Lista items={filtradas} seen={destaque} onOpen={abrir} empty="Nenhuma atualização registrada ainda." />
+        <Lista items={filtradas} seen={destaque} onOpen={abrir} piscar={piscar} empty="Nenhuma atualização registrada ainda." />
       </div>
     </Modal>
   );
@@ -180,11 +185,19 @@ export function PainelAtualizacoes({ onClose }: { onClose: () => void }) {
 
 /** Botão ao lado do perfil: mostra as últimas atualizações por dia e horário. */
 export function AtividadesButton({ onOpenPanel }: { onOpenPanel: () => void }) {
-  const { items, seen, novas, marcarVistas } = useAtividades();
+  const { items, loading, seen, novas, marcarVistas } = useAtividades();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [destaque, setDestaque] = useState(seen);
   const ref = useRef<HTMLDivElement>(null);
+  // o botão só pisca se já havia novidades quando o sistema carregou; as que chegam depois só aparecem no contador
+  const [piscar, setPiscar] = useState(false);
+  const carregou = useRef(false);
+  useEffect(() => {
+    if (loading || carregou.current) return;
+    carregou.current = true;
+    if (novas.length) setPiscar(true);
+  }, [loading]);
 
   useEffect(() => {
     if (!open) return;
@@ -202,13 +215,14 @@ export function AtividadesButton({ onOpenPanel }: { onOpenPanel: () => void }) {
     if (!open) {
       setDestaque(seen);
       marcarVistas();
+      setPiscar(false);
     }
     setOpen(!open);
   };
 
   return (
     <div className="activity-pop" ref={ref}>
-      <button className={`topbar-btn ${open ? 'is-open' : ''} ${novas.length && !open ? 'has-new' : ''}`} onClick={toggle} aria-expanded={open} aria-label="Atualizações" title="Atualizações">
+      <button className={`topbar-btn ${open ? 'is-open' : ''} ${piscar && novas.length && !open ? 'has-new' : ''}`} onClick={toggle} aria-expanded={open} aria-label="Atualizações" title="Atualizações">
         <History size={18} />
         {novas.length > 0 && <span className="topbar-btn__badge">{novas.length > 99 ? '99+' : novas.length}</span>}
       </button>
@@ -232,17 +246,32 @@ export function AtividadesButton({ onOpenPanel }: { onOpenPanel: () => void }) {
   );
 }
 
-/** Abre o painel de atualizações uma vez por sessão, logo que o sistema é aberto. */
+/**
+ * Ao carregar o sistema (primeiro acesso ou F5): abre o painel de atualizações na primeira vez da sessão
+ * ou sempre que houver novidades ainda não lidas — e só nesse momento as novidades piscam.
+ */
 export function usePainelAoAbrir() {
   const { usuario } = useSession();
   const { items, loading, novas } = useAtividades();
   const [aberto, setAberto] = useState(false);
+  const [piscar, setPiscar] = useState(false);
+  const decidido = useRef(false);
   useEffect(() => {
-    if (!usuario || loading || !items.length) return;
+    if (!usuario || loading || decidido.current) return;
+    decidido.current = true;
+    if (!items.length) return;
     const s = storage('session');
-    if (s?.getItem(shownKey(usuario.id))) return;
+    const primeiraVez = !s?.getItem(shownKey(usuario.id));
     try { s?.setItem(shownKey(usuario.id), '1'); } catch { /* ignora */ }
+    if (!primeiraVez && !novas.length) return;
+    setPiscar(novas.length > 0);
     setAberto(true);
-  }, [usuario?.id, loading, items.length]);
-  return { aberto, setAberto, novas: novas.length };
+  }, [usuario?.id, loading]);
+  return {
+    aberto,
+    piscar,
+    /** Aberto pelo usuário (botão "Abrir painel"): sem piscar. */
+    abrir: () => { setPiscar(false); setAberto(true); },
+    fechar: () => { setPiscar(false); setAberto(false); },
+  };
 }
