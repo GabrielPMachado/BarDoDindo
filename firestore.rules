@@ -40,6 +40,20 @@ service cloud.firestore {
       allow write: if col in areas() && podeEditar(areas()[col]);
     }
 
+    /* ---------- painel de atualizações ---------- */
+    // histórico de quem fez o quê: cada área vê o próprio; só se acrescenta, nunca se altera ou apaga
+    match /atividades/{area}/itens/{id} {
+      allow read: if podeVer(area);
+      allow create: if podeEditar(area)
+        && request.resource.data.keys().hasOnly(['area', 'acao', 'colecao', 'alvo', 'detalhe', 'usuarioId', 'usuarioNome', 'criadoEm'])
+        && request.resource.data.area == area
+        && request.resource.data.usuarioId == request.auth.uid
+        && request.resource.data.usuarioNome == get(caminho('usuarios', request.auth.uid)).data.nome
+        && request.resource.data.acao is string && request.resource.data.acao.size() <= 120
+        && request.resource.data.alvo is string && request.resource.data.alvo.size() <= 160
+        && request.resource.data.detalhe is string && request.resource.data.detalhe.size() <= 300;
+    }
+
     /* ---------- primeiro acesso ---------- */
     // o primeiro administrador, a função Administrador e a marca de "configurado" são gravados juntos, uma única vez
     function primeiroAcesso() {

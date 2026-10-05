@@ -6,28 +6,12 @@ import {
 } from 'lucide-react';
 import { brl } from '../data';
 import { ItemIcon } from './ItemIcon';
+import logoUrl from '../../shared/assets/logo.webp';
 import { dateParts, formatDateTime, parseDate, upcoming, useStore, type Consumption, type Reservation } from '../store';
 
-export function CrownIcon({ size = 28 }: { size?: number }) {
-  return (
-    <svg width={size} height={size * 0.6} viewBox="0 0 50 30" aria-hidden="true">
-      <path d="M3 26 L7 6 L17 16 L25 2 L33 16 L43 6 L47 26 Z" fill="currentColor" />
-      <rect x="3" y="26" width="44" height="4" rx="1" fill="currentColor" />
-    </svg>
-  );
-}
-
-export function Logo({ small = false, asLink = true }: { small?: boolean; asLink?: boolean }) {
-  const inner = (
-    <>
-      <span className="logo__crown"><CrownIcon size={small ? 18 : 26} /></span>
-      <span className="logo__bar">BAR DO</span>
-      <span className="logo__dindo">DINDO</span>
-      <svg className="logo__swash" viewBox="0 0 100 8" aria-hidden="true">
-        <path d="M5 2 Q50 10 95 2" stroke="currentColor" strokeWidth="2.2" fill="none" strokeLinecap="round" />
-      </svg>
-    </>
-  );
+export function Logo({ small = false, asLink = true, size }: { small?: boolean; asLink?: boolean; size?: number }) {
+  const px = size ?? (small ? 44 : 52);
+  const inner = <img src={logoUrl} width={px} height={px} alt="Bar do Dindo" className="logo__img" />;
   const cls = `logo ${small ? 'logo--small' : ''}`;
   return asLink ? <Link to="/" className={cls} aria-label="Bar do Dindo — início">{inner}</Link> : <div className={cls}>{inner}</div>;
 }
@@ -237,28 +221,28 @@ function TableArt() {
     <svg viewBox="0 0 120 90" className="table-art">
       <defs>
         <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#3a2414" />
-          <stop offset="1" stopColor="#1a0f08" />
+          <stop offset="0" stopColor="#31221d" />
+          <stop offset="1" stopColor="#160f0c" />
         </linearGradient>
         <radialGradient id="lamp" cx="0.5" cy="0.35" r="0.6">
-          <stop offset="0" stopColor="#f2b14a" stopOpacity="0.55" />
-          <stop offset="1" stopColor="#f2b14a" stopOpacity="0" />
+          <stop offset="0" stopColor="#e0703f" stopOpacity="0.55" />
+          <stop offset="1" stopColor="#e0703f" stopOpacity="0" />
         </radialGradient>
       </defs>
       <rect width="120" height="90" fill="url(#wall)" />
       {[8, 34, 60, 86].map((x) => (
-        <rect key={x} x={x} y="8" width="20" height="16" rx="1" fill="#5a3a1e" stroke="#b07a35" strokeWidth="1" />
+        <rect key={x} x={x} y="8" width="20" height="16" rx="1" fill="#5a301e" stroke="#b05a35" strokeWidth="1" />
       ))}
       {[20, 72].map((x) => (
-        <rect key={x} x={x} y="30" width="22" height="14" rx="1" fill="#4a2f17" stroke="#b07a35" strokeWidth="1" />
+        <rect key={x} x={x} y="30" width="22" height="14" rx="1" fill="#3f2a22" stroke="#b05a35" strokeWidth="1" />
       ))}
       <rect width="120" height="90" fill="url(#lamp)" />
-      <ellipse cx="60" cy="64" rx="38" ry="7" fill="#8a5426" />
-      <rect x="57" y="66" width="6" height="20" fill="#4a2b12" />
-      <rect x="54" y="52" width="4" height="10" rx="1" fill="#e2a63a" />
-      <rect x="64" y="54" width="4" height="8" rx="1" fill="#e2a63a" />
-      <path d="M14 60 v26 M30 58 v28 M14 66 h16" stroke="#3a210d" strokeWidth="3" />
-      <path d="M90 58 v28 M106 60 v26 M90 66 h16" stroke="#3a210d" strokeWidth="3" />
+      <ellipse cx="60" cy="64" rx="38" ry="7" fill="#8a4426" />
+      <rect x="57" y="66" width="6" height="20" fill="#3d271f" />
+      <rect x="54" y="52" width="4" height="10" rx="1" fill="#d0612f" />
+      <rect x="64" y="54" width="4" height="8" rx="1" fill="#d0612f" />
+      <path d="M14 60 v26 M30 58 v28 M14 66 h16" stroke="#301e17" strokeWidth="3" />
+      <path d="M90 58 v28 M106 60 v26 M90 66 h16" stroke="#301e17" strokeWidth="3" />
     </svg>
   );
 }

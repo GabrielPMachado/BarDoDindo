@@ -3,48 +3,44 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#0d0b09" />
+<meta name="theme-color" content="#0c0a0a" />
 <meta name="description" content="Garanta seu número de afilhado do Bar do Dindo antes do lançamento do aplicativo." />
 <title>Bar do Dindo · Garanta seu número de afilhado</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='96' fill='%230f0d0b'/%3E%3Cpath d='M166 200l30-60 60 50 60-50 30 60z' fill='%23d9a441'/%3E%3Ctext x='256' y='350' text-anchor='middle' font-family='Georgia' font-weight='700' font-size='150' fill='%23f3e6cc'%3ED%3C/text%3E%3C/svg%3E" />
+<link rel="icon" href="/icon.png" type="image/png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700;800;900&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Slab:wght@500;600;700;800;900&display=swap" rel="stylesheet" />
 <style>
   :root {
-    --bg: #0d0b09; --surface: #17130f; --surface-2: #1f1913; --border: #2e261d; --border-strong: #4a3b2a;
-    --text: #f4ece0; --muted: #a39684; --gold: #d9a441; --gold-light: #ecc274; --gold-dark: #a8772a; --on-gold: #1c1309;
-    --red: #e0644f; --serif: 'Playfair Display', Georgia, serif; --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --bg: #0c0a0a; --surface: #151211; --surface-2: #1c1716; --border: #2a2321; --border-strong: #4a342a;
+    --text: #f4ede7; --muted: #a59990; --brand: #c4572a; --brand-light: #e07a4c; --brand-dark: #8e3b1a; --on-brand: #0d0907;
+    --red: #e0644f; --serif: 'Roboto Slab', Georgia, serif; --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     color-scheme: dark;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; }
   body {
-    min-height: 100dvh; background: radial-gradient(120% 60% at 50% -10%, #3a2611 0%, transparent 60%), var(--bg);
+    min-height: 100dvh; background: radial-gradient(120% 60% at 50% -10%, #31201a 0%, transparent 60%), var(--bg);
     color: var(--text); font: 15px/1.45 var(--sans); -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
   }
   button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
   button:disabled { cursor: not-allowed; opacity: .6; }
-  :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 8px; }
+  :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 8px; }
   .muted { color: var(--muted); }
   .wrap { max-width: 460px; margin: 0 auto; padding: calc(28px + env(safe-area-inset-top)) 20px calc(32px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 22px; }
 
   /* marca */
-  .logo { display: flex; flex-direction: column; align-items: center; line-height: 1; }
-  .logo__crown { color: var(--gold); margin-bottom: 4px; }
-  .logo__bar { font: 700 13px var(--serif); letter-spacing: .14em; }
-  .logo__dindo { font: 800 40px var(--serif); letter-spacing: .02em; }
-  .logo__swash { width: 92px; height: 9px; color: var(--gold); margin-top: 2px; }
+  .logo { display: block; margin: 0 auto; border-radius: 50%; }
 
   /* chamada */
   .hero { text-align: center; display: flex; flex-direction: column; gap: 10px; }
-  .eyebrow { align-self: center; font-size: 11px; letter-spacing: .22em; text-transform: uppercase; color: var(--gold); border: 1px solid var(--border-strong); padding: 6px 12px; border-radius: 999px; background: #d9a4410d; }
+  .eyebrow { align-self: center; font-size: 11px; letter-spacing: .22em; text-transform: uppercase; color: var(--brand); border: 1px solid var(--border-strong); padding: 6px 12px; border-radius: 999px; background: #c4572a0d; }
   .hero h1 { margin: 0; font: 800 34px/1.1 var(--serif); }
-  .hero h1 span { color: var(--gold-light); }
+  .hero h1 span { color: var(--brand-light); }
   .hero p { margin: 0; color: var(--muted); }
   .proof { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 13px; color: var(--muted); }
   .proof__dots { display: flex; }
-  .proof__dots i { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--bg); margin-left: -7px; background: linear-gradient(135deg, var(--gold-light), var(--gold-dark)); }
+  .proof__dots i { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--bg); margin-left: -7px; background: linear-gradient(135deg, var(--brand-light), var(--brand-dark)); }
   .proof__dots i:first-child { margin-left: 0; }
   .proof strong { color: var(--text); }
 
@@ -53,47 +49,47 @@
   .card h2 { margin: 0 0 6px; font: 700 20px var(--serif); }
   label.lbl { font-size: 13px; color: var(--muted); font-weight: 500; margin-top: 8px; }
   .input { width: 100%; height: 48px; padding: 0 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; color: var(--text); font: inherit; }
-  .input:focus { outline: 0; border-color: var(--gold); }
+  .input:focus { outline: 0; border-color: var(--brand); }
   .pw { position: relative; }
-  .pw button { position: absolute; right: 6px; top: 6px; height: 36px; padding: 0 10px; color: var(--gold); font-size: 13px; font-weight: 600; }
+  .pw button { position: absolute; right: 6px; top: 6px; height: 36px; padding: 0 10px; color: var(--brand); font-size: 13px; font-weight: 600; }
   .check { display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; font-size: 13px; color: var(--muted); line-height: 1.4; cursor: pointer; }
   .check input { appearance: none; flex-shrink: 0; width: 20px; height: 20px; margin-top: 1px; border-radius: 6px; border: 1.5px solid var(--border-strong); background: var(--surface-2); display: grid; place-items: center; cursor: pointer; }
-  .check input:checked { background: var(--gold); border-color: var(--gold); }
-  .check input:checked::after { content: ''; width: 5px; height: 10px; border: solid var(--on-gold); border-width: 0 2px 2px 0; transform: rotate(45deg) translate(-1px, -1px); }
+  .check input:checked { background: var(--brand); border-color: var(--brand); }
+  .check input:checked::after { content: ''; width: 5px; height: 10px; border: solid var(--on-brand); border-width: 0 2px 2px 0; transform: rotate(45deg) translate(-1px, -1px); }
   .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 54px; border-radius: 14px; font-weight: 700; font-size: 16px; width: 100%; margin-top: 14px; transition: transform .12s, filter .15s; }
   .btn:active:not(:disabled) { transform: scale(.98); }
-  .btn--gold { background: linear-gradient(135deg, var(--gold-light), var(--gold) 50%, var(--gold-dark)); color: var(--on-gold); box-shadow: 0 10px 30px #d9a44133; }
-  .btn--gold:hover:not(:disabled) { filter: brightness(1.07); }
+  .btn--brand { background: linear-gradient(135deg, var(--brand-light), var(--brand) 50%, var(--brand-dark)); color: var(--on-brand); box-shadow: 0 10px 30px #c4572a33; }
+  .btn--brand:hover:not(:disabled) { filter: brightness(1.07); }
   .btn--ghost { border: 1px solid var(--border-strong); color: var(--text); height: 48px; font-size: 15px; font-weight: 600; }
   .error { color: var(--red); font-size: 13px; margin: 8px 0 0; min-height: 0; }
-  .link { color: var(--gold); font-weight: 600; text-align: center; padding: 10px; }
+  .link { color: var(--brand); font-weight: 600; text-align: center; padding: 10px; }
   .perks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
   .perk { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 10px; text-align: center; font-size: 12px; color: var(--muted); }
-  .perk svg { color: var(--gold); display: block; margin: 0 auto 6px; }
+  .perk svg { color: var(--brand); display: block; margin: 0 auto 6px; }
   .perk strong { display: block; color: var(--text); font-size: 13px; margin-bottom: 2px; }
   .foot { text-align: center; font-size: 11px; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; }
-  .spinner { width: 20px; height: 20px; border-radius: 50%; border: 2.5px solid #1c130955; border-top-color: var(--on-gold); animation: spin .7s linear infinite; }
+  .spinner { width: 20px; height: 20px; border-radius: 50%; border: 2.5px solid #0d090755; border-top-color: var(--on-brand); animation: spin .7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   [hidden] { display: none !important; }
 
   /* ---------- revelação do número ---------- */
   .reveal {
     position: fixed; inset: 0; z-index: 50; overflow-y: auto;
-    background: radial-gradient(70% 45% at 50% 32%, #4a3014 0%, #1a110a 55%, #070605 100%);
+    background: radial-gradient(70% 45% at 50% 32%, #3e2820 0%, #16100e 55%, #070605 100%);
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
     padding: calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom)); text-align: center;
     animation: fadeIn .4s ease both;
   }
   .reveal__rays { position: absolute; inset: -50%; pointer-events: none; opacity: .18;
-    background: repeating-conic-gradient(from 0deg at 50% 50%, #ecc27455 0deg 6deg, transparent 6deg 18deg); animation: rotate 40s linear infinite; mask: radial-gradient(circle, #000 0%, transparent 55%); -webkit-mask: radial-gradient(circle, #000 0%, transparent 55%); }
+    background: repeating-conic-gradient(from 0deg at 50% 50%, #e07a4c55 0deg 6deg, transparent 6deg 18deg); animation: rotate 40s linear infinite; mask: radial-gradient(circle, #000 0%, transparent 55%); -webkit-mask: radial-gradient(circle, #000 0%, transparent 55%); }
   .reveal > *:not(.reveal__rays):not(canvas) { position: relative; z-index: 1; }
-  .reveal__crown { color: var(--gold); filter: drop-shadow(0 0 18px #ecc27488); animation: drop .9s cubic-bezier(.2, 1.4, .4, 1) .15s both; }
-  .reveal__label { font-size: 12px; letter-spacing: .3em; text-transform: uppercase; color: var(--gold-light); animation: up .6s ease .7s both; }
+  .reveal__logo { border-radius: 50%; filter: drop-shadow(0 0 18px #e07a4c88); animation: drop .9s cubic-bezier(.2, 1.4, .4, 1) .15s both; }
+  .reveal__label { font-size: 12px; letter-spacing: .3em; text-transform: uppercase; color: var(--brand-light); animation: up .6s ease .7s both; }
   .reveal__number {
     font: 900 96px/1 var(--serif); letter-spacing: .02em; font-variant-numeric: tabular-nums;
-    background: linear-gradient(180deg, #fff3d6 0%, var(--gold-light) 40%, var(--gold) 70%, var(--gold-dark) 100%);
+    background: linear-gradient(180deg, #ffe1d1 0%, var(--brand-light) 40%, var(--brand) 70%, var(--brand-dark) 100%);
     -webkit-background-clip: text; background-clip: text; color: transparent;
-    filter: drop-shadow(0 6px 24px #d9a44166); animation: up .5s ease .8s both;
+    filter: drop-shadow(0 6px 24px #c4572a66); animation: up .5s ease .8s both;
   }
   .reveal__number.is-done { animation: pulse .7s ease; }
   .reveal__hello { font: 700 22px var(--serif); }
@@ -102,22 +98,19 @@
   /* cartão do afilhado */
   .member {
     width: min(340px, 100%); aspect-ratio: 1.6; border-radius: 18px; padding: 18px 20px; text-align: left;
-    background: linear-gradient(135deg, #2b1d0f 0%, #17110b 55%, #2a1b0c 100%); border: 1px solid #6b5230;
+    background: linear-gradient(135deg, #251915 0%, #140f0e 55%, #231713 100%); border: 1px solid #6b4230;
     box-shadow: 0 24px 60px #000c, inset 0 1px 0 #ffffff14; display: flex; flex-direction: column; justify-content: space-between;
     overflow: hidden; transform-origin: center;
   }
   .member::after { content: ''; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 30%, #fff3 45%, transparent 60%); transform: translateX(-120%); pointer-events: none; }
   .member.is-in::after { animation: shine 1.4s ease .8s; }
   .member__top { display: flex; justify-content: space-between; align-items: flex-start; }
-  .member__brand { line-height: 1; }
-  .member__brand small { display: block; font: 700 9px var(--serif); letter-spacing: .16em; }
-  .member__brand strong { font: 800 22px var(--serif); }
-  .member__crown { color: var(--gold); }
-  .member__num { font: 800 34px var(--serif); color: var(--gold-light); letter-spacing: .04em; }
+  .member__logo { border-radius: 50%; }
+  .member__num { font: 800 34px var(--serif); color: var(--brand-light); letter-spacing: .04em; }
   .member__bottom { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; }
   .member__name { font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .member__since { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
-  .member__tag { font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--gold); white-space: nowrap; }
+  .member__tag { font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--brand); white-space: nowrap; }
 
   .reveal__actions { display: flex; gap: 10px; width: min(340px, 100%); }
   .reveal__actions .btn { margin: 0; height: 48px; font-size: 15px; }
@@ -141,12 +134,7 @@
 </head>
 <body>
 <main class="wrap">
-  <div class="logo" aria-label="Bar do Dindo">
-    <span class="logo__crown"><svg width="34" height="20" viewBox="0 0 50 30" aria-hidden="true"><path d="M3 26 L7 6 L17 16 L25 2 L33 16 L43 6 L47 26 Z" fill="currentColor"/><rect x="3" y="26" width="44" height="4" rx="1" fill="currentColor"/></svg></span>
-    <span class="logo__bar">BAR DO</span>
-    <span class="logo__dindo">DINDO</span>
-    <svg class="logo__swash" viewBox="0 0 100 8" aria-hidden="true"><path d="M5 2 Q50 10 95 2" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>
-  </div>
+  <img class="logo" id="logo" src="../shared/assets/logo.webp" width="132" height="132" alt="Bar do Dindo" />
 
   <!-- cadastro -->
   <section id="view-cadastro">
@@ -171,7 +159,7 @@
       </div>
       <label class="check"><input type="checkbox" id="aceite" /> <span>Concordo que o Bar do Dindo use meus dados para o programa de afilhados e para me avisar sobre o lançamento do aplicativo.</span></label>
       <p class="error" id="erro-cadastro" role="alert"></p>
-      <button class="btn btn--gold" id="btn-cadastro" type="submit">Quero meu número</button>
+      <button class="btn btn--brand" id="btn-cadastro" type="submit">Quero meu número</button>
       <p class="muted" style="font-size:12px;text-align:center;margin:10px 0 0">Guarde seu e-mail e senha: eles darão acesso ao aplicativo oficial.</p>
     </form>
 
@@ -197,7 +185,7 @@
         <button type="button" data-toggle="l-senha">Mostrar</button>
       </div>
       <p class="error" id="erro-login" role="alert"></p>
-      <button class="btn btn--gold" id="btn-login" type="submit">Ver meu número</button>
+      <button class="btn btn--brand" id="btn-login" type="submit">Ver meu número</button>
     </form>
     <button class="link" id="ir-cadastro" type="button" style="width:100%;margin-top:6px">Ainda não tenho cadastro</button>
   </section>
@@ -208,7 +196,7 @@
 <!-- revelação -->
 <div class="reveal" id="reveal" hidden aria-live="polite">
   <div class="reveal__rays" aria-hidden="true"></div>
-  <div class="reveal__crown" aria-hidden="true"><svg width="76" height="46" viewBox="0 0 50 30"><path d="M3 26 L7 6 L17 16 L25 2 L33 16 L43 6 L47 26 Z" fill="currentColor"/><rect x="3" y="26" width="44" height="4" rx="1" fill="currentColor"/></svg></div>
+  <img class="reveal__logo" src="../shared/assets/logo.webp" width="96" height="96" alt="" aria-hidden="true" />
   <div class="reveal__label">Seu número de afilhado</div>
   <div class="reveal__number" id="numero">#000</div>
   <div class="stage" id="stage">
@@ -217,8 +205,7 @@
   </div>
   <div class="member stage" id="cartao">
     <div class="member__top">
-      <div class="member__brand"><small>BAR DO</small><strong>DINDO</strong></div>
-      <span class="member__crown"><svg width="30" height="18" viewBox="0 0 50 30" aria-hidden="true"><path d="M3 26 L7 6 L17 16 L25 2 L33 16 L43 6 L47 26 Z" fill="currentColor"/><rect x="3" y="26" width="44" height="4" rx="1" fill="currentColor"/></svg></span>
+      <img class="member__logo" src="../shared/assets/logo.webp" width="54" height="54" alt="Bar do Dindo" />
     </div>
     <div class="member__num" id="c-num">#000</div>
     <div class="member__bottom">
@@ -227,7 +214,7 @@
     </div>
   </div>
   <div class="reveal__actions stage" id="acoes">
-    <button class="btn btn--gold" id="btn-share" type="button">Compartilhar</button>
+    <button class="btn btn--brand" id="btn-share" type="button">Compartilhar</button>
     <button class="btn btn--ghost" id="btn-salvar" type="button">Salvar cartão</button>
   </div>
   <button class="link stage" id="btn-sair" type="button">Fechar</button>
@@ -370,7 +357,7 @@ import { api as dados } from '../src/api';
     const cv = $('confetti'), ctx = cv.getContext('2d');
     const dpr = Math.min(2, devicePixelRatio || 1);
     cv.width = innerWidth * dpr; cv.height = innerHeight * dpr; ctx.scale(dpr, dpr);
-    const cores = ['#ecc274', '#d9a441', '#a8772a', '#fff3d6', '#f4ece0'];
+    const cores = ['#e07a4c', '#c4572a', '#8e3b1a', '#ffe1d1', '#f4ede7'];
     const peças = Array.from({ length: 170 }, () => ({
       x: innerWidth / 2, y: innerHeight * 0.32,
       vx: (Math.random() - 0.5) * 13, vy: -Math.random() * 13 - 4,
@@ -413,24 +400,19 @@ import { api as dados } from '../src/api';
     const r = 48;
     g.beginPath(); g.moveTo(r, 0); g.arcTo(W, 0, W, H, r); g.arcTo(W, H, 0, H, r); g.arcTo(0, H, 0, 0, r); g.arcTo(0, 0, W, 0, r); g.closePath(); g.clip();
     const bg = g.createLinearGradient(0, 0, W, H);
-    bg.addColorStop(0, '#2b1d0f'); bg.addColorStop(0.55, '#17110b'); bg.addColorStop(1, '#2a1b0c');
+    bg.addColorStop(0, '#251915'); bg.addColorStop(0.55, '#140f0e'); bg.addColorStop(1, '#231713');
     g.fillStyle = bg; g.fillRect(0, 0, W, H);
-    g.strokeStyle = '#6b5230'; g.lineWidth = 4; g.strokeRect(2, 2, W - 4, H - 4);
-    const coroa = (x, y, s) => {
-      g.fillStyle = '#d9a441'; g.beginPath();
-      [[3, 26], [7, 6], [17, 16], [25, 2], [33, 16], [43, 6], [47, 26]].forEach(([px, py], i) => (i ? g.lineTo(x + px * s, y + py * s) : g.moveTo(x + px * s, y + py * s)));
-      g.closePath(); g.fill(); g.fillRect(x + 3 * s, y + 26 * s, 44 * s, 4 * s);
-    };
-    g.fillStyle = '#f4ece0'; g.font = '700 28px "Playfair Display"'; g.fillText('BAR DO', 64, 92);
-    g.font = '800 70px "Playfair Display"'; g.fillText('DINDO', 60, 160);
-    coroa(W - 180, 70, 2.4);
+    g.strokeStyle = '#6b4230'; g.lineWidth = 4; g.strokeRect(2, 2, W - 4, H - 4);
+    const logo = $('logo');
+    if (!logo.complete) await logo.decode().catch(() => undefined);
+    g.drawImage(logo, 60, 48, 150, 150);
     const ouro = g.createLinearGradient(0, 260, 0, 400);
-    ouro.addColorStop(0, '#fff3d6'); ouro.addColorStop(0.5, '#ecc274'); ouro.addColorStop(1, '#a8772a');
-    g.fillStyle = ouro; g.font = '900 150px "Playfair Display"'; g.fillText('#' + pad(atual.numero), 58, 400);
-    g.fillStyle = '#f4ece0'; g.font = '600 40px Inter'; g.fillText(atual.nome.length > 32 ? atual.nome.slice(0, 31) + '…' : atual.nome, 64, 560);
-    g.fillStyle = '#a39684'; g.font = '500 24px Inter';
+    ouro.addColorStop(0, '#ffe1d1'); ouro.addColorStop(0.5, '#e07a4c'); ouro.addColorStop(1, '#8e3b1a');
+    g.fillStyle = ouro; g.font = '900 150px "Roboto Slab"'; g.fillText('#' + pad(atual.numero), 58, 400);
+    g.fillStyle = '#f4ede7'; g.font = '600 40px Inter'; g.fillText(atual.nome.length > 32 ? atual.nome.slice(0, 31) + '…' : atual.nome, 64, 560);
+    g.fillStyle = '#a38d84'; g.font = '500 24px Inter';
     g.fillText(('Afilhado desde ' + new Date(atual.desde).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })).toUpperCase(), 64, 610);
-    g.fillStyle = '#d9a441'; g.font = '600 24px Inter'; g.textAlign = 'right'; g.fillText('AFILHADO FUNDADOR', W - 64, 610);
+    g.fillStyle = '#c4572a'; g.font = '600 24px Inter'; g.textAlign = 'right'; g.fillText('AFILHADO FUNDADOR', W - 64, 610);
     const a = document.createElement('a');
     a.href = c.toDataURL('image/png');
     a.download = `afilhado-${pad(atual.numero)}-bar-do-dindo.png`;

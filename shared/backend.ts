@@ -9,7 +9,7 @@ import {
   reauthenticateWithCredential, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, updatePassword, type UserCredential,
 } from 'firebase/auth';
 import {
-  collection, connectFirestoreEmulator, doc, getDoc, increment, initializeFirestore, onSnapshot, query, runTransaction, where, writeBatch,
+  collection, connectFirestoreEmulator, doc, getDoc, increment, initializeFirestore, limit, onSnapshot, orderBy, query, runTransaction, where, writeBatch,
   type Query, type WriteBatch,
 } from 'firebase/firestore';
 import { EMULADOR, EMULADOR_AUTH, EMULADOR_FIRESTORE, firebaseConfig } from './firebase-config';
@@ -41,6 +41,31 @@ const COLLECTIONS: Record<string, string> = {
   funcoes: 'cfg',
 };
 const AREAS = ['dir', 'atd', 'mkt', 'rh', 'dp', 'adm', 'fin', 'jur', 'fis', 'mon', 'cfg'];
+
+/** Como cada registro é citado no painel de atualizações ("cadastrou o produto …"). */
+const REGISTRO: Record<string, string> = {
+  metas: 'a meta', colaboradores: 'o colaborador', ferias: 'o registro de férias/afastamento',
+  projetos: 'o projeto', estoque: 'o item de estoque', materiais: 'o material',
+  terceirizados: 'o serviço terceirizado', fornecedores: 'o fornecedor', contratos: 'o contrato',
+  receitas: 'a receita', despesas: 'a despesa',
+  reservas: 'a reserva', consumos: 'o consumo', resgates: 'o voucher',
+  criacao: 'a peça', midias: 'a publicação', produtos: 'o produto', recompensas: 'a recompensa',
+  trabalhista: 'o processo trabalhista', consultoria: 'a demanda de consultoria',
+  qualidade: 'a inspeção', naoconformidades: 'a não conformidade',
+  funcoes: 'a função',
+};
+/** Nome legível de um registro qualquer, para o painel de atualizações. */
+function nomeDe(d: Dados | null | undefined) {
+  if (!d) return '';
+  for (const k of ['nome', 'titulo', 'descricao', 'assunto', 'item', 'servico', 'processo', 'colaborador', 'clienteNome', 'recompensa', 'codigo']) {
+    const v = d[k];
+    if (typeof v === 'string' && v.trim()) return v.trim().slice(0, 120);
+  }
+  return '';
+}
+const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+/** Valor em dinheiro do registro, quando houver (receitas, despesas, consumos, contratos…). */
+const valorDe = (d: Dados) => (typeof d.valor === 'number' && d.valor > 0 ? brl(d.valor) : '');
 
 const DEFAULT_CONFIG = {
   nomeEstabelecimento: 'Bar do Dindo',
@@ -273,6 +298,16 @@ export function createBackend(kind: 'app' | 'crm') {
     if (!ok) fail(403, semPermissao);
   }
 
+  /* ---------- painel de atualizações ----------
+   * Cada alteração feita no CRM grava, no mesmo lote, quem fez o quê e quando.
+   * Fica em `atividades/{área}/itens`, para que cada pessoa veja só o que é das áreas que ela acessa. */
+  function registrar(lote: WriteBatch, ctx: Ctx, area: string, acao: string, extra: { colecao?: string; alvo?: string; detalhe?: string } = {}) {
+    lote.set(doc(collection(db, 'atividades', area, 'itens')), {
+      area, acao: str(acao, 120), colecao: extra.colecao ?? '', alvo: str(extra.alvo, 160), detalhe: str(extra.detalhe, 300),
+      usuarioId: ctx.usuario.id, usuarioNome: ctx.usuario.nome, criadoEm: now(),
+    });
+  }
+
   /* ---------- rotas ---------- */
   interface Req { p: Record<string, string>; b: Dados; q: URLSearchParams }
   const rotas: { method: string; re: RegExp; keys: string[]; handler: (r: Req) => unknown }[] = [];
@@ -498,15 +533,26 @@ export function createBackend(kind: 'app' | 'crm') {
   /* CRM: sinal de mudança (as telas consultam a cada poucos segundos e recarregam quando muda) */
   rota('GET', '/crm/versao', async () => { await requireUsuario(); return { versao }; });
 
+  /* CRM: painel de atualizações (as últimas alterações das áreas que a pessoa acessa) */
+  rota('GET', '/crm/atividades', async () => {
+    const ctx = await requireUsuario();
+    const areas = AREAS.filter((a) => ctx.access(a) !== 'none');
+    const listas = await Promise.all(areas.map((a) =>
+      lista(`atividades@${a}`, query(collection(db, 'atividades', a, 'itens'), orderBy('criadoEm', 'desc'), limit(80)))));
+    return ordenar(listas.flat()).slice(0, 200);
+  });
+
   /* CRM: configuração */
   rota('GET', '/crm/config', async () => { await requireUsuario(); return getConfig(); });
   rota('PUT', '/crm/config', async ({ b }) => {
-    requireAccess(await requireUsuario(), 'cfg', 'edit');
+    const ctx = await requireUsuario();
+    requireAccess(ctx, 'cfg', 'edit');
     if (b.pontosPorReal !== undefined && !(Number(b.pontosPorReal) >= 0)) fail(400, 'Pontos por real inválido.');
     if (b.horarios && !b.horarios.every((h: string) => /^\d{2}:\d{2}$/.test(h))) fail(400, 'Horários devem estar no formato HH:MM.');
     const patch = Object.fromEntries(Object.entries(b).filter(([k]) => k in DEFAULT_CONFIG));
     const lote = writeBatch(db);
     lote.set(doc(db, 'config/geral'), patch, { merge: true });
+    registrar(lote, ctx, 'cfg', 'alterou os parâmetros do aplicativo');
     await lote.commit();
     return { ...(await getConfig()), ...patch };
   });
@@ -518,23 +564,27 @@ export function createBackend(kind: 'app' | 'crm') {
     return (await colecao('usuarios')).map(publicUsuario).sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
   });
   rota('POST', '/crm/usuarios', async ({ b }) => {
-    requireAccess(await requireUsuario(), 'cfg', 'edit');
+    const ctx = await requireUsuario();
+    requireAccess(ctx, 'cfg', 'edit');
     const nome = str(b.nome, 120), email = str(b.email, 160).toLowerCase(), senha = String(b.senha ?? '');
     const funcaoId = str(b.funcaoId, 40);
     if (nome.length < 3) fail(400, 'Informe o nome completo.');
     if (!emailOk(email)) fail(400, 'Informe um e-mail válido.');
     if (senha.length < 8) fail(400, 'A senha inicial deve ter pelo menos 8 caracteres.');
-    if (!(await colecao('funcoes')).some((f) => f.id === funcaoId)) fail(400, 'Selecione uma função.');
+    const funcao = (await colecao('funcoes')).find((f) => f.id === funcaoId);
+    if (!funcao) return fail(400, 'Selecione uma função.');
     if ((await colecao('usuarios')).some((u) => u.email === email)) fail(409, 'Já existe um usuário com este e-mail.');
     const uid = await criarContaDeTerceiro(email, senha);
     const usuario = { nome, email, funcaoId, status: b.status === 'Inativo' ? 'Inativo' : 'Ativo', ultimoAcesso: null, criadoEm: now() };
     const lote = writeBatch(db);
     lote.set(doc(db, 'usuarios', uid), usuario);
+    registrar(lote, ctx, 'cfg', 'cadastrou o usuário', { colecao: 'usuarios', alvo: nome, detalhe: `Função: ${funcao.nome}` });
     await lote.commit();
     return publicUsuario({ ...usuario, id: uid });
   });
   rota('PUT', '/crm/usuarios/:id', async ({ p, b }) => {
-    requireAccess(await requireUsuario(), 'cfg', 'edit');
+    const ctx = await requireUsuario();
+    requireAccess(ctx, 'cfg', 'edit');
     const usuarios = await colecao('usuarios');
     const u = usuarios.find((x) => x.id === p.id);
     if (!u) return fail(404, 'Usuário não encontrado.');
@@ -545,11 +595,18 @@ export function createBackend(kind: 'app' | 'crm') {
     // e-mail e senha pertencem à conta da pessoa (Firebase Auth) e não podem ser trocados por outro usuário
     if (b.email !== undefined && str(b.email, 160).toLowerCase() !== u.email) fail(400, 'O e-mail de acesso não pode ser alterado. Crie um novo usuário com o outro e-mail.');
     if (b.senha) fail(400, 'A senha só pode ser trocada pela própria pessoa. Use "Enviar e-mail de redefinição de senha".');
-    if (!(await colecao('funcoes')).some((f) => f.id === funcaoId)) fail(400, 'Selecione uma função.');
+    const funcoes = await colecao('funcoes');
+    if (!funcoes.some((f) => f.id === funcaoId)) fail(400, 'Selecione uma função.');
     const deixaDeSerAdmin = u.funcaoId === 'admin' && u.status === 'Ativo' && (funcaoId !== 'admin' || status !== 'Ativo');
     if (deixaDeSerAdmin && activeAdmins(usuarios) <= 1) fail(400, 'É preciso manter pelo menos um administrador ativo.');
     const lote = writeBatch(db);
     lote.update(doc(db, 'usuarios', p.id), { nome, funcaoId, status });
+    const mudancas = [
+      funcaoId !== u.funcaoId ? `Função: ${funcoes.find((f) => f.id === funcaoId)?.nome ?? funcaoId}` : '',
+      status !== u.status ? `Status: ${status}` : '',
+      nome !== u.nome ? `Nome: ${nome}` : '',
+    ].filter(Boolean).join(' · ');
+    registrar(lote, ctx, 'cfg', 'alterou o usuário', { colecao: 'usuarios', alvo: u.nome, detalhe: mudancas });
     await lote.commit();
     return publicUsuario({ ...u, nome, funcaoId, status });
   });
@@ -571,6 +628,7 @@ export function createBackend(kind: 'app' | 'crm') {
     // sem o cadastro em `usuarios` a conta não passa mais pelas regras nem pelo login do CRM
     const lote = writeBatch(db);
     lote.delete(doc(db, 'usuarios', p.id));
+    registrar(lote, ctx, 'cfg', 'excluiu o usuário', { colecao: 'usuarios', alvo: u.nome });
     await lote.commit();
     return { ok: true };
   });
@@ -669,7 +727,8 @@ export function createBackend(kind: 'app' | 'crm') {
     return folha;
   });
   rota('POST', '/crm/folha/lancar', async ({ b }) => {
-    requireAccess(await requireUsuario(), 'fin', 'edit');
+    const ctx = await requireUsuario();
+    requireAccess(ctx, 'fin', 'edit');
     const folha = await calcularFolha(str(b.mes, 7));
     if (folha.lancada) fail(409, 'A folha desta competência já foi lançada.');
     if (!folha.colaboradores) fail(400, 'Não há colaboradores com salário cadastrado no RH.');
@@ -683,13 +742,17 @@ export function createBackend(kind: 'app' | 'crm') {
     if (folha.totais.inss > 0) criadas.push({ ...base, categoria: 'Encargos', descricao: `INSS retido dos empregados · ${nomeMes}`, vencimento: iso(new Date(y, m, 20)), valor: folha.totais.inss });
     const lote = writeBatch(db);
     for (const d of criadas) lote.set(doc(collection(db, 'despesas')), d);
+    registrar(lote, ctx, 'fin', 'lançou a folha de pagamento', {
+      colecao: 'despesas', alvo: nomeMes, detalhe: `${folha.colaboradores} colaborador(es) · líquido ${brl(folha.totais.liquido)} · custo total ${brl(folha.totais.custo)}`,
+    });
     await lote.commit();
     return { ok: true, despesas: criadas.length };
   });
 
   /* CRM: lançamento de consumo (credita pontos e gera receita) */
   rota('POST', '/crm/consumos', async ({ b }) => {
-    requireAccess(await requireUsuario(), 'atd', 'edit');
+    const ctx = await requireUsuario();
+    requireAccess(ctx, 'atd', 'edit');
     const cliente = (await colecao('clientes')).find((c) => c.numero === Number(b.clienteId));
     if (!cliente) return fail(400, 'Selecione um cliente.');
     const produtos = await colecao('produtos');
@@ -718,6 +781,9 @@ export function createBackend(kind: 'app' | 'crm') {
       categoria: 'Consumo de clientes', formaPagamento: forma, valor, origem: 'Lançamento de consumo', consumoId: consumoRef.id, criadoEm: data, atualizadoEm: data,
     });
     lote.set(doc(db, 'saldos', cliente.id), { acumulados: increment(pontos) }, { merge: true });
+    registrar(lote, ctx, 'atd', 'lançou consumo para', {
+      colecao: 'consumos', alvo: `${cliente.nome} (#${String(cliente.numero).padStart(3, '0')})`, detalhe: `${brl(valor)} · ${pontos} pontos · ${forma}`,
+    });
     await lote.commit();
     return { ...consumo, id: consumoRef.id };
   });
@@ -760,7 +826,8 @@ export function createBackend(kind: 'app' | 'crm') {
     return colecao(p.col);
   });
   rota('POST', '/crm/c/:col', async ({ p, b }) => {
-    requireAccess(await requireUsuario(), collectionArea(p.col), 'edit');
+    const ctx = await requireUsuario();
+    requireAccess(ctx, collectionArea(p.col), 'edit');
     if (['consumos', 'resgates'].includes(p.col)) fail(400, 'Use o fluxo próprio deste módulo.');
     const t = now();
     const dados: Dados = { ...limpar(validarRegistro(b)), criadoEm: t, atualizadoEm: t };
@@ -770,11 +837,13 @@ export function createBackend(kind: 'app' | 'crm') {
     const lote = writeBatch(db);
     lote.set(ref, dados);
     espelhar(lote, p.col, ref.id, dados);
+    registrar(lote, ctx, collectionArea(p.col), `cadastrou ${REGISTRO[p.col] ?? 'o registro'}`, { colecao: p.col, alvo: nomeDe(dados), detalhe: valorDe(dados) });
     await lote.commit();
     return { ...dados, id: ref.id };
   });
   rota('PUT', '/crm/c/:col/:id', async ({ p, b }) => {
-    requireAccess(await requireUsuario(), collectionArea(p.col), 'edit');
+    const ctx = await requireUsuario();
+    requireAccess(ctx, collectionArea(p.col), 'edit');
     validarRegistro(b);
     const cur = (await colecao(p.col)).find((x) => x.id === p.id);
     if (!cur) return fail(404, 'Registro não encontrado.');
@@ -794,17 +863,25 @@ export function createBackend(kind: 'app' | 'crm') {
       if (antes !== depois && cur.clienteUid) {
         lote.set(doc(db, 'saldos', cur.clienteUid), { usados: increment((depois ? -1 : 1) * (Number(cur.custo) || 0)) }, { merge: true });
       }
+      if (status !== cur.status) {
+        registrar(lote, ctx, 'atd', 'alterou o voucher', { colecao: 'resgates', alvo: `${cur.codigo ?? ''} · ${cur.recompensa ?? ''}`, detalhe: `Status: ${cur.status} → ${status}` });
+      }
       await lote.commit();
       return { ...cur, status };
     }
     await vincularCliente(p.col, patch);
     lote.update(doc(db, p.col, p.id), patch);
     espelhar(lote, p.col, p.id, { ...cur, ...patch });
+    const novoStatus = typeof patch.status === 'string' && patch.status !== cur.status ? `Status: ${cur.status ?? '—'} → ${patch.status}` : '';
+    registrar(lote, ctx, collectionArea(p.col), `alterou ${REGISTRO[p.col] ?? 'o registro'}`, {
+      colecao: p.col, alvo: nomeDe({ ...cur, ...patch }), detalhe: [novoStatus, valorDe({ ...cur, ...patch })].filter(Boolean).join(' · '),
+    });
     await lote.commit();
     return { ...cur, ...patch };
   });
   rota('DELETE', '/crm/c/:col/:id', async ({ p }) => {
-    requireAccess(await requireUsuario(), collectionArea(p.col), 'edit');
+    const ctx = await requireUsuario();
+    requireAccess(ctx, collectionArea(p.col), 'edit');
     const cur = (await colecao(p.col)).find((x) => x.id === p.id);
     if (!cur) return fail(404, 'Registro não encontrado.');
     if (p.col === 'funcoes') {
@@ -821,6 +898,7 @@ export function createBackend(kind: 'app' | 'crm') {
     }
     lote.delete(doc(db, p.col, p.id));
     espelhar(lote, p.col, p.id, null);
+    registrar(lote, ctx, collectionArea(p.col), `excluiu ${REGISTRO[p.col] ?? 'o registro'}`, { colecao: p.col, alvo: nomeDe(cur), detalhe: valorDe(cur) });
     await lote.commit();
     return { ok: true };
   });
