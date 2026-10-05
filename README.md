@@ -22,7 +22,12 @@ Nenhum dado vem pré-cadastrado: cardápio, recompensas, clientes, equipe e lan�
 
 ## Áreas do CRM
 
-**Cérebro** — categoria principal, reúne todas as áreas:
+**Cérebro** é o nome do sistema de gestão. O menu tem três grandes grupos: **Diretoria**, **Departamentos** (Atendimento, Marketing e Vendas, Pessoal, Estrutura, Administrativo, Financeiro, Jurídico, Fiscalização e Monitoramento) e **Configurações**.
+
+- **Painel de atualizações**: ao abrir o sistema aparece o que a equipe fez (cadastros, alterações, folha lançada, consumos, usuários…), com quem fez, o dia e o horário. O mesmo histórico fica no botão ao lado do perfil, no topo. Cada pessoa vê só as atualizações das áreas que ela acessa (`atividades/{área}/itens` no Firestore).
+- **Fixar páginas**: o botão direito sobre uma página do menu abre em nova guia ou janela, copia o link e **fixa** a página no topo. Clicar no fixado abre a página e expande o departamento no menu. Os fixados ficam guardados no navegador, por usuário.
+
+Áreas:
 
 - **Diretoria**: painel executivo, metas e decisões
 - **Atendimento**: reservas, lançar consumo, validar vouchers

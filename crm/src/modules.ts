@@ -1,5 +1,5 @@
 import {
-  Briefcase, Cctv, ClipboardCheck, ConciergeBell, Landmark, Megaphone, Scale, Settings, Users, Wallet, Warehouse, type LucideIcon,
+  Briefcase, Building2, Cctv, ClipboardCheck, ConciergeBell, Landmark, Megaphone, Scale, Settings, Users, Wallet, Warehouse, type LucideIcon,
 } from 'lucide-react';
 
 export type AreaKey = 'dir' | 'atd' | 'mkt' | 'rh' | 'dp' | 'adm' | 'fin' | 'jur' | 'fis' | 'mon' | 'cfg';
@@ -116,6 +116,23 @@ export const AREAS: Area[] = [
   },
 ];
 
+/** Os três grandes grupos do menu: Diretoria, Departamentos (as demais áreas) e Configurações. */
+export interface NavGroup {
+  key: string;
+  label: string;
+  icon: LucideIcon;
+  /** Grupo de uma área só: os itens da área aparecem direto, sem um nível intermediário. */
+  single?: AreaKey;
+  areas: Area[];
+}
+const areaByKey = (k: AreaKey) => AREAS.find((a) => a.key === k)!;
+export const GROUPS: NavGroup[] = [
+  { key: 'dir', label: 'Diretoria', icon: Landmark, single: 'dir', areas: [areaByKey('dir')] },
+  { key: 'dep', label: 'Departamentos', icon: Building2, areas: AREAS.filter((a) => a.key !== 'dir' && a.key !== 'cfg') },
+  { key: 'cfg', label: 'Configurações', icon: Settings, single: 'cfg', areas: [areaByKey('cfg')] },
+];
+export const groupOf = (area: AreaKey) => GROUPS.find((g) => g.areas.some((a) => a.key === area))!;
+
 export function findModule(path: string) {
   for (const area of AREAS) {
     const item = area.items.find((i) => i.path === path);
@@ -123,3 +140,17 @@ export function findModule(path: string) {
   }
   return null;
 }
+
+/** Página de cada coleção, para abrir o registro citado no painel de atualizações. */
+export const COLLECTION_PAGE: Record<string, string> = {
+  metas: '/diretoria/metas',
+  reservas: '/atendimento/reservas', consumos: '/atendimento/consumo', resgates: '/atendimento/vouchers',
+  produtos: '/marketing/produtos', recompensas: '/vendas/recompensas', criacao: '/marketing/criacao', midias: '/marketing/midias',
+  colaboradores: '/rh/colaboradores', ferias: '/rh/ferias',
+  projetos: '/estrutura/projetos', estoque: '/estrutura/estoque', materiais: '/estrutura/materiais',
+  terceirizados: '/adm/terceirizados', fornecedores: '/adm/fornecedores', contratos: '/adm/contratos',
+  receitas: '/financeiro/receitas', despesas: '/financeiro/despesas',
+  trabalhista: '/juridico/trabalhista', consultoria: '/juridico/consultoria',
+  qualidade: '/fiscalizacao/qualidade', naoconformidades: '/fiscalizacao/nao-conformidades',
+  usuarios: '/config/usuarios', funcoes: '/config/funcoes',
+};

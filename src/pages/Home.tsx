@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CalendarDays, Camera, ChevronRight, Gift, ReceiptText, Star, Utensils } from 'lucide-react';
-import { ConsumoSheet, CrownIcon, Empty, HistoryRow, ReservationCard, SectionHeader } from '../components/ui';
+import { ConsumoSheet, Empty, HistoryRow, ReservationCard, SectionHeader } from '../components/ui';
 import { memberNumber, upcoming, useMe, useStore, type Consumption } from '../store';
 
 const ACTIONS = [
@@ -58,9 +58,9 @@ function BeerGlass() {
     <svg viewBox="0 0 120 170" className="beer" aria-hidden="true">
       <defs>
         <linearGradient id="beer" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#f6b73c" />
-          <stop offset="0.55" stopColor="#d9861c" />
-          <stop offset="1" stopColor="#8f4f0d" />
+          <stop offset="0" stopColor="#e47a45" />
+          <stop offset="0.55" stopColor="#c4572a" />
+          <stop offset="1" stopColor="#8f340d" />
         </linearGradient>
         <linearGradient id="shine" x1="0" y1="0" x2="1" y2="0">
           <stop offset="0" stopColor="#fff" stopOpacity="0" />
@@ -70,15 +70,15 @@ function BeerGlass() {
       </defs>
       <path d="M14 30 L106 30 L96 160 Q60 168 24 160 Z" fill="url(#beer)" />
       <path d="M22 40 L34 40 L36 150 L28 150 Z" fill="url(#shine)" />
-      <path d="M10 32 Q12 8 34 12 Q44 0 62 8 Q80 0 92 12 Q112 10 110 32 Q60 42 10 32 Z" fill="#fbf1de" />
+      <path d="M10 32 Q12 8 34 12 Q44 0 62 8 Q80 0 92 12 Q112 10 110 32 Q60 42 10 32 Z" fill="#fbeade" />
       {[[40, 70], [70, 100], [52, 120], [80, 60], [64, 140]].map(([x, y]) => (
         <circle key={`${x}-${y}`} cx={x} cy={y} r="2" fill="#fff6" />
       ))}
-      <g transform="translate(60 92)" fill="#3a1d05" textAnchor="middle" fontFamily="Playfair Display, Georgia, serif">
+      <g transform="translate(60 92)" fill="#2e1911" textAnchor="middle" fontFamily="Roboto Slab, Georgia, serif">
         <path d="M-10 -26 L-8 -36 L-3 -31 L0 -38 L3 -31 L8 -36 L10 -26 Z" />
         <text y="-12" fontSize="9" fontWeight="700">BAR DO</text>
         <text y="8" fontSize="20" fontWeight="800">DINDO</text>
-        <path d="M-22 14 Q0 20 22 14" stroke="#3a1d05" strokeWidth="1.6" fill="none" />
+        <path d="M-22 14 Q0 20 22 14" stroke="#2e1911" strokeWidth="1.6" fill="none" />
       </g>
     </svg>
   );
@@ -98,7 +98,6 @@ export default function Home() {
           <h1 className="profile__name">{me.cliente.nome}</h1>
           <p className="profile__member">{me.nivel.atual.nome} #{memberNumber(me.cliente.numero)}</p>
           <p className="profile__motto">
-            <span className="gold"><CrownIcon size={22} /></span>
             Aqui a amizade<br />sempre vale mais
           </p>
         </div>

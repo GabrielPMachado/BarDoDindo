@@ -73,6 +73,7 @@ await negado('virar usuário do CRM', () => setDoc(doc(db, 'usuarios', uid), { n
 await negado('refazer o primeiro acesso', () => setDoc(doc(db, 'meta/setup'), { feitoEm: 'x' }));
 await negado('alterar o contador de afilhados', () => updateDoc(doc(db, 'meta/contadores'), { clientes: increment(1) }));
 await negado('gravar no cardápio', () => setDoc(doc(db, 'cardapio/x'), { nome: 'x', preco: 0 }));
+await negado('ver atualizações da equipe', () => getDocs(collection(db, 'atividades', 'cfg', 'itens')));
 await signOut(auth);
 
 if (senhaAtendente) {
@@ -93,6 +94,15 @@ if (senhaAtendente) {
   });
   await negado('criar outro usuário', () => setDoc(doc(db, 'usuarios/novo'), { nome: 'x', email: 'x@x.x', funcaoId: 'admin', status: 'Ativo' }));
   await negado('alterar configuração', () => setDoc(doc(db, 'config/geral'), { pontosPorReal: 999 }, { merge: true }));
+  const eu = (await getDoc(doc(db, 'usuarios', eq.user.uid))).data();
+  const atividade = (area, extra = {}) => ({
+    area, acao: 'teste', colecao: '', alvo: '', detalhe: '', usuarioId: eq.user.uid, usuarioNome: eu.nome, criadoEm: new Date().toISOString(), ...extra,
+  });
+  await permitido('ver atualizações do Atendimento', () => getDocs(collection(db, 'atividades', 'atd', 'itens')));
+  await negado('ver atualizações do Financeiro', () => getDocs(collection(db, 'atividades', 'fin', 'itens')));
+  await permitido('registrar atualização no Atendimento', () => addDoc(collection(db, 'atividades', 'atd', 'itens'), atividade('atd')));
+  await negado('registrar atualização em nome de outro', () => addDoc(collection(db, 'atividades', 'atd', 'itens'), atividade('atd', { usuarioNome: 'Outra pessoa' })));
+  await negado('registrar atualização no Financeiro', () => addDoc(collection(db, 'atividades', 'fin', 'itens'), atividade('fin')));
   await signOut(auth);
 }
 

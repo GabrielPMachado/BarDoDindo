@@ -37,7 +37,7 @@ export default function Entrar() {
   return (
     <div className="auth">
       <div className="auth__brand">
-        <Logo asLink={false} />
+        <Logo asLink={false} size={150} />
         <p className="auth__tagline">Aqui a amizade sempre vale mais</p>
       </div>
 

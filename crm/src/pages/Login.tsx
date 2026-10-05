@@ -41,10 +41,7 @@ export default function Login() {
             <input id="nome" className="input" autoComplete="name" required value={form.nome} onChange={set('nome')} />
           </>
         ) : (
-          <>
-            <h1>Entrar</h1>
-            <p className="muted">Use o e-mail e a senha fornecidos pelo administrador.</p>
-          </>
+          <h1>Login</h1>
         )}
         <label htmlFor="email">E-mail</label>
         <input id="email" className="input" type="email" autoComplete="username" required value={form.email} onChange={set('email')} />
@@ -59,7 +56,7 @@ export default function Login() {
         )}
         {(error || serverError) && <ErrorBox>{error ?? serverError}</ErrorBox>}
         <button className="btn btn--primary btn--lg" disabled={busy}>
-          {setupPendente ? <><ShieldCheck size={18} /> Criar administrador</> : <><LogIn size={18} /> Entrar</>}
+          {setupPendente ? <><ShieldCheck size={18} /> Criar administrador</> : <><LogIn size={18} /> Login</>}
         </button>
       </form>
     </div>
