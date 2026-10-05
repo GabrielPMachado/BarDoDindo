@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { api, ApiError, getToken, setToken } from './api';
+import { api, ApiError, setToken } from './api';
 
 export interface Config {
   nomeEstabelecimento: string;
@@ -107,10 +107,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const loadMe = useCallback(async () => {
-    if (!getToken()) {
-      setMe(null);
-      return;
-    }
     try {
       setMe(await api<Me>('/app/me'));
     } catch (e) {

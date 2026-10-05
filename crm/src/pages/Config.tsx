@@ -111,12 +111,25 @@ function UsuarioForm({ user, funcoes, isSelf, onClose }: { user: Usuario | null;
         </div>
         <div className="form-field">
           <label htmlFor="u-email">E-mail de acesso *</label>
-          <input id="u-email" className="input" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          <input id="u-email" className="input" type="email" required disabled={!!user} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
         </div>
-        <div className="form-field">
-          <label htmlFor="u-senha">{user ? 'Nova senha (opcional)' : 'Senha inicial *'}</label>
-          <input id="u-senha" className="input" type="password" autoComplete="new-password" minLength={8} required={!user} value={form.senha} onChange={(e) => setForm({ ...form, senha: e.target.value })} placeholder="Mínimo de 8 caracteres" />
-        </div>
+        {/* e-mail e senha pertencem à conta da pessoa: depois de criada, só ela troca a senha (pelo menu ou por e-mail) */}
+        {user ? (
+          <div className="form-field">
+            <label>Senha</label>
+            <button type="button" className="btn btn--ghost"
+              onClick={() => api(`/crm/usuarios/${user.id}/redefinir-senha`, { method: 'POST' })
+                .then(() => notify(`E-mail de redefinição enviado para ${user.email}`))
+                .catch((err: Error) => setError(err.message))}>
+              Enviar e-mail de redefinição de senha
+            </button>
+          </div>
+        ) : (
+          <div className="form-field">
+            <label htmlFor="u-senha">Senha inicial *</label>
+            <input id="u-senha" className="input" type="password" autoComplete="new-password" minLength={8} required value={form.senha} onChange={(e) => setForm({ ...form, senha: e.target.value })} placeholder="Mínimo de 8 caracteres" />
+          </div>
+        )}
         <div className="form-field">
           <label htmlFor="u-funcao">Função *</label>
           <SelectPicker id="u-funcao" options={funcoes.map((f) => ({ value: f.id, label: f.nome }))} value={form.funcaoId} onChange={(v) => setForm({ ...form, funcaoId: v })} />

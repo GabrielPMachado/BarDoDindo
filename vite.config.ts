@@ -26,10 +26,8 @@ export default defineConfig({
       },
     }),
   ],
-  server: {
-    proxy: { '/api': 'http://localhost:3333' },
-  },
-  preview: {
-    proxy: { '/api': 'http://localhost:3333' },
+  build: {
+    // o pré-cadastro é uma segunda página do mesmo build (publicada em /afilhado)
+    rollupOptions: { input: { main: 'index.html', precadastro: 'precadastro/index.html' } },
   },
 });

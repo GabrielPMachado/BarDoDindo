@@ -10,6 +10,9 @@ server/data
 *.db-wal
 *.db-shm
 
+# Firebase (cache de publicação e dados dos emuladores)
+.firebase
+
 # ambiente local
 .env
 .env.*

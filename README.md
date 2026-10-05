@@ -1,12 +1,14 @@
 # Bar do Dindo
 
-Três partes que compartilham **um único servidor e um único banco de dados**:
+Três partes que compartilham **um único projeto Firebase** (Authentication + Firestore), sem servidor próprio:
 
-| Parte | Pasta | Para quem | Endereço (desenvolvimento) |
+| Parte | Pasta | Para quem | Endereço publicado |
 | --- | --- | --- | --- |
-| **API + banco** | `server/` | — | http://localhost:3333 |
-| **App do afilhado** (celular, PWA / Android / iOS) | raiz (`src/`) | Clientes | http://localhost:5173 |
-| **CRM / Gestão** (computador) | `crm/` | Equipe do bar | http://localhost:5174 |
+| **App do afilhado** (celular, PWA / Android / iOS) | raiz (`src/`) | Clientes | `/` |
+| **CRM / Gestão** (computador) | `crm/` | Equipe do bar | `/crm` |
+| **Pré-cadastro** | `precadastro/` | Clientes, antes do lançamento | `/afilhado` |
+
+As telas chamam `api('/app/...')` e `api('/crm/...')` como antes; quem atende essas rotas é `shared/backend.ts`, no próprio navegador, lendo e gravando no Firestore. O que cada pessoa pode ler ou gravar é decidido em `firestore.rules`.
 
 Nenhum dado vem pré-cadastrado: cardápio, recompensas, clientes, equipe e lançamentos começam vazios e são preenchidos pelo uso real.
 
@@ -38,7 +40,22 @@ Campos que se referem a pessoas ou cadastros são vinculados: o colaborador nas 
 
 Cada **função** define, por área, *Sem acesso*, *Visualizar* ou *Editar*. As permissões são verificadas no servidor, e não só na tela.
 
-## Rodando localmente
+## Configuração do Firebase
+
+1. No console do Firebase, ative **Authentication → E-mail/senha** e crie o **Firestore** (modo produção).
+2. Registre um app Web no projeto e copie a configuração para `shared/firebase-config.ts`:
+
+```bash
+firebase apps:sdkconfig web --project ID-DO-PROJETO
+```
+
+3. Aponte a CLI para o projeto:
+
+```bash
+firebase use --add ID-DO-PROJETO
+```
+
+## Publicar (regras + site)
 
 ```bash
 npm install
@@ -48,82 +65,47 @@ npm install
 npm --prefix crm install
 ```
 
-Em três terminais (versão compilada, estável; para ver mudanças no código, pare e rode de novo):
-
 ```bash
-npm run server
+npm run publicar
 ```
 
-```bash
-npm run serve
-```
+Esse comando compila o app, o pré-cadastro e o CRM, junta tudo em `dist/` e publica o Hosting e as regras do Firestore. Logo depois de publicar, abra `/crm` e crie o administrador: enquanto isso não for feito, a tela de primeiro acesso fica aberta para quem tiver o endereço.
+
+## Testar localmente (emuladores)
+
+Os emuladores precisam de Java 21 ou mais novo. Nada do que for feito neles vai para o projeto real.
 
 ```bash
-npm run serve:crm
+npm run emuladores
 ```
 
-App em http://localhost:5173 e CRM em http://localhost:5174. Esses comandos compilam e servem a versão final por um servidor Node simples (`scripts/static-server.mjs`). Para desenvolvimento com atualização automática existem `npm run dev` e `npm run crm`, mas nesta máquina Windows o Vite já serviu arquivos desatualizados e travou sozinho; para usar o sistema, prefira os comandos acima.
-
-O banco fica em `server/data/dindo.db` (SQLite embutido no Node 22.5+). **Faça backup desse arquivo.**
-
-## Produção (um único servidor)
+Em outro terminal, compile apontando para os emuladores (PowerShell: `$env:VITE_EMULADOR = '1'`) e abra http://127.0.0.1:5000:
 
 ```bash
 npm run build:all
 ```
 
-```bash
-npm start
-```
-
-O servidor entrega o app em `/`, o CRM em `/crm` e a API em `/api`. Publique atrás de HTTPS (ex.: VPS com Nginx/Caddy, Railway, Render, Fly.io com volume persistente para `server/data`).
+`scripts/testar-regras.mjs` confere que as regras barram o que não pode passar (cliente creditando pontos, criando voucher sem saldo, lendo salários, virando administrador etc.).
 
 ## App Android / iOS (Capacitor)
 
-Defina o endereço público da API antes do build do app:
-
-```bash
-set VITE_API_URL=https://seu-dominio.com.br
-```
+Com `shared/firebase-config.ts` preenchido:
 
 ```bash
 npm run cap:sync
 ```
 
-Depois `npx cap add android` / `npx cap open android` (Android Studio) ou `npx cap add ios` / `npx cap open ios` (Xcode, macOS).
+Depois `npx cap open android` (Android Studio) ou `npx cap add ios` / `npx cap open ios` (Xcode, macOS). O app fala direto com o Firebase, sem endereço de servidor para configurar.
 
-## Ambiente de demonstração (simulação ao vivo)
+## Segurança e limites do modelo sem servidor
 
-Usa um banco separado (`server/data/demo.db`); o banco real não é tocado. O simulador se recusa a rodar contra a API do banco real (porta 3333).
+- Contas e senhas ficam no Firebase Authentication (mínimo de 6 caracteres; as telas do CRM pedem 8).
+- O app e o CRM têm sessões separadas, mesmo abertos no mesmo navegador.
+- **Pontos**: quem credita é a equipe (lançamento de consumo). O cliente só consegue debitar o próprio saldo junto com a criação de um voucher, e as regras recusam se o saldo não cobrir o custo.
+- **Usuários do CRM**: o administrador cria a conta com uma senha inicial. Depois disso, e-mail e senha pertencem à pessoa: ela troca a senha pelo menu do usuário, ou o administrador envia um e-mail de redefinição. Excluir um usuário tira o acesso ao CRM, mas a conta continua existindo no Firebase Authentication (para apagá-la de vez, use o console do Firebase).
+- **Folha**: para calcular os totais, quem tem acesso ao Financeiro consegue ler o cadastro de colaboradores no banco, embora a tela só mostre o detalhe individual para o RH.
+- **Produtos**: o cardápio público é uma cópia sem custo nem margem; o Atendimento lê o cadastro completo para lançar consumo.
 
-1. Crie o administrador do banco de demonstração (uma vez):
+## Servidor antigo (Node + SQLite)
 
-```bash
-node scripts/criar-admin.mjs server/data/demo.db "Administrador" seu@email.com sua-senha
-```
-
-2. Compile o CRM:
-
-```bash
-npm --prefix crm run build
-```
-
-3. Suba a API de demonstração (porta 3334). O CRM fica em http://localhost:3334/crm:
-
-```bash
-npm run demo
-```
-
-4. Em outro terminal, rode a simulação (cadastros de afilhados, reservas e confirmações, vendas, resgates, baixas de vouchers e despesas):
-
-```bash
-npm run simular -- --email seu@email.com --senha sua-senha --vendas 100 --segundos 120
-```
-
-O CRM se atualiza sozinho a cada 2 segundos (indicador *Ao vivo* no topo). Para recomeçar do zero, pare a API de demonstração e apague os arquivos `server/data/demo.db*`.
-
-## Segurança
-
-- Senhas guardadas com hash *scrypt*; sessões por token.
-- A senha mínima nas telas é de 8 caracteres para usuários do CRM e de 6 para clientes.
-- Troque a senha inicial do administrador antes de publicar o sistema na internet (menu do usuário → *Alterar senha*).
+`server/`, `scripts/demo-server.mjs`, `scripts/simular.mjs`, `scripts/static-server.mjs`, `scripts/criar-admin.mjs` e `scripts/zerar-dados.mjs` são da versão anterior, com API própria e banco SQLite. As telas não usam mais essa API.
