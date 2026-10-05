@@ -1,0 +1,19 @@
+node_modules
+dist
+dev-dist
+android
+ios
+
+# banco de dados e cópias de segurança (dados de clientes — nunca enviar)
+server/data
+*.db
+*.db-wal
+*.db-shm
+
+# ambiente local
+.env
+.env.*
+*.log
+
+# artefatos de compilação
+*.tsbuildinfo
