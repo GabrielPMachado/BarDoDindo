@@ -1,0 +1,35 @@
+# Publica o site (app, pré-cadastro e CRM) e as regras do Firestore a cada push no main.
+
+name: Deploy to Firebase Hosting on merge
+on:
+  push:
+    branches:
+      - main
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            crm/package-lock.json
+      - run: npm ci
+      - run: npm --prefix crm ci
+      - run: npm run build:all
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BARDO_C0878 }}
+          channelId: live
+          projectId: bardo-c0878
+      # a conta de serviço precisa do papel "Administrador de regras do Firebase" no Google Cloud
+      - name: Publicar regras do Firestore
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BARDO_C0878 }}
+        run: |
+          echo "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/conta.json"
+          GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/conta.json" npx firebase-tools@15 deploy --only firestore:rules --project bardo-c0878 --non-interactive
