@@ -171,9 +171,10 @@ function inssEmpregado(salario: number, faixas: { ate: number; aliquota: number 
   return Math.round(total * 100) / 100;
 }
 
-export function createBackend(kind: 'app' | 'crm') {
+export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   // cada sistema tem a própria sessão, mesmo quando abertos no mesmo navegador
-  const app = initializeApp(firebaseConfig, kind);
+  // (`instancia` permite várias sessões no mesmo processo, ex.: roteiros de teste com vários afilhados)
+  const app = initializeApp(firebaseConfig, instancia);
   const auth = getAuth(app);
   // VITE_LONG_POLLING=1 só em builds locais de teste atrás de proxy, onde a conexão contínua do Firestore não passa
   const db = initializeFirestore(app, { ignoreUndefinedProperties: true, ...(import.meta.env.VITE_LONG_POLLING === '1' ? { experimentalForceLongPolling: true } : {}) });
