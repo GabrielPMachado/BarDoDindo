@@ -72,6 +72,29 @@ function baixar(blob: Blob, nome: string) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
+/* ---------- CSV ---------- */
+/** Valor de uma célula no CSV: números com vírgula decimal (como o Excel em português espera), datas dd/mm/aaaa. */
+function celulaCsv(c: Coluna, r: Row): string {
+  const v = c.valor(r);
+  if (vazio(v)) return '';
+  const decimal = (n: number, casas: number) => n.toFixed(casas).replace('.', ',');
+  let t: string;
+  switch (c.tipo) {
+    case 'dinheiro': t = decimal(Number(v), 2); break;
+    case 'numero': t = Number.isInteger(Number(v)) ? String(Number(v)) : decimal(Number(v), 2); break;
+    case 'percentual': t = Number.isInteger(Number(v)) ? String(Number(v)) : decimal(Number(v), 1); break;
+    case 'data': t = dateBR(v); break;
+    default: t = String(v);
+  }
+  return /[";\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+}
+/** CSV com ";" (padrão do Excel em português), as mesmas colunas do Excel, sem as fotos. */
+export function exportarCsv(colunas: Coluna[], rows: Row[], arquivo: string) {
+  const cols = colunas.filter((c) => c.tipo !== 'imagem');
+  const linhas = [cols.map((c) => c.titulo).join(';'), ...rows.map((r) => cols.map((c) => celulaCsv(c, r)).join(';'))];
+  baixar(new Blob(['\uFEFF' + linhas.join('\r\n')], { type: 'text/csv;charset=utf-8' }), `${arquivo}.csv`);
+}
+
 /** Tamanho original de uma imagem (para manter a proporção ao encaixar na célula). */
 function medidas(src: string): Promise<{ w: number; h: number }> {
   return new Promise((resolve) => {
