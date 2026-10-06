@@ -247,7 +247,7 @@ function TableArt() {
   );
 }
 
-export function consumoTitulo(c: Consumption) {
+function consumoTitulo(c: Consumption) {
   const [first, ...rest] = c.itens;
   if (!first) return 'Consumo';
   const nome = first.quantidade > 1 ? `${first.quantidade}× ${first.nome}` : first.nome;

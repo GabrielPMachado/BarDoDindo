@@ -14,7 +14,7 @@ import { colunasDe, exportarCsv, exportarExcel, exportarPdf } from '../lib/expor
 
 const PAGE = 50;
 
-export function formatField(f: Field, v: unknown): ReactNode {
+function formatField(f: Field, v: unknown): ReactNode {
   if (v === undefined || v === null || v === '') return <span className="muted">—</span>;
   switch (f.type) {
     case 'money': return brl(Number(v));

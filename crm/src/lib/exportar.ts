@@ -9,8 +9,8 @@ import { brl, dateBR, num } from './format';
 import { maskCnpj, maskPhone } from './masks';
 import logoUrl from '../../../shared/assets/logo.webp';
 
-export type TipoColuna = 'texto' | 'dinheiro' | 'numero' | 'percentual' | 'data' | 'status' | 'imagem';
-export interface Coluna {
+type TipoColuna = 'texto' | 'dinheiro' | 'numero' | 'percentual' | 'data' | 'status' | 'imagem';
+interface Coluna {
   titulo: string;
   tipo: TipoColuna;
   valor: (r: Row) => unknown;

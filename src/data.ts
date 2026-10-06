@@ -1,7 +1,7 @@
 export const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 /** Ordem de exibição preferida das categorias do cardápio; categorias novas aparecem no fim. */
-export const CATEGORY_ORDER = ['Cervejas', 'Chopes', 'Drinks', 'Destilados', 'Vinhos', 'Petiscos', 'Porções', 'Pratos', 'Sobremesas', 'Sem álcool'];
+const CATEGORY_ORDER = ['Cervejas', 'Chopes', 'Drinks', 'Destilados', 'Vinhos', 'Petiscos', 'Porções', 'Pratos', 'Sobremesas', 'Sem álcool'];
 
 export function sortCategories(cats: string[]) {
   const idx = (c: string) => {

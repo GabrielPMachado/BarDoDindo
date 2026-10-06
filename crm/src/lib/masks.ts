@@ -30,14 +30,6 @@ export function formatNumber(v: number, decimals: number, fixed = decimals > 0) 
   });
 }
 
-/** Converte texto digitado no padrão brasileiro ("1.234,5") em número. */
-export function parseBR(s: string): number | null {
-  const clean = s.replace(/\./g, '').replace(',', '.').trim();
-  if (!clean || clean === '.' || clean === '-') return null;
-  const n = Number(clean);
-  return Number.isFinite(n) ? n : null;
-}
-
 export interface NumberSpec {
   /** Casas decimais permitidas (0 = inteiro). */
   decimals: number;

@@ -7,7 +7,7 @@ import { useSession } from '../lib/session';
 import { initials } from '../lib/format';
 import { Modal } from './ui';
 
-export interface Atividade {
+interface Atividade {
   id: string;
   area: AreaKey;
   acao: string;

@@ -34,7 +34,7 @@ export function daysUntil(isoDate: unknown) {
   return Math.round((target - today) / 86400000);
 }
 
-export const MONTHS_SHORT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+const MONTHS_SHORT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
 export function monthLabel(key: string) {
   const [y, m] = key.split('-').map(Number);

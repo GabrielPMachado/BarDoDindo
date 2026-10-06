@@ -245,7 +245,7 @@ export function TimePicker({ value, onChange, id, disabled, required }: {
 /* ======================================================================
    Lista de opções (substitui o select do navegador nos formulários)
    ====================================================================== */
-export type SelectOption = string | { value: string; label: string };
+type SelectOption = string | { value: string; label: string };
 
 export function SelectPicker({ options, value, onChange, id, disabled, placeholder = 'Selecione…' }: {
   options: SelectOption[]; value: unknown; onChange: (v: string) => void; id?: string; disabled?: boolean; placeholder?: string;

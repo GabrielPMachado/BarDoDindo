@@ -1,18 +1,17 @@
 // Servidor estático simples (Node puro) para a versão compilada do app ou do CRM.
-// Entrega os arquivos de uma pasta "dist" e repassa /api para a API.
-// Uso: node scripts/static-server.mjs <pasta-dist> <porta> [api=http://localhost:3333]
-import { createServer, request } from 'node:http';
+// Entrega os arquivos de uma pasta "dist" (os dados vêm direto do Firebase, não há API própria).
+// Uso: node scripts/static-server.mjs <pasta-dist> <porta>
+import { createServer } from 'node:http';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, normalize, resolve } from 'node:path';
 
-const [dir, portArg, apiArg] = process.argv.slice(2);
+const [dir, portArg] = process.argv.slice(2);
 if (!dir || !portArg) {
-  console.error('Uso: node scripts/static-server.mjs <pasta-dist> <porta> [api]');
+  console.error('Uso: node scripts/static-server.mjs <pasta-dist> <porta>');
   process.exit(1);
 }
 const base = resolve(dir);
 const port = Number(portArg);
-const api = new URL(apiArg ?? 'http://localhost:3333');
 
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -22,23 +21,6 @@ const MIME = {
 
 createServer((req, res) => {
   const url = new URL(req.url ?? '/', 'http://localhost');
-
-  // repassa as chamadas da API
-  if (url.pathname.startsWith('/api/')) {
-    const proxy = request(
-      { hostname: api.hostname, port: api.port, path: req.url, method: req.method, headers: { ...req.headers, host: api.host } },
-      (r) => {
-        res.writeHead(r.statusCode ?? 502, r.headers);
-        r.pipe(res);
-      },
-    );
-    proxy.on('error', () => {
-      res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({ erro: 'Servidor da API indisponível.' }));
-    });
-    req.pipe(proxy);
-    return;
-  }
 
   // arquivos estáticos; qualquer rota desconhecida volta para o index.html
   let file = normalize(join(base, decodeURIComponent(url.pathname)));
@@ -55,4 +37,4 @@ createServer((req, res) => {
     'Cache-Control': isHtml ? 'no-cache' : 'public, max-age=31536000, immutable',
   });
   res.end(readFileSync(file));
-}).listen(port, () => console.log(`Servindo ${base} em http://localhost:${port} (API: ${api.origin})`));
+}).listen(port, () => console.log(`Servindo ${base} em http://localhost:${port}`));

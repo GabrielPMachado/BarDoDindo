@@ -113,9 +113,17 @@ Depois `npx cap open android` (Android Studio) ou `npx cap add ios` / `npx cap o
 - **Folha**: para calcular os totais, quem tem acesso ao Financeiro consegue ler o cadastro de colaboradores no banco, embora a tela só mostre o detalhe individual para o RH.
 - **Produtos**: o cardápio público é uma cópia sem custo nem margem; o Atendimento lê o cadastro completo para lançar consumo.
 
-## Servidor antigo (Node + SQLite)
+## Ao vivo
 
-`server/`, `scripts/demo-server.mjs`, `scripts/simular.mjs`, `scripts/static-server.mjs`, `scripts/criar-admin.mjs` e `scripts/zerar-dados.mjs` são da versão anterior, com API própria e banco SQLite. As telas não usam mais essa API.
+O app e o CRM perguntam a cada 1 segundo se algo mudou (o pré-cadastro, a cada 1,5 s) e só então recarregam o que está na tela. A resposta vem dos dados que já chegam em tempo real do Firestore, então isso não gasta leituras extras. A primeira leitura de cada consulta espera a resposta do servidor (até 2,5 s), para nunca mostrar uma cópia local desatualizada.
+
+Versões novas também entram sozinhas: o app (service worker) procura atualização a cada minuto, e o CRM confere se o site mudou e recarrega quando não há janela aberta nem campo em edição.
+
+## Administração
+
+- **Excluir afilhado** (Vendas → Clientes): apaga o cadastro, o saldo, os consumos (com as receitas), os vouchers e as reservas do afilhado. Exige permissão de excluir em Vendas e em Atendimento.
+- **Numeração dos afilhados** (Configurações → Parâmetros): mostra o próximo número e, depois de excluir afilhados, ajusta para voltar a seguir o maior número em uso.
+- **Zerar o sistema**: só a função Administrador, pela rota `/crm/admin/zerar` com a confirmação `ZERAR TUDO`. Apaga todas as informações (inclusive usuários, funções e parâmetros) e o sistema volta ao primeiro acesso. As contas de login continuam no Firebase Authentication. Logo depois de zerar, faça o primeiro acesso: até lá, quem abrir o CRM pode se cadastrar como administrador.
 
 ## Permissões
 
@@ -129,11 +137,13 @@ Receitas, despesas, consumos e reservas crescem com o tempo, então as telas car
 
 `npm run testar:regras` sobe os emuladores, cria os dados de teste (`scripts/semear-testes.mjs`) e confere que as regras do Firestore barram o que não pode passar (`scripts/testar-regras.mjs`). O GitHub Actions roda esse teste em cada pull request e antes de cada publicação: se algum falhar, nada é publicado.
 
-## Celular e tablet
+## Valores e clientes
 
 Os campos de **valor em R$** aceitam a digitação natural: "150" vira R$ 150,00 e "18,5" vira R$ 18,50 (antes o campo era preenchido como centavos, e "5" virava R$ 0,05).
 
 Na lista de **Clientes (afilhados)**, gasto total, visitas e última visita vêm de totais guardados no saldo de cada afilhado (`saldos/{uid}`: `gasto`, `lancamentos`, `dias`), atualizados a cada consumo lançado ou estornado — a tela não precisa carregar todos os consumos. Saldos antigos, sem esses totais, são calculados uma vez a partir dos consumos e gravados na primeira abertura da lista por alguém do Atendimento.
+
+## Celular e tablet
 
 O CRM se adapta à tela. No tablet e no celular o menu lateral vira uma gaveta (botão ☰), as grades viram uma coluna e, no celular, as tabelas viram cartões e as janelas ocupam a tela inteira. Como no toque não há botão direito, **segurar o dedo** sobre uma página do menu ou um bloco do painel abre o mesmo menu (fixar, adicionar ao painel…), e no modo *Personalizar* as setas ↑↓ mudam os blocos de lugar.
 
