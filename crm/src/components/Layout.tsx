@@ -151,7 +151,8 @@ export function Layout({ children }: { children: ReactNode }) {
       {gaveta && <div className="sidebar-backdrop" onClick={() => setGaveta(false)} aria-hidden="true" />}
       <aside className={`sidebar ${gaveta ? 'is-open' : ''}`}>
         <Brand />
-        <nav className="nav" ref={navRef}>
+        {/* na gaveta (celular/tablet), escolher uma página fecha o menu — inclusive a página em que já se está */}
+        <nav className="nav" ref={navRef} onClick={(e) => (e.target as HTMLElement).closest('a, .nav__fixado-go') && setGaveta(false)}>
           {GROUPS.map((g) => {
             const areas = g.areas.filter((a) => access(a.key) !== 'none');
             if (!areas.length) return null;

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { api, ApiError, setToken } from './api';
+import { api, ApiError, getToken, setToken } from './api';
 
 export interface Config {
   nomeEstabelecimento: string;
@@ -133,10 +133,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // atualiza ao voltar para o app (ex.: pontos lançados pelo bar)
     const onFocus = () => document.visibilityState === 'visible' && refresh();
     document.addEventListener('visibilitychange', onFocus);
-    const timer = setInterval(onFocus, 30000);
+    // quase ao vivo: a cada 3 s pergunta se algo mudou (reserva confirmada, pontos, voucher entregue) e só então recarrega
+    let ultima: number | null = null;
+    const vigia = setInterval(async () => {
+      if (document.visibilityState !== 'visible' || !getToken()) return;
+      try {
+        const { versao } = await api<{ versao: number }>('/app/versao');
+        if (ultima !== null && versao !== ultima) refresh();
+        ultima = versao;
+      } catch {
+        /* sem sessão ou sem conexão: tenta de novo no próximo ciclo */
+      }
+    }, 3000);
     return () => {
       document.removeEventListener('visibilitychange', onFocus);
-      clearInterval(timer);
+      clearInterval(vigia);
     };
   }, [refresh]);
 
