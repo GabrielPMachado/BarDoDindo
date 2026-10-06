@@ -1,8 +1,8 @@
 import {
-  Briefcase, Building2, Cctv, ClipboardCheck, ConciergeBell, Landmark, Megaphone, Scale, Settings, Users, Wallet, Warehouse, type LucideIcon,
+  Briefcase, Building2, Cctv, UserRound, ClipboardCheck, ConciergeBell, Landmark, Megaphone, Scale, Settings, Users, Wallet, Warehouse, type LucideIcon,
 } from 'lucide-react';
 
-export type AreaKey = 'dir' | 'atd' | 'mkt' | 'rh' | 'dp' | 'adm' | 'fin' | 'jur' | 'fis' | 'mon' | 'cfg';
+export type AreaKey = 'eu' | 'dir' | 'atd' | 'mkt' | 'rh' | 'dp' | 'adm' | 'fin' | 'jur' | 'fis' | 'mon' | 'cfg';
 export type Access = 'none' | 'view' | 'edit';
 
 export interface SubModule {
@@ -17,9 +17,19 @@ export interface Area {
   description: string;
   icon: LucideIcon;
   items: SubModule[];
+  /** Área de cada usuário (Meu perfil): sempre liberada e fora da tela de permissões. */
+  pessoal?: boolean;
 }
 
 export const AREAS: Area[] = [
+  {
+    key: 'eu', label: 'Meu perfil', icon: UserRound, pessoal: true,
+    description: 'Seus dados, sua senha e o seu painel.',
+    items: [
+      { path: '/perfil', label: 'Meus dados' },
+      { path: '/perfil/painel', label: 'Meu painel' },
+    ],
+  },
   {
     key: 'dir', label: 'Diretoria', icon: Landmark,
     description: 'Visão consolidada da operação, metas e decisões estratégicas.',
@@ -127,10 +137,14 @@ export interface NavGroup {
 }
 const areaByKey = (k: AreaKey) => AREAS.find((a) => a.key === k)!;
 export const GROUPS: NavGroup[] = [
+  { key: 'eu', label: 'Meu perfil', icon: UserRound, single: 'eu', areas: [areaByKey('eu')] },
   { key: 'dir', label: 'Diretoria', icon: Landmark, single: 'dir', areas: [areaByKey('dir')] },
-  { key: 'dep', label: 'Departamentos', icon: Building2, areas: AREAS.filter((a) => a.key !== 'dir' && a.key !== 'cfg') },
+  { key: 'dep', label: 'Departamentos', icon: Building2, areas: AREAS.filter((a) => !a.pessoal && a.key !== 'dir' && a.key !== 'cfg') },
   { key: 'cfg', label: 'Configurações', icon: Settings, single: 'cfg', areas: [areaByKey('cfg')] },
 ];
+/** Áreas controladas pelas funções (tela de permissões); "Meu perfil" fica de fora, é de todos. */
+export const AREAS_COM_PERMISSAO = AREAS.filter((a) => !a.pessoal);
+
 export const groupOf = (area: AreaKey) => GROUPS.find((g) => g.areas.some((a) => a.key === area))!;
 
 export function findModule(path: string) {

@@ -8,8 +8,8 @@ import { useAtividades } from '../components/Atividades';
 import { useCollection, useResource, type Row } from '../lib/data';
 import { brl, dateBR, daysUntil, isoToday, monthLabel, num, pct } from '../lib/format';
 import { currentMonth, despesaValida, lastMonths, monthName, monthOf, sumBy } from '../lib/finance';
-import { alternarAtalho, atalhoId, usePainelPrefs, type PainelPrefs } from '../lib/preferencias';
-import { findModule } from '../modules';
+import { alternarAtalho, atalhoId, usePainelPrefs, type PainelChave, type PainelPrefs } from '../lib/preferencias';
+import { AREAS, findModule } from '../modules';
 import { useSession } from '../lib/session';
 import type { Kpi } from '../collections';
 
@@ -52,6 +52,28 @@ function diaDe(v: unknown) {
 }
 
 export default function Diretoria() {
+  return (
+    <PainelDeBlocos
+      chave="painel" titulo="Painel executivo"
+      descricao="Visão consolidada de todas as áreas, atualizada com os dados lançados no sistema e no aplicativo."
+    />
+  );
+}
+
+/** Meu perfil → Meu painel: o painel próprio de cada usuário, com os blocos das áreas que ele acessa. */
+export function MeuPainel() {
+  return (
+    <PainelDeBlocos
+      chave="meuPainel" titulo="Meu painel"
+      descricao="O seu painel: monte com os blocos e atalhos que você mais usa. Só você vê esta arrumação."
+    />
+  );
+}
+
+interface PainelInfo { chave: PainelChave; titulo: string; descricao: string }
+
+/** Monta os blocos (indicadores, gráficos, listas) com os dados das áreas que o usuário acessa. */
+function PainelDeBlocos(info: PainelInfo) {
   const { access } = useSession();
   const can = (a: Parameters<typeof access>[0]) => access(a) !== 'none';
 
@@ -236,12 +258,20 @@ export default function Diretoria() {
   });
 
   /* ---------- blocos extras (catálogo "Adicionar bloco"): só carregam dados quando o usuário os adiciona ---------- */
-  const { prefs } = usePainelPrefs();
+  const { prefs } = usePainelPrefs(info.chave);
   const tem = (...ids: string[]) => ids.some((id) => prefs.extras.includes(id));
   const vendas = can('atd') || can('mkt');
   const consumos = useCollection('consumos', vendas && tem('x-vendas-hoje', 'x-ticket-mes', 'x-mais-vendidos')).rows;
   const resgates = useCollection('resgates', vendas && tem('x-vouchers')).rows;
-  const ferias = useCollection('ferias', can('rh') && tem('x-ausentes')).rows;
+  const ferias = useCollection('ferias', can('rh') && tem('x-ausentes', 'x-proximas-ferias')).rows;
+  const resgatesTop = useCollection('resgates', vendas && tem('x-recompensas-top')).rows;
+  const midias = useCollection('midias', can('mkt') && tem('x-midias')).rows;
+  const criacao = useCollection('criacao', can('mkt') && tem('x-criacao')).rows;
+  const projetos = useCollection('projetos', can('dp') && tem('x-projetos')).rows;
+  const materiais = useCollection('materiais', can('dp') && tem('x-materiais')).rows;
+  const terceirizados = useCollection('terceirizados', can('adm') && tem('x-terceirizados', 'x-custo-terceirizados')).rows;
+  const consultorias = useCollection('consultoria', can('jur') && tem('x-consultorias')).rows;
+  const usuarios = useResource<{ id: string; status: string; ultimoAcesso?: string | null }[]>(can('cfg') && tem('x-usuarios') ? '/crm/usuarios' : null).data ?? [];
   const { items: atividades } = useAtividades();
 
   const consumosHoje = consumos.filter((c) => diaDe(c.data) === hoje);
@@ -346,7 +376,7 @@ export default function Diretoria() {
     )),
   });
   add(true, {
-    id: 'x-atividades', titulo: 'Últimas atualizações', tipo: 'painel', extra: { area: 'Todas as áreas', descricao: 'O que a equipe fez por último no sistema, com quem fez e quando.' },
+    id: 'x-atividades', titulo: 'Últimas atualizações', tipo: 'painel', extra: { area: 'Geral', descricao: 'O que a equipe fez por último no sistema, com quem fez e quando.' },
     render: painel('Últimas atualizações', null, (
       <MiniLista vazio="Nenhuma atualização registrada ainda." itens={atividades.slice(0, 8).map((a) => ({
         key: a.id, principal: <>{a.usuarioNome} <span className="muted">{a.acao}</span> {a.alvo}</>,
@@ -355,7 +385,195 @@ export default function Diretoria() {
     )),
   });
 
-  return <PainelPersonalizavel blocos={blocos} />;
+  /* ---------- mais blocos do catálogo, por área ---------- */
+  const fechadas = ['Concluída', 'Cancelada'];
+  const metasAtrasadas = metas.filter((m) => !fechadas.includes(String(m.status)) && (m.status === 'Atrasada' || (m.prazo && daysUntil(m.prazo) < 0)));
+  const reservasAtivas = (r: Row) => !['Cancelada', 'Cancelada pelo cliente', 'Recusada', 'Não compareceu'].includes(String(r.status));
+  const proximasReservas = reservas
+    .filter((r) => reservasAtivas(r) && daysUntil(r.data) >= 1 && daysUntil(r.data) <= 7)
+    .sort((a, b) => `${a.data} ${a.hora}`.localeCompare(`${b.data} ${b.hora}`));
+  const pessoasHoje = reservasHoje.reduce((t, r) => t + (Number(r.pessoas) || 0), 0);
+  const novosDoMes = clientes.filter((c) => monthOf(c.desde) === mes).sort((a, b) => String(b.desde).localeCompare(String(a.desde)));
+  const contagem = (rows: Row[], campo: string) => Object.entries(rows.reduce<Record<string, number>>((acc, r) => {
+    const k = String(r[campo] ?? 'Outros') || 'Outros';
+    acc[k] = (acc[k] ?? 0) + 1;
+    return acc;
+  }, {})).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
+  const ativosRH = colaboradores.filter((c) => c.status !== 'Desligado');
+  const proximasFerias = ferias.filter((f) => f.status === 'Agendado' && String(f.inicio ?? '') >= hoje).sort((a, b) => String(a.inicio).localeCompare(String(b.inicio)));
+  const projetosAndamento = projetos.filter((p) => p.status === 'Em andamento' || p.status === 'Planejado').sort((a, b) => String(a.prazo ?? '9999').localeCompare(String(b.prazo ?? '9999')));
+  const estoqueVencendo = estoque.filter((r) => r.validade && daysUntil(r.validade) <= 15).sort((a, b) => String(a.validade).localeCompare(String(b.validade)));
+  const materiaisAtencao = materiais.filter((m) => m.estado === 'Manutenção' || m.estado === 'Descartar');
+  const terceirosAtivos = terceirizados.filter((t) => t.status === 'Ativo');
+  const receitasMes = receitas.filter((r) => monthOf(r.data) === mes);
+  const pagoMes = despesas.filter((d) => d.status === 'Pago' && monthOf(d.data) === mes);
+  const proximasAudiencias = processos.filter((p) => p.audiencia && daysUntil(p.audiencia) >= 0).sort((a, b) => String(a.audiencia).localeCompare(String(b.audiencia)));
+  const consultoriasAbertas = consultorias.filter((c) => c.status !== 'Concluída');
+  const gravidade: Record<string, number> = { 'Crítica': 0, 'Alta': 1, 'Média': 2, 'Baixa': 3 };
+  const ncsAbertas = ncs.filter((n) => n.status !== 'Resolvida').sort((a, b) => (gravidade[String(a.gravidade)] ?? 9) - (gravidade[String(b.gravidade)] ?? 9));
+  const ultimaInspecao = [...qualidade].sort((a, b) => String(b.data ?? '').localeCompare(String(a.data ?? '')))[0];
+  const ativosSistema = usuarios.filter((u) => u.status === 'Ativo');
+  const acessaramHoje = ativosSistema.filter((u) => u.ultimoAcesso && diaDe(u.ultimoAcesso) === hoje).length;
+
+  add(can('dir'), {
+    id: 'x-metas-atrasadas', titulo: 'Metas atrasadas', tipo: 'painel', extra: { area: 'Diretoria', descricao: 'Metas e decisões com prazo vencido ou marcadas como atrasadas.' },
+    render: painel('Metas atrasadas', verTodos('/diretoria/metas'), (
+      <MiniLista vazio="Nenhuma meta atrasada." itens={metasAtrasadas.slice(0, 8).map((m) => ({
+        key: m.id, principal: String(m.titulo ?? 'Meta'), detalhe: [m.responsavel, m.prazo ? `prazo ${dateBR(m.prazo)}` : null].filter(Boolean).join(' · '),
+        valor: `${num(Number(m.progresso) || 0)}%`, tom: 'bad' as const,
+      }))} />
+    )),
+  });
+  add(can('dir'), {
+    id: 'x-metas-concluidas', titulo: 'Metas concluídas', tipo: 'kpi', extra: { area: 'Diretoria', descricao: 'Quantas metas já foram concluídas, do total cadastrado.' },
+    render: kpi({ label: 'Metas concluídas', value: `${num(metas.filter((m) => m.status === 'Concluída').length)} de ${num(metas.filter((m) => m.status !== 'Cancelada').length)}`, hint: `${num(metasAtrasadas.length)} atrasadas`, tone: metasAtrasadas.length ? 'warn' : undefined }),
+  });
+  add(can('atd'), {
+    id: 'x-pessoas-hoje', titulo: 'Pessoas esperadas hoje', tipo: 'kpi', extra: { area: 'Atendimento', descricao: 'Soma de pessoas das reservas de hoje (confirmadas e pendentes).' },
+    render: kpi({ label: 'Pessoas esperadas hoje', value: num(pessoasHoje), hint: `${num(reservasHoje.length)} ${reservasHoje.length === 1 ? 'reserva' : 'reservas'}` }),
+  });
+  add(can('atd'), {
+    id: 'x-proximas-reservas', titulo: 'Próximas reservas', tipo: 'painel', extra: { area: 'Atendimento', descricao: 'Reservas dos próximos 7 dias, sem contar hoje.' },
+    render: painel('Próximas reservas', verTodos('/atendimento/reservas'), (
+      <MiniLista vazio="Nenhuma reserva nos próximos 7 dias." itens={proximasReservas.slice(0, 8).map((r) => ({
+        key: r.id, principal: `${dateBR(r.data).slice(0, 5)} ${r.hora ?? ''} · ${r.clienteNome ?? 'Sem nome'}`,
+        detalhe: [r.ambiente, r.status].filter(Boolean).join(' · '), valor: `${num(Number(r.pessoas) || 0)} pess.`,
+        tom: r.status === 'Pendente' ? 'warn' as const : undefined,
+      }))} />
+    )),
+  });
+  add(can('mkt'), {
+    id: 'x-novos-afilhados', titulo: 'Novos afilhados do mês', tipo: 'painel', extra: { area: 'Marketing e Vendas', descricao: 'Quem se cadastrou no aplicativo neste mês.' },
+    render: painel('Novos afilhados do mês', verTodos('/vendas/clientes'), (
+      <MiniLista vazio="Nenhum afilhado novo neste mês." itens={novosDoMes.slice(0, 8).map((c) => ({
+        key: String(c.id), principal: c.nome, detalhe: `#${String(c.id).padStart(3, '0')} · desde ${dateBR(c.desde)}`,
+      }))} />
+    )),
+  });
+  add(vendas, {
+    id: 'x-recompensas-top', titulo: 'Recompensas mais resgatadas', tipo: 'painel', extra: { area: 'Marketing e Vendas', descricao: 'As recompensas que os afilhados mais resgatam no aplicativo.' },
+    render: painel('Recompensas mais resgatadas', null, (() => {
+      const top = contagem(resgatesTop.filter((r) => r.status !== 'Cancelado'), 'recompensa').slice(0, 6);
+      return top.length ? <HBarList data={top} format={(v) => `${num(v)}×`} /> : <p className="muted pad">Nenhum resgate ainda.</p>;
+    })()),
+  });
+  add(can('mkt'), {
+    id: 'x-midias', titulo: 'Publicações agendadas', tipo: 'painel', extra: { area: 'Marketing e Vendas', descricao: 'Próximas publicações agendadas nas redes e canais.' },
+    render: painel('Publicações agendadas', verTodos('/marketing/midias'), (
+      <MiniLista vazio="Nenhuma publicação agendada." itens={midias.filter((m) => m.status === 'Agendado').sort((a, b) => String(a.data ?? '').localeCompare(String(b.data ?? ''))).slice(0, 8).map((m) => ({
+        key: m.id, principal: String(m.conteudo ?? 'Publicação'), detalhe: [m.canal, m.data ? dateBR(m.data) : null].filter(Boolean).join(' · '),
+        valor: m.tipo === 'Patrocinado' ? brl(Number(m.investimento) || 0) : undefined,
+      }))} />
+    )),
+  });
+  add(can('mkt'), {
+    id: 'x-criacao', titulo: 'Peças em produção', tipo: 'kpi', extra: { area: 'Marketing e Vendas', descricao: 'Peças de criação em briefing, produção ou aprovação.' },
+    render: (() => {
+      const abertas = criacao.filter((c) => ['Briefing', 'Em produção', 'Em aprovação'].includes(String(c.status)));
+      return kpi({ label: 'Peças em produção', value: num(abertas.length), hint: `${num(abertas.filter((c) => c.status === 'Em aprovação').length)} aguardando aprovação` });
+    })(),
+  });
+  add(can('rh'), {
+    id: 'x-proximas-ferias', titulo: 'Próximas férias', tipo: 'painel', extra: { area: 'Pessoal (RH/DP)', descricao: 'Férias e afastamentos agendados, do mais próximo ao mais distante.' },
+    render: painel('Próximas férias', verTodos('/rh/ferias'), (
+      <MiniLista vazio="Nenhuma férias agendada." itens={proximasFerias.slice(0, 8).map((f) => ({
+        key: f.id, principal: String(f.colaborador ?? 'Colaborador'), detalhe: `${f.tipo ?? ''} · ${dateBR(f.inicio)} a ${dateBR(f.fim)}`,
+      }))} />
+    )),
+  });
+  add(can('rh'), {
+    id: 'x-equipe-setor', titulo: 'Equipe por setor', tipo: 'painel', extra: { area: 'Pessoal (RH/DP)', descricao: 'Quantas pessoas ativas em cada setor (salão, bar, cozinha…).' },
+    render: painel('Equipe por setor', <span className="muted small">{num(ativosRH.length)} ativos</span>,
+      ativosRH.length ? <HBarList data={contagem(ativosRH, 'setor')} format={(v) => `${num(v)}`} /> : <p className="muted pad">Nenhum colaborador cadastrado.</p>),
+  });
+  add(can('dp'), {
+    id: 'x-projetos', titulo: 'Projetos em andamento', tipo: 'painel', extra: { area: 'Estrutura', descricao: 'Projetos planejados ou em andamento, com prazo e quanto do orçamento já foi gasto.' },
+    render: painel('Projetos em andamento', verTodos('/estrutura/projetos'), (
+      <MiniLista vazio="Nenhum projeto em andamento." itens={projetosAndamento.slice(0, 8).map((p) => {
+        const orc = Number(p.orcamento) || 0, gasto = Number(p.gasto) || 0;
+        return {
+          key: p.id, principal: String(p.nome ?? 'Projeto'), detalhe: [p.status, p.prazo ? `prazo ${dateBR(p.prazo)}` : null].filter(Boolean).join(' · '),
+          valor: orc ? `${pct(gasto / orc)} do orçamento` : undefined, tom: orc && gasto > orc ? 'bad' as const : p.prazo && daysUntil(p.prazo) < 0 ? 'warn' as const : undefined,
+        };
+      })} />
+    )),
+  });
+  add(can('dp'), {
+    id: 'x-estoque-vencendo', titulo: 'Validade próxima', tipo: 'painel', extra: { area: 'Estrutura', descricao: 'Itens de estoque vencidos ou que vencem nos próximos 15 dias.' },
+    render: painel('Validade próxima', verTodos('/estrutura/estoque'), (
+      <MiniLista vazio="Nenhum item vencendo." itens={estoqueVencendo.slice(0, 8).map((r) => ({
+        key: r.id, principal: String(r.item ?? 'Item'), detalhe: `${dateBR(r.validade)} · ${vence(r.validade)}`,
+        valor: `${num(Number(r.quantidade) || 0)} ${r.unidade ?? ''}`, tom: daysUntil(r.validade) < 0 ? 'bad' as const : 'warn' as const,
+      }))} />
+    )),
+  });
+  add(can('dp'), {
+    id: 'x-materiais', titulo: 'Materiais em manutenção', tipo: 'kpi', extra: { area: 'Estrutura', descricao: 'Equipamentos e materiais em manutenção ou para descartar.' },
+    render: kpi({ label: 'Materiais em manutenção', value: num(materiaisAtencao.length), hint: `${num(materiaisAtencao.filter((m) => m.estado === 'Descartar').length)} para descartar`, tone: materiaisAtencao.length ? 'warn' : undefined }),
+  });
+  add(can('adm'), {
+    id: 'x-terceirizados', titulo: 'Próximos serviços terceirizados', tipo: 'painel', extra: { area: 'Administrativo', descricao: 'Serviços terceirizados ativos, pela data do próximo atendimento ou pagamento.' },
+    render: painel('Próximos serviços terceirizados', verTodos('/adm/terceirizados'), (
+      <MiniLista vazio="Nenhum serviço terceirizado ativo." itens={[...terceirosAtivos].sort((a, b) => String(a.proximo ?? '9999').localeCompare(String(b.proximo ?? '9999'))).slice(0, 8).map((t) => ({
+        key: t.id, principal: String(t.servico ?? 'Serviço'), detalhe: [t.empresa, t.proximo ? `próximo ${dateBR(t.proximo)}` : t.periodicidade].filter(Boolean).join(' · '),
+        valor: t.valor ? brl(Number(t.valor)) : undefined,
+      }))} />
+    )),
+  });
+  add(can('adm'), {
+    id: 'x-custo-terceirizados', titulo: 'Terceirizados por mês', tipo: 'kpi', extra: { area: 'Administrativo', descricao: 'Custo mensal dos serviços terceirizados ativos cobrados por mês.' },
+    render: kpi({ label: 'Terceirizados por mês', value: brl(sumBy(terceirosAtivos.filter((t) => t.periodicidade === 'Mensal'))), hint: `${num(terceirosAtivos.length)} serviços ativos` }),
+  });
+  add(can('fin'), {
+    id: 'x-receitas-categoria', titulo: 'Receitas por categoria', tipo: 'painel', extra: { area: 'Financeiro', descricao: 'De onde veio a receita do mês, por categoria.' },
+    render: painel('Receitas por categoria', <span className="muted small">{monthName(mes)}</span>, (() => {
+      const cat = Object.entries(receitasMes.reduce<Record<string, number>>((acc, r) => {
+        acc[String(r.categoria ?? 'Outros')] = (acc[String(r.categoria ?? 'Outros')] ?? 0) + (Number(r.valor) || 0);
+        return acc;
+      }, {})).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
+      return cat.length ? <HBarList data={cat} format={brl} /> : <p className="muted pad">Nenhuma receita neste mês.</p>;
+    })()),
+  });
+  add(can('fin'), {
+    id: 'x-pago-mes', titulo: 'Pago no mês', tipo: 'kpi', extra: { area: 'Financeiro', descricao: 'Total de despesas do mês já marcadas como pagas.' },
+    render: kpi({ label: `Pago · ${monthName(mes)}`, value: brl(sumBy(pagoMes)), hint: `${num(pagoMes.length)} ${pagoMes.length === 1 ? 'conta paga' : 'contas pagas'}` }),
+  });
+  add(can('jur'), {
+    id: 'x-audiencias', titulo: 'Próximas audiências', tipo: 'painel', extra: { area: 'Jurídico', descricao: 'Audiências trabalhistas marcadas, da mais próxima à mais distante.' },
+    render: painel('Próximas audiências', verTodos('/juridico/trabalhista'), (
+      <MiniLista vazio="Nenhuma audiência marcada." itens={proximasAudiencias.slice(0, 8).map((p) => ({
+        key: p.id, principal: String(p.reclamante ?? p.numero ?? 'Processo'), detalhe: [p.assunto, `${dateBR(p.audiencia)} · ${vence(p.audiencia).replace('vence', 'é')}`].filter(Boolean).join(' · '),
+        tom: daysUntil(p.audiencia) <= 7 ? 'warn' as const : undefined,
+      }))} />
+    )),
+  });
+  add(can('jur'), {
+    id: 'x-consultorias', titulo: 'Consultorias em aberto', tipo: 'kpi', extra: { area: 'Jurídico', descricao: 'Demandas de consultoria empresarial ainda não concluídas.' },
+    render: kpi({ label: 'Consultorias em aberto', value: num(consultoriasAbertas.length), hint: `${num(consultoriasAbertas.filter((c) => c.prazo && daysUntil(c.prazo) < 0).length)} com prazo vencido` }),
+  });
+  add(can('fis'), {
+    id: 'x-ncs-abertas', titulo: 'Não conformidades abertas', tipo: 'painel', extra: { area: 'Fiscalização', descricao: 'Não conformidades ainda não resolvidas, das mais graves para as mais leves.' },
+    render: painel('Não conformidades abertas', verTodos('/fiscalizacao/nao-conformidades'), (
+      <MiniLista vazio="Nenhuma não conformidade aberta." itens={ncsAbertas.slice(0, 8).map((n) => ({
+        key: n.id, principal: String(n.descricao ?? 'Não conformidade'), detalhe: [n.area, n.status, n.prazo ? `prazo ${dateBR(n.prazo)}` : null].filter(Boolean).join(' · '),
+        valor: String(n.gravidade ?? ''), tom: ['Alta', 'Crítica'].includes(String(n.gravidade)) ? 'bad' as const : 'warn' as const,
+      }))} />
+    )),
+  });
+  add(can('fis'), {
+    id: 'x-ultima-inspecao', titulo: 'Última inspeção', tipo: 'kpi', extra: { area: 'Fiscalização', descricao: 'Nota e resultado da inspeção de qualidade mais recente.' },
+    render: kpi({
+      label: 'Última inspeção', value: ultimaInspecao ? `${num(Number(ultimaInspecao.nota) || 0, 1)}` : '—',
+      hint: ultimaInspecao ? `${ultimaInspecao.area ?? ''} · ${dateBR(ultimaInspecao.data)} · ${ultimaInspecao.resultado ?? ''}` : 'nenhuma inspeção registrada',
+      tone: ultimaInspecao?.resultado === 'Não conforme' ? 'bad' : ultimaInspecao?.resultado === 'Conforme com ressalvas' ? 'warn' : ultimaInspecao ? 'good' : undefined,
+    }),
+  });
+  add(can('cfg'), {
+    id: 'x-usuarios', titulo: 'Usuários do sistema', tipo: 'kpi', extra: { area: 'Configurações', descricao: 'Usuários ativos do CRM e quantos entraram hoje.' },
+    render: kpi({ label: 'Usuários ativos', value: num(ativosSistema.length), hint: `${num(acessaramHoje)} entraram hoje` }),
+  });
+
+  return <PainelPersonalizavel blocos={blocos} {...info} />;
 }
 
 /* ---------- personalização: cada usuário escolhe a ordem, o que fica fixado no topo e o que fica oculto ---------- */
@@ -377,8 +595,8 @@ function blocoAtalho(path: string): Bloco | null {
   };
 }
 
-function PainelPersonalizavel({ blocos: proprios }: { blocos: Bloco[] }) {
-  const { prefs, salvar } = usePainelPrefs();
+function PainelPersonalizavel({ blocos: proprios, chave, titulo, descricao }: { blocos: Bloco[] } & PainelInfo) {
+  const { prefs, salvar } = usePainelPrefs(chave);
   const { access } = useSession();
   // atalhos de páginas adicionadas pelo menu, só das áreas que a pessoa ainda acessa
   // blocos extras só entram depois de adicionados pelo catálogo
@@ -389,6 +607,10 @@ function PainelPersonalizavel({ blocos: proprios }: { blocos: Bloco[] }) {
   ];
   const [editando, setEditando] = useState(false);
   const [vendoCatalogo, setVendoCatalogo] = useState(false);
+  const [areaCatalogo, setAreaCatalogo] = useState('');
+  // áreas do catálogo na mesma ordem do menu ("Geral" primeiro)
+  const ordemAreas = ['Geral', ...AREAS.map((a) => a.label)];
+  const areasCatalogo = [...new Set(catalogo.map((b) => b.extra!.area))].sort((x, y) => ordemAreas.indexOf(x) - ordemAreas.indexOf(y));
   const [menu, setMenu] = useState<(MenuPos & { id: string }) | null>(null);
   const [arrastando, setArrastando] = useState<string | null>(null);
   const [sobre, setSobre] = useState<string | null>(null);
@@ -502,8 +724,8 @@ function PainelPersonalizavel({ blocos: proprios }: { blocos: Bloco[] }) {
   return (
     <div className="page">
       <PageHead
-        title="Painel executivo"
-        description="Visão consolidada de todas as áreas, atualizada com os dados lançados no sistema e no aplicativo."
+        title={titulo}
+        description={descricao}
         actions={<>
           {catalogo.length > 0 && <button className="btn btn--ghost" onClick={() => setVendoCatalogo(true)}><Plus size={16} /> Adicionar bloco</button>}
           {!editando && <button className="btn btn--ghost" onClick={() => setEditando(true)}><SlidersHorizontal size={16} /> Personalizar</button>}
@@ -514,7 +736,7 @@ function PainelPersonalizavel({ blocos: proprios }: { blocos: Bloco[] }) {
         <div className="customize-bar">
           <div className="customize-bar__text">
             <strong>Personalizando o seu painel</strong>
-            <span className="muted small">Arraste os blocos para mudar a ordem ou para a área “Fixados” no topo. Use “Adicionar bloco” para novos indicadores e listas; para uma página do sistema, clique com o botão direito nela no menu → “Adicionar ao painel”. As escolhas ficam salvas na sua conta.</span>
+            <span className="muted small">Arraste os blocos para mudar a ordem ou para a área “Fixados” no topo. Use “Adicionar bloco” para novos indicadores e listas; para uma página do sistema, clique com o botão direito nela no menu → “Adicionar ao meu painel”. As escolhas ficam salvas na sua conta.</span>
           </div>
           {ocultos.size > 0 && (
             <div className="customize-bar__hidden">
@@ -568,32 +790,41 @@ function PainelPersonalizavel({ blocos: proprios }: { blocos: Bloco[] }) {
         <Modal title="Adicionar bloco ao painel" onClose={() => setVendoCatalogo(false)} width={860}>
           <p className="muted catalog__intro">
             Blocos além dos padrões. Os adicionados entram no fim do painel; depois é só arrastar, fixar ou remover.
-            Para colocar uma página do sistema, use o botão direito sobre ela no menu → “Adicionar ao painel”.
+            Para colocar uma página do sistema, use o botão direito sobre ela no menu → “Adicionar ao meu painel”.
           </p>
-          {(['kpi', 'painel'] as const).map((tipo) => {
-            const lista = catalogo.filter((b) => b.tipo === tipo);
-            if (!lista.length) return null;
-            return (
-              <section key={tipo} className="catalog__group">
-                <h3 className="catalog__title">{tipo === 'kpi' ? 'Indicadores' : 'Painéis e listas'}</h3>
-                <div className="catalog">
-                  {lista.map((b) => {
-                    const ativo = prefs.extras.includes(b.id);
-                    return (
-                      <div key={b.id} className={`catalog__item ${ativo ? 'is-active' : ''}`}>
-                        <span className="catalog__area">{b.extra!.area}</span>
-                        <strong>{b.titulo}</strong>
-                        <span className="muted small">{b.extra!.descricao}</span>
-                        <button className={`btn btn--sm ${ativo ? 'btn--ghost' : 'btn--primary'}`} onClick={() => alternarExtra(b.id)}>
-                          {ativo ? <><Check size={14} /> Adicionado · remover</> : <><Plus size={14} /> Adicionar</>}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            );
-          })}
+          <div className="catalog__tabs" role="tablist" aria-label="Filtrar por área">
+            {['', ...areasCatalogo].map((a) => (
+              <button key={a || 'todas'} role="tab" aria-selected={areaCatalogo === a} className={areaCatalogo === a ? 'is-active' : ''} onClick={() => setAreaCatalogo(a)}>
+                {a || 'Todas'}
+                <span>{a ? catalogo.filter((b) => b.extra!.area === a).length : catalogo.length}</span>
+              </button>
+            ))}
+          </div>
+          <div className="catalog__scroll">
+            {areasCatalogo.filter((a) => !areaCatalogo || a === areaCatalogo).map((a) => {
+              const lista = catalogo.filter((b) => b.extra!.area === a).sort((x, y) => (x.tipo === y.tipo ? 0 : x.tipo === 'kpi' ? -1 : 1));
+              return (
+                <section key={a} className="catalog__group">
+                  <h3 className="catalog__title">{a} <span>{lista.filter((b) => prefs.extras.includes(b.id)).length} de {lista.length} no painel</span></h3>
+                  <div className="catalog">
+                    {lista.map((b) => {
+                      const ativo = prefs.extras.includes(b.id);
+                      return (
+                        <div key={b.id} className={`catalog__item ${ativo ? 'is-active' : ''}`}>
+                          <span className="catalog__type">{b.tipo === 'kpi' ? 'Indicador' : 'Painel'}</span>
+                          <strong>{b.titulo}</strong>
+                          <span className="muted small">{b.extra!.descricao}</span>
+                          <button className={`btn btn--sm ${ativo ? 'btn--ghost' : 'btn--primary'}`} onClick={() => alternarExtra(b.id)}>
+                            {ativo ? <><Check size={14} /> Adicionado · remover</> : <><Plus size={14} /> Adicionar</>}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
         </Modal>
       )}
     </div>

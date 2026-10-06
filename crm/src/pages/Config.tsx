@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Lock, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
-import { AREAS, type Access, type AreaKey } from '../modules';
+import { AREAS_COM_PERMISSAO as AREAS, type Access, type AreaKey } from '../modules';
 import { AsyncButton, Badge, EmptyState, ErrorBox, Loading, Modal, NumberInput, PageHead, notify } from '../components/ui';
 import { api } from '../lib/api';
 import { SelectPicker } from '../components/pickers';
@@ -390,33 +390,5 @@ export function Parametros() {
         </section>
       </fieldset>
     </div>
-  );
-}
-
-/* ---------------- Alterar senha ---------------- */
-export function ChangePassword({ onClose }: { onClose: () => void }) {
-  const [form, setForm] = useState({ atual: '', nova: '', confirma: '' });
-  const [error, setError] = useState<string | null>(null);
-  const save = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (form.nova !== form.confirma) return setError('As senhas não conferem.');
-    try {
-      await api('/crm/me/senha', { method: 'PUT', body: { atual: form.atual, nova: form.nova } });
-      notify('Senha alterada');
-      onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível alterar.');
-    }
-  };
-  return (
-    <Modal title="Alterar senha" onClose={onClose} width={460}
-      footer={<><span className="spacer" /><button className="btn btn--ghost" onClick={onClose}>Cancelar</button><button className="btn btn--primary" form="pw-form">Salvar</button></>}>
-      <form id="pw-form" className="form-grid form-grid--single" onSubmit={save}>
-        <div className="form-field"><label htmlFor="pw-a">Senha atual</label><input id="pw-a" className="input" type="password" autoComplete="current-password" required value={form.atual} onChange={(e) => setForm({ ...form, atual: e.target.value })} /></div>
-        <div className="form-field"><label htmlFor="pw-n">Nova senha</label><input id="pw-n" className="input" type="password" autoComplete="new-password" minLength={8} required value={form.nova} onChange={(e) => setForm({ ...form, nova: e.target.value })} /></div>
-        <div className="form-field"><label htmlFor="pw-c">Confirme a nova senha</label><input id="pw-c" className="input" type="password" autoComplete="new-password" minLength={8} required value={form.confirma} onChange={(e) => setForm({ ...form, confirma: e.target.value })} /></div>
-        {error && <p className="error">{error}</p>}
-      </form>
-    </Modal>
   );
 }

@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useState, type ReactNode } from 'react';
+import { StrictMode, useEffect, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ShieldOff } from 'lucide-react';
@@ -11,11 +11,12 @@ import { CollectionPage } from './components/CollectionPage';
 import { EmptyState, Toasts } from './components/ui';
 import { ConfirmHost } from './components/pickers';
 import Login from './pages/Login';
-import Diretoria from './pages/Diretoria';
+import Diretoria, { MeuPainel } from './pages/Diretoria';
 import { Despesas, Folha, Receitas, Resultado } from './pages/Financeiro';
 import Monitoramento from './pages/Monitoramento';
 import { Clientes, Consumo, Reservas, Resgates } from './pages/Vendas';
-import { ChangePassword, Funcoes, Parametros, Usuarios } from './pages/Config';
+import { Funcoes, Parametros, Usuarios } from './pages/Config';
+import MeuPerfil from './pages/MeuPerfil';
 import './styles.css';
 
 /** Módulos de cadastro que usam a tela genérica. */
@@ -40,6 +41,8 @@ const GENERIC: Record<string, string> = {
 };
 
 const CUSTOM: Record<string, () => ReactNode> = {
+  '/perfil': () => <MeuPerfil />,
+  '/perfil/painel': () => <MeuPainel />,
   '/diretoria': () => <Diretoria />,
   '/rh/folha': () => <Folha />,
   '/financeiro/receitas': () => <Receitas />,
@@ -71,20 +74,13 @@ function Guard({ area, children }: { area: AreaKey; children: ReactNode }) {
 
 function Home() {
   const { access } = useSession();
-  const first = AREAS.find((a) => access(a.key) !== 'none');
-  if (!first) {
-    return (
-      <div className="page">
-        <EmptyState title="Nenhuma área liberada">Sua função ainda não tem acesso a nenhuma área. Fale com o administrador do sistema.</EmptyState>
-      </div>
-    );
-  }
-  return <Navigate to={first.items[0].path} replace />;
+  // abre a primeira área liberada pela função; quem ainda não tem nenhuma cai no próprio painel (Meu perfil)
+  const first = AREAS.find((a) => !a.pessoal && access(a.key) !== 'none');
+  return <Navigate to={first ? first.items[0].path : '/perfil/painel'} replace />;
 }
 
 function App() {
   const { ready, usuario } = useSession();
-  const [pw, setPw] = useState(false);
 
   useEffect(() => {
     if (!usuario) return;
@@ -97,7 +93,7 @@ function App() {
 
   const paths = AREAS.flatMap((a) => a.items.map((i) => i.path));
   return (
-    <Layout onChangePassword={() => setPw(true)}>
+    <Layout>
       <Routes>
         <Route path="/" element={<Home />} />
         {paths.map((p) => {
@@ -107,7 +103,6 @@ function App() {
         })}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      {pw && <ChangePassword onClose={() => setPw(false)} />}
     </Layout>
   );
 }

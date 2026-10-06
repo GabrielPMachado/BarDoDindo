@@ -17,17 +17,20 @@ const PATH = '/crm/preferencias';
 const lista = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
 const normalizar = (p?: Partial<PainelPrefs>): PainelPrefs => ({ ordem: lista(p?.ordem), fixados: lista(p?.fixados), ocultos: lista(p?.ocultos), atalhos: lista(p?.atalhos), extras: lista(p?.extras) });
 
-/** Preferências do painel, salvas na conta do usuário (valem em qualquer computador). */
-export function usePainelPrefs() {
-  const { data, loading } = useResource<{ painel?: Partial<PainelPrefs> }>(PATH);
+/** Qual painel: o executivo (Diretoria) ou o painel próprio de cada usuário (Meu perfil → Meu painel). */
+export type PainelChave = 'painel' | 'meuPainel';
+
+/** Preferências de um painel, salvas na conta do usuário (valem em qualquer computador). */
+export function usePainelPrefs(chave: PainelChave = 'painel') {
+  const { data, loading } = useResource<Partial<Record<PainelChave, Partial<PainelPrefs>>>>(PATH);
   // mostra a mudança na hora; a cópia salva substitui esta assim que volta do servidor
   const [local, setLocal] = useState<PainelPrefs | null>(null);
-  const prefs = local ?? normalizar(data?.painel);
+  const prefs = local ?? normalizar(data?.[chave]);
 
   const salvar = async (painel: PainelPrefs) => {
     setLocal(painel);
     try {
-      await api(PATH, { method: 'PUT', body: { painel } });
+      await api(PATH, { method: 'PUT', body: { [chave]: painel } });
       await reload(PATH);
     } finally {
       setLocal(null);
