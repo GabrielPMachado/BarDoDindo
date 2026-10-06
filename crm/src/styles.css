@@ -540,6 +540,22 @@ select.input { appearance: none; padding-right: 30px; background-image: linear-g
 @media (max-width: 1100px) { .bloco--p { grid-column: span 4; } .bloco--g { grid-column: span 12; } }
 @media (max-width: 860px) { .bloco--p { grid-column: span 6; } .bloco--m, .bloco--g { grid-column: span 12; } }
 @media (max-width: 640px) { .blocos { gap: 10px; } }
+/* grade livre (área principal do painel): o bloco ocupa a célula inteira e o conteúdo rola dentro dele */
+.grade-livre { min-height: 60px; }
+.grade-livre.is-editing {
+  border-radius: 12px;
+  background-image: linear-gradient(to right, #c4572a14 1px, transparent 1px);
+  background-size: calc((100% + 16px) / 12) 100%;
+}
+.bloco--livre { display: flex; flex-direction: column; }
+.bloco--livre > .kpi, .bloco--livre > .panel { flex: 1; min-height: 0; overflow: auto; }
+.grade-livre .react-grid-item.react-grid-placeholder { background: var(--brand); opacity: .18; border-radius: var(--radius); }
+.grade-livre .react-grid-item.react-draggable-dragging { z-index: 5; box-shadow: 0 18px 40px #000a; border-radius: var(--radius); }
+.grade-livre .react-resizable-handle { z-index: 4; }
+.grade-livre .react-resizable-handle::after { border-color: var(--brand-light) !important; width: 8px !important; height: 8px !important; }
+.bloco--livre .bloco__grip { display: grid !important; cursor: grab; touch-action: none; }
+.bloco--livre.is-editing { cursor: default; }
+
 /* blocos estreitos: no modo Personalizar os botões ficam numa linha acima do conteúdo, sem cobrir o título */
 .bloco--p.is-editing .bloco__tools { position: static; align-self: flex-end; margin-bottom: 6px; box-shadow: none; }
 .bloco--p.is-editing .kpi__label, .bloco--p.is-editing .panel__head { padding-right: 0; }

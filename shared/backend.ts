@@ -610,6 +610,15 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       // largura escolhida para cada bloco (¼, ½, ¾ ou a linha inteira)
       tamanhos: Object.fromEntries(Object.entries(p.tamanhos && typeof p.tamanhos === 'object' ? p.tamanhos : {})
         .filter(([id, t]) => ids([id]).length === 1 && ['p', 'm', 'g', 'c'].includes(t as string)).slice(0, 60)),
+      // posição livre de cada bloco na grade (x, y e largura em colunas de 0 a 12; altura em linhas)
+      layout: Object.fromEntries(Object.entries(p.layout && typeof p.layout === 'object' ? p.layout : {})
+        .filter(([id]) => ids([id]).length === 1)
+        .map(([id, v]) => {
+          const q = (v ?? {}) as Dados;
+          const n = (x: unknown, min: number, max: number) => Math.min(max, Math.max(min, Math.round(Number(x) || 0)));
+          const x = n(q.x, 0, 11);
+          return [id, { x, y: n(q.y, 0, 999), w: Math.min(n(q.w, 1, 12), 12 - x), h: n(q.h, 1, 60) }];
+        }).slice(0, 60)),
     });
     // "painel" é o Painel executivo; "meuPainel" é o painel próprio (Meu perfil → Meu painel). Grava só o que veio.
     const salvo: Dados = {};
