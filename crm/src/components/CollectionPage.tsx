@@ -10,7 +10,7 @@ import { AsyncButton, Badge, checkRange, EmptyState, ErrorBox, FieldInput, KpiRo
 import { RefPicker } from './pickers';
 import { reduzirFoto } from './Avatar';
 import { ContextMenu, type MenuPos } from './ContextMenu';
-import { colunasDe, exportarExcel, exportarPdf } from '../lib/exportar';
+import { colunasDe, exportarCsv, exportarExcel, exportarPdf } from '../lib/exportar';
 
 const PAGE = 50;
 
@@ -44,11 +44,6 @@ function formatComputed(c: Computed, r: Row): ReactNode {
     c.format === 'money' ? brl(Number(v)) : c.format === 'percent' ? pct(Number(v)) : c.format === 'number' ? num(Number(v)) : String(v);
   if (c.format === 'badge') return <Badge tone={tone ?? toneOf(v)}>{text}</Badge>;
   return tone && tone !== 'neutral' ? <span className={`text-${tone}`}>{text}</span> : text;
-}
-
-function csvValue(v: unknown) {
-  const s = v === undefined || v === null ? '' : String(v);
-  return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 export function CollectionPage({ def, rowActions, before, newDefaults, filterRows }: {
@@ -118,16 +113,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
       setExportando(false);
     }
   };
-  const exportCsv = () => {
-    const header = [...def.fields.map((f) => f.label), ...(def.computed ?? []).map((c) => c.label)];
-    const lines = rows.map((r) => [...def.fields.map((f) => csvValue(r[f.key])), ...(def.computed ?? []).map((c) => csvValue(c.get(r)))].join(';'));
-    const blob = new Blob(['﻿' + [header.join(';'), ...lines].join('\n')], { type: 'text/csv;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `${def.id}-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  };
+  const exportCsv = () => exportarCsv(colunasDe(def), rows, `${def.id}-${new Date().toISOString().slice(0, 10)}`);
 
   const toggleSort = (key: string) =>
     setSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }));
