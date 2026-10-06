@@ -29,6 +29,10 @@ service cloud.firestore {
     function podeVer(area) { return pode(area, 'ver'); }
     // cópias espelhadas, histórico e saldos acompanham qualquer alteração na área
     function podeAlterar(area) { return pode(area, 'criar') || pode(area, 'editar') || pode(area, 'excluir'); }
+    // função Administrador (de sistema): a única que pode zerar o sistema
+    function sistema() { return daEquipe() && funcao().get('sistema', false) == true; }
+    // zerar o sistema: o último lote apaga o registro do primeiro acesso junto com o próprio usuário e a função Administrador
+    function zerando() { return sistema() && !existsAfter(caminho('meta', 'setup')); }
 
     // área (permissão) de cada coleção de cadastro do CRM
     function areas() {
@@ -64,6 +68,8 @@ service cloud.firestore {
         && request.resource.data.acao is string && request.resource.data.acao.size() <= 120
         && request.resource.data.alvo is string && request.resource.data.alvo.size() <= 160
         && request.resource.data.detalhe is string && request.resource.data.detalhe.size() <= 300;
+      // só o Administrador, ao zerar o sistema
+      allow delete: if sistema();
     }
 
     /* ---------- preferências de cada usuário (painel executivo personalizado) ---------- */
@@ -84,6 +90,7 @@ service cloud.firestore {
         && request.resource.data.get('paginas', []) is list && request.resource.data.get('paginas', []).size() <= 30
         && painelOk(request.resource.data.get('painel', {}))
         && painelOk(request.resource.data.get('meuPainel', {}));
+      allow delete: if sistema();
     }
 
     /* ---------- primeiro acesso ---------- */
@@ -96,6 +103,7 @@ service cloud.firestore {
     match /meta/setup {
       allow read: if true;
       allow create: if primeiroAcesso();
+      allow delete: if sistema();
     }
 
     match /usuarios/{uid} {
@@ -111,7 +119,7 @@ service cloud.firestore {
           && request.resource.data.get('telefone', '') is string && request.resource.data.get('telefone', '').size() <= 20
           && request.resource.data.get('nascimento', '') is string && request.resource.data.get('nascimento', '').size() <= 10
           && request.resource.data.get('sobre', '') is string && request.resource.data.get('sobre', '').size() <= 500);
-      allow delete: if pode('cfg', 'excluir') && request.auth.uid != uid;
+      allow delete: if (pode('cfg', 'excluir') && request.auth.uid != uid) || (request.auth.uid == uid && zerando());
     }
 
     match /funcoes/{id} {
@@ -119,7 +127,7 @@ service cloud.firestore {
       allow create: if (pode('cfg', 'criar') && request.resource.data.get('sistema', false) != true)
         || (id == 'admin' && primeiroAcesso());
       allow update: if pode('cfg', 'editar') && resource.data.get('sistema', false) != true && request.resource.data.get('sistema', false) != true;
-      allow delete: if pode('cfg', 'excluir') && resource.data.get('sistema', false) != true;
+      allow delete: if (pode('cfg', 'excluir') && resource.data.get('sistema', false) != true) || zerando();
     }
 
     match /config/{id} {
@@ -167,6 +175,10 @@ service cloud.firestore {
       allow read: if true;
       allow create: if request.resource.data.clientes == 1 && novoCliente();
       allow update: if request.resource.data.clientes == resource.data.clientes + 1 && novoCliente();
+      // o Administrador ajusta a numeração (ex.: depois de excluir afilhados de teste) ou a apaga ao zerar o sistema
+      allow create, update: if pode('cfg', 'editar') && request.resource.data.keys().hasOnly(['clientes'])
+        && request.resource.data.clientes is int && request.resource.data.clientes >= 0;
+      allow delete: if sistema();
     }
     match /clientes/{uid} {
       allow read: if logado() && (request.auth.uid == uid || podeVer('atd') || podeVer('vnd') || podeVer('mkt'));
@@ -176,6 +188,8 @@ service cloud.firestore {
         && existsAfter(caminho('saldos', uid));
       allow update: if logado() && request.auth.uid == uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nome', 'telefone', 'foto']);
+      // excluir o afilhado (a pedido dele, LGPD) ou ao zerar o sistema
+      allow delete: if pode('vnd', 'excluir');
     }
 
     // saldo de pontos usado para validar resgates: quem credita é a equipe; o cliente só debita junto com um voucher
