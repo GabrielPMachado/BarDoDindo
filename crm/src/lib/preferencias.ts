@@ -9,11 +9,13 @@ export interface PainelPrefs {
   ocultos: string[];
   /** Páginas do CRM adicionadas ao painel (botão direito no menu → Adicionar ao painel). */
   atalhos: string[];
+  /** Blocos do catálogo adicionados além dos padrões (botão "Adicionar bloco"). */
+  extras: string[];
 }
 
 const PATH = '/crm/preferencias';
 const lista = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
-const normalizar = (p?: Partial<PainelPrefs>): PainelPrefs => ({ ordem: lista(p?.ordem), fixados: lista(p?.fixados), ocultos: lista(p?.ocultos), atalhos: lista(p?.atalhos) });
+const normalizar = (p?: Partial<PainelPrefs>): PainelPrefs => ({ ordem: lista(p?.ordem), fixados: lista(p?.fixados), ocultos: lista(p?.ocultos), atalhos: lista(p?.atalhos), extras: lista(p?.extras) });
 
 /** Preferências do painel, salvas na conta do usuário (valem em qualquer computador). */
 export function usePainelPrefs() {
