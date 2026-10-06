@@ -13,7 +13,10 @@ import Perfil from './pages/Perfil';
 import Entrar from './pages/Entrar';
 import './styles.css';
 
-registerSW({ immediate: true });
+// na primeira visita o service worker é só instalado: recarregar ali apagava o formulário de quem já estava se cadastrando.
+// A página só recarrega quando uma versão nova substitui uma que já controlava o app.
+const jaControlado = typeof navigator !== 'undefined' && !!navigator.serviceWorker?.controller;
+registerSW({ immediate: true, onNeedReload: () => { if (jaControlado) window.location.reload(); } });
 
 function ScrollTop() {
   const { pathname } = useLocation();

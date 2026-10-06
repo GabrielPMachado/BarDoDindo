@@ -11,11 +11,26 @@ export interface PainelPrefs {
   atalhos: string[];
   /** Blocos do catálogo adicionados além dos padrões (botão "Adicionar bloco"). */
   extras: string[];
+  /** Largura escolhida para cada bloco; os que não estão aqui usam o tamanho padrão do tipo. */
+  tamanhos: Record<string, Tamanho>;
 }
+
+/** Largura de um bloco no painel: ¼, ½, ¾ ou a linha inteira. */
+export type Tamanho = 'p' | 'm' | 'g' | 'c';
+export const TAMANHOS: { valor: Tamanho; nome: string; fracao: string }[] = [
+  { valor: 'p', nome: 'Pequeno', fracao: '¼' },
+  { valor: 'm', nome: 'Médio', fracao: '½' },
+  { valor: 'g', nome: 'Grande', fracao: '¾' },
+  { valor: 'c', nome: 'Linha inteira', fracao: '1' },
+];
 
 const PATH = '/crm/preferencias';
 const lista = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
-const normalizar = (p?: Partial<PainelPrefs>): PainelPrefs => ({ ordem: lista(p?.ordem), fixados: lista(p?.fixados), ocultos: lista(p?.ocultos), atalhos: lista(p?.atalhos), extras: lista(p?.extras) });
+const tamanhos = (v: unknown): Record<string, Tamanho> =>
+  Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : {}).filter(([, t]) => TAMANHOS.some((x) => x.valor === t))) as Record<string, Tamanho>;
+const normalizar = (p?: Partial<PainelPrefs>): PainelPrefs => ({
+  ordem: lista(p?.ordem), fixados: lista(p?.fixados), ocultos: lista(p?.ocultos), atalhos: lista(p?.atalhos), extras: lista(p?.extras), tamanhos: tamanhos(p?.tamanhos),
+});
 
 /** Qual painel: o executivo (Diretoria) ou o painel próprio de cada usuário (Meu perfil → Meu painel). */
 export type PainelChave = 'painel' | 'meuPainel';

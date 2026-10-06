@@ -147,6 +147,13 @@ h1, h2, h3, p { margin: 0; }
 .ctx button:hover { background: var(--surface-3); }
 .ctx button:hover svg { color: var(--brand-light); }
 .ctx__sep { height: 1px; margin: 5px 4px; background: var(--border); }
+.ctx button:disabled { opacity: .4; cursor: default; background: none; }
+.ctx__label { padding: 6px 10px 4px; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+.ctx__sizes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 0 4px 2px; }
+.ctx .ctx__sizes button { flex-direction: column; align-items: stretch; gap: 6px; padding: 8px; font-size: 12px; border: 1px solid var(--border); text-align: center; }
+.ctx .ctx__sizes button.is-active { border-color: var(--brand); background: #c4572a1f; color: var(--brand-light); }
+.ctx__size-bar { display: block; height: 6px; border-radius: 3px; background: var(--surface-3); overflow: hidden; }
+.ctx__size-bar i { display: block; height: 100%; border-radius: 3px; background: var(--brand); }
 
 /* atualizações (botão ao lado do perfil e painel) */
 .topbar-btn { position: relative; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 10px; border: 1px solid var(--border); color: var(--muted); margin-right: 10px; }
@@ -523,6 +530,19 @@ select.input { appearance: none; padding-right: 30px; background-image: linear-g
 
 /* ---------- painel executivo personalizável ---------- */
 .bloco { position: relative; display: flex; flex-direction: column; min-width: 0; border-radius: var(--radius); }
+/* painel personalizável: uma grade de 12 colunas; cada bloco ocupa ¼, ½, ¾ ou a linha inteira, na ordem escolhida */
+.blocos { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.bloco--p { grid-column: span 3; }
+.bloco--m { grid-column: span 6; }
+.bloco--g { grid-column: span 9; }
+.bloco--c { grid-column: span 12; }
+.bloco--painel { align-self: stretch; }
+@media (max-width: 1100px) { .bloco--p { grid-column: span 4; } .bloco--g { grid-column: span 12; } }
+@media (max-width: 860px) { .bloco--p { grid-column: span 6; } .bloco--m, .bloco--g { grid-column: span 12; } }
+@media (max-width: 640px) { .blocos { gap: 10px; } }
+/* blocos estreitos: no modo Personalizar os botões ficam numa linha acima do conteúdo, sem cobrir o título */
+.bloco--p.is-editing .bloco__tools { position: static; align-self: flex-end; margin-bottom: 6px; box-shadow: none; }
+.bloco--p.is-editing .kpi__label, .bloco--p.is-editing .panel__head { padding-right: 0; }
 .bloco > .kpi, .bloco > .panel { flex: 1; }
 .bloco__pin { position: absolute; top: 10px; right: 10px; z-index: 2; color: var(--brand); opacity: .85; pointer-events: none; }
 .bloco.is-editing { cursor: grab; }

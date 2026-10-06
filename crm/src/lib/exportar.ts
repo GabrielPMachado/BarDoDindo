@@ -32,14 +32,15 @@ export function colunasDe(def: CollectionDef): Coluna[] {
   }
   for (const c of def.computed ?? []) {
     const tipo: TipoColuna = c.format === 'money' ? 'dinheiro' : c.format === 'number' ? 'numero' : c.format === 'percent' ? 'percentual' : c.format === 'badge' ? 'status' : 'texto';
-    cols.push({ titulo: c.label, tipo, valor: c.get });
+    // percentuais calculados vêm como fração (0,743 = 74,3%); nas exportações, como nos campos, vão de 0 a 100
+    const valor = c.format === 'percent' ? (r: Row) => { const v = c.get(r); return v === null || v === undefined || v === '' ? v : Number(v) * 100; } : c.get;
+    cols.push({ titulo: c.label, tipo, valor });
   }
   return cols;
 }
 
 /* ---------- utilitários ---------- */
 const vazio = (v: unknown) => v === undefined || v === null || v === '';
-const numero = (v: unknown) => (vazio(v) ? null : Number(v));
 /** Texto de uma célula, para o PDF. */
 function texto(c: Coluna, r: Row): string {
   const v = c.valor(r);
@@ -101,108 +102,167 @@ function logoEmPng() {
 const ehFoto = (v: unknown): v is string => typeof v === 'string' && /^data:image\/(jpeg|png);base64,/.test(v);
 
 /* ---------- Excel ---------- */
+const CINZA_BORDA = 'FFE6E0DB';
+/**
+ * Posição exata de uma imagem: célula + deslocamento em pixels (convertido para EMU, a unidade do Excel).
+ * O ExcelJS converte posições fracionárias com uma conta errada, então passamos os valores nativos.
+ */
+const ancora = (col: number, px: number, row: number, py: number) =>
+  ({ nativeCol: col, nativeColOff: Math.round(px * 9525), nativeRow: row, nativeRowOff: Math.round(py * 9525) }) as unknown as { col: number; row: number };
+const ESCURO = 'FF1A1614';
+/** Largura (em caracteres) de cada coluna: pelo tipo e pelo conteúdo, com limites. */
+function larguraDe(c: Coluna, rows: Row[]) {
+  const titulo = c.titulo.length + 4; // espaço para a setinha do filtro
+  switch (c.tipo) {
+    case 'imagem': return 12;
+    case 'dinheiro': return Math.max(15, titulo);
+    case 'data': return Math.max(12, titulo);
+    case 'numero': case 'percentual': return Math.max(10, titulo);
+    case 'status': return Math.max(14, titulo, ...rows.slice(0, 300).map((r) => texto(c, r).length + 4));
+    default: {
+      const maior = Math.max(0, ...rows.slice(0, 300).map((r) => texto(c, r).length));
+      return Math.min(45, Math.max(14, titulo, Math.ceil(maior * 1.05) + 2));
+    }
+  }
+}
+
 export async function exportarExcel(titulo: string, colunas: Coluna[], rows: Row[], arquivo: string) {
   const ExcelJS = (await import('exceljs')).default;
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Bar do Dindo · Cérebro';
+  wb.title = titulo;
   wb.created = new Date();
-  const ws = wb.addWorksheet(titulo.slice(0, 31), { views: [{ state: 'frozen', ySplit: 4 }], pageSetup: { orientation: colunas.length > 6 ? 'landscape' : 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
-  const ultima = colunas.length;
   const temFoto = colunas.some((c) => c.tipo === 'imagem');
-
-  // larguras por tipo de coluna
-  colunas.forEach((c, i) => {
-    const col = ws.getColumn(i + 1);
-    col.width = c.tipo === 'imagem' ? 13 : c.tipo === 'dinheiro' ? 15 : c.tipo === 'data' ? 12 : c.tipo === 'numero' || c.tipo === 'percentual' ? 11 : c.tipo === 'status' ? 16
-      : Math.min(42, Math.max(12, c.titulo.length + 2, ...rows.slice(0, 200).map((r) => texto(c, r).length * 0.9)));
+  const ultima = colunas.length;
+  const ws = wb.addWorksheet(titulo.slice(0, 31), {
+    // sem as linhas de grade (a tabela tem bordas próprias); cabeçalho e primeira(s) coluna(s) fixos ao rolar
+    views: [{ state: 'frozen', ySplit: 4, xSplit: temFoto ? 2 : 1, showGridLines: false }],
+    pageSetup: {
+      paperSize: 9, orientation: colunas.length > 5 ? 'landscape' : 'portrait',
+      fitToPage: true, fitToWidth: 1, fitToHeight: 0, horizontalCentered: true, printTitlesRow: '4:4',
+      margins: { left: 0.4, right: 0.4, top: 0.6, bottom: 0.6, header: 0.3, footer: 0.3 },
+    },
+    headerFooter: { oddFooter: '&L&8Bar do Dindo · Cérebro — ' + titulo + '&R&8Página &P de &N' },
   });
 
-  // título com a logo
-  ws.mergeCells(1, 2, 1, Math.max(2, ultima));
-  ws.mergeCells(2, 2, 2, Math.max(2, ultima));
+  colunas.forEach((c, i) => { ws.getColumn(i + 1).width = larguraDe(c, rows); });
+  if (!temFoto && (ws.getColumn(1).width ?? 0) < 11) ws.getColumn(1).width = 11; // cabe a logo
+
+  /* faixa do título: fundo escuro, logo, título e dados da exportação */
   ws.getRow(1).height = 30;
-  ws.getRow(2).height = 18;
-  const t = ws.getCell(1, 2);
+  ws.getRow(2).height = 22;
+  ws.getRow(3).height = 5;
+  for (let col = 1; col <= ultima; col++) {
+    for (const r of [1, 2]) ws.getCell(r, col).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ESCURO } };
+    ws.getCell(3, col).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LARANJA } };
+  }
+  if (ultima > 1) {
+    ws.mergeCells(1, 2, 1, ultima);
+    ws.mergeCells(2, 2, 2, ultima);
+  }
+  const t = ws.getCell(1, Math.min(2, ultima));
   t.value = titulo;
-  t.font = { name: 'Calibri', size: 18, bold: true, color: { argb: 'FF1A1A1A' } };
-  t.alignment = { vertical: 'middle' };
-  const sub = ws.getCell(2, 2);
-  sub.value = `Bar do Dindo · Cérebro — exportado em ${agora()} · ${rows.length} ${rows.length === 1 ? 'registro' : 'registros'}`;
-  sub.font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF777777' } };
+  t.font = { name: 'Calibri', size: 18, bold: true, color: { argb: 'FFFFFFFF' } };
+  t.alignment = { vertical: 'bottom', indent: 1 };
+  const sub = ws.getCell(2, Math.min(2, ultima));
+  sub.value = `Bar do Dindo · Cérebro   |   Exportado em ${agora()}   |   ${rows.length} ${rows.length === 1 ? 'registro' : 'registros'}`;
+  sub.font = { name: 'Calibri', size: 10, color: { argb: 'FFE07A4C' } };
+  sub.alignment = { vertical: 'top', indent: 1 };
   try {
     const logo = wb.addImage({ base64: await logoEmPng(), extension: 'png' });
-    ws.addImage(logo, { tl: { col: 0.15, row: 0.1 }, ext: { width: 46, height: 46 } });
+    ws.addImage(logo, { tl: ancora(0, 9, 0, 4), ext: { width: 62, height: 62 } });
   } catch { /* sem logo, segue */ }
 
-  // cabeçalho
+  /* cabeçalho da tabela */
   const cab = ws.getRow(4);
+  cab.height = 30;
   colunas.forEach((c, i) => {
     const cel = cab.getCell(i + 1);
     cel.value = c.titulo;
-    cel.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    cel.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
     cel.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LARANJA } };
-    cel.alignment = { vertical: 'middle', horizontal: ['dinheiro', 'numero', 'percentual'].includes(c.tipo) ? 'right' : c.tipo === 'imagem' ? 'center' : 'left', wrapText: true };
-    cel.border = { bottom: { style: 'thin', color: { argb: 'FF8E3B1A' } } };
+    cel.alignment = {
+      vertical: 'middle', wrapText: true, indent: ['imagem', 'status', 'data'].includes(c.tipo) ? 0 : 1,
+      horizontal: ['dinheiro', 'numero', 'percentual'].includes(c.tipo) ? 'right' : ['imagem', 'status', 'data'].includes(c.tipo) ? 'center' : 'left',
+    };
+    cel.border = { left: { style: 'thin', color: { argb: 'FFD9774E' } }, right: { style: 'thin', color: { argb: 'FFD9774E' } }, bottom: { style: 'medium', color: { argb: 'FF8E3B1A' } } };
   });
-  cab.height = 22;
 
-  // linhas
-  const borda = { style: 'thin' as const, color: { argb: 'FFE2E2E2' } };
+  /* linhas */
+  const borda = { style: 'thin' as const, color: { argb: CINZA_BORDA } };
+  const alturaLinha = temFoto ? 64 : 21;
   for (let k = 0; k < rows.length; k++) {
     const r = rows[k];
     const linha = ws.getRow(5 + k);
+    linha.height = alturaLinha;
     colunas.forEach((c, i) => {
       const cel = linha.getCell(i + 1);
       const v = c.valor(r);
-      if (c.tipo === 'dinheiro') { cel.value = numero(v); cel.numFmt = '"R$" #,##0.00;[Red]-"R$" #,##0.00'; }
-      else if (c.tipo === 'numero') { cel.value = numero(v); cel.numFmt = Number.isInteger(Number(v)) ? '#,##0' : '#,##0.00'; }
-      else if (c.tipo === 'percentual') { cel.value = vazio(v) ? null : Number(v) / 100; cel.numFmt = '0.0%'; }
+      const fundo = k % 2 === 1 ? 'FFFBF7F4' : 'FFFFFFFF';
+      cel.font = { name: 'Calibri', size: 10.5, color: { argb: 'FF26221F' } };
+      cel.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fundo } };
+      cel.border = { top: borda, bottom: borda, left: borda, right: borda };
+      let horizontal: 'left' | 'right' | 'center' = 'left';
+      if (c.tipo === 'imagem') { cel.value = null; horizontal = 'center'; }
+      else if (vazio(v)) {
+        // vazio fica com um traço discreto, mais fácil de ler que a célula em branco
+        cel.value = '—';
+        cel.font = { name: 'Calibri', size: 10.5, color: { argb: 'FFB5ACA5' } };
+        horizontal = 'center';
+      } else if (c.tipo === 'dinheiro') { cel.value = Number(v); cel.numFmt = '"R$" #,##0.00;[Red]-"R$" #,##0.00'; horizontal = 'right'; }
+      else if (c.tipo === 'numero') { cel.value = Number(v); cel.numFmt = Number.isInteger(Number(v)) ? '#,##0' : '#,##0.00'; horizontal = 'right'; }
+      else if (c.tipo === 'percentual') { cel.value = Number(v) / 100; cel.numFmt = '0.0%'; horizontal = 'right'; }
       else if (c.tipo === 'data') {
-        const iso = String(v ?? '').slice(0, 10);
-        cel.value = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(`${iso}T12:00:00`) : null;
-        cel.numFmt = 'dd/mm/yyyy';
-      } else if (c.tipo === 'imagem') cel.value = null;
-      else cel.value = vazio(v) ? null : String(v);
-      cel.alignment = { vertical: 'middle', horizontal: c.tipo === 'imagem' ? 'center' : undefined, wrapText: c.tipo === 'texto' };
-      cel.border = { bottom: borda };
-      if (k % 2 === 1) cel.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFAF6F3' } };
-      if (c.tipo === 'status' && !vazio(v)) {
+        const iso = String(v).slice(0, 10);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) { cel.value = new Date(`${iso}T12:00:00`); cel.numFmt = 'dd/mm/yyyy'; } else cel.value = String(v);
+        horizontal = 'center';
+      } else if (c.tipo === 'status') {
         const cor = COR_TOM[toneOf(v)];
+        cel.value = String(v);
         cel.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + cor.fundo } };
-        cel.font = { bold: true, color: { argb: 'FF' + cor.texto } };
-      }
+        cel.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF' + cor.texto } };
+        horizontal = 'center';
+      } else cel.value = String(v);
+      // recuo dos dois lados: o texto não encosta na coluna vizinha
+      cel.alignment = { vertical: 'middle', horizontal, wrapText: c.tipo === 'texto', indent: horizontal === 'center' ? 0 : 1 };
     });
-    if (temFoto) linha.height = 60;
-    // fotos dentro da célula, mantendo a proporção
+    // fotos centralizadas dentro da célula, mantendo a proporção
     for (let i = 0; i < colunas.length; i++) {
       const v = colunas[i].valor(r);
       if (colunas[i].tipo !== 'imagem' || !ehFoto(v)) continue;
       const { w, h } = await medidas(v);
-      const lado = 72, esc = Math.min(lado / w, lado / h);
+      const larguraPx = (ws.getColumn(i + 1).width ?? 12) * 7 + 5;
+      const alturaPx = (alturaLinha * 96) / 72;
+      const esc = Math.min((larguraPx - 10) / w, (alturaPx - 10) / h);
+      const iw = w * esc, ih = h * esc;
       const img = wb.addImage({ base64: v, extension: v.startsWith('data:image/png') ? 'png' : 'jpeg' });
-      ws.addImage(img, { tl: { col: i + 0.08, row: 4 + k + 0.06 }, ext: { width: w * esc, height: h * esc } });
+      ws.addImage(img, { tl: ancora(i, (larguraPx - iw) / 2, 4 + k, (alturaPx - ih) / 2), ext: { width: iw, height: ih } });
     }
   }
 
-  // totais das colunas de dinheiro
-  const somas = colunas.map((c) => c.tipo === 'dinheiro');
-  if (rows.length && somas.some(Boolean)) {
-    const tot = ws.getRow(5 + rows.length);
-    const primeiraTexto = colunas.findIndex((c) => c.tipo !== 'imagem');
-    tot.getCell(primeiraTexto + 1).value = 'Total';
+  /* linha de total */
+  if (rows.length) {
+    const fim = 5 + rows.length;
+    const tot = ws.getRow(fim);
+    tot.height = 24;
+    const primeira = colunas.findIndex((c) => c.tipo !== 'imagem');
     colunas.forEach((c, i) => {
       const cel = tot.getCell(i + 1);
-      if (somas[i]) {
+      if (c.tipo === 'dinheiro') {
         const letra = ws.getColumn(i + 1).letter;
-        cel.value = { formula: `SUM(${letra}5:${letra}${4 + rows.length})` };
+        cel.value = { formula: `SUM(${letra}5:${letra}${fim - 1})` };
         cel.numFmt = '"R$" #,##0.00;[Red]-"R$" #,##0.00';
+        cel.alignment = { vertical: 'middle', horizontal: 'right', indent: 1 };
+      } else if (i === primeira) {
+        cel.value = `Total · ${rows.length} ${rows.length === 1 ? 'registro' : 'registros'}`;
+        cel.alignment = { vertical: 'middle', indent: 1 };
       }
-      cel.font = { bold: true };
-      cel.border = { top: { style: 'medium', color: { argb: 'FF' + LARANJA } } };
+      cel.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF1A1614' } };
+      cel.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF6E7DE' } };
+      cel.border = { top: { style: 'medium', color: { argb: 'FF' + LARANJA } }, bottom: { style: 'thin', color: { argb: CINZA_BORDA } } };
     });
-    tot.height = 20;
   }
-  ws.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4, column: ultima } };
+  ws.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4 + rows.length, column: ultima } };
 
   const buf = await wb.xlsx.writeBuffer();
   baixar(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `${arquivo}.xlsx`);
