@@ -1,13 +1,15 @@
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, ArrowRight, Check, Eye, EyeOff, GripVertical, Pin, PinOff, RotateCcw, SlidersHorizontal } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Check, Eye, EyeOff, GripVertical, LayoutDashboard, Pin, PinOff, Plus, RotateCcw, SlidersHorizontal, X } from 'lucide-react';
 import { BarChart, HBarList } from '../components/Charts';
 import { ContextMenu, type MenuPos } from '../components/ContextMenu';
-import { notify, PageHead } from '../components/ui';
+import { Modal, notify, PageHead } from '../components/ui';
+import { useAtividades } from '../components/Atividades';
 import { useCollection, useResource, type Row } from '../lib/data';
-import { brl, daysUntil, isoToday, monthLabel, num, pct } from '../lib/format';
+import { brl, dateBR, daysUntil, isoToday, monthLabel, num, pct } from '../lib/format';
 import { currentMonth, despesaValida, lastMonths, monthName, monthOf, sumBy } from '../lib/finance';
-import { usePainelPrefs, type PainelPrefs } from '../lib/preferencias';
+import { alternarAtalho, atalhoId, usePainelPrefs, type PainelPrefs } from '../lib/preferencias';
+import { findModule } from '../modules';
 import { useSession } from '../lib/session';
 import type { Kpi } from '../collections';
 
@@ -19,6 +21,34 @@ interface Bloco {
   titulo: string;
   tipo: 'kpi' | 'painel';
   render: () => ReactNode;
+  /** Página do CRM adicionada ao painel pelo menu (botão direito → Adicionar ao painel). */
+  atalho?: string;
+  /** Bloco do catálogo: só aparece depois que o usuário o adiciona ("Adicionar bloco"). */
+  extra?: { area: string; descricao: string };
+}
+
+/** Linha de uma lista curta dentro de um bloco (reservas de hoje, contas a pagar…). */
+interface ItemLista { key: string; principal: ReactNode; detalhe?: ReactNode; valor?: ReactNode; tom?: 'bad' | 'warn' }
+
+function MiniLista({ itens, vazio }: { itens: ItemLista[]; vazio: string }) {
+  if (!itens.length) return <p className="muted pad">{vazio}</p>;
+  return (
+    <ul className="mini-list">
+      {itens.map((i) => (
+        <li key={i.key} className={i.tom ? `is-${i.tom}` : ''}>
+          <div><strong>{i.principal}</strong>{i.detalhe && <span className="muted small">{i.detalhe}</span>}</div>
+          {i.valor !== undefined && <span className="mini-list__value">{i.valor}</span>}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Data local (AAAA-MM-DD) de um registro gravado com data e hora. */
+function diaDe(v: unknown) {
+  const d = new Date(String(v ?? ''));
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 export default function Diretoria() {
@@ -205,14 +235,160 @@ export default function Diretoria() {
     ),
   });
 
+  /* ---------- blocos extras (catálogo "Adicionar bloco"): só carregam dados quando o usuário os adiciona ---------- */
+  const { prefs } = usePainelPrefs();
+  const tem = (...ids: string[]) => ids.some((id) => prefs.extras.includes(id));
+  const vendas = can('atd') || can('mkt');
+  const consumos = useCollection('consumos', vendas && tem('x-vendas-hoje', 'x-ticket-mes', 'x-mais-vendidos')).rows;
+  const resgates = useCollection('resgates', vendas && tem('x-vouchers')).rows;
+  const ferias = useCollection('ferias', can('rh') && tem('x-ausentes')).rows;
+  const { items: atividades } = useAtividades();
+
+  const consumosHoje = consumos.filter((c) => diaDe(c.data) === hoje);
+  const consumosMes = consumos.filter((c) => diaDe(c.data).slice(0, 7) === mes);
+  const aPagar = despesas.filter((d) => d.status === 'A pagar').sort((a, b) => String(a.vencimento ?? '').localeCompare(String(b.vencimento ?? '')));
+  const semana = aPagar.filter((d) => daysUntil(d.vencimento) >= 0 && daysUntil(d.vencimento) <= 7);
+  const vencidas = aPagar.filter((d) => daysUntil(d.vencimento) < 0);
+  const ausentes = ferias.filter((f) => f.status !== 'Cancelado' && String(f.inicio ?? '') <= hoje && String(f.fim ?? '9999') >= hoje);
+  const maisVendidos = Object.entries(
+    consumosMes.reduce<Record<string, number>>((acc, c) => {
+      for (const i of (Array.isArray(c.itens) ? c.itens : []) as { nome?: string; quantidade?: number }[]) {
+        acc[String(i.nome ?? 'Item')] = (acc[String(i.nome ?? 'Item')] ?? 0) + (Number(i.quantidade) || 0);
+      }
+      return acc;
+    }, {}),
+  ).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value).slice(0, 6);
+  const reservasHoje = reservas
+    .filter((r) => r.data === hoje && !['Cancelada', 'Cancelada pelo cliente', 'Recusada'].includes(String(r.status)))
+    .sort((a, b) => String(a.hora ?? '').localeCompare(String(b.hora ?? '')));
+  const contratosAVencer = contratos
+    .filter((c) => c.status !== 'Encerrado' && c.vencimento && daysUntil(c.vencimento) <= 60)
+    .sort((a, b) => String(a.vencimento).localeCompare(String(b.vencimento)));
+  const vence = (v: unknown) => {
+    const d = daysUntil(v);
+    return d < 0 ? `venceu há ${-d} ${d === -1 ? 'dia' : 'dias'}` : d === 0 ? 'vence hoje' : `vence em ${d} ${d === 1 ? 'dia' : 'dias'}`;
+  };
+  const painel = (titulo: string, lado: ReactNode, conteudo: ReactNode) => () => (
+    <section className="panel">
+      <div className="panel__head"><h2>{titulo}</h2>{lado}</div>
+      {conteudo}
+    </section>
+  );
+  const verTodos = (to: string) => <Link to={to} className="link">Ver todos</Link>;
+
+  add(vendas, {
+    id: 'x-vendas-hoje', titulo: 'Vendas de hoje', tipo: 'kpi', extra: { area: 'Atendimento', descricao: 'Total lançado em comandas hoje e quantas foram.' },
+    render: kpi({ label: 'Vendas de hoje', value: brl(sumBy(consumosHoje)), hint: `${num(consumosHoje.length)} ${consumosHoje.length === 1 ? 'comanda' : 'comandas'}` }),
+  });
+  add(vendas, {
+    id: 'x-ticket-mes', titulo: 'Ticket médio do mês', tipo: 'kpi', extra: { area: 'Atendimento', descricao: 'Valor médio por comanda lançada no mês.' },
+    render: kpi({ label: `Ticket médio · ${monthName(mes)}`, value: consumosMes.length ? brl(sumBy(consumosMes) / consumosMes.length) : '—', hint: `${num(consumosMes.length)} comandas no mês` }),
+  });
+  add(vendas, {
+    id: 'x-vouchers', titulo: 'Vouchers a entregar', tipo: 'kpi', extra: { area: 'Atendimento', descricao: 'Recompensas resgatadas no aplicativo que ainda não foram entregues.' },
+    render: (() => {
+      const n = resgates.filter((r) => r.status === 'Disponível').length;
+      return kpi({ label: 'Vouchers a entregar', value: num(n), hint: 'resgatados e ainda não entregues', tone: n ? 'warn' : undefined });
+    })(),
+  });
+  add(can('fin'), {
+    id: 'x-contas-semana', titulo: 'A pagar em 7 dias', tipo: 'kpi', extra: { area: 'Financeiro', descricao: 'Soma das contas que vencem nos próximos 7 dias (e quantas já venceram).' },
+    render: kpi({
+      label: 'A pagar em 7 dias', value: brl(sumBy(semana)),
+      hint: vencidas.length ? `${num(vencidas.length)} ${vencidas.length === 1 ? 'conta vencida' : 'contas vencidas'}` : `${num(semana.length)} ${semana.length === 1 ? 'conta' : 'contas'}`,
+      tone: vencidas.length ? 'bad' : semana.length ? 'warn' : undefined,
+    }),
+  });
+  add(can('rh'), {
+    id: 'x-ausentes', titulo: 'Equipe ausente hoje', tipo: 'kpi', extra: { area: 'Pessoal (RH/DP)', descricao: 'Colaboradores de férias, atestado ou afastados hoje.' },
+    render: kpi({ label: 'Equipe ausente hoje', value: num(ausentes.length), hint: ausentes.length ? ausentes.slice(0, 2).map((f) => String(f.colaborador)).join(', ') + (ausentes.length > 2 ? '…' : '') : 'todos presentes' }),
+  });
+  add(can('atd'), {
+    id: 'x-reservas-hoje', titulo: 'Reservas de hoje', tipo: 'painel', extra: { area: 'Atendimento', descricao: 'Lista das reservas do dia, por horário, com o número de pessoas.' },
+    render: painel('Reservas de hoje', verTodos('/atendimento/reservas'), (
+      <MiniLista vazio="Nenhuma reserva para hoje." itens={reservasHoje.slice(0, 8).map((r) => ({
+        key: r.id, principal: `${r.hora ?? '--:--'} · ${r.clienteNome ?? 'Sem nome'}`,
+        detalhe: [r.ambiente, r.status].filter(Boolean).join(' · '), valor: `${num(Number(r.pessoas) || 0)} pess.`,
+        tom: r.status === 'Pendente' ? 'warn' as const : undefined,
+      }))} />
+    )),
+  });
+  add(vendas, {
+    id: 'x-mais-vendidos', titulo: 'Mais vendidos do mês', tipo: 'painel', extra: { area: 'Atendimento', descricao: 'Os produtos com mais unidades lançadas nas comandas do mês.' },
+    render: painel('Mais vendidos do mês', <span className="muted small">{monthName(mes)}</span>,
+      maisVendidos.length ? <HBarList data={maisVendidos} format={(v) => `${num(v)} un.`} /> : <p className="muted pad">Nenhum consumo lançado neste mês.</p>),
+  });
+  add(can('fin'), {
+    id: 'x-contas-pagar', titulo: 'Próximas contas a pagar', tipo: 'painel', extra: { area: 'Financeiro', descricao: 'As próximas despesas em aberto, por vencimento; as vencidas em vermelho.' },
+    render: painel('Próximas contas a pagar', verTodos('/financeiro/despesas'), (
+      <MiniLista vazio="Nenhuma conta em aberto." itens={aPagar.slice(0, 8).map((d) => ({
+        key: d.id, principal: String(d.descricao ?? 'Despesa'), detalhe: `${dateBR(d.vencimento)} · ${vence(d.vencimento)}`,
+        valor: brl(Number(d.valor) || 0), tom: daysUntil(d.vencimento) < 0 ? 'bad' as const : undefined,
+      }))} />
+    )),
+  });
+  add(can('dp'), {
+    id: 'x-estoque-baixo', titulo: 'Estoque baixo', tipo: 'painel', extra: { area: 'Estrutura', descricao: 'Itens com quantidade igual ou abaixo do mínimo cadastrado.' },
+    render: painel('Estoque baixo', verTodos('/estrutura/estoque'), (
+      <MiniLista vazio="Nenhum item abaixo do mínimo." itens={repor.slice(0, 8).map((r) => ({
+        key: r.id, principal: String(r.item ?? 'Item'), detalhe: String(r.categoria ?? ''),
+        valor: `${num(Number(r.quantidade) || 0)} / mín. ${num(Number(r.minimo) || 0)} ${r.unidade ?? ''}`, tom: 'bad' as const,
+      }))} />
+    )),
+  });
+  add(can('adm'), {
+    id: 'x-contratos', titulo: 'Contratos a vencer', tipo: 'painel', extra: { area: 'Administrativo', descricao: 'Contratos que vencem nos próximos 60 dias (ou já venceram).' },
+    render: painel('Contratos a vencer', verTodos('/adm/contratos'), (
+      <MiniLista vazio="Nenhum contrato vencendo nos próximos 60 dias." itens={contratosAVencer.slice(0, 8).map((c) => ({
+        key: c.id, principal: String(c.titulo ?? 'Contrato'), detalhe: `${c.parte ?? ''}${c.parte ? ' · ' : ''}${vence(c.vencimento)}`,
+        valor: c.valor ? brl(Number(c.valor)) : undefined, tom: daysUntil(c.vencimento) < 0 ? 'bad' as const : daysUntil(c.vencimento) <= 15 ? 'warn' as const : undefined,
+      }))} />
+    )),
+  });
+  add(true, {
+    id: 'x-atividades', titulo: 'Últimas atualizações', tipo: 'painel', extra: { area: 'Todas as áreas', descricao: 'O que a equipe fez por último no sistema, com quem fez e quando.' },
+    render: painel('Últimas atualizações', null, (
+      <MiniLista vazio="Nenhuma atualização registrada ainda." itens={atividades.slice(0, 8).map((a) => ({
+        key: a.id, principal: <>{a.usuarioNome} <span className="muted">{a.acao}</span> {a.alvo}</>,
+        detalhe: new Date(a.criadoEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+      }))} />
+    )),
+  });
+
   return <PainelPersonalizavel blocos={blocos} />;
 }
 
 /* ---------- personalização: cada usuário escolhe a ordem, o que fica fixado no topo e o que fica oculto ---------- */
 
-function PainelPersonalizavel({ blocos }: { blocos: Bloco[] }) {
+/** Cartão de atalho para uma página do CRM. */
+function blocoAtalho(path: string): Bloco | null {
+  const m = findModule(path);
+  if (!m) return null;
+  const Icon = m.area.icon;
+  return {
+    id: atalhoId(path), titulo: m.item.label, tipo: 'kpi', atalho: path,
+    render: () => (
+      <Link to={path} className="kpi atalho">
+        <span className="kpi__label"><Icon size={14} className="atalho__icon" /> {m.area.label}</span>
+        <strong className="atalho__title">{m.item.label}</strong>
+        <span className="kpi__hint atalho__go">Abrir página <ArrowRight size={13} /></span>
+      </Link>
+    ),
+  };
+}
+
+function PainelPersonalizavel({ blocos: proprios }: { blocos: Bloco[] }) {
   const { prefs, salvar } = usePainelPrefs();
+  const { access } = useSession();
+  // atalhos de páginas adicionadas pelo menu, só das áreas que a pessoa ainda acessa
+  // blocos extras só entram depois de adicionados pelo catálogo
+  const catalogo = proprios.filter((b) => b.extra);
+  const blocos = [
+    ...prefs.atalhos.map(blocoAtalho).filter((b): b is Bloco => !!b && access(findModule(b.atalho!)!.area.key) !== 'none'),
+    ...proprios.filter((b) => !b.extra || prefs.extras.includes(b.id)),
+  ];
   const [editando, setEditando] = useState(false);
+  const [vendoCatalogo, setVendoCatalogo] = useState(false);
   const [menu, setMenu] = useState<(MenuPos & { id: string }) | null>(null);
   const [arrastando, setArrastando] = useState<string | null>(null);
   const [sobre, setSobre] = useState<string | null>(null);
@@ -227,11 +403,18 @@ function PainelPersonalizavel({ blocos }: { blocos: Bloco[] }) {
   const normais = ordem.filter((id) => !fixados.includes(id) && !ocultos.has(id));
 
   const gravar = (next: Partial<PainelPrefs>) =>
-    salvar({ ordem, fixados, ocultos: [...ocultos], ...next }).catch((e: Error) => notify(e.message || 'Não foi possível salvar o painel.', 'error'));
+    salvar({ ...prefs, ordem, fixados, ocultos: [...ocultos], ...next }).catch((e: Error) => notify(e.message || 'Não foi possível salvar o painel.', 'error'));
   const alternarFixado = (id: string) =>
     gravar({ fixados: fixados.includes(id) ? fixados.filter((x) => x !== id) : [...fixados, id] });
   const ocultar = (id: string) => gravar({ ocultos: [...ocultos, id], fixados: fixados.filter((x) => x !== id) });
+  const removerAtalho = (path: string) =>
+    salvar(alternarAtalho({ ...prefs, ordem, fixados, ocultos: [...ocultos] }, path)).catch((e: Error) => notify(e.message || 'Não foi possível salvar o painel.', 'error'));
   const mostrar = (id: string) => gravar({ ocultos: [...ocultos].filter((x) => x !== id) });
+  const alternarExtra = (id: string) => prefs.extras.includes(id)
+    ? gravar({ extras: prefs.extras.filter((x) => x !== id), fixados: fixados.filter((x) => x !== id) })
+    : gravar({ extras: [...prefs.extras, id] });
+  /** Atalhos e blocos do catálogo saem do painel; os padrões só podem ser ocultados. */
+  const remover = (b: Bloco) => (b.atalho ? removerAtalho(b.atalho) : alternarExtra(b.id));
 
   /** Solta `id` antes de `alvo` (ou no fim da área). Soltar entre os fixados fixa; entre os demais, desafixa. */
   const soltar = (id: string, zona: 'fixados' | 'normais', alvo?: string) => {
@@ -290,7 +473,11 @@ function PainelPersonalizavel({ blocos }: { blocos: Bloco[] }) {
             <button onClick={() => alternarFixado(id)} title={fixado ? 'Desafixar' : 'Fixar no topo'} aria-label={fixado ? `Desafixar ${b.titulo}` : `Fixar ${b.titulo} no topo`}>
               {fixado ? <PinOff size={14} /> : <Pin size={14} />}
             </button>
-            <button onClick={() => ocultar(id)} title="Ocultar" aria-label={`Ocultar ${b.titulo}`}><EyeOff size={14} /></button>
+            {b.atalho || b.extra ? (
+              <button onClick={() => remover(b)} title="Remover do painel" aria-label={`Remover ${b.titulo} do painel`}><X size={14} /></button>
+            ) : (
+              <button onClick={() => ocultar(id)} title="Ocultar" aria-label={`Ocultar ${b.titulo}`}><EyeOff size={14} /></button>
+            )}
           </div>
         ) : fixado && <Pin size={13} className="bloco__pin" aria-label="Fixado" />}
         {b.render()}
@@ -309,7 +496,7 @@ function PainelPersonalizavel({ blocos }: { blocos: Bloco[] }) {
     );
   };
 
-  const personalizado = prefs.ordem.length > 0 || prefs.fixados.length > 0 || prefs.ocultos.length > 0;
+  const personalizado = prefs.ordem.length > 0 || prefs.fixados.length > 0 || prefs.ocultos.length > 0 || prefs.atalhos.length > 0 || prefs.extras.length > 0;
   const menuBloco = menu && porId.get(menu.id);
 
   return (
@@ -317,16 +504,17 @@ function PainelPersonalizavel({ blocos }: { blocos: Bloco[] }) {
       <PageHead
         title="Painel executivo"
         description="Visão consolidada de todas as áreas, atualizada com os dados lançados no sistema e no aplicativo."
-        actions={!editando && (
-          <button className="btn btn--ghost" onClick={() => setEditando(true)}><SlidersHorizontal size={16} /> Personalizar</button>
-        )}
+        actions={<>
+          {catalogo.length > 0 && <button className="btn btn--ghost" onClick={() => setVendoCatalogo(true)}><Plus size={16} /> Adicionar bloco</button>}
+          {!editando && <button className="btn btn--ghost" onClick={() => setEditando(true)}><SlidersHorizontal size={16} /> Personalizar</button>}
+        </>}
       />
 
       {editando && (
         <div className="customize-bar">
           <div className="customize-bar__text">
             <strong>Personalizando o seu painel</strong>
-            <span className="muted small">Arraste os blocos para mudar a ordem ou para a área “Fixados” no topo. As escolhas ficam salvas na sua conta.</span>
+            <span className="muted small">Arraste os blocos para mudar a ordem ou para a área “Fixados” no topo. Use “Adicionar bloco” para novos indicadores e listas; para uma página do sistema, clique com o botão direito nela no menu → “Adicionar ao painel”. As escolhas ficam salvas na sua conta.</span>
           </div>
           {ocultos.size > 0 && (
             <div className="customize-bar__hidden">
@@ -338,7 +526,7 @@ function PainelPersonalizavel({ blocos }: { blocos: Bloco[] }) {
           )}
           <div className="customize-bar__actions">
             {personalizado && (
-              <button className="btn btn--ghost btn--sm" onClick={() => gravar({ ordem: [], fixados: [], ocultos: [] })}><RotateCcw size={14} /> Restaurar padrão</button>
+              <button className="btn btn--ghost btn--sm" onClick={() => gravar({ ordem: [], fixados: [], ocultos: [], atalhos: [], extras: [] })}><RotateCcw size={14} /> Restaurar padrão</button>
             )}
             <button className="btn btn--primary btn--sm" onClick={() => setEditando(false)}><Check size={14} /> Concluir</button>
           </div>
@@ -365,10 +553,48 @@ function PainelPersonalizavel({ blocos }: { blocos: Bloco[] }) {
           <button role="menuitem" onClick={() => alternarFixado(menu.id)}>
             {fixados.includes(menu.id) ? <><PinOff size={15} /> Desafixar</> : <><Pin size={15} /> Fixar no topo</>}
           </button>
-          <button role="menuitem" onClick={() => ocultar(menu.id)}><EyeOff size={15} /> Ocultar “{menuBloco.titulo}”</button>
+          {menuBloco.atalho || menuBloco.extra ? (
+            <button role="menuitem" onClick={() => remover(menuBloco)}><LayoutDashboard size={15} /> Remover do painel</button>
+          ) : (
+            <button role="menuitem" onClick={() => ocultar(menu.id)}><EyeOff size={15} /> Ocultar “{menuBloco.titulo}”</button>
+          )}
           <div className="ctx__sep" />
+          <button role="menuitem" onClick={() => setVendoCatalogo(true)}><Plus size={15} /> Adicionar bloco</button>
           <button role="menuitem" onClick={() => setEditando(true)}><SlidersHorizontal size={15} /> Personalizar painel</button>
         </ContextMenu>
+      )}
+
+      {vendoCatalogo && (
+        <Modal title="Adicionar bloco ao painel" onClose={() => setVendoCatalogo(false)} width={860}>
+          <p className="muted catalog__intro">
+            Blocos além dos padrões. Os adicionados entram no fim do painel; depois é só arrastar, fixar ou remover.
+            Para colocar uma página do sistema, use o botão direito sobre ela no menu → “Adicionar ao painel”.
+          </p>
+          {(['kpi', 'painel'] as const).map((tipo) => {
+            const lista = catalogo.filter((b) => b.tipo === tipo);
+            if (!lista.length) return null;
+            return (
+              <section key={tipo} className="catalog__group">
+                <h3 className="catalog__title">{tipo === 'kpi' ? 'Indicadores' : 'Painéis e listas'}</h3>
+                <div className="catalog">
+                  {lista.map((b) => {
+                    const ativo = prefs.extras.includes(b.id);
+                    return (
+                      <div key={b.id} className={`catalog__item ${ativo ? 'is-active' : ''}`}>
+                        <span className="catalog__area">{b.extra!.area}</span>
+                        <strong>{b.titulo}</strong>
+                        <span className="muted small">{b.extra!.descricao}</span>
+                        <button className={`btn btn--sm ${ativo ? 'btn--ghost' : 'btn--primary'}`} onClick={() => alternarExtra(b.id)}>
+                          {ativo ? <><Check size={14} /> Adicionado · remover</> : <><Plus size={14} /> Adicionar</>}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
+        </Modal>
       )}
     </div>
   );

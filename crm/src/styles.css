@@ -537,3 +537,37 @@ select.input { appearance: none; padding-right: 30px; background-image: linear-g
 .pinned-zone__empty { padding: 18px; text-align: center; color: var(--muted); border: 1px dashed var(--border-strong); border-radius: 10px; font-size: 13px; }
 .pinned-zone.is-target, .free-zone.is-target { box-shadow: 0 0 0 2px #c4572a40; border-radius: 14px; }
 .free-zone { display: flex; flex-direction: column; gap: 18px; min-height: 60px; }
+.bloco.is-editing > a.kpi { pointer-events: none; }
+
+/* atalho para uma página do CRM (botão direito no menu → Adicionar ao painel) */
+.atalho { color: inherit; transition: border-color .15s, background .15s; }
+.atalho:hover { border-color: var(--brand-dark); background: var(--surface-2); }
+.atalho .kpi__label { display: flex; align-items: center; gap: 6px; }
+.atalho__icon { color: var(--brand); flex-shrink: 0; }
+.atalho__title { font-size: 17px; font-weight: 700; }
+.atalho__go { display: inline-flex; align-items: center; gap: 4px; color: var(--brand-light); }
+.atalho:hover .atalho__go { text-decoration: underline; }
+
+/* listas curtas dentro dos blocos (reservas de hoje, contas a pagar…) */
+.mini-list { list-style: none; margin: 0; padding: 4px 18px 14px; display: flex; flex-direction: column; }
+.mini-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+.mini-list li:last-child { border-bottom: 0; }
+.mini-list li > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.mini-list li strong { font-weight: 600; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; }
+.mini-list__value { font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 13px; color: var(--muted); }
+.mini-list li.is-bad { box-shadow: inset 3px 0 0 var(--bad); padding-left: 10px; }
+.mini-list li.is-bad .mini-list__value { color: var(--bad); }
+.mini-list li.is-warn { box-shadow: inset 3px 0 0 var(--warn); padding-left: 10px; }
+
+/* catálogo de blocos ("Adicionar bloco") */
+.catalog__intro { margin-bottom: 6px; }
+.catalog__group + .catalog__group { margin-top: 18px; }
+.catalog__title { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: var(--brand-light); margin: 14px 0 10px; }
+.catalog { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.catalog__item { display: flex; flex-direction: column; gap: 6px; padding: 14px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); }
+.catalog__item strong { font-size: 14.5px; }
+.catalog__item .btn { margin-top: auto; align-self: flex-start; }
+.catalog__item .muted { flex: 1; margin-bottom: 6px; }
+.catalog__item.is-active { border-color: var(--brand-dark); background: linear-gradient(180deg, #c4572a14, var(--surface-2)); }
+.catalog__area { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.mini-list li strong .muted { font-weight: 400; }

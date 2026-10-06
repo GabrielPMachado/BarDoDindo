@@ -544,7 +544,10 @@ export function createBackend(kind: 'app' | 'crm') {
     // listas curtas de identificadores de blocos do painel; qualquer outra coisa é descartada
     const ids = (v: unknown) => (Array.isArray(v) ? v : []).filter((x): x is string => typeof x === 'string' && /^[a-z0-9-]{1,40}$/.test(x)).slice(0, 60);
     const p = (b.painel ?? {}) as Dados;
-    const painel = { ordem: ids(p.ordem), fixados: ids(p.fixados), ocultos: ids(p.ocultos) };
+    // atalhos: páginas do CRM adicionadas ao painel pelo botão direito do menu
+    const atalhos = (Array.isArray(p.atalhos) ? p.atalhos : []).filter((x: unknown): x is string => typeof x === 'string' && /^\/[a-z0-9/-]{1,60}$/.test(x)).slice(0, 30);
+    // extras: blocos do catálogo que o usuário escolheu adicionar além dos padrões
+    const painel = { ordem: ids(p.ordem), fixados: ids(p.fixados), ocultos: ids(p.ocultos), atalhos, extras: ids(p.extras) };
     const lote = writeBatch(db);
     lote.set(doc(db, 'preferencias', ctx.usuario.id), { painel, atualizadoEm: now() }, { merge: true });
     await lote.commit();
