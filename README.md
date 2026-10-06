@@ -22,7 +22,7 @@ Nenhum dado vem pré-cadastrado: cardápio, recompensas, clientes, equipe e lan�
 
 ## Áreas do CRM
 
-**Cérebro** é o nome do sistema de gestão. O menu começa por **Meu perfil** (de todo usuário: *Meus dados*, onde a pessoa vê e edita as próprias informações e troca a senha, e *Meu painel*, um painel próprio montado com os blocos e atalhos que ela quiser). Depois vêm três grandes grupos: **Diretoria**, **Departamentos** (Atendimento, Marketing e Vendas, Pessoal, Estrutura, Administrativo, Financeiro, Jurídico, Fiscalização e Monitoramento) e **Configurações**.
+**Cérebro** é o nome do sistema de gestão. O menu começa por **Meu perfil** (de todo usuário: *Meus dados*, onde a pessoa vê e edita as próprias informações e troca a senha, e *Meu painel*, um painel próprio montado com os blocos e atalhos que ela quiser; também dá para trocar a foto). Depois vêm três grandes grupos: **Diretoria**, **Departamentos** (Atendimento, Marketing e Vendas, Pessoal, Estrutura, Administrativo, Financeiro, Jurídico, Fiscalização e Monitoramento) e **Configurações**.
 
 - **Painel de atualizações**: ao abrir o sistema aparece o que a equipe fez (cadastros, alterações, folha lançada, consumos, usuários…), com quem fez, o dia e o horário. O mesmo histórico fica no botão ao lado do perfil, no topo. Cada pessoa vê só as atualizações das áreas que ela acessa (`atividades/{área}/itens` no Firestore).
 - **Painel executivo personalizável**: cada usuário escolhe como fica o seu painel. Botão direito sobre um bloco → *Fixar no topo* ou *Ocultar*; o botão *Personalizar* permite arrastar os blocos para mudar a ordem, mostrar de novo os ocultos e restaurar o padrão. Também dá para colocar qualquer página do CRM no painel: botão direito sobre ela no menu → *Adicionar ao painel* (entra como atalho fixado no topo). O botão *Adicionar bloco* abre um catálogo com mais de 30 blocos além dos padrões, separados por área (Diretoria, Atendimento, Marketing, Pessoal, Estrutura, Administrativo, Financeiro, Jurídico, Fiscalização, Configurações), cada um disponível só para quem acessa a área dele. O mesmo vale para o *Meu painel* de cada usuário, que é independente do Painel executivo. As escolhas ficam salvas na conta (`preferencias/{uid}` no Firestore) e valem em qualquer computador.
@@ -39,8 +39,8 @@ Nenhum dado vem pré-cadastrado: cardápio, recompensas, clientes, equipe e lan�
 - **Financeiro**: receitas, despesas (inclui lançar a folha), resultado (DRE)
 - **Jurídico**: trabalhista, consultoria empresarial
 - **Fiscalização**: controle de qualidade, não conformidades
-- **Monitoramento**: câmeras (grade pronta; conexão das câmeras a ser feita no futuro)
-- **Configurações**: usuários, funções e permissões, parâmetros
+- **Monitoramento**: câmeras — oculto por enquanto, até as câmeras serem conectadas
+- **Configurações**: usuários, funções e permissões (por área: ver, criar, editar e excluir), parâmetros
 
 Campos que se referem a pessoas ou cadastros são vinculados: o colaborador nas férias, o responsável nas metas, o fornecedor no estoque, o afilhado na reserva etc.
 
@@ -115,3 +115,15 @@ Depois `npx cap open android` (Android Studio) ou `npx cap add ios` / `npx cap o
 ## Servidor antigo (Node + SQLite)
 
 `server/`, `scripts/demo-server.mjs`, `scripts/simular.mjs`, `scripts/static-server.mjs`, `scripts/criar-admin.mjs` e `scripts/zerar-dados.mjs` são da versão anterior, com API própria e banco SQLite. As telas não usam mais essa API.
+
+## Permissões
+
+Cada função marca, área por área, o que o usuário pode fazer: **Ver**, **Criar**, **Editar** e **Excluir** (excluir inclui estornos, como apagar um consumo). As regras do Firestore conferem cada uma. Funções antigas, com um nível por área, continuam valendo: "Editar" equivale às quatro permissões e "Visualizar" a só ver.
+
+## Períodos
+
+Receitas, despesas, consumos e reservas crescem com o tempo, então as telas carregam só um período (12 meses para receitas e despesas, 90 dias para reservas e consumos), com um seletor que vai até "Todo o período". Contas a pagar em aberto aparecem sempre.
+
+## Testes das regras
+
+`npm run testar:regras` sobe os emuladores, cria os dados de teste (`scripts/semear-testes.mjs`) e confere que as regras do Firestore barram o que não pode passar (`scripts/testar-regras.mjs`). O GitHub Actions roda esse teste em cada pull request e antes de cada publicação: se algum falhar, nada é publicado.

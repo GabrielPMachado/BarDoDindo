@@ -1,13 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { api, getToken, setToken, setUnauthorizedHandler } from './api';
 import { clearCache } from './data';
-import type { Access, AreaKey } from '../modules';
+import { acoesDe, resumoAcesso, type Acao, type Access, type AreaKey } from '../modules';
 
 export interface Funcao {
   id: string;
   nome: string;
   descricao: string;
-  permissoes: Partial<Record<AreaKey, Access>>;
+  /** Por área: lista de permissões (ou o nível antigo "view"/"edit"). */
+  permissoes: Partial<Record<AreaKey, Acao[] | 'view' | 'edit' | 'none'>>;
   sistema?: boolean;
 }
 
@@ -22,6 +23,8 @@ export interface Usuario {
   telefone?: string;
   nascimento?: string;
   sobre?: string;
+  /** Foto do perfil (imagem pequena, já reduzida). */
+  foto?: string | null;
 }
 
 export interface Config {
@@ -42,6 +45,8 @@ interface Session {
   usuario: Usuario | null;
   funcao: Funcao | null;
   access: (area: AreaKey) => Access;
+  /** Se a função do usuário tem uma permissão (ver, criar, editar, excluir) na área. */
+  pode: (area: AreaKey, acao: Acao) => boolean;
   login: (email: string, senha: string) => Promise<void>;
   setup: (nome: string, email: string, senha: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -88,6 +93,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     refresh();
   }, [refresh, reset]);
 
+  // "Meu perfil" é de todo usuário; a função Administrador (de sistema) tem tudo; as demais áreas dependem da função
+  const acoes = (area: AreaKey): Acao[] => (area === 'eu' || funcao?.sistema ? acoesDe('edit') : acoesDe(funcao?.permissoes?.[area]));
+  const access = (area: AreaKey): Access => resumoAcesso(acoes(area));
+
   const value: Session = {
     ready,
     setupPendente,
@@ -96,8 +105,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     serverError,
     refresh,
     // a função Administrador (de sistema) tem acesso total, inclusive a áreas criadas depois
-    // "Meu perfil" é de todo usuário; as demais áreas dependem da função
-    access: (area) => (area === 'eu' || funcao?.sistema ? 'edit' : funcao?.permissoes?.[area] ?? 'none'),
+    access,
+    pode: (area, acao) => acoes(area).includes(acao),
     login: async (email, senha) => {
       const { token } = await api<{ token: string }>('/crm/login', { method: 'POST', body: { email, senha } });
       clearCache();

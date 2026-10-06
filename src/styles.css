@@ -10,7 +10,7 @@
   --brand-light: #e07a4c;
   --brand-dark: #8e3b1a;
   --green: #3fbf6a;
-  --red: #e0644f;
+  --red: #e5484d;
   --radius: 16px;
   --radius-sm: 12px;
   --serif: 'Roboto Slab', Georgia, 'Times New Roman', serif;
@@ -468,5 +468,5 @@ button.hist-row { width: 100%; text-align: left; }
 
 /* confirmação */
 .overlay--top { z-index: 70; }
-.success-icon--danger { color: var(--red); border-color: #e0644f99; background: #e0644f14; }
-.btn--danger { background: #c4513f; color: #fff; }
+.success-icon--danger { color: var(--red); border-color: #e5484d99; background: #e5484d14; }
+.btn--danger { background: #c9303a; color: #fff; }

@@ -77,15 +77,18 @@ function PainelDeBlocos(info: PainelInfo) {
   const { access } = useSession();
   const can = (a: Parameters<typeof access>[0]) => access(a) !== 'none';
 
-  const receitas = useCollection('receitas', can('fin')).rows;
-  const despesas = useCollection('despesas', can('fin')).rows.filter(despesaValida);
+  // só os meses que os gráficos mostram (os 6 últimos); contas em aberto vêm sempre
+  const inicioSerie = `${lastMonths(6)[0]}-01`;
+  const receitas = useCollection('receitas', can('fin'), inicioSerie).rows;
+  const despesas = useCollection('despesas', can('fin'), inicioSerie).rows.filter(despesaValida);
   const colaboradores = useCollection('colaboradores', can('rh')).rows;
   const estoque = useCollection('estoque', can('dp')).rows;
   const contratos = useCollection('contratos', can('adm')).rows;
   const ncs = useCollection('naoconformidades', can('fis')).rows;
   const qualidade = useCollection('qualidade', can('fis')).rows;
   const processos = useCollection('trabalhista', can('jur')).rows;
-  const reservas = useCollection('reservas', can('atd')).rows;
+  // reservas de hoje em diante (pendentes, de hoje e próximas)
+  const reservas = useCollection('reservas', can('atd'), isoToday()).rows;
   const metas = useCollection('metas', can('dir')).rows;
   const clientes = useResource<ClienteResumo[]>(can('mkt') || can('atd') ? '/crm/clientes' : null).data ?? [];
 
@@ -261,7 +264,7 @@ function PainelDeBlocos(info: PainelInfo) {
   const { prefs } = usePainelPrefs(info.chave);
   const tem = (...ids: string[]) => ids.some((id) => prefs.extras.includes(id));
   const vendas = can('atd') || can('mkt');
-  const consumos = useCollection('consumos', vendas && tem('x-vendas-hoje', 'x-ticket-mes', 'x-mais-vendidos')).rows;
+  const consumos = useCollection('consumos', vendas && tem('x-vendas-hoje', 'x-ticket-mes', 'x-mais-vendidos'), `${currentMonth()}-01`).rows;
   const resgates = useCollection('resgates', vendas && tem('x-vouchers')).rows;
   const ferias = useCollection('ferias', can('rh') && tem('x-ausentes', 'x-proximas-ferias')).rows;
   const resgatesTop = useCollection('resgates', vendas && tem('x-recompensas-top')).rows;

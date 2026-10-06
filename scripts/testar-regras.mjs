@@ -1,10 +1,11 @@
 // Confere, contra os emuladores locais, que as regras do Firestore barram o que não pode passar.
-// Uso: com `npm run emuladores` rodando e os dados de teste criados, `node scripts/testar-regras.mjs <senhaCliente> <senhaAtendente>`
+// Uso: com `npm run emuladores` rodando e os dados de teste criados (`node scripts/semear-testes.mjs`),
+// `node scripts/testar-regras.mjs <senhaCliente> <senhaAtendente>` — ou tudo de uma vez: `npm run testar:regras`.
 // (cliente2@teste.local e atendente@teste.local são contas que só existem no emulador).
 import { initializeApp } from 'firebase/app';
 import { connectAuthEmulator, getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import {
-  addDoc, collection, connectFirestoreEmulator, doc, getDoc, getDocs, getFirestore, increment, query, setDoc, updateDoc, where, writeBatch,
+  addDoc, collection, connectFirestoreEmulator, deleteDoc, doc, getDoc, getDocs, getFirestore, increment, query, setDoc, updateDoc, where, writeBatch,
 } from 'firebase/firestore';
 
 const [senhaCliente, senhaAtendente] = process.argv.slice(2);
@@ -78,7 +79,7 @@ await negado('ver atualizações da equipe', () => getDocs(collection(db, 'ativi
 await signOut(auth);
 
 if (senhaAtendente) {
-  console.log('— equipe: função só com Atendimento (editar) —');
+  console.log('— equipe: função só com Atendimento (ver, criar e editar; sem excluir) —');
   const eq = await signInWithEmailAndPassword(auth, 'atendente@teste.local', senhaAtendente);
   await permitido('listar reservas', () => getDocs(collection(db, 'reservas')));
   await permitido('listar clientes', () => getDocs(collection(db, 'clientes')));
@@ -86,9 +87,17 @@ if (senhaAtendente) {
   await permitido('listar nomes da equipe', () => getDocs(collection(db, 'ref_colaboradores')));
   await negado('listar colaboradores (salários)', () => getDocs(collection(db, 'colaboradores')));
   await negado('listar despesas', () => getDocs(collection(db, 'despesas')));
+  const reserva = await addDoc(collection(db, 'reservas'), { clienteNome: 'Teste', data: '2099-01-01', hora: '20:00', pessoas: 2, status: 'Pendente', origem: 'Telefone' })
+    .then((r) => { console.log('ok   criar reserva (tem "criar"): permitido'); return r; })
+    .catch((e) => { falhas++; console.log(`FALHA criar reserva (tem "criar"): ${e.code}`); return null; });
+  if (reserva) {
+    await permitido('alterar reserva (tem "editar")', () => updateDoc(reserva, { status: 'Confirmada' }));
+    await negado('excluir reserva (não tem "excluir")', () => deleteDoc(reserva));
+  }
   await negado('alterar produto', () => addDoc(collection(db, 'produtos'), { nome: 'x', preco: 1 }));
   await negado('lançar receita avulsa', () => addDoc(collection(db, 'receitas'), { descricao: 'x', valor: 1 }));
   await permitido('editar o próprio perfil', () => updateDoc(doc(db, 'usuarios', eq.user.uid), { telefone: '(11) 91234-5678', sobre: 'Atendente do salão' }));
+  await permitido('trocar a própria foto', () => updateDoc(doc(db, 'usuarios', eq.user.uid), { foto: 'data:image/jpeg;base64,AAAA' }));
   await negado('trocar o próprio e-mail pelo perfil', () => updateDoc(doc(db, 'usuarios', eq.user.uid), { email: 'outro@x.x' }));
   await negado('promover a si mesmo a administrador', () => updateDoc(doc(db, 'usuarios', eq.user.uid), { funcaoId: 'admin' }));
   await negado('dar todas as permissões à própria função', async () => {

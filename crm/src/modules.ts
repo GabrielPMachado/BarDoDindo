@@ -3,7 +3,29 @@ import {
 } from 'lucide-react';
 
 export type AreaKey = 'eu' | 'dir' | 'atd' | 'mkt' | 'rh' | 'dp' | 'adm' | 'fin' | 'jur' | 'fis' | 'mon' | 'cfg';
+/** Resumo do acesso a uma área: sem acesso, só leitura ou com alguma permissão de alteração. */
 export type Access = 'none' | 'view' | 'edit';
+
+/** Permissões que cada função marca, área por área. */
+export type Acao = 'ver' | 'criar' | 'editar' | 'excluir';
+export const ACOES: { key: Acao; label: string; sigla: string; dica: string }[] = [
+  { key: 'ver', label: 'Ver', sigla: 'V', dica: 'Abrir a área e consultar os registros' },
+  { key: 'criar', label: 'Criar', sigla: 'C', dica: 'Cadastrar e lançar registros novos' },
+  { key: 'editar', label: 'Editar', sigla: 'E', dica: 'Alterar registros existentes' },
+  { key: 'excluir', label: 'Excluir', sigla: 'X', dica: 'Apagar registros (inclui estornos)' },
+];
+const TODAS: Acao[] = ['ver', 'criar', 'editar', 'excluir'];
+/**
+ * Permissões gravadas numa função. Aceita o formato antigo (um nível por área):
+ * "edit" equivale a todas as permissões e "view" a só ver.
+ */
+export function acoesDe(p: unknown): Acao[] {
+  if (Array.isArray(p)) return TODAS.filter((a) => p.includes(a));
+  if (p === 'edit') return [...TODAS];
+  if (p === 'view') return ['ver'];
+  return [];
+}
+export const resumoAcesso = (acoes: Acao[]): Access => (!acoes.includes('ver') ? 'none' : acoes.length > 1 ? 'edit' : 'view');
 
 export interface SubModule {
   path: string;
@@ -19,6 +41,8 @@ export interface Area {
   items: SubModule[];
   /** Área de cada usuário (Meu perfil): sempre liberada e fora da tela de permissões. */
   pessoal?: boolean;
+  /** Oculta por enquanto: fora do menu, das rotas e da tela de permissões (o código continua aqui). */
+  oculta?: boolean;
 }
 
 export const AREAS: Area[] = [
@@ -111,7 +135,8 @@ export const AREAS: Area[] = [
     ],
   },
   {
-    key: 'mon', label: 'Monitoramento', icon: Cctv,
+    // oculto até as câmeras serem conectadas
+    key: 'mon', label: 'Monitoramento', icon: Cctv, oculta: true,
     description: 'Visualização das câmeras do estabelecimento.',
     items: [{ path: '/monitoramento', label: 'Câmeras' }],
   },
@@ -139,16 +164,18 @@ const areaByKey = (k: AreaKey) => AREAS.find((a) => a.key === k)!;
 export const GROUPS: NavGroup[] = [
   { key: 'eu', label: 'Meu perfil', icon: UserRound, single: 'eu', areas: [areaByKey('eu')] },
   { key: 'dir', label: 'Diretoria', icon: Landmark, single: 'dir', areas: [areaByKey('dir')] },
-  { key: 'dep', label: 'Departamentos', icon: Building2, areas: AREAS.filter((a) => !a.pessoal && a.key !== 'dir' && a.key !== 'cfg') },
+  { key: 'dep', label: 'Departamentos', icon: Building2, areas: AREAS.filter((a) => !a.pessoal && !a.oculta && a.key !== 'dir' && a.key !== 'cfg') },
   { key: 'cfg', label: 'Configurações', icon: Settings, single: 'cfg', areas: [areaByKey('cfg')] },
 ];
 /** Áreas controladas pelas funções (tela de permissões); "Meu perfil" fica de fora, é de todos. */
-export const AREAS_COM_PERMISSAO = AREAS.filter((a) => !a.pessoal);
+export const AREAS_COM_PERMISSAO = AREAS.filter((a) => !a.pessoal && !a.oculta);
+/** Áreas que aparecem no sistema (menu, rotas, atalhos). */
+export const AREAS_VISIVEIS = AREAS.filter((a) => !a.oculta);
 
 export const groupOf = (area: AreaKey) => GROUPS.find((g) => g.areas.some((a) => a.key === area))!;
 
 export function findModule(path: string) {
-  for (const area of AREAS) {
+  for (const area of AREAS_VISIVEIS) {
     const item = area.items.find((i) => i.path === path);
     if (item) return { area, item };
   }

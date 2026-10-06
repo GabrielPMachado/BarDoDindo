@@ -14,12 +14,19 @@ service cloud.firestore {
     function funcao() {
       return get(caminho('funcoes', get(caminho('usuarios', request.auth.uid)).data.funcaoId)).data;
     }
-    // a função Administrador (de sistema) tem acesso total, inclusive a áreas criadas depois
-    function nivel(area) {
-      return funcao().get('sistema', false) == true ? 'edit' : funcao().get('permissoes', {}).get(area, 'none');
+    // permissões da função em cada área: lista com "ver", "criar", "editar" e "excluir".
+    // Formato antigo (um nível por área) continua valendo: "edit" = todas, "view" = só ver.
+    // A função Administrador (de sistema) pode tudo, inclusive em áreas criadas depois.
+    function permissao(area) { return funcao().get('permissoes', {}).get(area, 'none'); }
+    function pode(area, acao) {
+      return daEquipe() && (
+        funcao().get('sistema', false) == true
+        || (permissao(area) is list && acao in permissao(area))
+        || (permissao(area) is string && (permissao(area) == 'edit' || (permissao(area) == 'view' && acao == 'ver'))));
     }
-    function podeVer(area) { return daEquipe() && nivel(area) in ['view', 'edit']; }
-    function podeEditar(area) { return daEquipe() && nivel(area) == 'edit'; }
+    function podeVer(area) { return pode(area, 'ver'); }
+    // cópias espelhadas, histórico e saldos acompanham qualquer alteração na área
+    function podeAlterar(area) { return pode(area, 'criar') || pode(area, 'editar') || pode(area, 'excluir'); }
 
     // área (permissão) de cada coleção de cadastro do CRM
     function areas() {
@@ -37,14 +44,16 @@ service cloud.firestore {
     }
     match /{col}/{id} {
       allow read: if col in areas() && podeVer(areas()[col]);
-      allow write: if col in areas() && podeEditar(areas()[col]);
+      allow create: if col in areas() && pode(areas()[col], 'criar');
+      allow update: if col in areas() && pode(areas()[col], 'editar');
+      allow delete: if col in areas() && pode(areas()[col], 'excluir');
     }
 
     /* ---------- painel de atualizações ---------- */
     // histórico de quem fez o quê: cada área vê o próprio; só se acrescenta, nunca se altera ou apaga
     match /atividades/{area}/itens/{id} {
       allow read: if podeVer(area);
-      allow create: if podeEditar(area)
+      allow create: if podeAlterar(area)
         && request.resource.data.keys().hasOnly(['area', 'acao', 'colecao', 'alvo', 'detalhe', 'usuarioId', 'usuarioNome', 'criadoEm'])
         && request.resource.data.area == area
         && request.resource.data.usuarioId == request.auth.uid
@@ -67,7 +76,8 @@ service cloud.firestore {
     match /preferencias/{uid} {
       allow read: if logado() && request.auth.uid == uid;
       allow write: if daEquipe() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['painel', 'meuPainel', 'atualizadoEm'])
+        && request.resource.data.keys().hasOnly(['painel', 'meuPainel', 'paginas', 'atualizadoEm'])
+        && request.resource.data.get('paginas', []) is list && request.resource.data.get('paginas', []).size() <= 30
         && painelOk(request.resource.data.get('painel', {}))
         && painelOk(request.resource.data.get('meuPainel', {}));
     }
@@ -86,46 +96,47 @@ service cloud.firestore {
 
     match /usuarios/{uid} {
       allow read: if logado() && (request.auth.uid == uid || daEquipe());
-      allow create: if podeEditar('cfg') || (request.auth.uid == uid && primeiroAcesso());
-      allow update: if podeEditar('cfg')
+      allow create: if pode('cfg', 'criar') || (request.auth.uid == uid && primeiroAcesso());
+      allow update: if pode('cfg', 'editar')
         || (logado() && request.auth.uid == uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ultimoAcesso']))
-        // Meu perfil: a própria pessoa edita nome, telefone, nascimento e "sobre mim" (nunca função, status ou e-mail)
+        // Meu perfil: a própria pessoa edita nome, telefone, nascimento, "sobre mim" e foto (nunca função, status ou e-mail)
         || (daEquipe() && request.auth.uid == uid
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nome', 'telefone', 'nascimento', 'sobre'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nome', 'telefone', 'nascimento', 'sobre', 'foto'])
+          && (request.resource.data.get('foto', null) == null || (request.resource.data.foto is string && request.resource.data.foto.size() <= 400000))
           && request.resource.data.nome is string && request.resource.data.nome.size() >= 3 && request.resource.data.nome.size() <= 120
           && request.resource.data.get('telefone', '') is string && request.resource.data.get('telefone', '').size() <= 20
           && request.resource.data.get('nascimento', '') is string && request.resource.data.get('nascimento', '').size() <= 10
           && request.resource.data.get('sobre', '') is string && request.resource.data.get('sobre', '').size() <= 500);
-      allow delete: if podeEditar('cfg') && request.auth.uid != uid;
+      allow delete: if pode('cfg', 'excluir') && request.auth.uid != uid;
     }
 
     match /funcoes/{id} {
       allow read: if daEquipe();
-      allow create: if (podeEditar('cfg') && request.resource.data.get('sistema', false) != true)
+      allow create: if (pode('cfg', 'criar') && request.resource.data.get('sistema', false) != true)
         || (id == 'admin' && primeiroAcesso());
-      allow update: if podeEditar('cfg') && resource.data.get('sistema', false) != true && request.resource.data.get('sistema', false) != true;
-      allow delete: if podeEditar('cfg') && resource.data.get('sistema', false) != true;
+      allow update: if pode('cfg', 'editar') && resource.data.get('sistema', false) != true && request.resource.data.get('sistema', false) != true;
+      allow delete: if pode('cfg', 'excluir') && resource.data.get('sistema', false) != true;
     }
 
     match /config/{id} {
       allow read: if true;
-      allow write: if podeEditar('cfg');
+      allow write: if pode('cfg', 'editar');
     }
 
     /* ---------- cópias com dados reduzidos ---------- */
     // cardápio público (sem custo nem margem dos produtos)
     match /cardapio/{id} {
       allow read: if true;
-      allow write: if podeEditar('mkt');
+      allow write: if podeAlterar('mkt');
     }
     // nomes para vincular registros, visíveis a toda a equipe (sem salários nem contatos)
     match /ref_colaboradores/{id} {
       allow read: if daEquipe();
-      allow write: if podeEditar('rh');
+      allow write: if podeAlterar('rh');
     }
     match /ref_fornecedores/{id} {
       allow read: if daEquipe();
-      allow write: if podeEditar('adm');
+      allow write: if podeAlterar('adm');
     }
 
     /* ---------- acessos cruzados entre áreas ---------- */
@@ -139,8 +150,8 @@ service cloud.firestore {
     }
     // o lançamento de consumo (Atendimento) gera e estorna a própria receita
     match /receitas/{id} {
-      allow create: if podeEditar('atd') && request.resource.data.consumoId is string;
-      allow delete: if podeEditar('atd') && resource.data.get('consumoId', null) != null;
+      allow create: if pode('atd', 'criar') && request.resource.data.consumoId is string;
+      allow delete: if pode('atd', 'excluir') && resource.data.get('consumoId', null) != null;
     }
 
     /* ---------- afilhados (aplicativo) ---------- */
@@ -169,7 +180,7 @@ service cloud.firestore {
       allow create: if logado() && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(['acumulados', 'usados', 'ultimoResgate'])
         && request.resource.data.acumulados == 0 && request.resource.data.usados == 0;
-      allow write: if podeEditar('atd');
+      allow write: if podeAlterar('atd');
       allow update: if logado() && request.auth.uid == uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usados', 'ultimoResgate'])
         && request.resource.data.ultimoResgate != resource.data.ultimoResgate

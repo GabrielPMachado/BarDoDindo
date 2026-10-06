@@ -1,4 +1,5 @@
-# Gera um link de prévia temporário do site para cada pull request (as regras do Firestore não são alteradas).
+# Testa as regras do Firestore nos emuladores e gera um link de prévia temporário do site para cada pull request
+# (as regras do Firestore de produção não são alteradas).
 
 name: Deploy to Firebase Hosting on PR
 on: pull_request
@@ -22,6 +23,13 @@ jobs:
       - run: npm ci
       - run: npm --prefix crm ci
       - run: npm run build:all
+      # regras de segurança do Firestore: roda os testes nos emuladores antes de publicar
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Testar regras do Firestore
+        run: npm run testar:regras
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}

@@ -1,18 +1,22 @@
 import { useEffect, useState } from 'react';
 import { Lock, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
-import { AREAS_COM_PERMISSAO as AREAS, type Access, type AreaKey } from '../modules';
+import { ACOES, AREAS_COM_PERMISSAO as AREAS, acoesDe, type Acao, type AreaKey } from '../modules';
 import { AsyncButton, Badge, EmptyState, ErrorBox, Loading, Modal, NumberInput, PageHead, notify } from '../components/ui';
 import { api } from '../lib/api';
 import { SelectPicker } from '../components/pickers';
 import { reload, useCollection, useResource, type Row } from '../lib/data';
 import { useSession, type Config, type Funcao, type Usuario } from '../lib/session';
 
-const ACCESS_LABEL: Record<Access, string> = { none: 'Sem acesso', view: 'Visualizar', edit: 'Editar' };
+/** "Tudo", "Só ver" ou a lista das permissões marcadas. */
+const resumoAcoes = (acoes: Acao[]) =>
+  acoes.length === ACOES.length ? 'Tudo' : acoes.length === 1 ? 'Só ver' : ACOES.filter((x) => acoes.includes(x.key)).map((x) => x.label).join(', ');
 
 /* ---------------- Usuários ---------------- */
 export function Usuarios() {
-  const { access, usuario: eu } = useSession();
-  const canEdit = access('cfg') === 'edit';
+  const { pode, usuario: eu } = useSession();
+  const canCreate = pode('cfg', 'criar');
+  const canEdit = pode('cfg', 'editar');
+  const canDelete = pode('cfg', 'excluir');
   const users = useResource<Usuario[]>('/crm/usuarios');
   const funcoes = useCollection<Funcao & Row>('funcoes').rows;
   const [editing, setEditing] = useState<Usuario | 'new' | null>(null);
@@ -23,7 +27,7 @@ export function Usuarios() {
       <PageHead
         title="Usuários"
         description="Pessoas com acesso ao sistema. O que cada uma pode ver e editar é definido pela função atribuída."
-        actions={canEdit && <button className="btn btn--primary" onClick={() => setEditing('new')}><Plus size={16} /> Novo usuário</button>}
+        actions={canCreate && <button className="btn btn--primary" onClick={() => setEditing('new')}><Plus size={16} /> Novo usuário</button>}
       />
       <div className="panel">
         {users.error && <ErrorBox>{users.error}</ErrorBox>}
@@ -54,6 +58,7 @@ export function Usuarios() {
           user={editing === 'new' ? null : editing}
           funcoes={funcoes}
           isSelf={editing !== 'new' && editing.id === eu?.id}
+          canDelete={canDelete}
           onClose={() => setEditing(null)}
         />
       )}
@@ -61,7 +66,9 @@ export function Usuarios() {
   );
 }
 
-function UsuarioForm({ user, funcoes, isSelf, onClose }: { user: Usuario | null; funcoes: Funcao[]; isSelf: boolean; onClose: () => void }) {
+function UsuarioForm({ user, funcoes, isSelf, canDelete, onClose }: {
+  user: Usuario | null; funcoes: Funcao[]; isSelf: boolean; canDelete: boolean; onClose: () => void;
+}) {
   const [form, setForm] = useState({ nome: user?.nome ?? '', email: user?.email ?? '', funcaoId: user?.funcaoId ?? '', status: user?.status ?? 'Ativo', senha: '' });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -92,7 +99,7 @@ function UsuarioForm({ user, funcoes, isSelf, onClose }: { user: Usuario | null;
       onClose={onClose}
       footer={
         <>
-          {user && !isSelf && (
+          {user && !isSelf && canDelete && (
             <AsyncButton className="btn btn--danger" confirm={{ title: `Excluir o usuário ${user.nome}?`, message: 'A pessoa perde o acesso ao sistema imediatamente.', confirmLabel: 'Excluir', danger: true }}
               onClick={async () => { await api(`/crm/usuarios/${user.id}`, { method: 'DELETE' }); await reload('/crm/usuarios'); notify('Usuário excluído'); onClose(); }}>
               <Trash2 size={16} /> Excluir
@@ -143,8 +150,10 @@ function UsuarioForm({ user, funcoes, isSelf, onClose }: { user: Usuario | null;
             <label>Acessos desta função</label>
             <div className="access-chips">
               {AREAS.map((a) => {
-                const v = funcao.permissoes[a.key] ?? 'none';
-                return v === 'none' ? null : <Badge key={a.key} tone={v === 'edit' ? 'good' : 'info'}>{a.label} · {ACCESS_LABEL[v]}</Badge>;
+                const acoes = funcao.sistema ? acoesDe('edit') : acoesDe(funcao.permissoes[a.key]);
+                return acoes.includes('ver')
+                  ? <Badge key={a.key} tone={acoes.length > 1 ? 'good' : 'info'}>{a.label} · {resumoAcoes(acoes)}</Badge>
+                  : null;
               })}
             </div>
           </div>
@@ -157,8 +166,10 @@ function UsuarioForm({ user, funcoes, isSelf, onClose }: { user: Usuario | null;
 
 /* ---------------- Funções e permissões ---------------- */
 export function Funcoes() {
-  const { access, refresh } = useSession();
-  const canEdit = access('cfg') === 'edit';
+  const { pode, refresh } = useSession();
+  const canCreate = pode('cfg', 'criar');
+  const canEdit = pode('cfg', 'editar');
+  const canDelete = pode('cfg', 'excluir');
   const col = useCollection<Funcao & Row>('funcoes');
   const [editing, setEditing] = useState<Funcao | 'new' | null>(null);
 
@@ -166,8 +177,8 @@ export function Funcoes() {
     <div className="page">
       <PageHead
         title="Funções e permissões"
-        description="Cada função define, por área, se o usuário não tem acesso, apenas visualiza ou pode editar."
-        actions={canEdit && <button className="btn btn--primary" onClick={() => setEditing('new')}><Plus size={16} /> Nova função</button>}
+        description="Cada função define, área por área, o que o usuário pode fazer: V = ver, C = criar, E = editar, X = excluir."
+        actions={canCreate && <button className="btn btn--primary" onClick={() => setEditing('new')}><Plus size={16} /> Nova função</button>}
       />
       <div className="panel">
         {col.loading ? <Loading /> : (
@@ -185,8 +196,16 @@ export function Funcoes() {
                   <tr key={f.id}>
                     <td className="matrix__role"><strong>{f.nome}</strong>{f.sistema && <Lock size={12} className="muted inline-icon" />}<div className="muted small">{f.descricao}</div></td>
                     {AREAS.map((a) => {
-                      const v = f.permissoes?.[a.key] ?? 'none';
-                      return <td key={a.key} className="center"><span className={`access access--${v}`} title={ACCESS_LABEL[v]}>{v === 'edit' ? 'Editar' : v === 'view' ? 'Ver' : '—'}</span></td>;
+                      const acoes = f.sistema ? acoesDe('edit') : acoesDe(f.permissoes?.[a.key]);
+                      return (
+                        <td key={a.key} className="center">
+                          {acoes.includes('ver') ? (
+                            <span className="perm-dots" title={resumoAcoes(acoes)}>
+                              {ACOES.map((x) => <i key={x.key} className={acoes.includes(x.key) ? 'is-on' : ''} title={x.label}>{x.sigla}</i>)}
+                            </span>
+                          ) : <span className="access access--none" title="Sem acesso">—</span>}
+                        </td>
+                      );
                     })}
                     <td className="actions-col">
                       {canEdit && !f.sistema && <button className="icon-btn" onClick={() => setEditing(f)} aria-label="Editar"><Pencil size={16} /></button>}
@@ -214,7 +233,7 @@ export function Funcoes() {
             notify('Função salva');
             setEditing(null);
           }}
-          onDelete={editing !== 'new' ? async () => { await col.remove(editing.id); notify('Função excluída'); setEditing(null); } : undefined}
+          onDelete={editing !== 'new' && canDelete ? async () => { await col.remove(editing.id); notify('Função excluída'); setEditing(null); } : undefined}
         />
       )}
     </div>
@@ -226,7 +245,18 @@ function FuncaoForm({ funcao, onClose, onSave, onDelete }: {
 }) {
   const [nome, setNome] = useState(funcao?.nome ?? '');
   const [descricao, setDescricao] = useState(funcao?.descricao ?? '');
-  const [perm, setPerm] = useState<Partial<Record<AreaKey, Access>>>(funcao?.permissoes ?? {});
+  const [perm, setPerm] = useState<Partial<Record<AreaKey, Acao[]>>>(
+    () => Object.fromEntries(AREAS.map((a) => [a.key, acoesDe(funcao?.permissoes?.[a.key])])),
+  );
+  /** Marcar criar/editar/excluir também marca "ver"; desmarcar "ver" tira o acesso à área. */
+  const alternar = (area: AreaKey, acao: Acao) => {
+    const atual = perm[area] ?? [];
+    let novo = atual.includes(acao) ? atual.filter((x) => x !== acao) : [...atual, acao];
+    if (acao === 'ver' && !novo.includes('ver')) novo = [];
+    if (novo.length && !novo.includes('ver')) novo = ['ver', ...novo];
+    setPerm({ ...perm, [area]: ACOES.map((x) => x.key).filter((k) => novo.includes(k)) });
+  };
+  const definir = (area: AreaKey, acoes: Acao[]) => setPerm({ ...perm, [area]: acoes });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -268,18 +298,23 @@ function FuncaoForm({ funcao, onClose, onSave, onDelete }: {
         </div>
         <div className="form-field form-field--wide">
           <label>Permissões por área</label>
+          <p className="muted small">Ver: abrir e consultar · Criar: cadastrar e lançar · Editar: alterar o que existe · Excluir: apagar (inclui estornos).</p>
           <div className="perm-list">
             {AREAS.map((a) => (
               <div key={a.key} className="perm">
                 <a.icon size={18} className="gold" />
                 <div className="perm__text"><strong>{a.label}</strong><span className="muted small">{a.description}</span></div>
-                <div className="segmented" role="radiogroup" aria-label={a.label}>
-                  {(['none', 'view', 'edit'] as Access[]).map((v) => (
-                    <button type="button" key={v} role="radio" aria-checked={(perm[a.key] ?? 'none') === v}
-                      className={(perm[a.key] ?? 'none') === v ? 'is-active' : ''} onClick={() => setPerm({ ...perm, [a.key]: v })}>
-                      {ACCESS_LABEL[v]}
-                    </button>
+                <div className="perm-checks" role="group" aria-label={`Permissões em ${a.label}`}>
+                  {ACOES.map((x) => (
+                    <label key={x.key} className={`perm-check ${(perm[a.key] ?? []).includes(x.key) ? 'is-on' : ''}`} title={x.dica}>
+                      <input type="checkbox" checked={(perm[a.key] ?? []).includes(x.key)} onChange={() => alternar(a.key, x.key)} />
+                      {x.label}
+                    </label>
                   ))}
+                  <span className="perm-quick">
+                    <button type="button" onClick={() => definir(a.key, [])}>Nada</button>
+                    <button type="button" onClick={() => definir(a.key, ACOES.map((x) => x.key))}>Tudo</button>
+                  </span>
                 </div>
               </div>
             ))}
@@ -304,8 +339,8 @@ function normalizarHora(h: string) {
 }
 
 export function Parametros() {
-  const { access } = useSession();
-  const canEdit = access('cfg') === 'edit';
+  const { pode } = useSession();
+  const canEdit = pode('cfg', 'editar');
   const res = useResource<Config>('/crm/config');
   const [cfg, setCfg] = useState<Config | null>(null);
   useEffect(() => {

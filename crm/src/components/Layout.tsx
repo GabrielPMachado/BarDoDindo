@@ -3,13 +3,13 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { AppWindow, ChevronDown, LayoutDashboard, UserRound, Copy, ExternalLink, KeyRound, LogOut, MousePointerClick, Pin, PinOff, X } from 'lucide-react';
 import { GROUPS, findModule, groupOf, type Area } from '../modules';
 import { useSession } from '../lib/session';
-import { initials } from '../lib/format';
 import { useLastSync } from '../lib/data';
 import { usePins } from '../lib/pins';
 import { alternarAtalho, usePainelPrefs } from '../lib/preferencias';
 import { AtividadesButton, PainelAtualizacoes, usePainelAoAbrir } from './Atividades';
 import { notify } from './ui';
 import { ContextMenu, type MenuPos } from './ContextMenu';
+import { Avatar } from './Avatar';
 import logoUrl from '../../../shared/assets/logo.webp';
 
 export function Brand({ large = false }: { large?: boolean }) {
@@ -204,7 +204,7 @@ export function Layout({ children }: { children: ReactNode }) {
           <AtividadesButton onOpenPanel={painel.abrir} />
           <div className="user">
             <button className="user__btn" onClick={() => setMenu((m) => !m)} aria-expanded={menu}>
-              <span className="user__avatar">{initials(usuario?.nome ?? '')}</span>
+              <Avatar className="user__avatar" nome={usuario?.nome ?? ''} foto={usuario?.foto} />
               <span className="user__info">
                 <strong>{usuario?.nome}</strong>
                 <small>{funcao?.nome ?? 'Sem função'}</small>

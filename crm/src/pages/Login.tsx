@@ -30,7 +30,7 @@ export default function Login() {
     <div className="login">
       <div className="login__art">
         <Brand large />
-        <p>Sistema de gestão integrado ao aplicativo dos afilhados.</p>
+        <p>SISTEMA DE ORGANIZAÇÃO ESTRUTURAL</p>
       </div>
       <form className="login__card" onSubmit={submit}>
         {setupPendente ? (

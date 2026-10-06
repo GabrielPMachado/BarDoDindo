@@ -31,10 +31,10 @@ interface Folha {
 
 /* ---------------- Folha de pagamento (Pessoal · RH/DP) ---------------- */
 export function Folha() {
-  const { access } = useSession();
+  const { pode } = useSession();
   const [mes, setMes] = useState(currentMonth());
   const { data: folha, loading, error } = useResource<Folha>(`/crm/folha?mes=${mes}`);
-  const podeLancar = access('fin') === 'edit';
+  const podeLancar = pode('fin', 'criar');
 
   return (
     <div className="page">
@@ -118,11 +118,12 @@ export function Folha() {
 
 /** Painel do Financeiro para lançar a folha calculada pelo RH como contas a pagar. */
 function LancarFolha() {
-  const { access } = useSession();
+  const { pode } = useSession();
   const [mes, setMes] = useState(currentMonth());
   const path = `/crm/folha?mes=${mes}`;
   const { data: folha, loading, error } = useResource<Folha>(path);
-  const podeLancar = access('fin') === 'edit';
+  // lançar a folha cria as despesas do mês
+  const podeLancar = pode('fin', 'criar');
 
   return (
     <section className="panel pad-lg folha-box">
@@ -239,9 +240,10 @@ export function Despesas() {
 
 /* ---------------- Resultado (DRE) ---------------- */
 export function Resultado() {
-  const receitas = useCollection('receitas').rows;
-  const despesas = useCollection('despesas').rows.filter(despesaValida);
   const [mes, setMes] = useState(currentMonth());
+  // só o necessário para o mês escolhido
+  const receitas = useCollection('receitas', true, `${mes}-01`).rows;
+  const despesas = useCollection('despesas', true, `${mes}-01`).rows.filter(despesaValida);
 
   const rec = receitas.filter((r) => monthOf(r.data) === mes);
   const des = despesas.filter((r) => monthOf(r.data) === mes);
