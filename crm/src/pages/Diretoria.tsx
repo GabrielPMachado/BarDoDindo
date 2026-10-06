@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, ArrowRight, Check, Eye, EyeOff, GripVertical, LayoutDashboard, Pin, PinOff, Plus, RotateCcw, SlidersHorizontal, X } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowRight, ArrowUp, Check, Eye, EyeOff, GripVertical, LayoutDashboard, Pin, PinOff, Plus, RotateCcw, SlidersHorizontal, X } from 'lucide-react';
 import { BarChart, HBarList } from '../components/Charts';
 import { ContextMenu, type MenuPos } from '../components/ContextMenu';
 import { Modal, notify, PageHead } from '../components/ui';
@@ -11,6 +11,7 @@ import { currentMonth, despesaValida, lastMonths, monthName, monthOf, sumBy } fr
 import { alternarAtalho, atalhoId, usePainelPrefs, type PainelChave, type PainelPrefs } from '../lib/preferencias';
 import { AREAS, findModule } from '../modules';
 import { useSession } from '../lib/session';
+import { useToqueLongo } from '../lib/toque';
 import type { Kpi } from '../collections';
 
 interface ClienteResumo { id: number; nome: string; totalGasto: number; visitas: number; criadoEm?: string; desde: string }
@@ -642,6 +643,18 @@ function PainelPersonalizavel({ blocos: proprios, chave, titulo, descricao }: { 
   const remover = (b: Bloco) => (b.atalho ? removerAtalho(b.atalho) : alternarExtra(b.id));
 
   /** Solta `id` antes de `alvo` (ou no fim da área). Soltar entre os fixados fixa; entre os demais, desafixa. */
+  /** Setas do modo Personalizar (no toque não dá para arrastar): troca de lugar com o vizinho do mesmo tipo. */
+  const mover = (id: string, passo: -1 | 1) => {
+    const zona = fixados.includes(id) ? fixados : normais;
+    const mesmoTipo = zona.filter((x) => porId.get(x)!.tipo === porId.get(id)!.tipo);
+    const vizinho = mesmoTipo[mesmoTipo.indexOf(id) + passo];
+    if (!vizinho) return;
+    const trocar = (lista: string[]) => lista.map((x) => (x === id ? vizinho : x === vizinho ? id : x));
+    if (fixados.includes(id)) gravar({ fixados: trocar(fixados) });
+    else gravar({ ordem: trocar(ordem) });
+  };
+  const toqueLongo = useToqueLongo();
+
   const soltar = (id: string, zona: 'fixados' | 'normais', alvo?: string) => {
     if (id === alvo) return;
     const fix = fixados.filter((x) => x !== id);
@@ -691,10 +704,13 @@ function PainelPersonalizavel({ blocos: proprios, chave, titulo, descricao }: { 
           fimArraste();
         }}
         onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY, id }); }}
+        {...(editando ? {} : toqueLongo((x, y) => setMenu({ x, y, id })))}
       >
         {editando ? (
           <div className="bloco__tools">
             <span className="bloco__grip" title="Arraste para mudar de lugar"><GripVertical size={15} /></span>
+            <button onClick={() => mover(id, -1)} title="Mover para antes" aria-label={`Mover ${b.titulo} para antes`}><ArrowUp size={14} /></button>
+            <button onClick={() => mover(id, 1)} title="Mover para depois" aria-label={`Mover ${b.titulo} para depois`}><ArrowDown size={14} /></button>
             <button onClick={() => alternarFixado(id)} title={fixado ? 'Desafixar' : 'Fixar no topo'} aria-label={fixado ? `Desafixar ${b.titulo}` : `Fixar ${b.titulo} no topo`}>
               {fixado ? <PinOff size={14} /> : <Pin size={14} />}
             </button>
@@ -739,7 +755,7 @@ function PainelPersonalizavel({ blocos: proprios, chave, titulo, descricao }: { 
         <div className="customize-bar">
           <div className="customize-bar__text">
             <strong>Personalizando o seu painel</strong>
-            <span className="muted small">Arraste os blocos para mudar a ordem ou para a área “Fixados” no topo. Use “Adicionar bloco” para novos indicadores e listas; para uma página do sistema, clique com o botão direito nela no menu → “Adicionar ao meu painel”. As escolhas ficam salvas na sua conta.</span>
+            <span className="muted small">Arraste os blocos (ou use as setas ↑↓) para mudar a ordem ou para a área “Fixados” no topo. Use “Adicionar bloco” para novos indicadores e listas; para uma página do sistema, use o botão direito (ou segure o dedo) sobre ela no menu → “Adicionar ao meu painel”. As escolhas ficam salvas na sua conta.</span>
           </div>
           {ocultos.size > 0 && (
             <div className="customize-bar__hidden">
@@ -762,7 +778,7 @@ function PainelPersonalizavel({ blocos: proprios, chave, titulo, descricao }: { 
         <section className={`pinned-zone ${editando ? 'is-editing' : ''} ${editando && arrastando ? 'is-target' : ''}`} {...zonaProps('fixados')}>
           <h2 className="pinned-zone__title"><Pin size={14} /> Fixados</h2>
           {fixados.length ? area(fixados, 'fixados') : (
-            <p className="pinned-zone__empty">Arraste um bloco para cá, ou clique com o botão direito sobre ele e escolha “Fixar no topo”.</p>
+            <p className="pinned-zone__empty">Arraste um bloco para cá, ou use o botão direito (ou segure o dedo) sobre ele e escolha “Fixar no topo”.</p>
           )}
         </section>
       )}
@@ -793,7 +809,7 @@ function PainelPersonalizavel({ blocos: proprios, chave, titulo, descricao }: { 
         <Modal title="Adicionar bloco ao painel" onClose={() => setVendoCatalogo(false)} width={860}>
           <p className="muted catalog__intro">
             Blocos além dos padrões. Os adicionados entram no fim do painel; depois é só arrastar, fixar ou remover.
-            Para colocar uma página do sistema, use o botão direito sobre ela no menu → “Adicionar ao meu painel”.
+            Para colocar uma página do sistema, use o botão direito (ou segure o dedo) sobre ela no menu → “Adicionar ao meu painel”.
           </p>
           <div className="catalog__tabs" role="tablist" aria-label="Filtrar por área">
             {['', ...areasCatalogo].map((a) => (

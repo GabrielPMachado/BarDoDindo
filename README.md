@@ -127,3 +127,7 @@ Receitas, despesas, consumos e reservas crescem com o tempo, então as telas car
 ## Testes das regras
 
 `npm run testar:regras` sobe os emuladores, cria os dados de teste (`scripts/semear-testes.mjs`) e confere que as regras do Firestore barram o que não pode passar (`scripts/testar-regras.mjs`). O GitHub Actions roda esse teste em cada pull request e antes de cada publicação: se algum falhar, nada é publicado.
+
+## Celular e tablet
+
+O CRM se adapta à tela. No tablet e no celular o menu lateral vira uma gaveta (botão ☰), as grades viram uma coluna e, no celular, as tabelas viram cartões e as janelas ocupam a tela inteira. Como no toque não há botão direito, **segurar o dedo** sobre uma página do menu ou um bloco do painel abre o mesmo menu (fixar, adicionar ao painel…), e no modo *Personalizar* as setas ↑↓ mudam os blocos de lugar.

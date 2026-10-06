@@ -163,7 +163,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
           <EmptyState title="Nenhum resultado">Ajuste a busca ou o filtro.</EmptyState>
         ) : (
           <div className="table-wrap">
-            <table className="table">
+            <table className="table table--cards">
               <thead>
                 <tr>
                   {tableFields.map((f) => (
@@ -182,10 +182,10 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
                 {visible.map((r) => (
                   <tr key={r.id} className="is-clickable" onClick={() => setEditing(r)} title={canEdit ? 'Clique para editar' : 'Clique para ver os detalhes'}>
                     {tableFields.map((f) => (
-                      <td key={f.key} className={cellClass(f)}>{formatField(f, r[f.key])}</td>
+                      <td key={f.key} data-label={f.label} className={cellClass(f)}>{formatField(f, r[f.key])}</td>
                     ))}
                     {def.computed?.map((c) => (
-                      <td key={c.label} className={c.format === 'badge' || c.format === 'text' ? 'nowrap' : 'num'}>{formatComputed(c, r)}</td>
+                      <td key={c.label} data-label={c.label} className={c.format === 'badge' || c.format === 'text' ? 'nowrap' : 'num'}>{formatComputed(c, r)}</td>
                     ))}
                     <td className="actions-col" onClick={(e) => e.stopPropagation()}>
                       <div className="row-actions">

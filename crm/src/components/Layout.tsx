@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { AppWindow, ChevronDown, LayoutDashboard, UserRound, Copy, ExternalLink, KeyRound, LogOut, MousePointerClick, Pin, PinOff, X } from 'lucide-react';
+import { AppWindow, ChevronDown, LayoutDashboard, Menu, UserRound, Copy, ExternalLink, KeyRound, LogOut, MousePointerClick, Pin, PinOff, X } from 'lucide-react';
 import { GROUPS, findModule, groupOf, type Area } from '../modules';
 import { useSession } from '../lib/session';
 import { useLastSync } from '../lib/data';
 import { usePins } from '../lib/pins';
+import { useToqueLongo } from '../lib/toque';
 import { alternarAtalho, usePainelPrefs } from '../lib/preferencias';
 import { AtividadesButton, PainelAtualizacoes, usePainelAoAbrir } from './Atividades';
 import { notify } from './ui';
@@ -92,6 +93,10 @@ export function Layout({ children }: { children: ReactNode }) {
   const [ctx, setCtx] = useState<MenuState | null>(null);
   const painel = usePainelAoAbrir();
   const navRef = useRef<HTMLElement>(null);
+  // celular e tablet: o menu lateral vira uma gaveta, aberta pelo botão ☰
+  const [gaveta, setGaveta] = useState(false);
+  useEffect(() => setGaveta(false), [pathname]);
+  const toqueLongo = useToqueLongo();
 
   // grupos começam abertos; departamentos começam fechados, exceto o da página atual
   const [open, setOpen] = useState<Record<string, boolean>>(() => ({ 'g:eu': true, 'g:dir': true, 'g:dep': true, 'g:cfg': true }));
@@ -108,6 +113,8 @@ export function Layout({ children }: { children: ReactNode }) {
     e.preventDefault();
     setCtx({ x: e.clientX, y: e.clientY, path });
   };
+  /** Botão direito no computador; toque longo no celular. */
+  const menuProps = (path: string) => ({ onContextMenu: openMenu(path), ...toqueLongo((x, y) => setCtx({ x, y, path })) });
   const goPinned = (path: string) => {
     const m = findModule(path);
     if (m) expand(m.area.key);
@@ -124,7 +131,7 @@ export function Layout({ children }: { children: ReactNode }) {
           return (
             <div key={i.path}>
               {header && <div className="nav__group">{header}</div>}
-              <NavLink to={i.path} end className="nav__link" onContextMenu={openMenu(i.path)}>
+              <NavLink to={i.path} end className="nav__link" {...menuProps(i.path)}>
                 <span>{i.label}</span>
                 {isPinned(i.path) && <Pin size={12} className="nav__pin" aria-label="Fixado" />}
               </NavLink>
@@ -141,7 +148,8 @@ export function Layout({ children }: { children: ReactNode }) {
 
   return (
     <div className="shell">
-      <aside className="sidebar">
+      {gaveta && <div className="sidebar-backdrop" onClick={() => setGaveta(false)} aria-hidden="true" />}
+      <aside className={`sidebar ${gaveta ? 'is-open' : ''}`}>
         <Brand />
         <nav className="nav" ref={navRef}>
           {GROUPS.map((g) => {
@@ -183,23 +191,24 @@ export function Layout({ children }: { children: ReactNode }) {
 
       <div className="main">
         <header className="topbar">
+          <button className="topbar__menu" onClick={() => setGaveta(true)} aria-label="Abrir menu"><Menu size={22} /></button>
           {/* páginas fixadas pelo usuário (botão direito sobre uma página do menu → Fixar) */}
           <div className="pins" aria-label="Páginas fixadas">
             {fixados.length ? fixados.map((m) => (
               <div key={m.item.path} className={`pin ${current?.item.path === m.item.path ? 'is-active' : ''}`} title={`${m.area.label} · ${m.item.label}`}>
-                <button className="pin__go" onClick={() => goPinned(m.item.path)} onContextMenu={openMenu(m.item.path)}>
+                <button className="pin__go" onClick={() => goPinned(m.item.path)} {...menuProps(m.item.path)}>
                   <m.area.icon size={14} strokeWidth={1.8} />
                   <span>{m.item.label}</span>
                 </button>
                 <button className="pin__x" onClick={() => unpin(m.item.path)} aria-label={`Desafixar ${m.item.label}`}><X size={12} /></button>
               </div>
             )) : (
-              <span className="pins__hint"><Pin size={13} /> Clique com o botão direito em uma página do menu para fixá-la aqui</span>
+              <span className="pins__hint"><Pin size={13} /> <span className="pins__hint-desktop">Clique com o botão direito em uma página do menu para fixá-la aqui</span><span className="pins__hint-touch">Segure o dedo sobre uma página do menu para fixá-la aqui</span></span>
             )}
           </div>
           <div className="live" title="Os dados são atualizados automaticamente">
             <span className={`live__dot ${lastSync && Date.now() - lastSync.getTime() < 10000 ? 'is-on' : ''}`} />
-            {lastSync ? `Ao vivo · ${lastSync.toLocaleTimeString('pt-BR')}` : 'Conectando…'}
+            <span className="live__text">{lastSync ? `Ao vivo · ${lastSync.toLocaleTimeString('pt-BR')}` : 'Conectando…'}</span>
           </div>
           <AtividadesButton onOpenPanel={painel.abrir} />
           <div className="user">

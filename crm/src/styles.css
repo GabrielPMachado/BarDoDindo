@@ -25,7 +25,7 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; }
-body { background: var(--bg); color: var(--text); font: 14px/1.45 var(--sans); -webkit-font-smoothing: antialiased; min-width: 1100px; }
+body { background: var(--bg); color: var(--text); font: 14px/1.45 var(--sans); -webkit-font-smoothing: antialiased; }
 a { color: inherit; text-decoration: none; }
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
 button:disabled { cursor: not-allowed; opacity: .5; }
@@ -70,7 +70,7 @@ h1, h2, h3, p { margin: 0; }
 .brand__line--right::after { right: auto; left: -3px; }
 .brand--lg { gap: 22px; }
 .brand--lg .brand__name { font-size: 48px; letter-spacing: .2em; }
-.brand--lg .brand__title { width: 380px; max-width: 100%; }
+.brand--lg .brand__title { width: min(380px, 100%); }
 
 .nav { display: flex; flex-direction: column; gap: 2px; border-top: 1px solid var(--border); padding-top: 9px; }
 .nav__block + .nav__block { margin-top: 2px; }
@@ -621,3 +621,119 @@ select.input { appearance: none; padding-right: 30px; background-image: linear-g
 .matrix th, .matrix td { padding-left: 3px; padding-right: 3px; }
 .matrix .perm-dots { gap: 1px; }
 .matrix .perm-dots i { width: 14px; height: 17px; font-size: 9.5px; }
+
+/* ======================================================================
+   Celular e tablet
+   ====================================================================== */
+.topbar__menu, .sidebar-backdrop, .pins__hint-touch { display: none; }
+
+/* tablet (e celular): o menu lateral vira uma gaveta aberta pelo botão ☰ */
+@media (max-width: 1024px) {
+  .shell { grid-template-columns: 1fr; }
+  .sidebar {
+    position: fixed; z-index: 60; left: 0; top: 0; bottom: 0; width: min(300px, 86vw);
+    transform: translateX(-102%); transition: transform .22s ease; box-shadow: 0 0 40px #000c;
+  }
+  .sidebar.is-open { transform: none; }
+  .sidebar-backdrop { display: block; position: fixed; inset: 0; z-index: 55; background: #000a; animation: fade .15s ease; }
+  .topbar__menu { display: grid; place-items: center; width: 40px; height: 40px; margin-right: 6px; border-radius: 10px; color: var(--brand-light); flex-shrink: 0; }
+  .topbar__menu:hover { background: #ffffff0a; }
+  .topbar { padding: 0 16px; }
+  .content { padding: 20px 16px 48px; }
+  .grid-2, .grid-2--wide-left { grid-template-columns: minmax(0, 1fr); }
+  .comanda { position: static; }
+  .profile-card__facts { padding-left: 16px; }
+}
+
+/* toque: alvos maiores e a dica certa para fixar páginas */
+@media (pointer: coarse) {
+  .nav__link { padding: 10px 12px; }
+  .nav__head { padding: 11px 10px; }
+  .pins__hint-desktop { display: none; }
+  .pins__hint-touch { display: inline; }
+  .bloco__tools button, .bloco__grip { width: 32px; height: 32px; }
+  .bloco__grip { display: none; }
+  /* no toque os botões do bloco ficam numa linha acima do conteúdo, sem cobrir o título */
+  .bloco.is-editing .bloco__tools { position: static; align-self: flex-end; margin-bottom: 6px; box-shadow: none; }
+  .bloco.is-editing .panel__head { padding-right: 14px; }
+  .bloco.is-editing .kpi__label { padding-right: 0; }
+}
+
+/* celular */
+@media (max-width: 640px) {
+  .topbar { height: 56px; padding: 0 10px; gap: 2px; }
+  .live { margin: 0 8px; }
+  .live__text { display: none; }
+  .topbar-btn { margin-right: 6px; }
+  .user__btn { padding: 4px; border: 0; }
+  .user__info, .user__btn > svg:last-child { display: none; }
+  .pins__hint { display: none; }
+  .activity-pop__panel { position: fixed; left: 8px; right: 8px; top: 62px; width: auto; }
+
+  .content { padding: 16px 12px 40px; }
+  .page { gap: 14px; }
+  .page-head { flex-direction: column; align-items: stretch; gap: 12px; }
+  .page-head h1 { font-size: 23px; }
+  .page-head__actions { flex-wrap: wrap; }
+  .page-head__actions > * { flex: 1 1 auto; }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .kpi { padding: 12px; }
+  .kpi__value { font-size: 18px; }
+  .panel__head { padding: 14px 14px 6px; }
+  .pad-lg { padding: 16px 14px; }
+  .mini-list { padding: 4px 14px 12px; }
+  .hbars { padding: 8px 14px 14px; }
+  .hbar { grid-template-columns: minmax(80px, 36%) 1fr auto; gap: 8px; }
+
+  .toolbar { flex-wrap: wrap; }
+  .search { min-width: 0; flex: 1 1 100%; }
+  .toolbar .input--sm { flex: 1 1 auto; }
+
+  /* tabelas viram cartões: cada linha um cartão, cada coluna "rótulo: valor" */
+  .table--cards thead { display: none; }
+  .table--cards, .table--cards tbody, .table--cards tr, .table--cards td { display: block; width: 100%; }
+  .table--cards tr { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  .table--cards tbody tr:last-child { border-bottom: 0; }
+  .table--cards td { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 4px 0 !important; border: 0; text-align: right; min-width: 0; max-width: none; }
+  .table--cards td::before { content: attr(data-label); color: var(--muted); font-size: 12px; text-align: left; flex-shrink: 0; }
+  .table--cards td:first-child { font-weight: 600; }
+  .table--cards td.actions-col { position: static; box-shadow: none; background: none; justify-content: flex-end; padding-top: 8px !important; }
+  .table--cards td.actions-col::before { content: none; }
+  .table--cards tbody tr:hover td { background: none; }
+
+  /* janelas ocupam a tela inteira */
+  .modal-overlay { padding: 0; }
+  .modal { max-width: none !important; min-height: 100dvh; border-radius: 0; border: 0; }
+  .modal__body { padding: 16px; }
+  .modal__foot { flex-wrap: wrap; position: sticky; bottom: 0; background: var(--surface); }
+  .form-grid { grid-template-columns: 1fr; }
+  .confirm { min-height: 0; border-radius: 14px; margin: 0 16px; max-width: none !important; }
+  .modal-overlay--confirm { padding: 16px; }
+
+  .profile-card { flex-direction: column; text-align: center; padding: 20px 16px; }
+  .profile-card__main { align-items: center; }
+  .profile-card__role { align-self: center; }
+  .profile-card__facts { border-left: 0; border-top: 1px solid var(--border); padding: 14px 0 0; width: 100%; text-align: left; }
+
+  .customize-bar__actions { margin-left: 0; width: 100%; }
+  .customize-bar__actions .btn { flex: 1; }
+  .pinned-zone { margin: 0 -6px; padding: 12px 10px; }
+  .perm { flex-wrap: wrap; }
+  .perm-checks { width: 100%; justify-content: flex-start; }
+  .catalog { grid-template-columns: 1fr; }
+  .catalog__scroll { max-height: none; }
+  .activity-head { flex-direction: column; align-items: stretch; }
+  .activity-filters { flex-wrap: wrap; }
+  .activity-filters .input { flex: 1 1 140px; }
+  .activity-scroll { max-height: none; }
+  .toasts { left: 12px; right: 12px; bottom: 12px; }
+  .toast { max-width: none; }
+
+  /* login: uma coluna, com a logo em cima */
+  .login { grid-template-columns: minmax(0, 1fr); }
+  .login__card { width: min(420px, calc(100% - 32px)); }
+  .login__art { padding: 32px 16px 20px; gap: 16px; border-right: 0; border-bottom: 1px solid var(--border); }
+  .brand--lg .brand__logo { width: 150px; height: 150px; }
+  .brand--lg .brand__name { font-size: 32px; }
+  .login__card { padding: 24px 0 40px; }
+}
