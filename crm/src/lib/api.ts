@@ -4,7 +4,6 @@
  */
 import { ApiError, createBackend } from '../../../shared/backend';
 
-export { ApiError };
 
 const backend = createBackend('crm');
 

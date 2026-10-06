@@ -8,17 +8,12 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "cap:sync": "npm run build && npx cap sync",
-    "server": "node server/index.mjs",
     "crm": "npm --prefix crm run dev",
     "build:all": "npm run build && npm --prefix crm run build && node scripts/montar-hosting.mjs",
     "emuladores": "firebase emulators:start --project demo-bardodindo",
     "publicar": "npm run build:all && firebase deploy",
-    "start": "node server/index.mjs",
-    "demo": "node scripts/demo-server.mjs",
-    "simular": "node scripts/simular.mjs",
     "serve": "npm run build && node scripts/static-server.mjs dist 5173",
     "serve:crm": "npm --prefix crm run build && node scripts/static-server.mjs crm/dist 5174",
-    "serve:afilhado": "node scripts/static-server.mjs precadastro 5175",
     "testar:regras": "npx -y firebase-tools@15 emulators:exec --only auth,firestore --project demo-bardodindo \"node scripts/semear-testes.mjs && node scripts/testar-regras.mjs senha-cliente-123 senha-atendente-123 senha-marketing-123\""
   },
   "dependencies": {

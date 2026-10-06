@@ -171,9 +171,10 @@ function inssEmpregado(salario: number, faixas: { ate: number; aliquota: number 
   return Math.round(total * 100) / 100;
 }
 
-export function createBackend(kind: 'app' | 'crm') {
+export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   // cada sistema tem a própria sessão, mesmo quando abertos no mesmo navegador
-  const app = initializeApp(firebaseConfig, kind);
+  // (`instancia` permite várias sessões no mesmo processo, ex.: roteiros de teste com vários afilhados)
+  const app = initializeApp(firebaseConfig, instancia);
   const auth = getAuth(app);
   // VITE_LONG_POLLING=1 só em builds locais de teste atrás de proxy, onde a conexão contínua do Firestore não passa
   const db = initializeFirestore(app, { ignoreUndefinedProperties: true, ...(import.meta.env.VITE_LONG_POLLING === '1' ? { experimentalForceLongPolling: true } : {}) });
@@ -609,6 +610,15 @@ export function createBackend(kind: 'app' | 'crm') {
       // largura escolhida para cada bloco (¼, ½, ¾ ou a linha inteira)
       tamanhos: Object.fromEntries(Object.entries(p.tamanhos && typeof p.tamanhos === 'object' ? p.tamanhos : {})
         .filter(([id, t]) => ids([id]).length === 1 && ['p', 'm', 'g', 'c'].includes(t as string)).slice(0, 60)),
+      // posição livre de cada bloco na grade (x, y e largura em colunas de 0 a 12; altura em linhas)
+      layout: Object.fromEntries(Object.entries(p.layout && typeof p.layout === 'object' ? p.layout : {})
+        .filter(([id]) => ids([id]).length === 1)
+        .map(([id, v]) => {
+          const q = (v ?? {}) as Dados;
+          const n = (x: unknown, min: number, max: number) => Math.min(max, Math.max(min, Math.round(Number(x) || 0)));
+          const x = n(q.x, 0, 11);
+          return [id, { x, y: n(q.y, 0, 999), w: Math.min(n(q.w, 1, 12), 12 - x), h: n(q.h, 1, 60) }];
+        }).slice(0, 60)),
     });
     // "painel" é o Painel executivo; "meuPainel" é o painel próprio (Meu perfil → Meu painel). Grava só o que veio.
     const salvo: Dados = {};

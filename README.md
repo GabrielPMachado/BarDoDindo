@@ -25,7 +25,7 @@ Nenhum dado vem pré-cadastrado: cardápio, recompensas, clientes, equipe e lan�
 **Cérebro** é o nome do sistema de gestão. O menu começa por **Meu perfil** (de todo usuário: *Meus dados*, onde a pessoa vê e edita as próprias informações e troca a senha, e *Meu painel*, um painel próprio montado com os blocos e atalhos que ela quiser; também dá para trocar a foto). Depois vêm três grandes grupos: **Diretoria**, **Departamentos** (Atendimento, Vendas, Marketing, Pessoal, Estrutura, Administrativo, Financeiro, Jurídico e Fiscalização) e **Configurações**.
 
 - **Painel de atualizações**: ao abrir o sistema aparece o que a equipe fez (cadastros, alterações, folha lançada, consumos, usuários…), com quem fez, o dia e o horário. O mesmo histórico fica no botão ao lado do perfil, no topo. Cada pessoa vê só as atualizações das áreas que ela acessa (`atividades/{área}/itens` no Firestore).
-- **Painel executivo personalizável**: cada usuário escolhe como fica o seu painel. Botão direito sobre um bloco → *Fixar no topo* ou *Ocultar*; o botão *Personalizar* permite arrastar os blocos para mudar a ordem, escolher o **tamanho** de cada um (¼, ½, ¾ ou a linha inteira — indicadores e painéis podem ficar lado a lado na ordem que a pessoa quiser), levá-los para o início ou o fim, mostrar de novo os ocultos e restaurar o padrão. As mesmas opções de tamanho e lugar aparecem no botão direito sobre o bloco. Também dá para colocar qualquer página do CRM no painel: botão direito sobre ela no menu → *Adicionar ao painel* (entra como atalho fixado no topo). O botão *Adicionar bloco* abre um catálogo com mais de 30 blocos além dos padrões, separados por área (Diretoria, Atendimento, Marketing, Pessoal, Estrutura, Administrativo, Financeiro, Jurídico, Fiscalização, Configurações), cada um disponível só para quem acessa a área dele. O mesmo vale para o *Meu painel* de cada usuário, que é independente do Painel executivo. As escolhas ficam salvas na conta (`preferencias/{uid}` no Firestore) e valem em qualquer computador.
+- **Painel executivo personalizável**: cada usuário escolhe como fica o seu painel. Botão direito sobre um bloco → *Fixar no topo* ou *Ocultar*; o botão *Personalizar* transforma o painel numa **grade livre** de 12 colunas: cada bloco é arrastado pela alça ⠿ para **qualquer lugar** (fica exatamente onde foi solto, pode sobrar espaço vazio, e só os blocos que ele cobriria descem) e muda de **largura e altura** pelo canto inferior direito. Há atalhos de tamanho (¼, ½, ¾ ou a linha inteira) e de lugar (início, fim, antes, depois), também no botão direito sobre o bloco; dá para mostrar de novo os ocultos e restaurar o padrão. No celular os blocos ficam empilhados na ordem de leitura. A área *Fixados*, no topo, continua em fileira. Também dá para colocar qualquer página do CRM no painel: botão direito sobre ela no menu → *Adicionar ao painel* (entra como atalho fixado no topo). O botão *Adicionar bloco* abre um catálogo com mais de 30 blocos além dos padrões, separados por área (Diretoria, Atendimento, Marketing, Pessoal, Estrutura, Administrativo, Financeiro, Jurídico, Fiscalização, Configurações), cada um disponível só para quem acessa a área dele. O mesmo vale para o *Meu painel* de cada usuário, que é independente do Painel executivo. As escolhas ficam salvas na conta (`preferencias/{uid}` no Firestore) e valem em qualquer computador.
 - **Fixar páginas**: o botão direito (ou segurar o dedo) sobre uma página do menu abre em nova guia ou janela, copia o link e **fixa** a página. As fixadas aparecem em *Meu perfil → Fixados*; clicar abre a página e expande o departamento no menu. No topo fica o caminho da página atual (Cérebro / grupo / departamento / página).
 
 Áreas:
@@ -113,9 +113,17 @@ Depois `npx cap open android` (Android Studio) ou `npx cap add ios` / `npx cap o
 - **Folha**: para calcular os totais, quem tem acesso ao Financeiro consegue ler o cadastro de colaboradores no banco, embora a tela só mostre o detalhe individual para o RH.
 - **Produtos**: o cardápio público é uma cópia sem custo nem margem; o Atendimento lê o cadastro completo para lançar consumo.
 
-## Servidor antigo (Node + SQLite)
+## Ao vivo
 
-`server/`, `scripts/demo-server.mjs`, `scripts/simular.mjs`, `scripts/static-server.mjs`, `scripts/criar-admin.mjs` e `scripts/zerar-dados.mjs` são da versão anterior, com API própria e banco SQLite. As telas não usam mais essa API.
+O app e o CRM perguntam a cada 1 segundo se algo mudou (o pré-cadastro, a cada 1,5 s) e só então recarregam o que está na tela. A resposta vem dos dados que já chegam em tempo real do Firestore, então isso não gasta leituras extras. A primeira leitura de cada consulta espera a resposta do servidor (até 2,5 s), para nunca mostrar uma cópia local desatualizada.
+
+Versões novas também entram sozinhas: o app (service worker) procura atualização a cada minuto, e o CRM confere se o site mudou e recarrega quando não há janela aberta nem campo em edição.
+
+## Administração
+
+- **Excluir afilhado** (Vendas → Clientes): apaga o cadastro, o saldo, os consumos (com as receitas), os vouchers e as reservas do afilhado. Exige permissão de excluir em Vendas e em Atendimento.
+- **Numeração dos afilhados** (Configurações → Parâmetros): mostra o próximo número e, depois de excluir afilhados, ajusta para voltar a seguir o maior número em uso.
+- **Zerar o sistema**: só a função Administrador, pela rota `/crm/admin/zerar` com a confirmação `ZERAR TUDO`. Apaga todas as informações (inclusive usuários, funções e parâmetros) e o sistema volta ao primeiro acesso. As contas de login continuam no Firebase Authentication. Logo depois de zerar, faça o primeiro acesso: até lá, quem abrir o CRM pode se cadastrar como administrador.
 
 ## Permissões
 
@@ -129,11 +137,13 @@ Receitas, despesas, consumos e reservas crescem com o tempo, então as telas car
 
 `npm run testar:regras` sobe os emuladores, cria os dados de teste (`scripts/semear-testes.mjs`) e confere que as regras do Firestore barram o que não pode passar (`scripts/testar-regras.mjs`). O GitHub Actions roda esse teste em cada pull request e antes de cada publicação: se algum falhar, nada é publicado.
 
-## Celular e tablet
+## Valores e clientes
 
 Os campos de **valor em R$** aceitam a digitação natural: "150" vira R$ 150,00 e "18,5" vira R$ 18,50 (antes o campo era preenchido como centavos, e "5" virava R$ 0,05).
 
 Na lista de **Clientes (afilhados)**, gasto total, visitas e última visita vêm de totais guardados no saldo de cada afilhado (`saldos/{uid}`: `gasto`, `lancamentos`, `dias`), atualizados a cada consumo lançado ou estornado — a tela não precisa carregar todos os consumos. Saldos antigos, sem esses totais, são calculados uma vez a partir dos consumos e gravados na primeira abertura da lista por alguém do Atendimento.
+
+## Celular e tablet
 
 O CRM se adapta à tela. No tablet e no celular o menu lateral vira uma gaveta (botão ☰), as grades viram uma coluna e, no celular, as tabelas viram cartões e as janelas ocupam a tela inteira. Como no toque não há botão direito, **segurar o dedo** sobre uma página do menu ou um bloco do painel abre o mesmo menu (fixar, adicionar ao painel…), e no modo *Personalizar* as setas ↑↓ mudam os blocos de lugar.
 

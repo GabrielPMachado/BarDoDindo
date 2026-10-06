@@ -75,13 +75,14 @@ service cloud.firestore {
     /* ---------- preferências de cada usuário (painel executivo personalizado) ---------- */
     // cada painel (executivo e "Meu painel") guarda só listas curtas de identificadores
     function painelOk(p) {
-      return p.keys().hasOnly(['ordem', 'fixados', 'ocultos', 'atalhos', 'extras', 'tamanhos'])
+      return p.keys().hasOnly(['ordem', 'fixados', 'ocultos', 'atalhos', 'extras', 'tamanhos', 'layout'])
         && p.get('ordem', []) is list && p.get('ordem', []).size() <= 60
         && p.get('fixados', []) is list && p.get('fixados', []).size() <= 60
         && p.get('ocultos', []) is list && p.get('ocultos', []).size() <= 60
         && p.get('atalhos', []) is list && p.get('atalhos', []).size() <= 30
         && p.get('extras', []) is list && p.get('extras', []).size() <= 60
-        && p.get('tamanhos', {}) is map && p.get('tamanhos', {}).size() <= 60;
+        && p.get('tamanhos', {}) is map && p.get('tamanhos', {}).size() <= 60
+        && p.get('layout', {}) is map && p.get('layout', {}).size() <= 60;
     }
     match /preferencias/{uid} {
       allow read: if logado() && request.auth.uid == uid;
@@ -126,7 +127,9 @@ service cloud.firestore {
       allow read: if daEquipe();
       allow create: if (pode('cfg', 'criar') && request.resource.data.get('sistema', false) != true)
         || (id == 'admin' && primeiroAcesso());
-      allow update: if pode('cfg', 'editar') && resource.data.get('sistema', false) != true && request.resource.data.get('sistema', false) != true;
+      allow update: if (pode('cfg', 'editar') && resource.data.get('sistema', false) != true && request.resource.data.get('sistema', false) != true)
+        // primeiro acesso refeito (ex.: registro apagado no console): recria a função Administrador que sobrou
+        || (id == 'admin' && primeiroAcesso());
       allow delete: if (pode('cfg', 'excluir') && resource.data.get('sistema', false) != true) || zerando();
     }
 

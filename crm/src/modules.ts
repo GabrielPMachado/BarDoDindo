@@ -8,12 +8,6 @@ export type Access = 'none' | 'view' | 'edit';
 
 /** Permissões que cada função marca, área por área. */
 export type Acao = 'ver' | 'criar' | 'editar' | 'excluir';
-export const ACOES: { key: Acao; label: string; sigla: string; dica: string }[] = [
-  { key: 'ver', label: 'Ver', sigla: 'V', dica: 'Abrir a área e consultar os registros' },
-  { key: 'criar', label: 'Criar', sigla: 'C', dica: 'Cadastrar e lançar registros novos' },
-  { key: 'editar', label: 'Editar', sigla: 'E', dica: 'Alterar registros existentes' },
-  { key: 'excluir', label: 'Excluir', sigla: 'X', dica: 'Apagar registros (inclui estornos)' },
-];
 const TODAS: Acao[] = ['ver', 'criar', 'editar', 'excluir'];
 /**
  * Permissões gravadas numa função. Aceita o formato antigo (um nível por área):
@@ -34,7 +28,7 @@ export function acoesDe(p: unknown): Acao[] {
   return [];
 }
 /** Os 4 níveis escolhidos na tela de funções; por baixo cada um vira uma lista de permissões. */
-export type Nivel = 'none' | 'ver' | 'editar' | 'total';
+type Nivel = 'none' | 'ver' | 'editar' | 'total';
 export const NIVEIS: { key: Nivel; label: string; dica: string; acoes: Acao[] }[] = [
   { key: 'none', label: 'Sem acesso', dica: 'A área não aparece para o usuário', acoes: [] },
   { key: 'ver', label: 'Ver', dica: 'Abrir e consultar, sem alterar nada', acoes: ['ver'] },
@@ -179,7 +173,7 @@ export const AREAS: Area[] = [
 ];
 
 /** Os três grandes grupos do menu: Diretoria, Departamentos (as demais áreas) e Configurações. */
-export interface NavGroup {
+interface NavGroup {
   key: string;
   label: string;
   icon: LucideIcon;

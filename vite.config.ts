@@ -8,8 +8,8 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      // a API e o CRM nunca passam pelo cache do app
-      workbox: { navigateFallbackDenylist: [/^\/api/, /^\/crm/, /^\/afilhado/] },
+      // o CRM e o pré-cadastro nunca passam pelo cache do app
+      workbox: { navigateFallbackDenylist: [/^\/crm/, /^\/afilhado/] },
       includeAssets: ['icon.png', 'icon-192.png', 'icon-maskable.png', 'apple-touch-icon.png'],
       manifest: {
         name: 'Bar do Dindo',

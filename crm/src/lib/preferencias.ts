@@ -13,7 +13,11 @@ export interface PainelPrefs {
   extras: string[];
   /** Largura escolhida para cada bloco; os que não estão aqui usam o tamanho padrão do tipo. */
   tamanhos: Record<string, Tamanho>;
+  /** Posição livre de cada bloco na grade de 12 colunas (x, y e largura em colunas; altura em linhas). */
+  layout: Record<string, Posicao>;
 }
+
+export interface Posicao { x: number; y: number; w: number; h: number }
 
 /** Largura de um bloco no painel: ¼, ½, ¾ ou a linha inteira. */
 export type Tamanho = 'p' | 'm' | 'g' | 'c';
@@ -28,8 +32,19 @@ const PATH = '/crm/preferencias';
 const lista = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
 const tamanhos = (v: unknown): Record<string, Tamanho> =>
   Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : {}).filter(([, t]) => TAMANHOS.some((x) => x.valor === t))) as Record<string, Tamanho>;
+const inteiro = (v: unknown, min: number, max: number) => (Number.isInteger(v) && (v as number) >= min && (v as number) <= max ? (v as number) : null);
+const layout = (v: unknown): Record<string, Posicao> => {
+  const out: Record<string, Posicao> = {};
+  for (const [id, p] of Object.entries(v && typeof v === 'object' ? v : {})) {
+    const q = (p ?? {}) as Record<string, unknown>;
+    const x = inteiro(q.x, 0, 11), y = inteiro(q.y, 0, 999), w = inteiro(q.w, 1, 12), h = inteiro(q.h, 1, 60);
+    if (x !== null && y !== null && w !== null && h !== null) out[id] = { x, y, w: Math.min(w, 12 - x), h };
+  }
+  return out;
+};
 const normalizar = (p?: Partial<PainelPrefs>): PainelPrefs => ({
   ordem: lista(p?.ordem), fixados: lista(p?.fixados), ocultos: lista(p?.ocultos), atalhos: lista(p?.atalhos), extras: lista(p?.extras), tamanhos: tamanhos(p?.tamanhos),
+  layout: layout(p?.layout),
 });
 
 /** Qual painel: o executivo (Diretoria) ou o painel próprio de cada usuário (Meu perfil → Meu painel). */

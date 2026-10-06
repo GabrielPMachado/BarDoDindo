@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { api, ApiError, getToken, setToken } from './api';
 
-export interface Config {
+interface Config {
   nomeEstabelecimento: string;
   horarios: string[];
   ambientes: string[];
@@ -11,7 +11,7 @@ export interface Config {
   niveis: { nome: string; minimo: number }[];
 }
 
-export interface Produto {
+interface Produto {
   id: string;
   nome: string;
   categoria: string;
@@ -56,7 +56,7 @@ export interface Redemption {
   data: string;
 }
 
-export interface Me {
+interface Me {
   cliente: { id: number; numero: number; nome: string; email: string; telefone: string; foto: string | null; desde: string };
   pontos: number;
   acumulados: number;
@@ -225,7 +225,7 @@ export function parseDate(date: string) {
   return new Date(y, m - 1, d);
 }
 
-export const ACTIVE_STATUS: ReservaStatus[] = ['Pendente', 'Confirmada'];
+const ACTIVE_STATUS: ReservaStatus[] = ['Pendente', 'Confirmada'];
 
 export function upcoming(reservations: Reservation[]) {
   const today = todayISO();

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, ArrowDown, ArrowRight, ArrowUp, Check, ChevronsDown, ChevronsUp, Eye, EyeOff, GripVertical, LayoutDashboard, Pin, PinOff, Plus, RotateCcw, Scaling, SlidersHorizontal, X } from 'lucide-react';
 import { BarChart, HBarList } from '../components/Charts';
@@ -8,11 +8,17 @@ import { useAtividades } from '../components/Atividades';
 import { useCollection, useResource, type Row } from '../lib/data';
 import { brl, dateBR, daysUntil, isoToday, monthLabel, num, pct } from '../lib/format';
 import { currentMonth, despesaValida, lastMonths, monthName, monthOf, sumBy } from '../lib/finance';
-import { alternarAtalho, atalhoId, TAMANHOS, usePainelPrefs, type PainelChave, type PainelPrefs, type Tamanho } from '../lib/preferencias';
+import { alternarAtalho, atalhoId, TAMANHOS, usePainelPrefs, type PainelChave, type PainelPrefs, type Posicao, type Tamanho } from '../lib/preferencias';
 import { AREAS, findModule } from '../modules';
 import { useSession } from '../lib/session';
 import { useToqueLongo } from '../lib/toque';
 import type { Kpi } from '../collections';
+import RGL, { type Layout } from 'react-grid-layout';
+import 'react-grid-layout/css/styles.css';
+import 'react-resizable/css/styles.css';
+
+/** Grade livre do painel: mede a largura disponível sozinha. */
+const Grade = RGL.WidthProvider(RGL);
 
 interface ClienteResumo { id: number; nome: string; totalGasto: number; visitas: number; criadoEm?: string; desde: string }
 
@@ -585,6 +591,37 @@ function PainelDeBlocos(info: PainelInfo) {
 /** Tamanho padrão: indicadores ocupam ¼ da linha; painéis (gráficos, listas), metade. */
 const tamanhoPadrao = (b: Bloco): Tamanho => (b.tipo === 'kpi' ? 'p' : 'm');
 
+/* grade livre: 12 colunas; cada linha tem 20 px e o espaço entre blocos é 16 px (altura = 36·h − 16 px) */
+const COLUNAS = 12;
+const LARGURA: Record<Tamanho, number> = { p: 3, m: 6, g: 9, c: 12 };
+const alturaPadrao = (b: Bloco) => (b.tipo === 'kpi' ? 4 : 10);
+const tamanhoDaLargura = (w: number): Tamanho => (w <= 3 ? 'p' : w <= 6 ? 'm' : w <= 9 ? 'g' : 'c');
+const colide = (a: Posicao, b: Posicao) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+const leitura = (a: Posicao, b: Posicao) => a.y - b.y || a.x - b.x;
+/** Tira sobreposições empurrando para baixo; `primeiro` fica onde está e os outros abrem espaço para ele. */
+function resolver(pos: Record<string, Posicao>, primeiro?: string): Record<string, Posicao> {
+  const ids = Object.keys(pos).sort((a, b) => (a === primeiro ? -1 : b === primeiro ? 1 : leitura(pos[a], pos[b])));
+  const feitos: Posicao[] = [];
+  const out: Record<string, Posicao> = {};
+  for (const id of ids) {
+    const p = { ...pos[id] };
+    while (feitos.some((q) => colide(p, q))) p.y++;
+    feitos.push(p);
+    out[id] = p;
+  }
+  return out;
+}
+/** No celular a grade livre vira uma coluna, na ordem de leitura (de cima para baixo, da esquerda para a direita). */
+function useTelaLarga() {
+  const [larga, setLarga] = useState(() => window.innerWidth >= 760);
+  useEffect(() => {
+    const ver = () => setLarga(window.innerWidth >= 760);
+    window.addEventListener('resize', ver);
+    return () => window.removeEventListener('resize', ver);
+  }, []);
+  return larga;
+}
+
 /** Cartão de atalho para uma página do CRM. */
 function blocoAtalho(path: string): Bloco | null {
   const m = findModule(path);
@@ -630,6 +667,20 @@ function PainelPersonalizavel({ blocos: proprios, chave, titulo, descricao }: { 
   const ocultos = new Set(prefs.ocultos.filter((id) => existe.has(id)));
   const fixados = prefs.fixados.filter((id) => existe.has(id) && !ocultos.has(id));
   const normais = ordem.filter((id) => !fixados.includes(id) && !ocultos.has(id));
+  const telaLarga = useTelaLarga();
+
+  // posição de cada bloco da área livre: a salva ou, para blocos sem posição, o primeiro espaço livre na ordem de leitura
+  const posicoes: Record<string, Posicao> = {};
+  for (const id of normais) if (prefs.layout[id]) posicoes[id] = prefs.layout[id];
+  for (const id of normais) {
+    if (posicoes[id]) continue;
+    const b = porId.get(id)!;
+    const w = LARGURA[prefs.tamanhos[id] ?? tamanhoPadrao(b)], h = alturaPadrao(b);
+    const p = { x: 0, y: 0, w, h };
+    while (Object.values(posicoes).some((q) => colide(p, q))) { p.x++; if (p.x + w > COLUNAS) { p.x = 0; p.y++; } }
+    posicoes[id] = p;
+  }
+  const emLeitura = [...normais].sort((a, b) => leitura(posicoes[a], posicoes[b]));
 
   const gravar = (next: Partial<PainelPrefs>) =>
     salvar({ ...prefs, ordem, fixados, ocultos: [...ocultos], ...next }).catch((e: Error) => notify(e.message || 'Não foi possível salvar o painel.', 'error'));
@@ -645,10 +696,22 @@ function PainelPersonalizavel({ blocos: proprios, chave, titulo, descricao }: { 
   /** Atalhos e blocos do catálogo saem do painel; os padrões só podem ser ocultados. */
   const remover = (b: Bloco) => (b.atalho ? removerAtalho(b.atalho) : alternarExtra(b.id));
 
-  /** Solta `id` antes de `alvo` (ou no fim da área). Soltar entre os fixados fixa; entre os demais, desafixa. */
+  /** Grava as posições da área livre (as de blocos fora dela continuam guardadas). */
+  const gravarPosicoes = (novas: Record<string, Posicao>) => gravar({ layout: { ...prefs.layout, ...novas } });
+  // durante o arraste os blocos podem se sobrepor; ao soltar, o bloco fica exatamente ali e só os que ele cobriria descem
+  const aoMexer = (l: Layout[], _antes: Layout, item: Layout) =>
+    gravarPosicoes(resolver(Object.fromEntries(l.map((x) => [x.i, { x: x.x, y: x.y, w: x.w, h: x.h }])), item.i));
+
   /** Setas do modo Personalizar (no toque não dá para arrastar): troca de lugar com o bloco vizinho. */
   const mover = (id: string, passo: -1 | 1) => {
-    const zona = fixados.includes(id) ? fixados : normais;
+    if (!fixados.includes(id)) {
+      const vizinho = emLeitura[emLeitura.indexOf(id) + passo];
+      if (!vizinho) return;
+      const a = posicoes[id], b = posicoes[vizinho];
+      gravarPosicoes(resolver({ ...posicoes, [id]: { ...a, x: Math.min(b.x, COLUNAS - a.w), y: b.y }, [vizinho]: { ...b, x: Math.min(a.x, COLUNAS - b.w), y: a.y } }, id));
+      return;
+    }
+    const zona = fixados;
     const vizinho = zona[zona.indexOf(id) + passo];
     if (!vizinho) return;
     const trocar = (lista: string[]) => lista.map((x) => (x === id ? vizinho : x === vizinho ? id : x));
@@ -660,19 +723,25 @@ function PainelPersonalizavel({ blocos: proprios, chave, titulo, descricao }: { 
     const pos = (lista: string[]) => { const sem = lista.filter((x) => x !== id); return ponta === 'inicio' ? [id, ...sem] : [...sem, id]; };
     if (fixados.includes(id)) gravar({ fixados: pos(fixados) });
     else {
-      // na ordem geral, "começo" e "fim" são relativos aos blocos visíveis fora dos fixados
-      const visiveis = pos(normais);
-      gravar({ ordem: [...visiveis, ...ordem.filter((x) => !visiveis.includes(x))] });
+      // na área livre: no topo à esquerda (os outros descem) ou embaixo de todos
+      const p = posicoes[id];
+      const fundo = Math.max(0, ...normais.filter((x) => x !== id).map((x) => posicoes[x].y + posicoes[x].h));
+      gravarPosicoes(resolver({ ...posicoes, [id]: ponta === 'inicio' ? { ...p, x: 0, y: 0 } : { ...p, x: 0, y: fundo } }, id));
     }
   };
-  const tamanhoDe = (id: string): Tamanho => prefs.tamanhos[id] ?? tamanhoPadrao(porId.get(id)!);
+  const tamanhoDe = (id: string): Tamanho => (posicoes[id] ? tamanhoDaLargura(posicoes[id].w) : prefs.tamanhos[id] ?? tamanhoPadrao(porId.get(id)!));
   const redimensionar = (id: string, t: Tamanho) => {
+    if (posicoes[id]) {
+      const p = posicoes[id], w = LARGURA[t];
+      gravarPosicoes(resolver({ ...posicoes, [id]: { ...p, w, x: Math.min(p.x, COLUNAS - w) } }, id));
+      return;
+    }
     const { [id]: _antigo, ...resto } = prefs.tamanhos;
     gravar({ tamanhos: t === tamanhoPadrao(porId.get(id)!) ? resto : { ...resto, [id]: t } });
   };
   /** Opções de tamanho e lugar (botão do modo Personalizar e botão direito sobre o bloco). */
   const opcoesLayout = (id: string) => {
-    const zona = fixados.includes(id) ? fixados : normais;
+    const zona = fixados.includes(id) ? fixados : emLeitura;
     const i = zona.indexOf(id);
     return (
       <>
@@ -722,14 +791,14 @@ function PainelPersonalizavel({ blocos: proprios, chave, titulo, descricao }: { 
     },
   });
 
-  const renderBloco = (id: string, zona: 'fixados' | 'normais') => {
+  const renderBloco = (id: string, zona: 'fixados' | 'normais', livre = false) => {
     const b = porId.get(id)!;
     const fixado = fixados.includes(id);
     return (
       <div
         key={id}
-        className={`bloco bloco--${tamanhoDe(id)} bloco--${b.tipo} ${editando ? 'is-editing' : ''} ${arrastando === id ? 'is-dragging' : ''} ${sobre === id ? 'is-over' : ''}`}
-        draggable={editando}
+        className={`bloco bloco--${tamanhoDe(id)} bloco--${b.tipo} ${livre ? 'bloco--livre' : ''} ${editando ? 'is-editing' : ''} ${arrastando === id ? 'is-dragging' : ''} ${sobre === id ? 'is-over' : ''}`}
+        draggable={editando && !livre}
         onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; setArrastando(id); }}
         onDragEnd={fimArraste}
         onDragOver={(e) => {
@@ -750,7 +819,7 @@ function PainelPersonalizavel({ blocos: proprios, chave, titulo, descricao }: { 
       >
         {editando ? (
           <div className="bloco__tools">
-            <span className="bloco__grip" title="Arraste para mudar de lugar"><GripVertical size={15} /></span>
+            <span className="bloco__grip" title={livre ? 'Arraste para qualquer lugar' : 'Arraste para mudar de lugar'}><GripVertical size={15} /></span>
             <button onClick={() => mover(id, -1)} title="Mover para antes" aria-label={`Mover ${b.titulo} para antes`}><ArrowUp size={14} /></button>
             <button onClick={() => mover(id, 1)} title="Mover para depois" aria-label={`Mover ${b.titulo} para depois`}><ArrowDown size={14} /></button>
             <button
@@ -775,7 +844,7 @@ function PainelPersonalizavel({ blocos: proprios, chave, titulo, descricao }: { 
   // uma grade só, de 12 colunas: cada bloco ocupa a largura escolhida, na ordem escolhida (indicadores e painéis misturados)
   const area = (ids: string[], zona: 'fixados' | 'normais') => <div className="blocos">{ids.map((id) => renderBloco(id, zona))}</div>;
 
-  const personalizado = prefs.ordem.length > 0 || prefs.fixados.length > 0 || prefs.ocultos.length > 0 || prefs.atalhos.length > 0 || prefs.extras.length > 0 || Object.keys(prefs.tamanhos).length > 0;
+  const personalizado = prefs.ordem.length > 0 || prefs.fixados.length > 0 || prefs.ocultos.length > 0 || prefs.atalhos.length > 0 || prefs.extras.length > 0 || Object.keys(prefs.tamanhos).length > 0 || Object.keys(prefs.layout).length > 0;
   const menuBloco = menu && porId.get(menu.id);
 
   return (
@@ -793,7 +862,7 @@ function PainelPersonalizavel({ blocos: proprios, chave, titulo, descricao }: { 
         <div className="customize-bar">
           <div className="customize-bar__text">
             <strong>Personalizando o seu painel</strong>
-            <span className="muted small">Arraste os blocos (ou use as setas ↑↓) para mudar a ordem ou para a área “Fixados” no topo, e use o botão de tamanho para deixar cada bloco com ¼, ½, ¾ ou a linha inteira. Use “Adicionar bloco” para novos indicadores e listas; para uma página do sistema, use o botão direito (ou segure o dedo) sobre ela no menu → “Adicionar ao meu painel”. As escolhas ficam salvas na sua conta.</span>
+            <span className="muted small">Arraste cada bloco pela alça ⠿ para qualquer lugar do painel (pode deixar espaço vazio) e puxe o canto inferior direito para mudar a largura e a altura. O botão de tamanho tem atalhos (¼, ½, ¾ ou a linha inteira) e o alfinete leva o bloco para a área “Fixados” no topo. Use “Adicionar bloco” para novos indicadores e listas; para uma página do sistema, use o botão direito (ou segure o dedo) sobre ela no menu → “Adicionar ao meu painel”. As escolhas ficam salvas na sua conta.</span>
           </div>
           {ocultos.size > 0 && (
             <div className="customize-bar__hidden">
@@ -805,7 +874,7 @@ function PainelPersonalizavel({ blocos: proprios, chave, titulo, descricao }: { 
           )}
           <div className="customize-bar__actions">
             {personalizado && (
-              <button className="btn btn--ghost btn--sm" onClick={() => gravar({ ordem: [], fixados: [], ocultos: [], atalhos: [], extras: [], tamanhos: {} })}><RotateCcw size={14} /> Restaurar padrão</button>
+              <button className="btn btn--ghost btn--sm" onClick={() => gravar({ ordem: [], fixados: [], ocultos: [], atalhos: [], extras: [], tamanhos: {}, layout: {} })}><RotateCcw size={14} /> Restaurar padrão</button>
             )}
             <button className="btn btn--primary btn--sm" onClick={() => setEditando(false)}><Check size={14} /> Concluir</button>
           </div>
@@ -822,7 +891,18 @@ function PainelPersonalizavel({ blocos: proprios, chave, titulo, descricao }: { 
       )}
 
       <div className={`free-zone ${editando && arrastando ? 'is-target' : ''}`} {...zonaProps('normais')}>
-        {normais.length ? area(normais, 'normais') : (
+        {normais.length ? (telaLarga ? (
+          // grade livre: cada bloco fica exatamente onde foi solto (pode sobrar espaço vazio) e muda de largura e altura pelo canto
+          <Grade
+            className={`grade-livre ${editando ? 'is-editing' : ''}`}
+            layout={normais.map((id) => ({ i: id, ...posicoes[id], minW: 2, minH: 2 }))}
+            cols={COLUNAS} rowHeight={20} margin={[16, 16]} containerPadding={[0, 0]}
+            compactType={null} allowOverlap isDraggable={editando} isResizable={editando} draggableHandle=".bloco__grip" resizeHandles={['se']}
+            onDragStop={aoMexer} onResizeStop={aoMexer}
+          >
+            {normais.map((id) => renderBloco(id, 'normais', true))}
+          </Grade>
+        ) : area(emLeitura, 'normais')) : (
           <p className="muted pad center">Todos os blocos estão fixados ou ocultos.{!editando && <> <button className="link" onClick={() => setEditando(true)}>Personalizar</button></>}</p>
         )}
       </div>
