@@ -9,7 +9,7 @@ import {
   reauthenticateWithCredential, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, updatePassword, type UserCredential,
 } from 'firebase/auth';
 import {
-  collection, connectFirestoreEmulator, doc, getDoc, increment, initializeFirestore, limit, onSnapshot, orderBy, query, runTransaction, where, writeBatch,
+  arrayRemove, arrayUnion, collection, connectFirestoreEmulator, doc, getDoc, increment, initializeFirestore, limit, onSnapshot, orderBy, query, runTransaction, where, writeBatch,
   type Query, type WriteBatch,
 } from 'firebase/firestore';
 import { EMULADOR, EMULADOR_AUTH, EMULADOR_FIRESTORE, firebaseConfig } from './firebase-config';
@@ -289,7 +289,8 @@ export function createBackend(kind: 'app' | 'crm') {
   async function requireCliente() {
     const u = auth.currentUser;
     if (!u) return fail(401, 'Sessão expirada. Entre novamente.');
-    const c = await documento(`clientes/${u.uid}`);
+    // o cache pode ainda dizer "não existe" logo após o cadastro de quem já tinha conta (ex.: alguém da equipe): confirma no servidor
+    const c = (await documento(`clientes/${u.uid}`)) ?? (await getDoc(doc(db, 'clientes', u.uid)).then((s) => (s.exists() ? ({ ...s.data(), id: s.id } as Dados) : null)));
     if (!c) return fail(401, 'Sessão expirada. Entre novamente.');
     return { uid: u.uid, c };
   }
@@ -598,6 +599,9 @@ export function createBackend(kind: 'app' | 'crm') {
       atalhos: (Array.isArray(p.atalhos) ? p.atalhos : []).filter((x: unknown): x is string => typeof x === 'string' && /^\/[a-z0-9/-]{1,60}$/.test(x)).slice(0, 30),
       // extras: blocos do catálogo que o usuário escolheu adicionar além dos padrões
       extras: ids(p.extras),
+      // largura escolhida para cada bloco (¼, ½, ¾ ou a linha inteira)
+      tamanhos: Object.fromEntries(Object.entries(p.tamanhos && typeof p.tamanhos === 'object' ? p.tamanhos : {})
+        .filter(([id, t]) => ids([id]).length === 1 && ['p', 'm', 'g', 'c'].includes(t as string)).slice(0, 60)),
     });
     // "painel" é o Painel executivo; "meuPainel" é o painel próprio (Meu perfil → Meu painel). Grava só o que veio.
     const salvo: Dados = {};
@@ -712,15 +716,32 @@ export function createBackend(kind: 'app' | 'crm') {
 
   /* CRM: clientes do aplicativo */
   rota('GET', '/crm/clientes', async () => {
-    requireAnyAccess(await requireUsuario(), ['vnd', 'mkt', 'atd'], 'ver');
-    const [clientes, consumos, resgates, cfg] = await Promise.all([colecao('clientes'), colecao('consumos'), colecao('resgates'), getConfig()]);
+    const ctx = await requireUsuario();
+    requireAnyAccess(ctx, ['vnd', 'mkt', 'atd'], 'ver');
+    // os totais de cada afilhado ficam no saldo (atualizados a cada consumo), sem carregar todos os consumos
+    const [clientes, saldos, cfg] = await Promise.all([colecao('clientes'), colecao('saldos'), getConfig()]);
+    const saldoDe = new Map(saldos.map((s) => [s.id, s]));
+    const faltando = clientes.filter((c) => !Array.isArray(saldoDe.get(c.id)?.dias));
+    if (faltando.length) {
+      // saldos de antes dos totais: calcula uma vez a partir dos consumos e, se possível, grava para as próximas vezes
+      const [consumos, resgates] = await Promise.all([colecao('consumos'), colecao('resgates')]);
+      const lote = writeBatch(db);
+      for (const c of faltando) {
+        const r = resumo(consumos.filter((x) => x.clienteUid === c.id), resgates.filter((x) => x.clienteUid === c.id));
+        const totais = { gasto: Math.round(r.totalGasto * 100) / 100, lancamentos: r.consumos.length, dias: [...new Set(r.consumos.map((x) => String(x.data).slice(0, 10)))].sort() };
+        saldoDe.set(c.id, { acumulados: r.acumulados, usados: r.acumulados - r.pontos, ...saldoDe.get(c.id), ...totais });
+        lote.set(doc(db, 'saldos', c.id), totais, { merge: true });
+      }
+      if (ctx.acoes('atd').some((a) => a !== 'ver')) await lote.commit().catch(() => undefined);
+    }
     return clientes
       .map((c) => {
-        const r = resumo(consumos.filter((x) => x.clienteId === c.numero), resgates.filter((x) => x.clienteId === c.numero));
-        const ultima = r.consumos.map((x) => x.data).sort().at(-1) ?? null;
+        const s = saldoDe.get(c.id) ?? {};
+        const dias: string[] = Array.isArray(s.dias) ? [...s.dias].sort() : [];
+        const acumulados = Number(s.acumulados) || 0;
         return {
-          ...publicCliente(c), foto: undefined, pontos: r.pontos, acumulados: r.acumulados, totalGasto: r.totalGasto,
-          visitas: r.visitas, ultimaVisita: ultima, nivel: nivelDe(r.acumulados, cfg.niveis).atual?.nome ?? '',
+          ...publicCliente(c), foto: undefined, pontos: acumulados - (Number(s.usados) || 0), acumulados, totalGasto: Math.round((Number(s.gasto) || 0) * 100) / 100,
+          visitas: dias.length, ultimaVisita: dias.at(-1) ?? null, nivel: nivelDe(acumulados, cfg.niveis).atual?.nome ?? '',
         };
       })
       .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
@@ -857,7 +878,9 @@ export function createBackend(kind: 'app' | 'crm') {
       data: data.slice(0, 10), descricao: `Consumo · ${cliente.nome} (#${String(cliente.numero).padStart(3, '0')})`,
       categoria: 'Consumo de clientes', formaPagamento: forma, valor, origem: 'Lançamento de consumo', consumoId: consumoRef.id, criadoEm: data, atualizadoEm: data,
     });
-    lote.set(doc(db, 'saldos', cliente.id), { acumulados: increment(pontos) }, { merge: true });
+    lote.set(doc(db, 'saldos', cliente.id), {
+      acumulados: increment(pontos), gasto: increment(valor), lancamentos: increment(1), dias: arrayUnion(data.slice(0, 10)),
+    }, { merge: true });
     registrar(lote, ctx, 'atd', 'lançou consumo para', {
       colecao: 'consumos', alvo: `${cliente.nome} (#${String(cliente.numero).padStart(3, '0')})`, detalhe: `${brl(valor)} · ${pontos} pontos · ${forma}`,
     });
@@ -988,7 +1011,15 @@ export function createBackend(kind: 'app' | 'crm') {
     if (p.col === 'consumos') {
       // excluir o lançamento estorna a receita e os pontos
       if (cur.receitaId) lote.delete(doc(db, 'receitas', cur.receitaId));
-      if (cur.clienteUid) lote.set(doc(db, 'saldos', cur.clienteUid), { acumulados: increment(-(Number(cur.pontos) || 0)) }, { merge: true });
+      if (cur.clienteUid) {
+        // a visita do dia só sai do total se não sobrar outro consumo do afilhado no mesmo dia
+        const dia = String(cur.data).slice(0, 10);
+        const outros = (await doCliente('consumos', cur.clienteUid)).some((x) => x.id !== cur.id && String(x.data).slice(0, 10) === dia);
+        lote.set(doc(db, 'saldos', cur.clienteUid), {
+          acumulados: increment(-(Number(cur.pontos) || 0)), gasto: increment(-(Number(cur.valor) || 0)), lancamentos: increment(-1),
+          ...(outros ? {} : { dias: arrayRemove(dia) }),
+        }, { merge: true });
+      }
     }
     lote.delete(doc(db, p.col, p.id));
     espelhar(lote, p.col, p.id, null);

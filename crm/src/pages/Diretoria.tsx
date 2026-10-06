@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, ArrowDown, ArrowRight, ArrowUp, Check, Eye, EyeOff, GripVertical, LayoutDashboard, Pin, PinOff, Plus, RotateCcw, SlidersHorizontal, X } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowRight, ArrowUp, Check, ChevronsDown, ChevronsUp, Eye, EyeOff, GripVertical, LayoutDashboard, Pin, PinOff, Plus, RotateCcw, Scaling, SlidersHorizontal, X } from 'lucide-react';
 import { BarChart, HBarList } from '../components/Charts';
 import { ContextMenu, type MenuPos } from '../components/ContextMenu';
 import { Modal, notify, PageHead } from '../components/ui';
@@ -8,7 +8,7 @@ import { useAtividades } from '../components/Atividades';
 import { useCollection, useResource, type Row } from '../lib/data';
 import { brl, dateBR, daysUntil, isoToday, monthLabel, num, pct } from '../lib/format';
 import { currentMonth, despesaValida, lastMonths, monthName, monthOf, sumBy } from '../lib/finance';
-import { alternarAtalho, atalhoId, usePainelPrefs, type PainelChave, type PainelPrefs } from '../lib/preferencias';
+import { alternarAtalho, atalhoId, TAMANHOS, usePainelPrefs, type PainelChave, type PainelPrefs, type Tamanho } from '../lib/preferencias';
 import { AREAS, findModule } from '../modules';
 import { useSession } from '../lib/session';
 import { useToqueLongo } from '../lib/toque';
@@ -580,7 +580,10 @@ function PainelDeBlocos(info: PainelInfo) {
   return <PainelPersonalizavel blocos={blocos} {...info} />;
 }
 
-/* ---------- personalização: cada usuário escolhe a ordem, o que fica fixado no topo e o que fica oculto ---------- */
+/* ---------- personalização: cada usuário escolhe a ordem, o tamanho, o que fica fixado no topo e o que fica oculto ---------- */
+
+/** Tamanho padrão: indicadores ocupam ¼ da linha; painéis (gráficos, listas), metade. */
+const tamanhoPadrao = (b: Bloco): Tamanho => (b.tipo === 'kpi' ? 'p' : 'm');
 
 /** Cartão de atalho para uma página do CRM. */
 function blocoAtalho(path: string): Bloco | null {
@@ -615,7 +618,7 @@ function PainelPersonalizavel({ blocos: proprios, chave, titulo, descricao }: { 
   // áreas do catálogo na mesma ordem do menu ("Geral" primeiro)
   const ordemAreas = ['Geral', ...AREAS.map((a) => a.label)];
   const areasCatalogo = [...new Set(catalogo.map((b) => b.extra!.area))].sort((x, y) => ordemAreas.indexOf(x) - ordemAreas.indexOf(y));
-  const [menu, setMenu] = useState<(MenuPos & { id: string }) | null>(null);
+  const [menu, setMenu] = useState<(MenuPos & { id: string; soLayout?: boolean }) | null>(null);
   const [arrastando, setArrastando] = useState<string | null>(null);
   const [sobre, setSobre] = useState<string | null>(null);
 
@@ -643,15 +646,54 @@ function PainelPersonalizavel({ blocos: proprios, chave, titulo, descricao }: { 
   const remover = (b: Bloco) => (b.atalho ? removerAtalho(b.atalho) : alternarExtra(b.id));
 
   /** Solta `id` antes de `alvo` (ou no fim da área). Soltar entre os fixados fixa; entre os demais, desafixa. */
-  /** Setas do modo Personalizar (no toque não dá para arrastar): troca de lugar com o vizinho do mesmo tipo. */
+  /** Setas do modo Personalizar (no toque não dá para arrastar): troca de lugar com o bloco vizinho. */
   const mover = (id: string, passo: -1 | 1) => {
     const zona = fixados.includes(id) ? fixados : normais;
-    const mesmoTipo = zona.filter((x) => porId.get(x)!.tipo === porId.get(id)!.tipo);
-    const vizinho = mesmoTipo[mesmoTipo.indexOf(id) + passo];
+    const vizinho = zona[zona.indexOf(id) + passo];
     if (!vizinho) return;
     const trocar = (lista: string[]) => lista.map((x) => (x === id ? vizinho : x === vizinho ? id : x));
     if (fixados.includes(id)) gravar({ fixados: trocar(fixados) });
     else gravar({ ordem: trocar(ordem) });
+  };
+  /** Leva o bloco para o começo ou para o fim da área em que ele está. */
+  const moverParaPonta = (id: string, ponta: 'inicio' | 'fim') => {
+    const pos = (lista: string[]) => { const sem = lista.filter((x) => x !== id); return ponta === 'inicio' ? [id, ...sem] : [...sem, id]; };
+    if (fixados.includes(id)) gravar({ fixados: pos(fixados) });
+    else {
+      // na ordem geral, "começo" e "fim" são relativos aos blocos visíveis fora dos fixados
+      const visiveis = pos(normais);
+      gravar({ ordem: [...visiveis, ...ordem.filter((x) => !visiveis.includes(x))] });
+    }
+  };
+  const tamanhoDe = (id: string): Tamanho => prefs.tamanhos[id] ?? tamanhoPadrao(porId.get(id)!);
+  const redimensionar = (id: string, t: Tamanho) => {
+    const { [id]: _antigo, ...resto } = prefs.tamanhos;
+    gravar({ tamanhos: t === tamanhoPadrao(porId.get(id)!) ? resto : { ...resto, [id]: t } });
+  };
+  /** Opções de tamanho e lugar (botão do modo Personalizar e botão direito sobre o bloco). */
+  const opcoesLayout = (id: string) => {
+    const zona = fixados.includes(id) ? fixados : normais;
+    const i = zona.indexOf(id);
+    return (
+      <>
+        <div className="ctx__label">Tamanho</div>
+        <div className="ctx__sizes" role="group" aria-label="Tamanho do bloco">
+          {TAMANHOS.map((t) => (
+            <button key={t.valor} role="menuitemradio" aria-checked={tamanhoDe(id) === t.valor} className={tamanhoDe(id) === t.valor ? 'is-active' : ''}
+              title={`${t.nome} (${t.fracao === '1' ? 'linha inteira' : `${t.fracao} da linha`})`} onClick={() => redimensionar(id, t.valor)}>
+              <span className="ctx__size-bar"><i style={{ width: { p: '25%', m: '50%', g: '75%', c: '100%' }[t.valor] }} /></span>
+              {t.nome}
+            </button>
+          ))}
+        </div>
+        <div className="ctx__sep" />
+        <div className="ctx__label">Lugar</div>
+        <button role="menuitem" disabled={i <= 0} onClick={() => moverParaPonta(id, 'inicio')}><ChevronsUp size={15} /> Mover para o início</button>
+        <button role="menuitem" disabled={i <= 0} onClick={() => mover(id, -1)}><ArrowUp size={15} /> Uma posição antes</button>
+        <button role="menuitem" disabled={i < 0 || i >= zona.length - 1} onClick={() => mover(id, 1)}><ArrowDown size={15} /> Uma posição depois</button>
+        <button role="menuitem" disabled={i < 0 || i >= zona.length - 1} onClick={() => moverParaPonta(id, 'fim')}><ChevronsDown size={15} /> Mover para o fim</button>
+      </>
+    );
   };
   const toqueLongo = useToqueLongo();
 
@@ -686,7 +728,7 @@ function PainelPersonalizavel({ blocos: proprios, chave, titulo, descricao }: { 
     return (
       <div
         key={id}
-        className={`bloco ${editando ? 'is-editing' : ''} ${arrastando === id ? 'is-dragging' : ''} ${sobre === id ? 'is-over' : ''}`}
+        className={`bloco bloco--${tamanhoDe(id)} bloco--${b.tipo} ${editando ? 'is-editing' : ''} ${arrastando === id ? 'is-dragging' : ''} ${sobre === id ? 'is-over' : ''}`}
         draggable={editando}
         onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; setArrastando(id); }}
         onDragEnd={fimArraste}
@@ -711,6 +753,10 @@ function PainelPersonalizavel({ blocos: proprios, chave, titulo, descricao }: { 
             <span className="bloco__grip" title="Arraste para mudar de lugar"><GripVertical size={15} /></span>
             <button onClick={() => mover(id, -1)} title="Mover para antes" aria-label={`Mover ${b.titulo} para antes`}><ArrowUp size={14} /></button>
             <button onClick={() => mover(id, 1)} title="Mover para depois" aria-label={`Mover ${b.titulo} para depois`}><ArrowDown size={14} /></button>
+            <button
+              onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMenu({ x: r.left, y: r.bottom + 6, id, soLayout: true }); }}
+              title="Tamanho e lugar" aria-label={`Tamanho e lugar de ${b.titulo}`}
+            ><Scaling size={14} /></button>
             <button onClick={() => alternarFixado(id)} title={fixado ? 'Desafixar' : 'Fixar no topo'} aria-label={fixado ? `Desafixar ${b.titulo}` : `Fixar ${b.titulo} no topo`}>
               {fixado ? <PinOff size={14} /> : <Pin size={14} />}
             </button>
@@ -726,18 +772,10 @@ function PainelPersonalizavel({ blocos: proprios, chave, titulo, descricao }: { 
     );
   };
 
-  const area = (ids: string[], zona: 'fixados' | 'normais') => {
-    const kpis = ids.filter((id) => porId.get(id)!.tipo === 'kpi');
-    const paineis = ids.filter((id) => porId.get(id)!.tipo === 'painel');
-    return (
-      <>
-        {kpis.length > 0 && <div className="kpis">{kpis.map((id) => renderBloco(id, zona))}</div>}
-        {paineis.length > 0 && <div className="grid-2">{paineis.map((id) => renderBloco(id, zona))}</div>}
-      </>
-    );
-  };
+  // uma grade só, de 12 colunas: cada bloco ocupa a largura escolhida, na ordem escolhida (indicadores e painéis misturados)
+  const area = (ids: string[], zona: 'fixados' | 'normais') => <div className="blocos">{ids.map((id) => renderBloco(id, zona))}</div>;
 
-  const personalizado = prefs.ordem.length > 0 || prefs.fixados.length > 0 || prefs.ocultos.length > 0 || prefs.atalhos.length > 0 || prefs.extras.length > 0;
+  const personalizado = prefs.ordem.length > 0 || prefs.fixados.length > 0 || prefs.ocultos.length > 0 || prefs.atalhos.length > 0 || prefs.extras.length > 0 || Object.keys(prefs.tamanhos).length > 0;
   const menuBloco = menu && porId.get(menu.id);
 
   return (
@@ -755,7 +793,7 @@ function PainelPersonalizavel({ blocos: proprios, chave, titulo, descricao }: { 
         <div className="customize-bar">
           <div className="customize-bar__text">
             <strong>Personalizando o seu painel</strong>
-            <span className="muted small">Arraste os blocos (ou use as setas ↑↓) para mudar a ordem ou para a área “Fixados” no topo. Use “Adicionar bloco” para novos indicadores e listas; para uma página do sistema, use o botão direito (ou segure o dedo) sobre ela no menu → “Adicionar ao meu painel”. As escolhas ficam salvas na sua conta.</span>
+            <span className="muted small">Arraste os blocos (ou use as setas ↑↓) para mudar a ordem ou para a área “Fixados” no topo, e use o botão de tamanho para deixar cada bloco com ¼, ½, ¾ ou a linha inteira. Use “Adicionar bloco” para novos indicadores e listas; para uma página do sistema, use o botão direito (ou segure o dedo) sobre ela no menu → “Adicionar ao meu painel”. As escolhas ficam salvas na sua conta.</span>
           </div>
           {ocultos.size > 0 && (
             <div className="customize-bar__hidden">
@@ -767,7 +805,7 @@ function PainelPersonalizavel({ blocos: proprios, chave, titulo, descricao }: { 
           )}
           <div className="customize-bar__actions">
             {personalizado && (
-              <button className="btn btn--ghost btn--sm" onClick={() => gravar({ ordem: [], fixados: [], ocultos: [], atalhos: [], extras: [] })}><RotateCcw size={14} /> Restaurar padrão</button>
+              <button className="btn btn--ghost btn--sm" onClick={() => gravar({ ordem: [], fixados: [], ocultos: [], atalhos: [], extras: [], tamanhos: {} })}><RotateCcw size={14} /> Restaurar padrão</button>
             )}
             <button className="btn btn--primary btn--sm" onClick={() => setEditando(false)}><Check size={14} /> Concluir</button>
           </div>
@@ -789,8 +827,13 @@ function PainelPersonalizavel({ blocos: proprios, chave, titulo, descricao }: { 
         )}
       </div>
 
-      {menu && menuBloco && (
+      {menu && menuBloco && menu.soLayout && (
+        <ContextMenu at={menu} onClose={() => setMenu(null)}>{opcoesLayout(menu.id)}</ContextMenu>
+      )}
+      {menu && menuBloco && !menu.soLayout && (
         <ContextMenu at={menu} onClose={() => setMenu(null)}>
+          {opcoesLayout(menu.id)}
+          <div className="ctx__sep" />
           <button role="menuitem" onClick={() => alternarFixado(menu.id)}>
             {fixados.includes(menu.id) ? <><PinOff size={15} /> Desafixar</> : <><Pin size={15} /> Fixar no topo</>}
           </button>

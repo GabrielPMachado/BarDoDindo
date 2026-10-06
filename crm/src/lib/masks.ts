@@ -43,7 +43,7 @@ export interface NumberSpec {
   decimals: number;
   min: number;
   max: number;
-  /** Moeda: digitação da direita para a esquerda, sempre com 2 casas. */
+  /** Moeda: digitação natural ("150" = R$ 150,00; "150,5" = R$ 150,50), até 2 casas; ao sair do campo mostra os centavos. */
   money?: boolean;
 }
 
@@ -52,14 +52,8 @@ export interface NumberSpec {
  * Nunca deixa ultrapassar o máximo nem o número de casas decimais.
  */
 export function applyNumberMask(raw: string, spec: NumberSpec): [string, number | ''] {
-  if (spec.money) {
-    // digitação em centavos: 1 → 0,01 · 12 → 0,12 · 1234 → 12,34
-    const d = onlyDigits(raw).replace(/^0+/, '').slice(0, 15);
-    if (!d) return ['', ''];
-    let n = Number(d) / 100;
-    if (n > spec.max) n = spec.max;
-    return [formatNumber(n, 2, true), n];
-  }
+  // moeda segue a digitação decimal natural com 2 casas (antes era em centavos: "5" virava R$ 0,05)
+  if (spec.money) spec = { ...spec, decimals: 2 };
   if (spec.decimals === 0) {
     const d = onlyDigits(raw).replace(/^0+(?=\d)/, '').slice(0, 15);
     if (!d) return ['', ''];

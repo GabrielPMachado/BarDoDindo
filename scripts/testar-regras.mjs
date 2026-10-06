@@ -115,7 +115,7 @@ if (senhaAtendente) {
   await permitido('registrar atualização no Atendimento', () => addDoc(collection(db, 'atividades', 'atd', 'itens'), atividade('atd')));
   await negado('registrar atualização em nome de outro', () => addDoc(collection(db, 'atividades', 'atd', 'itens'), atividade('atd', { usuarioNome: 'Outra pessoa' })));
   await negado('registrar atualização no Financeiro', () => addDoc(collection(db, 'atividades', 'fin', 'itens'), atividade('fin')));
-  const painel = { ordem: [], fixados: ['k-receita'], ocultos: [] };
+  const painel = { ordem: [], fixados: ['k-receita'], ocultos: [], tamanhos: { 'k-receita': 'm' } };
   await permitido('salvar as próprias preferências', () => setDoc(doc(db, 'preferencias', eq.user.uid), { painel, atualizadoEm: 'x' }));
   await permitido('ler as próprias preferências', () => getDoc(doc(db, 'preferencias', eq.user.uid)));
   await negado('salvar preferências de outro usuário', () => setDoc(doc(db, 'preferencias', 'outro'), { painel, atualizadoEm: 'x' }));
