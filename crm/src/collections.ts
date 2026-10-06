@@ -71,6 +71,8 @@ export interface CollectionDef {
   filterKey?: string;
   sortKey?: string;
   sortDir?: 'asc' | 'desc';
+  /** Cada registro pode ter uma foto (miniatura na tabela, campo no formulário e imagem nas exportações). */
+  comFoto?: boolean;
 }
 
 const n = (v: unknown) => Number(v) || 0;
@@ -104,7 +106,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     fields: [
       { key: 'titulo', label: 'Título', type: 'text', required: true, wide: true },
       { key: 'tipo', label: 'Tipo', type: 'select', options: ['Meta', 'Decisão'], required: true },
-      { key: 'area', label: 'Área', type: 'select', options: ['Geral', 'RH', 'Estrutura', 'Administrativo', 'Financeiro', 'Marketing e Vendas', 'Jurídico', 'Fiscalização'] },
+      { key: 'area', label: 'Área', type: 'select', options: ['Geral', 'Pessoal', 'Estrutura', 'Administrativo', 'Financeiro', 'Vendas', 'Marketing', 'Jurídico', 'Fiscalização'] },
       { key: 'responsavel', label: 'Responsável', type: 'ref', ref: 'pessoas', refKey: 'responsavelId', livre: true },
       { key: 'prazo', label: 'Prazo', type: 'date' },
       { key: 'progresso', label: 'Progresso', type: 'percent', default: 0, decimals: 0 },
@@ -120,7 +122,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
 
   /* ---------------- RH ---------------- */
   colaboradores: {
-    id: 'colaboradores', area: 'rh', title: 'Colaboradores', singular: 'colaborador',
+    id: 'colaboradores', comFoto: true, area: 'rh', title: 'Colaboradores', singular: 'colaborador',
     description: 'Cadastro da equipe, cargos e vínculos.',
     filterKey: 'setor', sortKey: 'nome',
     fields: [
@@ -203,7 +205,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     },
   },
   estoque: {
-    id: 'estoque', area: 'dp', title: 'Estoque', singular: 'item de estoque',
+    id: 'estoque', comFoto: true, area: 'dp', title: 'Estoque', singular: 'item de estoque',
     description: 'Insumos com controle de quantidade mínima e validade.',
     filterKey: 'categoria', sortKey: 'item',
     fields: [
@@ -236,7 +238,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     },
   },
   materiais: {
-    id: 'materiais', area: 'dp', title: 'Materiais', singular: 'material',
+    id: 'materiais', comFoto: true, area: 'dp', title: 'Materiais', singular: 'material',
     description: 'Patrimônio: equipamentos, utensílios, mobiliário e uniformes.',
     filterKey: 'tipo', sortKey: 'material',
     fields: [
@@ -375,9 +377,9 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     ],
   },
 
-  /* ---------------- Marketing e Vendas ---------------- */
+  /* ---------------- Marketing e Vendas (produtos são de Vendas) ---------------- */
   criacao: {
-    id: 'criacao', feminino: true, area: 'mkt', title: 'Criação', singular: 'peça',
+    id: 'criacao', comFoto: true, feminino: true, area: 'mkt', title: 'Criação', singular: 'peça',
     description: 'Fluxo de produção de peças: do briefing à publicação.',
     filterKey: 'status', sortKey: 'entrega', sortDir: 'asc',
     fields: [
@@ -396,7 +398,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     ],
   },
   midias: {
-    id: 'midias', feminino: true, area: 'mkt', title: 'Gestão de mídias', singular: 'publicação',
+    id: 'midias', comFoto: true, feminino: true, area: 'mkt', title: 'Gestão de mídias', singular: 'publicação',
     description: 'Calendário de publicações e resultados por canal.',
     filterKey: 'canal', sortKey: 'data', sortDir: 'desc',
     fields: [
@@ -424,7 +426,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     },
   },
   produtos: {
-    id: 'produtos', area: 'mkt', title: 'Produtos e cardápio', singular: 'produto',
+    id: 'produtos', comFoto: true, area: 'vnd', title: 'Produtos e cardápio', singular: 'produto',
     description: 'Produtos marcados como "No cardápio" e ativos aparecem no aplicativo dos clientes.',
     filterKey: 'categoria', sortKey: 'nome',
     fields: [
@@ -455,7 +457,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     },
   },
   recompensas: {
-    id: 'recompensas', feminino: true, area: 'mkt', title: 'Recompensas', singular: 'recompensa',
+    id: 'recompensas', comFoto: true, feminino: true, area: 'mkt', title: 'Recompensas', singular: 'recompensa',
     description: 'Catálogo de recompensas do programa de fidelidade. As ativas aparecem no aplicativo.',
     filterKey: 'status', sortKey: 'custo', sortDir: 'asc',
     fields: [

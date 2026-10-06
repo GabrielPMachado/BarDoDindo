@@ -29,7 +29,7 @@ interface Folha {
   lancamentos: { id: string; descricao: string; valor: number; status: string }[];
 }
 
-/* ---------------- Folha de pagamento (Pessoal · RH/DP) ---------------- */
+/* ---------------- Folha de pagamento (Pessoal) ---------------- */
 export function Folha() {
   const { pode } = useSession();
   const [mes, setMes] = useState(currentMonth());

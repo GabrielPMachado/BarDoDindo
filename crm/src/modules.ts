@@ -1,8 +1,8 @@
 import {
-  Briefcase, Building2, Cctv, UserRound, ClipboardCheck, ConciergeBell, Landmark, Megaphone, Scale, Settings, Users, Wallet, Warehouse, type LucideIcon,
+  Briefcase, Building2, Cctv, ShoppingBag, UserRound, ClipboardCheck, ConciergeBell, Landmark, Megaphone, Scale, Settings, Users, Wallet, Warehouse, type LucideIcon,
 } from 'lucide-react';
 
-export type AreaKey = 'eu' | 'dir' | 'atd' | 'mkt' | 'rh' | 'dp' | 'adm' | 'fin' | 'jur' | 'fis' | 'mon' | 'cfg';
+export type AreaKey = 'eu' | 'dir' | 'atd' | 'vnd' | 'mkt' | 'rh' | 'dp' | 'adm' | 'fin' | 'jur' | 'fis' | 'mon' | 'cfg';
 /** Resumo do acesso a uma área: sem acesso, só leitura ou com alguma permissão de alteração. */
 export type Access = 'none' | 'view' | 'edit';
 
@@ -19,6 +19,14 @@ const TODAS: Acao[] = ['ver', 'criar', 'editar', 'excluir'];
  * Permissões gravadas numa função. Aceita o formato antigo (um nível por área):
  * "edit" equivale a todas as permissões e "view" a só ver.
  */
+/**
+ * Permissões de uma função numa área. Vendas foi separada de Marketing: enquanto a função não tiver
+ * permissões próprias para Vendas, valem as que ela tinha em Marketing.
+ */
+export function acoesNaArea(permissoes: Record<string, unknown> | undefined, area: string): Acao[] {
+  const p = permissoes ?? {};
+  return acoesDe(area === 'vnd' && !('vnd' in p) ? p.mkt : p[area]);
+}
 export function acoesDe(p: unknown): Acao[] {
   if (Array.isArray(p)) return TODAS.filter((a) => p.includes(a));
   if (p === 'edit') return [...TODAS];
@@ -72,18 +80,24 @@ export const AREAS: Area[] = [
     ],
   },
   {
-    key: 'mkt', label: 'Marketing e Vendas', icon: Megaphone,
-    description: 'Cardápio, clientes, programa de fidelidade, criação e mídias.',
+    key: 'vnd', label: 'Vendas', icon: ShoppingBag,
+    description: 'Produtos e cardápio do aplicativo e os clientes (afilhados).',
     items: [
-      { path: '/marketing/produtos', label: 'Produtos e cardápio' },
+      { path: '/vendas/produtos', label: 'Produtos e cardápio' },
       { path: '/vendas/clientes', label: 'Clientes (afilhados)' },
-      { path: '/vendas/recompensas', label: 'Recompensas' },
+    ],
+  },
+  {
+    key: 'mkt', label: 'Marketing', icon: Megaphone,
+    description: 'Programa de fidelidade (recompensas), criação de peças e gestão de mídias.',
+    items: [
+      { path: '/marketing/recompensas', label: 'Recompensas' },
       { path: '/marketing/criacao', label: 'Criação' },
       { path: '/marketing/midias', label: 'Gestão de mídias' },
     ],
   },
   {
-    key: 'rh', label: 'Pessoal (RH/DP)', icon: Users,
+    key: 'rh', label: 'Pessoal', icon: Users,
     description: 'Colaboradores, férias, afastamentos e folha de pagamento.',
     items: [
       { path: '/rh/colaboradores', label: 'Colaboradores' },
@@ -174,7 +188,11 @@ export const AREAS_VISIVEIS = AREAS.filter((a) => !a.oculta);
 
 export const groupOf = (area: AreaKey) => GROUPS.find((g) => g.areas.some((a) => a.key === area))!;
 
-export function findModule(path: string) {
+/** Endereços antigos (antes de separar Marketing e Vendas), para fixados e atalhos já salvos. */
+export const CAMINHOS_ANTIGOS: Record<string, string> = { '/marketing/produtos': '/vendas/produtos', '/vendas/recompensas': '/marketing/recompensas' };
+
+export function findModule(caminho: string) {
+  const path = CAMINHOS_ANTIGOS[caminho] ?? caminho;
   for (const area of AREAS_VISIVEIS) {
     const item = area.items.find((i) => i.path === path);
     if (item) return { area, item };
@@ -186,7 +204,7 @@ export function findModule(path: string) {
 export const COLLECTION_PAGE: Record<string, string> = {
   metas: '/diretoria/metas',
   reservas: '/atendimento/reservas', consumos: '/atendimento/consumo', resgates: '/atendimento/vouchers',
-  produtos: '/marketing/produtos', recompensas: '/vendas/recompensas', criacao: '/marketing/criacao', midias: '/marketing/midias',
+  produtos: '/vendas/produtos', recompensas: '/marketing/recompensas', criacao: '/marketing/criacao', midias: '/marketing/midias',
   colaboradores: '/rh/colaboradores', ferias: '/rh/ferias',
   projetos: '/estrutura/projetos', estoque: '/estrutura/estoque', materiais: '/estrutura/materiais',
   terceirizados: '/adm/terceirizados', fornecedores: '/adm/fornecedores', contratos: '/adm/contratos',

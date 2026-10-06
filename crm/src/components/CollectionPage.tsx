@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, Download, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Camera, ChevronDown, Download, FileSpreadsheet, FileText, ImageOff, Pencil, Plus, Search, Sheet, Trash2 } from 'lucide-react';
 import { numberSpec, STATUS_KEYS, termos, toneOf, type CollectionDef, type Computed, type Field } from '../collections';
 import { maskCnpj, maskPhone } from '../lib/masks';
 import { useCollection, type Row } from '../lib/data';
@@ -8,6 +8,9 @@ import { useSession } from '../lib/session';
 import { desdeDe, PERIODO_PADRAO, PERIODOS, type PeriodoKey } from '../lib/periodo';
 import { AsyncButton, Badge, checkRange, EmptyState, ErrorBox, FieldInput, KpiRow, Loading, Modal, PageHead, notify } from './ui';
 import { RefPicker } from './pickers';
+import { reduzirFoto } from './Avatar';
+import { ContextMenu, type MenuPos } from './ContextMenu';
+import { colunasDe, exportarExcel, exportarPdf } from '../lib/exportar';
 
 const PAGE = 50;
 
@@ -99,6 +102,22 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   const pages = Math.max(1, Math.ceil(rows.length / PAGE));
   const visible = rows.slice(page * PAGE, page * PAGE + PAGE);
 
+  const [menuExportar, setMenuExportar] = useState<MenuPos | null>(null);
+  const [exportando, setExportando] = useState(false);
+  const exportar = async (formato: 'pdf' | 'xlsx') => {
+    setExportando(true);
+    try {
+      const colunas = colunasDe(def);
+      const arquivo = `${def.id}-${new Date().toISOString().slice(0, 10)}`;
+      if (formato === 'pdf') await exportarPdf(def.title, colunas, rows, arquivo);
+      else await exportarExcel(def.title, colunas, rows, arquivo);
+    } catch (e) {
+      console.error(e);
+      notify('Não foi possível gerar o arquivo.', 'error');
+    } finally {
+      setExportando(false);
+    }
+  };
   const exportCsv = () => {
     const header = [...def.fields.map((f) => f.label), ...(def.computed ?? []).map((c) => c.label)];
     const lines = rows.map((r) => [...def.fields.map((f) => csvValue(r[f.key])), ...(def.computed ?? []).map((c) => csvValue(c.get(r)))].join(';'));
@@ -120,11 +139,24 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
         description={def.description}
         actions={
           <>
-            <button className="btn btn--ghost" onClick={exportCsv} disabled={!rows.length}><Download size={16} /> Exportar</button>
+            <button
+              className="btn btn--ghost" disabled={!rows.length || exportando}
+              onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMenuExportar({ x: r.left, y: r.bottom + 6 }); }}
+            >
+              <Download size={16} /> {exportando ? 'Gerando…' : 'Exportar'} <ChevronDown size={14} />
+            </button>
             {canCreate && <button className="btn btn--primary" onClick={() => setEditing('new')}><Plus size={16} /> {termos(def).novo}</button>}
           </>
         }
       />
+
+      {menuExportar && (
+        <ContextMenu at={menuExportar} onClose={() => setMenuExportar(null)}>
+          <button role="menuitem" onClick={() => exportar('pdf')}><FileText size={15} /> PDF (para imprimir)</button>
+          <button role="menuitem" onClick={() => exportar('xlsx')}><FileSpreadsheet size={15} /> Excel (.xlsx){def.comFoto ? ', com fotos' : ''}</button>
+          <button role="menuitem" onClick={exportCsv}><Sheet size={15} /> CSV (texto simples)</button>
+        </ContextMenu>
+      )}
 
       {def.kpis && all.length > 0 && <KpiRow items={def.kpis(all)} />}
       {before?.(all)}
@@ -166,6 +198,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
             <table className="table table--cards">
               <thead>
                 <tr>
+                  {def.comFoto && <th className="foto-col">Foto</th>}
                   {tableFields.map((f) => (
                     <th key={f.key} className={['money', 'number', 'percent'].includes(f.type) ? 'num' : ''}>
                       <button onClick={() => toggleSort(f.key)}>
@@ -181,6 +214,11 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
               <tbody>
                 {visible.map((r) => (
                   <tr key={r.id} className="is-clickable" onClick={() => setEditing(r)} title={canEdit ? 'Clique para editar' : 'Clique para ver os detalhes'}>
+                    {def.comFoto && (
+                      <td className="foto-col" data-label="Foto">
+                        {typeof r.foto === 'string' && r.foto ? <img className="thumb" src={r.foto} alt="" loading="lazy" /> : <span className="thumb thumb--vazio"><ImageOff size={14} /></span>}
+                      </td>
+                    )}
                     {tableFields.map((f) => (
                       <td key={f.key} data-label={f.label} className={cellClass(f)}>{formatField(f, r[f.key])}</td>
                     ))}
@@ -281,6 +319,7 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
         if (f.refKey) payload[f.refKey] = data[f.refKey] ?? null;
         for (const extra of Object.keys(f.fill ?? {})) if (!def.fields.some((x) => x.key === extra)) payload[extra] = data[extra] ?? '';
       }
+      if (def.comFoto) payload.foto = data.foto ?? '';
       await onSave(payload);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível salvar.');
@@ -309,6 +348,9 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
       }
     >
       <form id="record-form" className="form-grid" onSubmit={submit}>
+        {def.comFoto && (
+          <FotoCampo valor={typeof data.foto === 'string' ? data.foto : ''} disabled={!canEdit} onChange={(foto) => setData((d) => ({ ...d, foto }))} />
+        )}
         {def.fields.map((f) => (
           <div key={f.key} className={`form-field ${f.wide || f.type === 'textarea' ? 'form-field--wide' : ''}`}>
             <label htmlFor={`f-${f.key}`}>{f.label}{f.required && canEdit && <span className="req"> *</span>}</label>
@@ -328,5 +370,38 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
         {error && <p className="error form-field--wide">{error}</p>}
       </form>
     </Modal>
+  );
+}
+
+/** Foto do registro: escolher (a imagem é reduzida antes de salvar), trocar ou remover. */
+function FotoCampo({ valor, disabled, onChange }: { valor: string; disabled: boolean; onChange: (foto: string) => void }) {
+  const [erro, setErro] = useState<string | null>(null);
+  const escolher = async (arquivo?: File) => {
+    if (!arquivo) return;
+    setErro(null);
+    try {
+      onChange(await reduzirFoto(arquivo, 640, false));
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Não foi possível ler a imagem.');
+    }
+  };
+  return (
+    <div className="form-field form-field--wide foto-campo">
+      <label>Foto</label>
+      <div className="foto-campo__linha">
+        <div className="foto-campo__previa">{valor ? <img src={valor} alt="Foto do registro" /> : <ImageOff size={22} />}</div>
+        {!disabled && (
+          <div className="foto-campo__acoes">
+            <label className="btn btn--ghost btn--sm">
+              <Camera size={14} /> {valor ? 'Trocar foto' : 'Escolher foto'}
+              <input type="file" accept="image/*" hidden onChange={(e) => { void escolher(e.target.files?.[0]); e.target.value = ''; }} />
+            </label>
+            {valor && <button type="button" className="btn btn--ghost btn--sm" onClick={() => onChange('')}><Trash2 size={14} /> Remover</button>}
+            <span className="muted small">JPG ou PNG. A imagem é reduzida automaticamente.</span>
+          </div>
+        )}
+      </div>
+      {erro && <p className="error">{erro}</p>}
+    </div>
   );
 }

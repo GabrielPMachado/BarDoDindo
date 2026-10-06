@@ -4,7 +4,7 @@ import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ShieldOff } from 'lucide-react';
 import { SessionProvider, useSession } from './lib/session';
 import { startLiveUpdates, stopLiveUpdates } from './lib/data';
-import { AREAS_VISIVEIS as AREAS, findModule, type AreaKey } from './modules';
+import { AREAS_VISIVEIS as AREAS, CAMINHOS_ANTIGOS, findModule, type AreaKey } from './modules';
 import { COLLECTIONS } from './collections';
 import { Layout } from './components/Layout';
 import { CollectionPage } from './components/CollectionPage';
@@ -32,8 +32,8 @@ const GENERIC: Record<string, string> = {
   '/adm/contratos': 'contratos',
   '/marketing/criacao': 'criacao',
   '/marketing/midias': 'midias',
-  '/marketing/produtos': 'produtos',
-  '/vendas/recompensas': 'recompensas',
+  '/vendas/produtos': 'produtos',
+  '/marketing/recompensas': 'recompensas',
   '/juridico/trabalhista': 'trabalhista',
   '/juridico/consultoria': 'consultoria',
   '/fiscalizacao/qualidade': 'qualidade',
@@ -101,6 +101,7 @@ function App() {
           const element = CUSTOM[p] ? CUSTOM[p]() : GENERIC[p] ? <CollectionPage key={p} def={COLLECTIONS[GENERIC[p]]} /> : null;
           return <Route key={p} path={p} element={<Guard area={area}>{element}</Guard>} />;
         })}
+        {Object.entries(CAMINHOS_ANTIGOS).map(([antigo, novo]) => <Route key={antigo} path={antigo} element={<Navigate to={novo} replace />} />)}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
