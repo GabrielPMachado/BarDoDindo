@@ -33,16 +33,16 @@ export function Usuarios() {
         {users.error && <ErrorBox>{users.error}</ErrorBox>}
         {users.loading ? <Loading /> : (
           <div className="table-wrap">
-            <table className="table">
+            <table className="table table--cards">
               <thead><tr><th>Nome</th><th>E-mail</th><th>Função</th><th>Status</th><th>Último acesso</th><th className="actions-col" /></tr></thead>
               <tbody>
                 {(users.data ?? []).map((u) => (
                   <tr key={u.id}>
-                    <td>{u.nome} {u.id === eu?.id && <span className="muted small">(você)</span>}</td>
-                    <td>{u.email}</td>
-                    <td>{nomeFuncao(u.funcaoId)}</td>
-                    <td><Badge tone={u.status === 'Ativo' ? 'good' : 'neutral'}>{u.status}</Badge></td>
-                    <td>{u.ultimoAcesso ? new Date(u.ultimoAcesso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : <span className="muted">Nunca acessou</span>}</td>
+                    <td data-label="Nome">{u.nome} {u.id === eu?.id && <span className="muted small">(você)</span>}</td>
+                    <td data-label="E-mail">{u.email}</td>
+                    <td data-label="Função">{nomeFuncao(u.funcaoId)}</td>
+                    <td data-label="Status"><Badge tone={u.status === 'Ativo' ? 'good' : 'neutral'}>{u.status}</Badge></td>
+                    <td data-label="Último acesso">{u.ultimoAcesso ? new Date(u.ultimoAcesso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : <span className="muted">Nunca acessou</span>}</td>
                     <td className="actions-col">
                       {canEdit && <button className="icon-btn" onClick={() => setEditing(u)} aria-label="Editar"><Pencil size={16} /></button>}
                     </td>

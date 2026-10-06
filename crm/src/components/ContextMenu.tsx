@@ -10,7 +10,9 @@ export function ContextMenu({ at, onClose, children }: { at: MenuPos; onClose: (
   useEffect(() => {
     const r = ref.current?.getBoundingClientRect();
     if (r) setPos({ left: Math.min(at.x, innerWidth - r.width - 8), top: Math.min(at.y, innerHeight - r.height - 8) });
-    const fora = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && onClose();
+    // logo depois de abrir (toque longo), o navegador pode gerar um clique fora: esse não fecha o menu
+    const abertoEm = Date.now();
+    const fora = (e: MouseEvent) => Date.now() - abertoEm > 350 && ref.current && !ref.current.contains(e.target as Node) && onClose();
     const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     document.addEventListener('mousedown', fora);
     document.addEventListener('keydown', esc);

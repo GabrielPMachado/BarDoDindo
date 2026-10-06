@@ -60,7 +60,7 @@ export function Clientes() {
           <EmptyState title="Nenhum cliente cadastrado">Os clientes aparecem aqui quando criam a conta no aplicativo.</EmptyState>
         ) : (
           <div className="table-wrap">
-            <table className="table">
+            <table className="table table--cards">
               <thead>
                 <tr>
                   <th>Afilhado</th><th>Contato</th><th>Nível</th>
@@ -70,14 +70,14 @@ export function Clientes() {
               <tbody>
                 {list.map((c) => (
                   <tr key={c.id}>
-                    <td className="text"><strong>{c.nome}</strong><div className="muted small">{numero(c.numero)}{c.origem === 'Pré-cadastro' && <> · <span className="gold">Pré-cadastro</span></>}</div></td>
-                    <td className="text"><div className="small">{c.email}</div><div className="muted small nowrap">{c.telefone ? maskPhone(c.telefone) : '—'}</div></td>
-                    <td className="nowrap"><Badge tone="info">{c.nivel}</Badge></td>
-                    <td className="num">{num(c.pontos)}</td>
-                    <td className="num">{num(c.visitas)}</td>
-                    <td className="num">{brl(c.totalGasto)}</td>
-                    <td className="nowrap">{c.ultimaVisita ? dateBR(c.ultimaVisita) : <span className="muted">—</span>}</td>
-                    <td className="nowrap">{dateBR(c.desde)}</td>
+                    <td data-label="Afilhado" className="text"><strong>{c.nome}</strong><div className="muted small">{numero(c.numero)}{c.origem === 'Pré-cadastro' && <> · <span className="gold">Pré-cadastro</span></>}</div></td>
+                    <td data-label="Contato" className="text"><div className="small">{c.email}</div><div className="muted small nowrap">{c.telefone ? maskPhone(c.telefone) : '—'}</div></td>
+                    <td data-label="Nível" className="nowrap"><Badge tone="info">{c.nivel}</Badge></td>
+                    <td data-label="Pontos" className="num">{num(c.pontos)}</td>
+                    <td data-label="Visitas" className="num">{num(c.visitas)}</td>
+                    <td data-label="Consumo total" className="num">{brl(c.totalGasto)}</td>
+                    <td data-label="Última visita" className="nowrap">{c.ultimaVisita ? dateBR(c.ultimaVisita) : <span className="muted">—</span>}</td>
+                    <td data-label="Cliente desde" className="nowrap">{dateBR(c.desde)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -259,17 +259,17 @@ export function Consumo() {
           <p className="muted pad">Nenhum consumo lançado ainda.</p>
         ) : (
           <div className="table-wrap">
-            <table className="table">
+            <table className="table table--cards">
               <thead><tr><th>Data</th><th>Cliente</th><th>Itens</th><th>Pagamento</th><th className="num">Valor</th><th className="num">Pontos</th><th className="actions-col" /></tr></thead>
               <tbody>
                 {recentes.map((c) => (
                   <tr key={c.id}>
-                    <td>{new Date(String(c.data)).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</td>
-                    <td>{String(c.clienteNome)} <span className="muted">{numero(Number(c.clienteId))}</span></td>
-                    <td className="small">{(c.itens as { nome: string; quantidade: number }[]).map((i) => `${i.quantidade}× ${i.nome}`).join(', ')}</td>
-                    <td>{String(c.formaPagamento ?? '')}</td>
-                    <td className="num">{brl(Number(c.valor))}</td>
-                    <td className="num">{num(Number(c.pontos))}</td>
+                    <td data-label="Data">{new Date(String(c.data)).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</td>
+                    <td data-label="Cliente">{String(c.clienteNome)} <span className="muted">{numero(Number(c.clienteId))}</span></td>
+                    <td data-label="Itens" className="small">{(c.itens as { nome: string; quantidade: number }[]).map((i) => `${i.quantidade}× ${i.nome}`).join(', ')}</td>
+                    <td data-label="Pagamento">{String(c.formaPagamento ?? '')}</td>
+                    <td data-label="Valor" className="num">{brl(Number(c.valor))}</td>
+                    <td data-label="Pontos" className="num">{num(Number(c.pontos))}</td>
                     <td className="actions-col">
                       {canDelete && (
                         <AsyncButton className="icon-btn" confirm={{ title: 'Estornar este consumo?', message: 'Os pontos do cliente e a receita correspondente serão removidos.', confirmLabel: 'Estornar', danger: true }}
@@ -329,17 +329,17 @@ export function Resgates() {
           <EmptyState title="Nenhum resgate encontrado">{col.rows.length ? 'Ajuste a busca ou o filtro.' : 'Os resgates feitos pelos clientes aparecem aqui.'}</EmptyState>
         ) : (
           <div className="table-wrap">
-            <table className="table">
+            <table className="table table--cards">
               <thead><tr><th>Código</th><th>Cliente</th><th>Recompensa</th><th className="num">Pontos</th><th>Data</th><th>Status</th><th className="actions-col" /></tr></thead>
               <tbody>
                 {list.map((r) => (
                   <tr key={r.id}>
-                    <td><span className="code">{String(r.codigo)}</span></td>
-                    <td>{String(r.clienteNome)} <span className="muted">{numero(Number(r.clienteId))}</span></td>
-                    <td>{String(r.recompensa)}</td>
-                    <td className="num">{num(Number(r.custo))}</td>
-                    <td>{dateBR(r.data)}</td>
-                    <td><Badge tone={r.status === 'Disponível' ? 'info' : r.status === 'Utilizado' ? 'good' : 'neutral'}>{String(r.status)}</Badge></td>
+                    <td data-label="Código"><span className="code">{String(r.codigo)}</span></td>
+                    <td data-label="Cliente">{String(r.clienteNome)} <span className="muted">{numero(Number(r.clienteId))}</span></td>
+                    <td data-label="Recompensa">{String(r.recompensa)}</td>
+                    <td data-label="Pontos" className="num">{num(Number(r.custo))}</td>
+                    <td data-label="Data">{dateBR(r.data)}</td>
+                    <td data-label="Status"><Badge tone={r.status === 'Disponível' ? 'info' : r.status === 'Utilizado' ? 'good' : 'neutral'}>{String(r.status)}</Badge></td>
                     <td className="actions-col">
                       {canEdit && r.status === 'Disponível' && (
                         <div className="row-actions">
