@@ -165,7 +165,30 @@ export function Layout({ children }: { children: ReactNode }) {
                   {g.single && access(g.single) === 'view' && <span className="nav__ro" title="Somente leitura">leitura</span>}
                   <ChevronDown size={14} className={`nav__chev ${gOpen ? '' : 'is-closed'}`} />
                 </button>
-                {gOpen && (g.single ? items(areas[0]) : (
+                {gOpen && g.key === 'eu' && (
+                  <>
+                    {items(areas[0])}
+                    {/* páginas fixadas (botão direito ou toque longo sobre uma página → Fixar) */}
+                    <div className="nav__items nav__fixados">
+                      <div className="nav__group"><Pin size={11} /> Fixados</div>
+                      {fixados.length ? fixados.map((m) => (
+                        <div key={m.item.path} className={`nav__fixado ${current?.item.path === m.item.path ? 'is-current' : ''}`} title={`${m.area.label} · ${m.item.label}`}>
+                          <button className="nav__fixado-go" onClick={() => goPinned(m.item.path)} {...menuProps(m.item.path)}>
+                            <m.area.icon size={14} strokeWidth={1.8} />
+                            <span>{m.item.label}</span>
+                          </button>
+                          <button className="nav__fixado-x" onClick={() => unpin(m.item.path)} aria-label={`Desafixar ${m.item.label}`} title="Desafixar"><X size={12} /></button>
+                        </div>
+                      )) : (
+                        <p className="nav__fixados-dica">
+                          <span className="pins__hint-desktop">Clique com o botão direito em uma página do menu e escolha “Fixar”.</span>
+                          <span className="pins__hint-touch">Segure o dedo sobre uma página do menu e escolha “Fixar”.</span>
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
+                {gOpen && g.key !== 'eu' && (g.single ? items(areas[0]) : (
                   <div className="nav__depts">
                     {areas.map((a) => {
                       const aOpen = !!open[`a:${a.key}`];
@@ -192,20 +215,26 @@ export function Layout({ children }: { children: ReactNode }) {
       <div className="main">
         <header className="topbar">
           <button className="topbar__menu" onClick={() => setGaveta(true)} aria-label="Abrir menu"><Menu size={22} /></button>
-          {/* páginas fixadas pelo usuário (botão direito sobre uma página do menu → Fixar) */}
-          <div className="pins" aria-label="Páginas fixadas">
-            {fixados.length ? fixados.map((m) => (
-              <div key={m.item.path} className={`pin ${current?.item.path === m.item.path ? 'is-active' : ''}`} title={`${m.area.label} · ${m.item.label}`}>
-                <button className="pin__go" onClick={() => goPinned(m.item.path)} {...menuProps(m.item.path)}>
-                  <m.area.icon size={14} strokeWidth={1.8} />
-                  <span>{m.item.label}</span>
-                </button>
-                <button className="pin__x" onClick={() => unpin(m.item.path)} aria-label={`Desafixar ${m.item.label}`}><X size={12} /></button>
-              </div>
-            )) : (
-              <span className="pins__hint"><Pin size={13} /> <span className="pins__hint-desktop">Clique com o botão direito em uma página do menu para fixá-la aqui</span><span className="pins__hint-touch">Segure o dedo sobre uma página do menu para fixá-la aqui</span></span>
+          {/* onde a pessoa está: Cérebro / grupo / departamento / página */}
+          <nav className="crumbs" aria-label="Caminho">
+            {current ? (
+              <>
+                <span className="crumbs__root">Cérebro</span>
+                <span className="crumbs__sep">/</span>
+                <span className="crumbs__mid">{groupOf(current.area.key).label}</span>
+                {!groupOf(current.area.key).single && (
+                  <>
+                    <span className="crumbs__sep">/</span>
+                    <span className="crumbs__mid">{current.area.label}</span>
+                  </>
+                )}
+                <span className="crumbs__sep">/</span>
+                <strong className="crumbs__page">{current.item.label}</strong>
+              </>
+            ) : (
+              <strong className="crumbs__page">Início</strong>
             )}
-          </div>
+          </nav>
           <div className="live" title="Os dados são atualizados automaticamente">
             <span className={`live__dot ${lastSync && Date.now() - lastSync.getTime() < 10000 ? 'is-on' : ''}`} />
             <span className="live__text">{lastSync ? `Ao vivo · ${lastSync.toLocaleTimeString('pt-BR')}` : 'Conectando…'}</span>

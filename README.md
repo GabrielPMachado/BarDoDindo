@@ -26,7 +26,7 @@ Nenhum dado vem pré-cadastrado: cardápio, recompensas, clientes, equipe e lan�
 
 - **Painel de atualizações**: ao abrir o sistema aparece o que a equipe fez (cadastros, alterações, folha lançada, consumos, usuários…), com quem fez, o dia e o horário. O mesmo histórico fica no botão ao lado do perfil, no topo. Cada pessoa vê só as atualizações das áreas que ela acessa (`atividades/{área}/itens` no Firestore).
 - **Painel executivo personalizável**: cada usuário escolhe como fica o seu painel. Botão direito sobre um bloco → *Fixar no topo* ou *Ocultar*; o botão *Personalizar* permite arrastar os blocos para mudar a ordem, mostrar de novo os ocultos e restaurar o padrão. Também dá para colocar qualquer página do CRM no painel: botão direito sobre ela no menu → *Adicionar ao painel* (entra como atalho fixado no topo). O botão *Adicionar bloco* abre um catálogo com mais de 30 blocos além dos padrões, separados por área (Diretoria, Atendimento, Marketing, Pessoal, Estrutura, Administrativo, Financeiro, Jurídico, Fiscalização, Configurações), cada um disponível só para quem acessa a área dele. O mesmo vale para o *Meu painel* de cada usuário, que é independente do Painel executivo. As escolhas ficam salvas na conta (`preferencias/{uid}` no Firestore) e valem em qualquer computador.
-- **Fixar páginas**: o botão direito sobre uma página do menu abre em nova guia ou janela, copia o link e **fixa** a página no topo. Clicar no fixado abre a página e expande o departamento no menu. Os fixados ficam guardados no navegador, por usuário.
+- **Fixar páginas**: o botão direito (ou segurar o dedo) sobre uma página do menu abre em nova guia ou janela, copia o link e **fixa** a página. As fixadas aparecem em *Meu perfil → Fixados*; clicar abre a página e expande o departamento no menu. No topo fica o caminho da página atual (Cérebro / grupo / departamento / página).
 
 Áreas:
 
@@ -119,7 +119,7 @@ Depois `npx cap open android` (Android Studio) ou `npx cap add ios` / `npx cap o
 
 ## Permissões
 
-Cada função marca, área por área, o que o usuário pode fazer: **Ver**, **Criar**, **Editar** e **Excluir** (excluir inclui estornos, como apagar um consumo). As regras do Firestore conferem cada uma. Funções antigas, com um nível por área, continuam valendo: "Editar" equivale às quatro permissões e "Visualizar" a só ver.
+Cada função escolhe, área por área, um de 4 níveis: **Sem acesso**, **Ver**, **Editar** (ver, cadastrar e alterar) e **Total** (editar e também excluir, inclusive estornos). Por baixo cada nível vira uma lista de permissões (ver, criar, editar, excluir), que as telas, o backend e as regras do Firestore conferem uma a uma. Funções antigas, com um nível por área, continuam valendo: "Editar" equivale às quatro permissões e "Visualizar" a só ver.
 
 ## Períodos
 

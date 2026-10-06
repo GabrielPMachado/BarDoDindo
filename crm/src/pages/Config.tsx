@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Lock, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
-import { ACOES, AREAS_COM_PERMISSAO as AREAS, acoesDe, acoesNaArea, type Acao, type AreaKey } from '../modules';
+import { AREAS_COM_PERMISSAO as AREAS, NIVEIS, acoesDe, acoesNaArea, nivelDe, type Acao, type AreaKey } from '../modules';
 import { AsyncButton, Badge, EmptyState, ErrorBox, Loading, Modal, NumberInput, PageHead, notify } from '../components/ui';
 import { api } from '../lib/api';
 import { SelectPicker } from '../components/pickers';
@@ -8,8 +8,7 @@ import { reload, useCollection, useResource, type Row } from '../lib/data';
 import { useSession, type Config, type Funcao, type Usuario } from '../lib/session';
 
 /** "Tudo", "Só ver" ou a lista das permissões marcadas. */
-const resumoAcoes = (acoes: Acao[]) =>
-  acoes.length === ACOES.length ? 'Tudo' : acoes.length === 1 ? 'Só ver' : ACOES.filter((x) => acoes.includes(x.key)).map((x) => x.label).join(', ');
+const resumoAcoes = (acoes: Acao[]) => NIVEIS.find((n) => n.key === nivelDe(acoes))?.label ?? 'Personalizado';
 
 /* ---------------- Usuários ---------------- */
 export function Usuarios() {
@@ -177,7 +176,7 @@ export function Funcoes() {
     <div className="page">
       <PageHead
         title="Funções e permissões"
-        description="Cada função define, área por área, o que o usuário pode fazer: V = ver, C = criar, E = editar, X = excluir."
+        description="Cada função define, área por área, o nível de acesso: sem acesso, ver, editar (ver, cadastrar e alterar) ou total (também excluir)."
         actions={canCreate && <button className="btn btn--primary" onClick={() => setEditing('new')}><Plus size={16} /> Nova função</button>}
       />
       <div className="panel">
@@ -200,9 +199,7 @@ export function Funcoes() {
                       return (
                         <td key={a.key} className="center">
                           {acoes.includes('ver') ? (
-                            <span className="perm-dots" title={resumoAcoes(acoes)}>
-                              {ACOES.map((x) => <i key={x.key} className={acoes.includes(x.key) ? 'is-on' : ''} title={x.label}>{x.sigla}</i>)}
-                            </span>
+                            <span className={`access access--${nivelDe(acoes) ?? 'editar'}`} title={NIVEIS.find((n) => n.key === nivelDe(acoes))?.dica}>{resumoAcoes(acoes)}</span>
                           ) : <span className="access access--none" title="Sem acesso">—</span>}
                         </td>
                       );
@@ -248,14 +245,6 @@ function FuncaoForm({ funcao, onClose, onSave, onDelete }: {
   const [perm, setPerm] = useState<Partial<Record<AreaKey, Acao[]>>>(
     () => Object.fromEntries(AREAS.map((a) => [a.key, acoesNaArea(funcao?.permissoes as Record<string, unknown> | undefined, a.key)])),
   );
-  /** Marcar criar/editar/excluir também marca "ver"; desmarcar "ver" tira o acesso à área. */
-  const alternar = (area: AreaKey, acao: Acao) => {
-    const atual = perm[area] ?? [];
-    let novo = atual.includes(acao) ? atual.filter((x) => x !== acao) : [...atual, acao];
-    if (acao === 'ver' && !novo.includes('ver')) novo = [];
-    if (novo.length && !novo.includes('ver')) novo = ['ver', ...novo];
-    setPerm({ ...perm, [area]: ACOES.map((x) => x.key).filter((k) => novo.includes(k)) });
-  };
   const definir = (area: AreaKey, acoes: Acao[]) => setPerm({ ...perm, [area]: acoes });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -298,23 +287,22 @@ function FuncaoForm({ funcao, onClose, onSave, onDelete }: {
         </div>
         <div className="form-field form-field--wide">
           <label>Permissões por área</label>
-          <p className="muted small">Ver: abrir e consultar · Criar: cadastrar e lançar · Editar: alterar o que existe · Excluir: apagar (inclui estornos).</p>
+          <p className="muted small">Ver: abrir e consultar · Editar: ver, cadastrar e alterar · Total: editar e também excluir (inclui estornos).</p>
           <div className="perm-list">
             {AREAS.map((a) => (
               <div key={a.key} className="perm">
                 <a.icon size={18} className="gold" />
                 <div className="perm__text"><strong>{a.label}</strong><span className="muted small">{a.description}</span></div>
-                <div className="perm-checks" role="group" aria-label={`Permissões em ${a.label}`}>
-                  {ACOES.map((x) => (
-                    <label key={x.key} className={`perm-check ${(perm[a.key] ?? []).includes(x.key) ? 'is-on' : ''}`} title={x.dica}>
-                      <input type="checkbox" checked={(perm[a.key] ?? []).includes(x.key)} onChange={() => alternar(a.key, x.key)} />
-                      {x.label}
-                    </label>
-                  ))}
-                  <span className="perm-quick">
-                    <button type="button" onClick={() => definir(a.key, [])}>Nada</button>
-                    <button type="button" onClick={() => definir(a.key, ACOES.map((x) => x.key))}>Tudo</button>
-                  </span>
+                <div className="segmented" role="radiogroup" aria-label={`Acesso em ${a.label}`}>
+                  {NIVEIS.map((n) => {
+                    const ativo = nivelDe(perm[a.key] ?? []) === n.key;
+                    return (
+                      <button type="button" key={n.key} role="radio" aria-checked={ativo} title={n.dica}
+                        className={ativo ? 'is-active' : ''} onClick={() => definir(a.key, [...n.acoes])}>
+                        {n.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             ))}
