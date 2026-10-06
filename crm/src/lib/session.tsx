@@ -19,6 +19,9 @@ export interface Usuario {
   status: 'Ativo' | 'Inativo';
   ultimoAcesso?: string | null;
   criadoEm?: string;
+  telefone?: string;
+  nascimento?: string;
+  sobre?: string;
 }
 
 export interface Config {
@@ -93,7 +96,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     serverError,
     refresh,
     // a função Administrador (de sistema) tem acesso total, inclusive a áreas criadas depois
-    access: (area) => (funcao?.sistema ? 'edit' : funcao?.permissoes?.[area] ?? 'none'),
+    // "Meu perfil" é de todo usuário; as demais áreas dependem da função
+    access: (area) => (area === 'eu' || funcao?.sistema ? 'edit' : funcao?.permissoes?.[area] ?? 'none'),
     login: async (email, senha) => {
       const { token } = await api<{ token: string }>('/crm/login', { method: 'POST', body: { email, senha } });
       clearCache();

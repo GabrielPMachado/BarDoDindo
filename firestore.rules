@@ -55,16 +55,21 @@ service cloud.firestore {
     }
 
     /* ---------- preferências de cada usuário (painel executivo personalizado) ---------- */
+    // cada painel (executivo e "Meu painel") guarda só listas curtas de identificadores
+    function painelOk(p) {
+      return p.keys().hasOnly(['ordem', 'fixados', 'ocultos', 'atalhos', 'extras'])
+        && p.get('ordem', []) is list && p.get('ordem', []).size() <= 60
+        && p.get('fixados', []) is list && p.get('fixados', []).size() <= 60
+        && p.get('ocultos', []) is list && p.get('ocultos', []).size() <= 60
+        && p.get('atalhos', []) is list && p.get('atalhos', []).size() <= 30
+        && p.get('extras', []) is list && p.get('extras', []).size() <= 60;
+    }
     match /preferencias/{uid} {
       allow read: if logado() && request.auth.uid == uid;
       allow write: if daEquipe() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['painel', 'atualizadoEm'])
-        && request.resource.data.painel.keys().hasOnly(['ordem', 'fixados', 'ocultos', 'atalhos', 'extras'])
-        && request.resource.data.painel.ordem is list && request.resource.data.painel.ordem.size() <= 60
-        && request.resource.data.painel.fixados is list && request.resource.data.painel.fixados.size() <= 60
-        && request.resource.data.painel.ocultos is list && request.resource.data.painel.ocultos.size() <= 60
-        && request.resource.data.painel.get('atalhos', []) is list && request.resource.data.painel.get('atalhos', []).size() <= 30
-        && request.resource.data.painel.get('extras', []) is list && request.resource.data.painel.get('extras', []).size() <= 60;
+        && request.resource.data.keys().hasOnly(['painel', 'meuPainel', 'atualizadoEm'])
+        && painelOk(request.resource.data.get('painel', {}))
+        && painelOk(request.resource.data.get('meuPainel', {}));
     }
 
     /* ---------- primeiro acesso ---------- */
@@ -83,7 +88,14 @@ service cloud.firestore {
       allow read: if logado() && (request.auth.uid == uid || daEquipe());
       allow create: if podeEditar('cfg') || (request.auth.uid == uid && primeiroAcesso());
       allow update: if podeEditar('cfg')
-        || (logado() && request.auth.uid == uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ultimoAcesso']));
+        || (logado() && request.auth.uid == uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ultimoAcesso']))
+        // Meu perfil: a própria pessoa edita nome, telefone, nascimento e "sobre mim" (nunca função, status ou e-mail)
+        || (daEquipe() && request.auth.uid == uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nome', 'telefone', 'nascimento', 'sobre'])
+          && request.resource.data.nome is string && request.resource.data.nome.size() >= 3 && request.resource.data.nome.size() <= 120
+          && request.resource.data.get('telefone', '') is string && request.resource.data.get('telefone', '').size() <= 20
+          && request.resource.data.get('nascimento', '') is string && request.resource.data.get('nascimento', '').size() <= 10
+          && request.resource.data.get('sobre', '') is string && request.resource.data.get('sobre', '').size() <= 500);
       allow delete: if podeEditar('cfg') && request.auth.uid != uid;
     }
 

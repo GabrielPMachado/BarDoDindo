@@ -140,6 +140,7 @@ const publicCliente = (c: Dados) => ({
 });
 const publicUsuario = (u: Dados) => ({
   id: u.id, nome: u.nome, email: u.email, funcaoId: u.funcaoId, status: u.status, ultimoAcesso: u.ultimoAcesso ?? null, criadoEm: u.criadoEm,
+  telefone: u.telefone ?? '', nascimento: u.nascimento ?? '', sobre: u.sobre ?? '',
 });
 
 const VINCULOS_FOLHA = ['CLT', 'Intermitente', 'Temporário'];
@@ -516,6 +517,21 @@ export function createBackend(kind: 'app' | 'crm') {
     const ctx = await requireUsuario();
     return { usuario: publicUsuario(ctx.usuario), funcao: ctx.funcao };
   });
+  /* Meu perfil: cada usuário edita as próprias informações (e-mail, função e status continuam com o administrador) */
+  rota('PUT', '/crm/me', async ({ b }) => {
+    const ctx = await requireUsuario();
+    const nome = str(b.nome, 120);
+    if (nome.length < 3) fail(400, 'Informe o nome completo.');
+    const tel = telefone(b.telefone);
+    const nascimento = str(b.nascimento, 10);
+    if (nascimento && (!/^\d{4}-\d{2}-\d{2}$/.test(nascimento) || nascimento > today())) fail(400, 'Data de nascimento inválida.');
+    const sobre = str(b.sobre, 500);
+    const dados = { nome, telefone: tel, nascimento, sobre };
+    const lote = writeBatch(db);
+    lote.update(doc(db, 'usuarios', ctx.usuario.id), dados);
+    await lote.commit();
+    return publicUsuario({ ...ctx.usuario, ...dados });
+  });
   rota('PUT', '/crm/me/senha', async ({ b }) => {
     await requireUsuario();
     const user = auth.currentUser!;
@@ -543,15 +559,20 @@ export function createBackend(kind: 'app' | 'crm') {
     const ctx = await requireUsuario();
     // listas curtas de identificadores de blocos do painel; qualquer outra coisa é descartada
     const ids = (v: unknown) => (Array.isArray(v) ? v : []).filter((x): x is string => typeof x === 'string' && /^[a-z0-9-]{1,40}$/.test(x)).slice(0, 60);
-    const p = (b.painel ?? {}) as Dados;
-    // atalhos: páginas do CRM adicionadas ao painel pelo botão direito do menu
-    const atalhos = (Array.isArray(p.atalhos) ? p.atalhos : []).filter((x: unknown): x is string => typeof x === 'string' && /^\/[a-z0-9/-]{1,60}$/.test(x)).slice(0, 30);
-    // extras: blocos do catálogo que o usuário escolheu adicionar além dos padrões
-    const painel = { ordem: ids(p.ordem), fixados: ids(p.fixados), ocultos: ids(p.ocultos), atalhos, extras: ids(p.extras) };
+    const limparPainel = (p: Dados) => ({
+      ordem: ids(p.ordem), fixados: ids(p.fixados), ocultos: ids(p.ocultos),
+      // atalhos: páginas do CRM adicionadas ao painel pelo botão direito do menu
+      atalhos: (Array.isArray(p.atalhos) ? p.atalhos : []).filter((x: unknown): x is string => typeof x === 'string' && /^\/[a-z0-9/-]{1,60}$/.test(x)).slice(0, 30),
+      // extras: blocos do catálogo que o usuário escolheu adicionar além dos padrões
+      extras: ids(p.extras),
+    });
+    // "painel" é o Painel executivo; "meuPainel" é o painel próprio (Meu perfil → Meu painel). Grava só o que veio.
+    const salvo: Dados = {};
+    for (const chave of ['painel', 'meuPainel']) if (b[chave] && typeof b[chave] === 'object') salvo[chave] = limparPainel(b[chave]);
     const lote = writeBatch(db);
-    lote.set(doc(db, 'preferencias', ctx.usuario.id), { painel, atualizadoEm: now() }, { merge: true });
+    lote.set(doc(db, 'preferencias', ctx.usuario.id), { ...salvo, atualizadoEm: now() }, { merge: true });
     await lote.commit();
-    return { painel };
+    return salvo;
   });
 
   /* CRM: painel de atualizações (as últimas alterações das áreas que a pessoa acessa) */

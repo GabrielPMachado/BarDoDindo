@@ -88,6 +88,8 @@ if (senhaAtendente) {
   await negado('listar despesas', () => getDocs(collection(db, 'despesas')));
   await negado('alterar produto', () => addDoc(collection(db, 'produtos'), { nome: 'x', preco: 1 }));
   await negado('lançar receita avulsa', () => addDoc(collection(db, 'receitas'), { descricao: 'x', valor: 1 }));
+  await permitido('editar o próprio perfil', () => updateDoc(doc(db, 'usuarios', eq.user.uid), { telefone: '(11) 91234-5678', sobre: 'Atendente do salão' }));
+  await negado('trocar o próprio e-mail pelo perfil', () => updateDoc(doc(db, 'usuarios', eq.user.uid), { email: 'outro@x.x' }));
   await negado('promover a si mesmo a administrador', () => updateDoc(doc(db, 'usuarios', eq.user.uid), { funcaoId: 'admin' }));
   await negado('dar todas as permissões à própria função', async () => {
     const eu = (await getDoc(doc(db, 'usuarios', eq.user.uid))).data();
