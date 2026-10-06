@@ -59,10 +59,11 @@ service cloud.firestore {
       allow read: if logado() && request.auth.uid == uid;
       allow write: if daEquipe() && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(['painel', 'atualizadoEm'])
-        && request.resource.data.painel.keys().hasOnly(['ordem', 'fixados', 'ocultos'])
+        && request.resource.data.painel.keys().hasOnly(['ordem', 'fixados', 'ocultos', 'atalhos'])
         && request.resource.data.painel.ordem is list && request.resource.data.painel.ordem.size() <= 60
         && request.resource.data.painel.fixados is list && request.resource.data.painel.fixados.size() <= 60
-        && request.resource.data.painel.ocultos is list && request.resource.data.painel.ocultos.size() <= 60;
+        && request.resource.data.painel.ocultos is list && request.resource.data.painel.ocultos.size() <= 60
+        && request.resource.data.painel.get('atalhos', []) is list && request.resource.data.painel.get('atalhos', []).size() <= 30;
     }
 
     /* ---------- primeiro acesso ---------- */

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { AppWindow, ChevronDown, Copy, ExternalLink, KeyRound, LogOut, MousePointerClick, Pin, PinOff, X } from 'lucide-react';
+import { AppWindow, ChevronDown, LayoutDashboard, Copy, ExternalLink, KeyRound, LogOut, MousePointerClick, Pin, PinOff, X } from 'lucide-react';
 import { GROUPS, findModule, groupOf, type Area } from '../modules';
 import { useSession } from '../lib/session';
 import { initials } from '../lib/format';
 import { useLastSync } from '../lib/data';
 import { usePins } from '../lib/pins';
+import { alternarAtalho, usePainelPrefs } from '../lib/preferencias';
 import { AtividadesButton, PainelAtualizacoes, usePainelAoAbrir } from './Atividades';
 import { notify } from './ui';
 import { ContextMenu, type MenuPos } from './ContextMenu';
@@ -30,7 +31,9 @@ const fullUrl = (path: string) => `${location.origin}${location.pathname}${locat
 interface MenuState extends MenuPos { path: string }
 
 /** Menu do botão direito sobre uma página: abrir em outra guia/janela, copiar o link e fixar no topo. */
-function PageMenu({ menu, pinned, onPin, onClose }: { menu: MenuState; pinned: boolean; onPin: () => void; onClose: () => void }) {
+function PageMenu({ menu, pinned, onPin, noPainel, onPainel, onClose }: {
+  menu: MenuState; pinned: boolean; onPin: () => void; noPainel: boolean; onPainel: () => void; onClose: () => void;
+}) {
   const navigate = useNavigate();
   const copiar = async () => {
     try {
@@ -50,6 +53,9 @@ function PageMenu({ menu, pinned, onPin, onClose }: { menu: MenuState; pinned: b
       <button role="menuitem" onClick={onPin}>
         {pinned ? <><PinOff size={15} /> Desafixar</> : <><Pin size={15} /> Fixar</>}
       </button>
+      <button role="menuitem" onClick={onPainel}>
+        {noPainel ? <><LayoutDashboard size={15} /> Remover do painel</> : <><LayoutDashboard size={15} /> Adicionar ao painel</>}
+      </button>
     </ContextMenu>
   );
 }
@@ -61,6 +67,13 @@ export function Layout({ children, onChangePassword }: { children: ReactNode; on
   const current = findModule(pathname);
   const lastSync = useLastSync();
   const { pins, isPinned, toggle, unpin } = usePins(usuario?.id);
+  const painelPrefs = usePainelPrefs();
+  const alternarNoPainel = (path: string) => {
+    const adicionando = !painelPrefs.prefs.atalhos.includes(path);
+    painelPrefs.salvar(alternarAtalho(painelPrefs.prefs, path))
+      .then(() => notify(adicionando ? 'Atalho adicionado ao Painel executivo.' : 'Atalho removido do Painel executivo.'))
+      .catch((e: Error) => notify(e.message || 'Não foi possível salvar o painel.', 'error'));
+  };
   const [menu, setMenu] = useState(false);
   const [ctx, setCtx] = useState<MenuState | null>(null);
   const painel = usePainelAoAbrir();
@@ -195,7 +208,13 @@ export function Layout({ children, onChangePassword }: { children: ReactNode; on
         <main className="content">{children}</main>
       </div>
 
-      {ctx && <PageMenu menu={ctx} pinned={isPinned(ctx.path)} onPin={() => toggle(ctx.path)} onClose={() => setCtx(null)} />}
+      {ctx && (
+        <PageMenu
+          menu={ctx} pinned={isPinned(ctx.path)} onPin={() => toggle(ctx.path)}
+          noPainel={painelPrefs.prefs.atalhos.includes(ctx.path)} onPainel={() => alternarNoPainel(ctx.path)}
+          onClose={() => setCtx(null)}
+        />
+      )}
       {painel.aberto && <PainelAtualizacoes piscar={painel.piscar} onClose={painel.fechar} />}
     </div>
   );

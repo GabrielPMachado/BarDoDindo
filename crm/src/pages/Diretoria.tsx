@@ -1,13 +1,14 @@
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, ArrowRight, Check, Eye, EyeOff, GripVertical, Pin, PinOff, RotateCcw, SlidersHorizontal } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Check, Eye, EyeOff, GripVertical, LayoutDashboard, Pin, PinOff, RotateCcw, SlidersHorizontal, X } from 'lucide-react';
 import { BarChart, HBarList } from '../components/Charts';
 import { ContextMenu, type MenuPos } from '../components/ContextMenu';
 import { notify, PageHead } from '../components/ui';
 import { useCollection, useResource, type Row } from '../lib/data';
 import { brl, daysUntil, isoToday, monthLabel, num, pct } from '../lib/format';
 import { currentMonth, despesaValida, lastMonths, monthName, monthOf, sumBy } from '../lib/finance';
-import { usePainelPrefs, type PainelPrefs } from '../lib/preferencias';
+import { alternarAtalho, atalhoId, usePainelPrefs, type PainelPrefs } from '../lib/preferencias';
+import { findModule } from '../modules';
 import { useSession } from '../lib/session';
 import type { Kpi } from '../collections';
 
@@ -19,6 +20,8 @@ interface Bloco {
   titulo: string;
   tipo: 'kpi' | 'painel';
   render: () => ReactNode;
+  /** Página do CRM adicionada ao painel pelo menu (botão direito → Adicionar ao painel). */
+  atalho?: string;
 }
 
 export default function Diretoria() {
@@ -210,8 +213,31 @@ export default function Diretoria() {
 
 /* ---------- personalização: cada usuário escolhe a ordem, o que fica fixado no topo e o que fica oculto ---------- */
 
-function PainelPersonalizavel({ blocos }: { blocos: Bloco[] }) {
+/** Cartão de atalho para uma página do CRM. */
+function blocoAtalho(path: string): Bloco | null {
+  const m = findModule(path);
+  if (!m) return null;
+  const Icon = m.area.icon;
+  return {
+    id: atalhoId(path), titulo: m.item.label, tipo: 'kpi', atalho: path,
+    render: () => (
+      <Link to={path} className="kpi atalho">
+        <span className="kpi__label"><Icon size={14} className="atalho__icon" /> {m.area.label}</span>
+        <strong className="atalho__title">{m.item.label}</strong>
+        <span className="kpi__hint atalho__go">Abrir página <ArrowRight size={13} /></span>
+      </Link>
+    ),
+  };
+}
+
+function PainelPersonalizavel({ blocos: proprios }: { blocos: Bloco[] }) {
   const { prefs, salvar } = usePainelPrefs();
+  const { access } = useSession();
+  // atalhos de páginas adicionadas pelo menu, só das áreas que a pessoa ainda acessa
+  const blocos = [
+    ...prefs.atalhos.map(blocoAtalho).filter((b): b is Bloco => !!b && access(findModule(b.atalho!)!.area.key) !== 'none'),
+    ...proprios,
+  ];
   const [editando, setEditando] = useState(false);
   const [menu, setMenu] = useState<(MenuPos & { id: string }) | null>(null);
   const [arrastando, setArrastando] = useState<string | null>(null);
@@ -227,10 +253,12 @@ function PainelPersonalizavel({ blocos }: { blocos: Bloco[] }) {
   const normais = ordem.filter((id) => !fixados.includes(id) && !ocultos.has(id));
 
   const gravar = (next: Partial<PainelPrefs>) =>
-    salvar({ ordem, fixados, ocultos: [...ocultos], ...next }).catch((e: Error) => notify(e.message || 'Não foi possível salvar o painel.', 'error'));
+    salvar({ ...prefs, ordem, fixados, ocultos: [...ocultos], ...next }).catch((e: Error) => notify(e.message || 'Não foi possível salvar o painel.', 'error'));
   const alternarFixado = (id: string) =>
     gravar({ fixados: fixados.includes(id) ? fixados.filter((x) => x !== id) : [...fixados, id] });
   const ocultar = (id: string) => gravar({ ocultos: [...ocultos, id], fixados: fixados.filter((x) => x !== id) });
+  const removerAtalho = (path: string) =>
+    salvar(alternarAtalho({ ...prefs, ordem, fixados, ocultos: [...ocultos] }, path)).catch((e: Error) => notify(e.message || 'Não foi possível salvar o painel.', 'error'));
   const mostrar = (id: string) => gravar({ ocultos: [...ocultos].filter((x) => x !== id) });
 
   /** Solta `id` antes de `alvo` (ou no fim da área). Soltar entre os fixados fixa; entre os demais, desafixa. */
@@ -290,7 +318,11 @@ function PainelPersonalizavel({ blocos }: { blocos: Bloco[] }) {
             <button onClick={() => alternarFixado(id)} title={fixado ? 'Desafixar' : 'Fixar no topo'} aria-label={fixado ? `Desafixar ${b.titulo}` : `Fixar ${b.titulo} no topo`}>
               {fixado ? <PinOff size={14} /> : <Pin size={14} />}
             </button>
-            <button onClick={() => ocultar(id)} title="Ocultar" aria-label={`Ocultar ${b.titulo}`}><EyeOff size={14} /></button>
+            {b.atalho ? (
+              <button onClick={() => removerAtalho(b.atalho!)} title="Remover do painel" aria-label={`Remover ${b.titulo} do painel`}><X size={14} /></button>
+            ) : (
+              <button onClick={() => ocultar(id)} title="Ocultar" aria-label={`Ocultar ${b.titulo}`}><EyeOff size={14} /></button>
+            )}
           </div>
         ) : fixado && <Pin size={13} className="bloco__pin" aria-label="Fixado" />}
         {b.render()}
@@ -309,7 +341,7 @@ function PainelPersonalizavel({ blocos }: { blocos: Bloco[] }) {
     );
   };
 
-  const personalizado = prefs.ordem.length > 0 || prefs.fixados.length > 0 || prefs.ocultos.length > 0;
+  const personalizado = prefs.ordem.length > 0 || prefs.fixados.length > 0 || prefs.ocultos.length > 0 || prefs.atalhos.length > 0;
   const menuBloco = menu && porId.get(menu.id);
 
   return (
@@ -326,7 +358,7 @@ function PainelPersonalizavel({ blocos }: { blocos: Bloco[] }) {
         <div className="customize-bar">
           <div className="customize-bar__text">
             <strong>Personalizando o seu painel</strong>
-            <span className="muted small">Arraste os blocos para mudar a ordem ou para a área “Fixados” no topo. As escolhas ficam salvas na sua conta.</span>
+            <span className="muted small">Arraste os blocos para mudar a ordem ou para a área “Fixados” no topo. Para adicionar uma página, clique com o botão direito nela no menu e escolha “Adicionar ao painel”. As escolhas ficam salvas na sua conta.</span>
           </div>
           {ocultos.size > 0 && (
             <div className="customize-bar__hidden">
@@ -338,7 +370,7 @@ function PainelPersonalizavel({ blocos }: { blocos: Bloco[] }) {
           )}
           <div className="customize-bar__actions">
             {personalizado && (
-              <button className="btn btn--ghost btn--sm" onClick={() => gravar({ ordem: [], fixados: [], ocultos: [] })}><RotateCcw size={14} /> Restaurar padrão</button>
+              <button className="btn btn--ghost btn--sm" onClick={() => gravar({ ordem: [], fixados: [], ocultos: [], atalhos: [] })}><RotateCcw size={14} /> Restaurar padrão</button>
             )}
             <button className="btn btn--primary btn--sm" onClick={() => setEditando(false)}><Check size={14} /> Concluir</button>
           </div>
@@ -365,7 +397,11 @@ function PainelPersonalizavel({ blocos }: { blocos: Bloco[] }) {
           <button role="menuitem" onClick={() => alternarFixado(menu.id)}>
             {fixados.includes(menu.id) ? <><PinOff size={15} /> Desafixar</> : <><Pin size={15} /> Fixar no topo</>}
           </button>
-          <button role="menuitem" onClick={() => ocultar(menu.id)}><EyeOff size={15} /> Ocultar “{menuBloco.titulo}”</button>
+          {menuBloco.atalho ? (
+            <button role="menuitem" onClick={() => removerAtalho(menuBloco.atalho!)}><LayoutDashboard size={15} /> Remover do painel</button>
+          ) : (
+            <button role="menuitem" onClick={() => ocultar(menu.id)}><EyeOff size={15} /> Ocultar “{menuBloco.titulo}”</button>
+          )}
           <div className="ctx__sep" />
           <button role="menuitem" onClick={() => setEditando(true)}><SlidersHorizontal size={15} /> Personalizar painel</button>
         </ContextMenu>
