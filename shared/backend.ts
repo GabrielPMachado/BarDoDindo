@@ -397,6 +397,8 @@ export function createBackend(kind: 'app' | 'crm') {
     return { token: user.uid };
   });
   rota('POST', '/app/logout', async () => { await sair(); return { ok: true }; });
+  /* app: sinal de mudança (os dados já chegam ao vivo do Firestore; o app só pergunta se algo mudou, sem leituras extras) */
+  rota('GET', '/app/versao', async () => { await requireCliente(); return { versao }; });
   rota('GET', '/app/me', async () => {
     const { uid, c } = await requireCliente();
     const [consumos, resgates, reservas, cfg] = await Promise.all([doCliente('consumos', uid), doCliente('resgates', uid), doCliente('reservas', uid), getConfig()]);

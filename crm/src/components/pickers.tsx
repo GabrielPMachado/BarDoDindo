@@ -12,6 +12,8 @@ function usePopover() {
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && setOpen(false);
+    // Tab (ou clique) para outro campo também fecha: senão o calendário/lista fica aberto cobrindo os campos de baixo
+    const onFocus = (e: FocusEvent) => ref.current && !ref.current.contains(e.target as Node) && setOpen(false);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation();
@@ -20,9 +22,11 @@ function usePopover() {
     };
     document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onKey, true);
+    document.addEventListener('focusin', onFocus);
     return () => {
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey, true);
+      document.removeEventListener('focusin', onFocus);
     };
   }, [open]);
   return { open, setOpen, ref };
