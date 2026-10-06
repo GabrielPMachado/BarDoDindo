@@ -133,7 +133,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // atualiza ao voltar para o app (ex.: pontos lançados pelo bar)
     const onFocus = () => document.visibilityState === 'visible' && refresh();
     document.addEventListener('visibilitychange', onFocus);
-    // quase ao vivo: a cada 3 s pergunta se algo mudou (reserva confirmada, pontos, voucher entregue) e só então recarrega
+    // ao vivo: a cada 1 s pergunta se algo mudou (reserva confirmada, pontos, voucher entregue) e só então recarrega.
+    // A pergunta é respondida pelos dados que já chegam em tempo real do Firestore, sem leituras extras.
     let ultima: number | null = null;
     const vigia = setInterval(async () => {
       if (document.visibilityState !== 'visible' || !getToken()) return;
@@ -144,7 +145,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       } catch {
         /* sem sessão ou sem conexão: tenta de novo no próximo ciclo */
       }
-    }, 3000);
+    }, 1000);
     return () => {
       document.removeEventListener('visibilitychange', onFocus);
       clearInterval(vigia);

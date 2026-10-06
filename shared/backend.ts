@@ -175,7 +175,8 @@ export function createBackend(kind: 'app' | 'crm') {
   // cada sistema tem a própria sessão, mesmo quando abertos no mesmo navegador
   const app = initializeApp(firebaseConfig, kind);
   const auth = getAuth(app);
-  const db = initializeFirestore(app, { ignoreUndefinedProperties: true });
+  // VITE_LONG_POLLING=1 só em builds locais de teste atrás de proxy, onde a conexão contínua do Firestore não passa
+  const db = initializeFirestore(app, { ignoreUndefinedProperties: true, ...(import.meta.env.VITE_LONG_POLLING === '1' ? { experimentalForceLongPolling: true } : {}) });
   if (EMULADOR) {
     connectAuthEmulator(auth, EMULADOR_AUTH, { disableWarnings: true });
     connectFirestoreEmulator(db, EMULADOR_FIRESTORE.host, EMULADOR_FIRESTORE.port);
@@ -1056,8 +1057,8 @@ export function createBackend(kind: 'app' | 'crm') {
     }
   }
 
-  // só nos builds de teste (emulador): permite chamar as rotas pelo console do navegador
-  if (EMULADOR) (globalThis as Dados)[`__dindo_${kind}`] = request;
+  // só nos builds de teste (emulador, ou VITE_EXPOR_API=1 num build local que nunca é publicado): permite chamar as rotas pelo console
+  if (EMULADOR || import.meta.env.VITE_EXPOR_API === '1') (globalThis as Dados)[`__dindo_${kind}`] = request;
 
   return {
     request,

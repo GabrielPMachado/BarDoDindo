@@ -16,7 +16,12 @@ import './styles.css';
 // na primeira visita o service worker é só instalado: recarregar ali apagava o formulário de quem já estava se cadastrando.
 // A página só recarrega quando uma versão nova substitui uma que já controlava o app.
 const jaControlado = typeof navigator !== 'undefined' && !!navigator.serviceWorker?.controller;
-registerSW({ immediate: true, onNeedReload: () => { if (jaControlado) window.location.reload(); } });
+registerSW({
+  immediate: true,
+  onNeedReload: () => { if (jaControlado) window.location.reload(); },
+  // procura versão nova a cada minuto, sem a pessoa precisar fechar e abrir o app
+  onRegisteredSW: (_url, r) => { if (r) setInterval(() => r.update().catch(() => undefined), 60000); },
+});
 
 function ScrollTop() {
   const { pathname } = useLocation();

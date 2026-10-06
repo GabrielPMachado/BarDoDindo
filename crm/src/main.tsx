@@ -3,7 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ShieldOff } from 'lucide-react';
 import { SessionProvider, useSession } from './lib/session';
-import { startLiveUpdates, stopLiveUpdates } from './lib/data';
+import { startLiveUpdates, stopLiveUpdates, vigiarNovaVersao } from './lib/data';
 import { AREAS_VISIVEIS as AREAS, CAMINHOS_ANTIGOS, findModule, type AreaKey } from './modules';
 import { COLLECTIONS } from './collections';
 import { Layout } from './components/Layout';
@@ -18,6 +18,8 @@ import { Clientes, Consumo, Reservas, Resgates } from './pages/Vendas';
 import { Funcoes, Parametros, Usuarios } from './pages/Config';
 import MeuPerfil from './pages/MeuPerfil';
 import './styles.css';
+
+vigiarNovaVersao();
 
 /** Módulos de cadastro que usam a tela genérica. */
 const GENERIC: Record<string, string> = {

@@ -125,9 +125,33 @@ export function startLiveUpdates() {
     } catch {
       /* servidor indisponível: tenta de novo no próximo ciclo */
     }
-    if (watching()) setTimeout(tick, 2000);
+    // a cada 1 s: o sinal de mudança vem dos dados que já chegam ao vivo do Firestore, sem leituras extras
+    if (watching()) setTimeout(tick, 1000);
   };
   tick();
+}
+
+/**
+ * Versão nova publicada: a cada minuto confere se o site mudou (o nome do arquivo principal muda a cada publicação)
+ * e recarrega sozinho, sem a pessoa precisar reiniciar o navegador. Nunca recarrega com uma janela aberta ou
+ * um campo em edição: nesse caso tenta de novo no minuto seguinte.
+ */
+export function vigiarNovaVersao() {
+  const atual = Array.from(document.scripts).map((s) => s.src).find((src) => /\/assets\/index-[^/]+\.js$/.test(src));
+  if (!atual) return; // ambiente de desenvolvimento
+  setInterval(async () => {
+    if (document.visibilityState !== 'visible') return;
+    try {
+      const html = await (await fetch(location.pathname, { cache: 'no-store' })).text();
+      const nova = html.match(/assets\/index-[^"']+\.js/)?.[0];
+      if (!nova || atual.endsWith(nova)) return;
+      const editando = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName ?? '');
+      if (document.querySelector('.modal, .confirm, .ctx') || editando) return;
+      location.reload();
+    } catch {
+      /* sem conexão: tenta de novo no próximo ciclo */
+    }
+  }, 60000);
 }
 
 export function stopLiveUpdates() {
