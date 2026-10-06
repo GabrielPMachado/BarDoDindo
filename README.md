@@ -14,7 +14,7 @@ Nenhum dado vem pré-cadastrado: cardápio, recompensas, clientes, equipe e lan�
 
 ## Como os dois sistemas se conectam
 
-- **Cardápio**: produtos cadastrados no CRM (*Marketing e Vendas → Produtos e cardápio*), ativos e marcados "No cardápio", aparecem no app.
+- **Cardápio**: produtos cadastrados no CRM (*Vendas → Produtos e cardápio*), ativos e marcados "No cardápio", aparecem no app.
 - **Recompensas**: o catálogo é cadastrado no CRM e aparece no app. O resgate do cliente gera um voucher que a equipe vê em *Resgates* e dá baixa ao entregar.
 - **Reservas**: o cliente solicita pelo app. A equipe confirma ou recusa em *Reservas* e o cliente vê o status no app.
 - **Consumo e pontos**: em *Lançar consumo* a equipe registra a comanda do afilhado pelo número (#001…). Os pontos aparecem no app e o valor entra automaticamente em *Financeiro → Receita*. Excluir o lançamento estorna pontos e receita.
@@ -22,7 +22,7 @@ Nenhum dado vem pré-cadastrado: cardápio, recompensas, clientes, equipe e lan�
 
 ## Áreas do CRM
 
-**Cérebro** é o nome do sistema de gestão. O menu começa por **Meu perfil** (de todo usuário: *Meus dados*, onde a pessoa vê e edita as próprias informações e troca a senha, e *Meu painel*, um painel próprio montado com os blocos e atalhos que ela quiser; também dá para trocar a foto). Depois vêm três grandes grupos: **Diretoria**, **Departamentos** (Atendimento, Marketing e Vendas, Pessoal, Estrutura, Administrativo, Financeiro, Jurídico, Fiscalização e Monitoramento) e **Configurações**.
+**Cérebro** é o nome do sistema de gestão. O menu começa por **Meu perfil** (de todo usuário: *Meus dados*, onde a pessoa vê e edita as próprias informações e troca a senha, e *Meu painel*, um painel próprio montado com os blocos e atalhos que ela quiser; também dá para trocar a foto). Depois vêm três grandes grupos: **Diretoria**, **Departamentos** (Atendimento, Vendas, Marketing, Pessoal, Estrutura, Administrativo, Financeiro, Jurídico e Fiscalização) e **Configurações**.
 
 - **Painel de atualizações**: ao abrir o sistema aparece o que a equipe fez (cadastros, alterações, folha lançada, consumos, usuários…), com quem fez, o dia e o horário. O mesmo histórico fica no botão ao lado do perfil, no topo. Cada pessoa vê só as atualizações das áreas que ela acessa (`atividades/{área}/itens` no Firestore).
 - **Painel executivo personalizável**: cada usuário escolhe como fica o seu painel. Botão direito sobre um bloco → *Fixar no topo* ou *Ocultar*; o botão *Personalizar* permite arrastar os blocos para mudar a ordem, mostrar de novo os ocultos e restaurar o padrão. Também dá para colocar qualquer página do CRM no painel: botão direito sobre ela no menu → *Adicionar ao painel* (entra como atalho fixado no topo). O botão *Adicionar bloco* abre um catálogo com mais de 30 blocos além dos padrões, separados por área (Diretoria, Atendimento, Marketing, Pessoal, Estrutura, Administrativo, Financeiro, Jurídico, Fiscalização, Configurações), cada um disponível só para quem acessa a área dele. O mesmo vale para o *Meu painel* de cada usuário, que é independente do Painel executivo. As escolhas ficam salvas na conta (`preferencias/{uid}` no Firestore) e valem em qualquer computador.
@@ -32,8 +32,9 @@ Nenhum dado vem pré-cadastrado: cardápio, recompensas, clientes, equipe e lan�
 
 - **Diretoria**: painel executivo, metas e decisões
 - **Atendimento**: reservas, lançar consumo, validar vouchers
-- **Marketing e Vendas**: produtos e cardápio, clientes (afilhados), recompensas, criação, gestão de mídias
-- **Pessoal (RH/DP)**: colaboradores, férias e afastamentos, folha de pagamento (o lançamento como despesa é feito pelo Financeiro)
+- **Vendas**: produtos e cardápio, clientes (afilhados)
+- **Marketing**: recompensas (programa de fidelidade), criação, gestão de mídias
+- **Pessoal**: colaboradores, férias e afastamentos, folha de pagamento (o lançamento como despesa é feito pelo Financeiro)
 - **Estrutura**: projetos, estoque, materiais
 - **Administrativo**: serviços terceirizados, fornecedores, contratos
 - **Financeiro**: receitas, despesas (inclui lançar a folha), resultado (DRE)
@@ -131,3 +132,7 @@ Receitas, despesas, consumos e reservas crescem com o tempo, então as telas car
 ## Celular e tablet
 
 O CRM se adapta à tela. No tablet e no celular o menu lateral vira uma gaveta (botão ☰), as grades viram uma coluna e, no celular, as tabelas viram cartões e as janelas ocupam a tela inteira. Como no toque não há botão direito, **segurar o dedo** sobre uma página do menu ou um bloco do painel abre o mesmo menu (fixar, adicionar ao painel…), e no modo *Personalizar* as setas ↑↓ mudam os blocos de lugar.
+
+## Fotos e exportação
+
+Produtos, estoque, materiais, recompensas, peças de criação, publicações e colaboradores podem ter **foto** (a imagem é reduzida no navegador antes de salvar; aparece como miniatura na tabela e nos produtos de *Lançar consumo*). Toda lista de cadastro tem **Exportar → PDF** (com a logo, título, data, fotos, status coloridos, totais e páginas numeradas), **Excel (.xlsx)** (cabeçalho fixo com filtro, valores como números e datas de verdade, totais com fórmula e as fotos dentro das células) e **CSV**.

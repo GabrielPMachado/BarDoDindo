@@ -35,7 +35,8 @@ const COLLECTIONS: Record<string, string> = {
   terceirizados: 'adm', fornecedores: 'adm', contratos: 'adm',
   receitas: 'fin', despesas: 'fin',
   reservas: 'atd', consumos: 'atd', resgates: 'atd',
-  criacao: 'mkt', midias: 'mkt', produtos: 'mkt', recompensas: 'mkt',
+  criacao: 'mkt', midias: 'mkt', recompensas: 'mkt',
+  produtos: 'vnd',
   trabalhista: 'jur', consultoria: 'jur',
   qualidade: 'fis', naoconformidades: 'fis',
   funcoes: 'cfg',
@@ -50,7 +51,7 @@ function acoesDe(p: unknown): Acao[] {
   if (p === 'view') return ['ver'];
   return [];
 }
-const AREAS = ['dir', 'atd', 'mkt', 'rh', 'dp', 'adm', 'fin', 'jur', 'fis', 'mon', 'cfg'];
+const AREAS = ['dir', 'atd', 'vnd', 'mkt', 'rh', 'dp', 'adm', 'fin', 'jur', 'fis', 'mon', 'cfg'];
 
 /** Como cada registro é citado no painel de atualizações ("cadastrou o produto …"). */
 const REGISTRO: Record<string, string> = {
@@ -122,6 +123,12 @@ function validarRegistro(data: unknown): Dados {
   for (const [k, v] of Object.entries(data as Dados)) {
     if (typeof v === 'number' && (!Number.isFinite(v) || Math.abs(v) > 1e12)) fail(400, `Valor numérico inválido em "${k}".`);
     if (typeof v === 'number' && v < 0) fail(400, `O campo "${k}" não aceita valores negativos.`);
+    // foto do registro: imagem já reduzida no navegador (data URL), com limite de tamanho
+    if (k === 'foto' && typeof v === 'string' && v) {
+      if (!/^data:image\/(jpeg|png|webp);base64,/.test(v)) fail(400, 'Imagem inválida.');
+      if (v.length > 400_000) fail(413, 'Imagem muito grande.');
+      continue;
+    }
     if (typeof v === 'string' && v.length > 5000) fail(400, `Texto muito longo em "${k}".`);
   }
   return data as Dados;
@@ -294,7 +301,9 @@ export function createBackend(kind: 'app' | 'crm') {
     const funcao = await documento(`funcoes/${usuario.funcaoId}`);
     // a função Administrador (de sistema) sempre tem acesso total, inclusive a áreas novas
     // permissões da função, área por área; a função Administrador (de sistema) tem todas, inclusive em áreas novas
-    const acoes = (area: string): string[] => (funcao?.sistema ? [...ACOES] : acoesDe(funcao?.permissoes?.[area]));
+    // Vendas foi separada de Marketing: sem permissões próprias para Vendas, valem as de Marketing
+    const perm = (funcao?.permissoes ?? {}) as Dados;
+    const acoes = (area: string): string[] => (funcao?.sistema ? [...ACOES] : acoesDe(area === 'vnd' && !('vnd' in perm) ? perm.mkt : perm[area]));
     return {
       usuario, funcao, acoes,
       access: (area: string): string => (!acoes(area).includes('ver') ? 'none' : acoes(area).length > 1 ? 'edit' : 'view'),
@@ -701,7 +710,7 @@ export function createBackend(kind: 'app' | 'crm') {
 
   /* CRM: clientes do aplicativo */
   rota('GET', '/crm/clientes', async () => {
-    requireAnyAccess(await requireUsuario(), ['mkt', 'atd'], 'ver');
+    requireAnyAccess(await requireUsuario(), ['vnd', 'mkt', 'atd'], 'ver');
     const [clientes, consumos, resgates, cfg] = await Promise.all([colecao('clientes'), colecao('consumos'), colecao('resgates'), getConfig()]);
     return clientes
       .map((c) => {
@@ -738,7 +747,7 @@ export function createBackend(kind: 'app' | 'crm') {
         return (await colecao('ref_fornecedores'))
           .map((f) => ({ id: f.id, nome: f.nome, detalhe: [f.categoria, f.status !== 'Ativo' ? f.status : null].filter(Boolean).join(' · '), inativo: f.status === 'Inativo' }));
       case 'clientes':
-        requireAnyAccess(ctx, ['atd', 'mkt'], 'ver');
+        requireAnyAccess(ctx, ['atd', 'vnd', 'mkt'], 'ver');
         return (await colecao('clientes'))
           .map((c) => ({ id: c.numero, nome: c.nome, detalhe: `#${String(c.numero).padStart(3, '0')}${c.telefone ? ' · ' + c.telefone : ''}`, telefone: c.telefone }));
       default:
@@ -748,10 +757,10 @@ export function createBackend(kind: 'app' | 'crm') {
 
   /* CRM: produtos disponíveis para venda (o atendimento lança consumo sem acesso ao cadastro de produtos) */
   rota('GET', '/crm/produtos-venda', async () => {
-    requireAnyAccess(await requireUsuario(), ['atd', 'mkt'], 'ver');
+    requireAnyAccess(await requireUsuario(), ['atd', 'vnd'], 'ver');
     return (await colecao('produtos'))
       .filter((p) => p.status !== 'Inativo')
-      .map((p) => ({ id: p.id, nome: p.nome, categoria: p.categoria, preco: Number(p.preco) || 0 }))
+      .map((p) => ({ id: p.id, nome: p.nome, categoria: p.categoria, preco: Number(p.preco) || 0, foto: p.foto || undefined }))
       .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
   });
 
@@ -902,8 +911,8 @@ export function createBackend(kind: 'app' | 'crm') {
   }
   rota('GET', '/crm/c/:col', async ({ p, q }) => {
     const ctx = await requireUsuario();
-    // consumos e resgates também alimentam o resumo de clientes, visto por Marketing e Vendas
-    if (['consumos', 'resgates'].includes(p.col)) requireAnyAccess(ctx, ['atd', 'mkt'], 'ver');
+    // consumos e resgates também alimentam o resumo de clientes, visto por Vendas e Marketing
+    if (['consumos', 'resgates'].includes(p.col)) requireAnyAccess(ctx, ['atd', 'vnd', 'mkt'], 'ver');
     else requireAccess(ctx, collectionArea(p.col), 'ver');
     // ?desde=AAAA-MM-DD carrega só o período (receitas, despesas, consumos e reservas)
     return colecaoDesde(p.col, q.get('desde'));

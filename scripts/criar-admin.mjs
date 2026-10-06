@@ -10,7 +10,7 @@ if (!arquivo || !nome || !email || !senha) {
 process.env.DINDO_DB = resolve(arquivo);
 const { db, now, newId, hashPassword } = await import('../server/db.mjs');
 
-const AREAS = ['dir', 'atd', 'mkt', 'rh', 'dp', 'adm', 'fin', 'jur', 'fis', 'mon', 'cfg'];
+const AREAS = ['dir', 'atd', 'vnd', 'mkt', 'rh', 'dp', 'adm', 'fin', 'jur', 'fis', 'mon', 'cfg'];
 const t = now();
 if (!db.prepare("SELECT 1 FROM records WHERE collection = 'funcoes' AND id = 'admin'").get()) {
   db.prepare('INSERT INTO records (id, collection, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)').run(

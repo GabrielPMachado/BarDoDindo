@@ -17,7 +17,9 @@ service cloud.firestore {
     // permissões da função em cada área: lista com "ver", "criar", "editar" e "excluir".
     // Formato antigo (um nível por área) continua valendo: "edit" = todas, "view" = só ver.
     // A função Administrador (de sistema) pode tudo, inclusive em áreas criadas depois.
-    function permissao(area) { return funcao().get('permissoes', {}).get(area, 'none'); }
+    // Vendas foi separada de Marketing: sem permissões próprias para Vendas, valem as de Marketing
+    function legado(area) { return { 'vnd': 'mkt' }.get(area, '-'); }
+    function permissao(area) { return funcao().get('permissoes', {}).get(area, funcao().get('permissoes', {}).get(legado(area), 'none')); }
     function pode(area, acao) {
       return daEquipe() && (
         funcao().get('sistema', false) == true
@@ -37,7 +39,8 @@ service cloud.firestore {
         'terceirizados': 'adm', 'fornecedores': 'adm', 'contratos': 'adm',
         'receitas': 'fin', 'despesas': 'fin',
         'reservas': 'atd', 'consumos': 'atd', 'resgates': 'atd',
-        'criacao': 'mkt', 'midias': 'mkt', 'produtos': 'mkt', 'recompensas': 'mkt',
+        'criacao': 'mkt', 'midias': 'mkt', 'recompensas': 'mkt',
+        'produtos': 'vnd',
         'trabalhista': 'jur', 'consultoria': 'jur',
         'qualidade': 'fis', 'naoconformidades': 'fis'
       };
@@ -127,7 +130,7 @@ service cloud.firestore {
     // cardápio público (sem custo nem margem dos produtos)
     match /cardapio/{id} {
       allow read: if true;
-      allow write: if podeAlterar('mkt');
+      allow write: if podeAlterar('vnd');
     }
     // nomes para vincular registros, visíveis a toda a equipe (sem salários nem contatos)
     match /ref_colaboradores/{id} {
@@ -165,7 +168,7 @@ service cloud.firestore {
       allow update: if request.resource.data.clientes == resource.data.clientes + 1 && novoCliente();
     }
     match /clientes/{uid} {
-      allow read: if logado() && (request.auth.uid == uid || podeVer('atd') || podeVer('mkt'));
+      allow read: if logado() && (request.auth.uid == uid || podeVer('atd') || podeVer('vnd') || podeVer('mkt'));
       allow create: if logado() && request.auth.uid == uid
         && request.resource.data.email == request.auth.token.email
         && request.resource.data.numero == getAfter(caminho('meta', 'contadores')).data.clientes
@@ -176,7 +179,7 @@ service cloud.firestore {
 
     // saldo de pontos usado para validar resgates: quem credita é a equipe; o cliente só debita junto com um voucher
     match /saldos/{uid} {
-      allow read: if logado() && (request.auth.uid == uid || podeVer('atd') || podeVer('mkt'));
+      allow read: if logado() && (request.auth.uid == uid || podeVer('atd') || podeVer('vnd') || podeVer('mkt'));
       allow create: if logado() && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(['acumulados', 'usados', 'ultimoResgate'])
         && request.resource.data.acumulados == 0 && request.resource.data.usados == 0;
@@ -206,11 +209,11 @@ service cloud.firestore {
     }
 
     match /consumos/{id} {
-      allow read: if (logado() && resource.data.clienteUid == request.auth.uid) || podeVer('mkt');
+      allow read: if (logado() && resource.data.clienteUid == request.auth.uid) || podeVer('vnd') || podeVer('mkt');
     }
 
     match /resgates/{id} {
-      allow read: if (logado() && resource.data.clienteUid == request.auth.uid) || podeVer('mkt');
+      allow read: if (logado() && resource.data.clienteUid == request.auth.uid) || podeVer('vnd') || podeVer('mkt');
       allow create: if logado() && request.resource.data.clienteUid == request.auth.uid
         && request.resource.data.status == 'Disponível'
         && get(caminho('recompensas', request.resource.data.recompensaId)).data.status == 'Ativa'

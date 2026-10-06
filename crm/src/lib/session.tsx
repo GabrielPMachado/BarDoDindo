@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { api, getToken, setToken, setUnauthorizedHandler } from './api';
 import { clearCache } from './data';
-import { acoesDe, resumoAcesso, type Acao, type Access, type AreaKey } from '../modules';
+import { acoesDe, acoesNaArea, resumoAcesso, type Acao, type Access, type AreaKey } from '../modules';
 
 export interface Funcao {
   id: string;
@@ -94,7 +94,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [refresh, reset]);
 
   // "Meu perfil" é de todo usuário; a função Administrador (de sistema) tem tudo; as demais áreas dependem da função
-  const acoes = (area: AreaKey): Acao[] => (area === 'eu' || funcao?.sistema ? acoesDe('edit') : acoesDe(funcao?.permissoes?.[area]));
+  const acoes = (area: AreaKey): Acao[] => (area === 'eu' || funcao?.sistema ? acoesDe('edit') : acoesNaArea(funcao?.permissoes as Record<string, unknown> | undefined, area));
   const access = (area: AreaKey): Access => resumoAcesso(acoes(area));
 
   const value: Session = {

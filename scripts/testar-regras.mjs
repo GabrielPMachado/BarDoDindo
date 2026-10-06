@@ -8,7 +8,7 @@ import {
   addDoc, collection, connectFirestoreEmulator, deleteDoc, doc, getDoc, getDocs, getFirestore, increment, query, setDoc, updateDoc, where, writeBatch,
 } from 'firebase/firestore';
 
-const [senhaCliente, senhaAtendente] = process.argv.slice(2);
+const [senhaCliente, senhaAtendente, senhaMarketing] = process.argv.slice(2);
 const app = initializeApp({ apiKey: 'teste', projectId: 'demo-bardodindo' });
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -120,6 +120,16 @@ if (senhaAtendente) {
   await permitido('ler as próprias preferências', () => getDoc(doc(db, 'preferencias', eq.user.uid)));
   await negado('salvar preferências de outro usuário', () => setDoc(doc(db, 'preferencias', 'outro'), { painel, atualizadoEm: 'x' }));
   await negado('ler preferências de outro usuário', () => getDoc(doc(db, 'preferencias', 'outro')));
+  await signOut(auth);
+}
+
+if (senhaMarketing) {
+  console.log('— equipe: função antiga só com Marketing ("view") — Vendas herda de Marketing —');
+  await signInWithEmailAndPassword(auth, 'marketing@teste.local', senhaMarketing);
+  await permitido('ver produtos (Vendas herda o "ver" de Marketing)', () => getDocs(collection(db, 'produtos')));
+  await permitido('ver recompensas (Marketing)', () => getDocs(collection(db, 'recompensas')));
+  await negado('cadastrar produto (só "ver")', () => addDoc(collection(db, 'produtos'), { nome: 'x', preco: 1 }));
+  await negado('listar despesas', () => getDocs(collection(db, 'despesas')));
   await signOut(auth);
 }
 

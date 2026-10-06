@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Lock, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
-import { ACOES, AREAS_COM_PERMISSAO as AREAS, acoesDe, type Acao, type AreaKey } from '../modules';
+import { ACOES, AREAS_COM_PERMISSAO as AREAS, acoesDe, acoesNaArea, type Acao, type AreaKey } from '../modules';
 import { AsyncButton, Badge, EmptyState, ErrorBox, Loading, Modal, NumberInput, PageHead, notify } from '../components/ui';
 import { api } from '../lib/api';
 import { SelectPicker } from '../components/pickers';
@@ -150,7 +150,7 @@ function UsuarioForm({ user, funcoes, isSelf, canDelete, onClose }: {
             <label>Acessos desta função</label>
             <div className="access-chips">
               {AREAS.map((a) => {
-                const acoes = funcao.sistema ? acoesDe('edit') : acoesDe(funcao.permissoes[a.key]);
+                const acoes = funcao.sistema ? acoesDe('edit') : acoesNaArea(funcao.permissoes as Record<string, unknown>, a.key);
                 return acoes.includes('ver')
                   ? <Badge key={a.key} tone={acoes.length > 1 ? 'good' : 'info'}>{a.label} · {resumoAcoes(acoes)}</Badge>
                   : null;
@@ -196,7 +196,7 @@ export function Funcoes() {
                   <tr key={f.id}>
                     <td className="matrix__role"><strong>{f.nome}</strong>{f.sistema && <Lock size={12} className="muted inline-icon" />}<div className="muted small">{f.descricao}</div></td>
                     {AREAS.map((a) => {
-                      const acoes = f.sistema ? acoesDe('edit') : acoesDe(f.permissoes?.[a.key]);
+                      const acoes = f.sistema ? acoesDe('edit') : acoesNaArea(f.permissoes as Record<string, unknown>, a.key);
                       return (
                         <td key={a.key} className="center">
                           {acoes.includes('ver') ? (
@@ -246,7 +246,7 @@ function FuncaoForm({ funcao, onClose, onSave, onDelete }: {
   const [nome, setNome] = useState(funcao?.nome ?? '');
   const [descricao, setDescricao] = useState(funcao?.descricao ?? '');
   const [perm, setPerm] = useState<Partial<Record<AreaKey, Acao[]>>>(
-    () => Object.fromEntries(AREAS.map((a) => [a.key, acoesDe(funcao?.permissoes?.[a.key])])),
+    () => Object.fromEntries(AREAS.map((a) => [a.key, acoesNaArea(funcao?.permissoes as Record<string, unknown> | undefined, a.key)])),
   );
   /** Marcar criar/editar/excluir também marca "ver"; desmarcar "ver" tira o acesso à área. */
   const alternar = (area: AreaKey, acao: Acao) => {

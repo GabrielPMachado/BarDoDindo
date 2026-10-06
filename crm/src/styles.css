@@ -373,9 +373,12 @@ select.input { appearance: none; padding-right: 30px; background-image: linear-g
 .selected-client { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--brand-dark); }
 .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
 .product { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; text-align: left; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); }
+.product__foto { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 6px; margin-bottom: 4px; background: #fff; }
 .product:hover { border-color: var(--brand); }
 .product strong { color: var(--brand); font-size: 13px; }
-.comanda { display: flex; flex-direction: column; gap: 10px; align-self: start; position: sticky; top: 80px; }
+/* z-index: a comanda "gruda" na tela (sticky) e cria uma camada própria; sem ele, a lista de forma de pagamento
+   abria por baixo do quadro "Últimos lançamentos" */
+.comanda { display: flex; flex-direction: column; gap: 10px; align-self: start; position: sticky; top: 80px; z-index: 5; }
 .comanda__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .comanda__list li { display: grid; grid-template-columns: 1fr auto 90px; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .comanda__list li strong { text-align: right; font-variant-numeric: tabular-nums; }
@@ -736,4 +739,19 @@ select.input { appearance: none; padding-right: 30px; background-image: linear-g
   .brand--lg .brand__logo { width: 150px; height: 150px; }
   .brand--lg .brand__name { font-size: 32px; }
   .login__card { padding: 24px 0 40px; }
+}
+
+/* ---------- fotos dos cadastros ---------- */
+.table th.foto-col, .table td.foto-col { width: 56px; padding-right: 0; }
+.thumb { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; display: grid; place-items: center; background: var(--surface-2); border: 1px solid var(--border); }
+.thumb--vazio { color: #5d5245; }
+.foto-campo__linha { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.foto-campo__previa { width: 120px; height: 120px; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: var(--surface-2); border: 1px dashed var(--border-strong); color: #5d5245; flex-shrink: 0; }
+.foto-campo__previa img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
+.foto-campo__acoes { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.foto-campo__acoes label.btn { cursor: pointer; }
+@media (max-width: 640px) {
+  .table--cards td.foto-col { width: 100%; justify-content: flex-start; }
+  .table--cards td.foto-col::before { content: none; }
+  .table--cards .thumb { width: 64px; height: 64px; }
 }

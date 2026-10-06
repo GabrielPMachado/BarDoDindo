@@ -91,7 +91,7 @@ function PainelDeBlocos(info: PainelInfo) {
   // reservas de hoje em diante (pendentes, de hoje e próximas)
   const reservas = useCollection('reservas', can('atd'), isoToday()).rows;
   const metas = useCollection('metas', can('dir')).rows;
-  const clientes = useResource<ClienteResumo[]>(can('mkt') || can('atd') ? '/crm/clientes' : null).data ?? [];
+  const clientes = useResource<ClienteResumo[]>(can('vnd') || can('mkt') || can('atd') ? '/crm/clientes' : null).data ?? [];
 
   const mes = currentMonth();
   const recMes = sumBy(receitas.filter((r) => monthOf(r.data) === mes));
@@ -154,8 +154,8 @@ function PainelDeBlocos(info: PainelInfo) {
   });
   add(can('fin'), { id: 'k-despesas', titulo: 'Despesas do mês', tipo: 'kpi', render: kpi({ label: 'Despesas do mês', value: brl(despMes) }) });
   add(can('fin'), { id: 'k-resultado', titulo: 'Resultado do mês', tipo: 'kpi', render: kpi({ label: 'Resultado do mês', value: brl(recMes - despMes), tone: recMes - despMes < 0 ? 'bad' : 'good' }) });
-  add(can('mkt'), { id: 'k-afilhados', titulo: 'Afilhados cadastrados', tipo: 'kpi', render: kpi({ label: 'Afilhados cadastrados', value: num(clientes.length), hint: `${num(novosClientes)} novos este mês` }) });
-  add(can('mkt'), { id: 'k-reservas', titulo: 'Reservas pendentes', tipo: 'kpi', render: kpi({ label: 'Reservas pendentes', value: num(pendentes), tone: pendentes ? 'warn' : undefined }) });
+  add(can('vnd'), { id: 'k-afilhados', titulo: 'Afilhados cadastrados', tipo: 'kpi', render: kpi({ label: 'Afilhados cadastrados', value: num(clientes.length), hint: `${num(novosClientes)} novos este mês` }) });
+  add(can('atd'), { id: 'k-reservas', titulo: 'Reservas pendentes', tipo: 'kpi', render: kpi({ label: 'Reservas pendentes', value: num(pendentes), tone: pendentes ? 'warn' : undefined }) });
   add(can('rh'), { id: 'k-equipe', titulo: 'Equipe ativa', tipo: 'kpi', render: kpi({ label: 'Equipe ativa', value: num(colaboradores.filter((c) => c.status !== 'Desligado').length) }) });
 
   add(can('fin'), {
@@ -235,7 +235,7 @@ function PainelDeBlocos(info: PainelInfo) {
       </section>
     ),
   });
-  add(can('mkt') || can('fis'), {
+  add(can('vnd') || can('fis'), {
     id: 'p-clientes', titulo: 'Clientes e qualidade', tipo: 'painel',
     render: () => (
       <section className="panel">
@@ -244,14 +244,14 @@ function PainelDeBlocos(info: PainelInfo) {
           {can('fis') && (
             <div><span className="muted small">Nota média de qualidade (30 dias)</span><strong>{notaMedia === null ? '—' : num(notaMedia, 1)}</strong></div>
           )}
-          {can('mkt') && (
+          {can('vnd') && (
             <div><span className="muted small">Ticket médio por visita</span><strong>{(() => {
               const visitas = clientes.reduce((t, c) => t + c.visitas, 0);
               return visitas ? brl(clientes.reduce((t, c) => t + c.totalGasto, 0) / visitas) : '—';
             })()}</strong></div>
           )}
         </div>
-        {can('mkt') && topClientes.length > 0 && (
+        {can('vnd') && topClientes.length > 0 && (
           <>
             <h3 className="subhead">Afilhados que mais consomem</h3>
             <HBarList data={topClientes.map((c) => ({ label: c.nome, value: c.totalGasto }))} format={brl} />
@@ -264,7 +264,7 @@ function PainelDeBlocos(info: PainelInfo) {
   /* ---------- blocos extras (catálogo "Adicionar bloco"): só carregam dados quando o usuário os adiciona ---------- */
   const { prefs } = usePainelPrefs(info.chave);
   const tem = (...ids: string[]) => ids.some((id) => prefs.extras.includes(id));
-  const vendas = can('atd') || can('mkt');
+  const vendas = can('atd') || can('vnd') || can('mkt');
   const consumos = useCollection('consumos', vendas && tem('x-vendas-hoje', 'x-ticket-mes', 'x-mais-vendidos'), `${currentMonth()}-01`).rows;
   const resgates = useCollection('resgates', vendas && tem('x-vouchers')).rows;
   const ferias = useCollection('ferias', can('rh') && tem('x-ausentes', 'x-proximas-ferias')).rows;
@@ -334,7 +334,7 @@ function PainelDeBlocos(info: PainelInfo) {
     }),
   });
   add(can('rh'), {
-    id: 'x-ausentes', titulo: 'Equipe ausente hoje', tipo: 'kpi', extra: { area: 'Pessoal (RH/DP)', descricao: 'Colaboradores de férias, atestado ou afastados hoje.' },
+    id: 'x-ausentes', titulo: 'Equipe ausente hoje', tipo: 'kpi', extra: { area: 'Pessoal', descricao: 'Colaboradores de férias, atestado ou afastados hoje.' },
     render: kpi({ label: 'Equipe ausente hoje', value: num(ausentes.length), hint: ausentes.length ? ausentes.slice(0, 2).map((f) => String(f.colaborador)).join(', ') + (ausentes.length > 2 ? '…' : '') : 'todos presentes' }),
   });
   add(can('atd'), {
@@ -446,8 +446,8 @@ function PainelDeBlocos(info: PainelInfo) {
       }))} />
     )),
   });
-  add(can('mkt'), {
-    id: 'x-novos-afilhados', titulo: 'Novos afilhados do mês', tipo: 'painel', extra: { area: 'Marketing e Vendas', descricao: 'Quem se cadastrou no aplicativo neste mês.' },
+  add(can('vnd'), {
+    id: 'x-novos-afilhados', titulo: 'Novos afilhados do mês', tipo: 'painel', extra: { area: 'Vendas', descricao: 'Quem se cadastrou no aplicativo neste mês.' },
     render: painel('Novos afilhados do mês', verTodos('/vendas/clientes'), (
       <MiniLista vazio="Nenhum afilhado novo neste mês." itens={novosDoMes.slice(0, 8).map((c) => ({
         key: String(c.id), principal: c.nome, detalhe: `#${String(c.id).padStart(3, '0')} · desde ${dateBR(c.desde)}`,
@@ -455,14 +455,14 @@ function PainelDeBlocos(info: PainelInfo) {
     )),
   });
   add(vendas, {
-    id: 'x-recompensas-top', titulo: 'Recompensas mais resgatadas', tipo: 'painel', extra: { area: 'Marketing e Vendas', descricao: 'As recompensas que os afilhados mais resgatam no aplicativo.' },
+    id: 'x-recompensas-top', titulo: 'Recompensas mais resgatadas', tipo: 'painel', extra: { area: 'Marketing', descricao: 'As recompensas que os afilhados mais resgatam no aplicativo.' },
     render: painel('Recompensas mais resgatadas', null, (() => {
       const top = contagem(resgatesTop.filter((r) => r.status !== 'Cancelado'), 'recompensa').slice(0, 6);
       return top.length ? <HBarList data={top} format={(v) => `${num(v)}×`} /> : <p className="muted pad">Nenhum resgate ainda.</p>;
     })()),
   });
   add(can('mkt'), {
-    id: 'x-midias', titulo: 'Publicações agendadas', tipo: 'painel', extra: { area: 'Marketing e Vendas', descricao: 'Próximas publicações agendadas nas redes e canais.' },
+    id: 'x-midias', titulo: 'Publicações agendadas', tipo: 'painel', extra: { area: 'Marketing', descricao: 'Próximas publicações agendadas nas redes e canais.' },
     render: painel('Publicações agendadas', verTodos('/marketing/midias'), (
       <MiniLista vazio="Nenhuma publicação agendada." itens={midias.filter((m) => m.status === 'Agendado').sort((a, b) => String(a.data ?? '').localeCompare(String(b.data ?? ''))).slice(0, 8).map((m) => ({
         key: m.id, principal: String(m.conteudo ?? 'Publicação'), detalhe: [m.canal, m.data ? dateBR(m.data) : null].filter(Boolean).join(' · '),
@@ -471,14 +471,14 @@ function PainelDeBlocos(info: PainelInfo) {
     )),
   });
   add(can('mkt'), {
-    id: 'x-criacao', titulo: 'Peças em produção', tipo: 'kpi', extra: { area: 'Marketing e Vendas', descricao: 'Peças de criação em briefing, produção ou aprovação.' },
+    id: 'x-criacao', titulo: 'Peças em produção', tipo: 'kpi', extra: { area: 'Marketing', descricao: 'Peças de criação em briefing, produção ou aprovação.' },
     render: (() => {
       const abertas = criacao.filter((c) => ['Briefing', 'Em produção', 'Em aprovação'].includes(String(c.status)));
       return kpi({ label: 'Peças em produção', value: num(abertas.length), hint: `${num(abertas.filter((c) => c.status === 'Em aprovação').length)} aguardando aprovação` });
     })(),
   });
   add(can('rh'), {
-    id: 'x-proximas-ferias', titulo: 'Próximas férias', tipo: 'painel', extra: { area: 'Pessoal (RH/DP)', descricao: 'Férias e afastamentos agendados, do mais próximo ao mais distante.' },
+    id: 'x-proximas-ferias', titulo: 'Próximas férias', tipo: 'painel', extra: { area: 'Pessoal', descricao: 'Férias e afastamentos agendados, do mais próximo ao mais distante.' },
     render: painel('Próximas férias', verTodos('/rh/ferias'), (
       <MiniLista vazio="Nenhuma férias agendada." itens={proximasFerias.slice(0, 8).map((f) => ({
         key: f.id, principal: String(f.colaborador ?? 'Colaborador'), detalhe: `${f.tipo ?? ''} · ${dateBR(f.inicio)} a ${dateBR(f.fim)}`,
@@ -486,7 +486,7 @@ function PainelDeBlocos(info: PainelInfo) {
     )),
   });
   add(can('rh'), {
-    id: 'x-equipe-setor', titulo: 'Equipe por setor', tipo: 'painel', extra: { area: 'Pessoal (RH/DP)', descricao: 'Quantas pessoas ativas em cada setor (salão, bar, cozinha…).' },
+    id: 'x-equipe-setor', titulo: 'Equipe por setor', tipo: 'painel', extra: { area: 'Pessoal', descricao: 'Quantas pessoas ativas em cada setor (salão, bar, cozinha…).' },
     render: painel('Equipe por setor', <span className="muted small">{num(ativosRH.length)} ativos</span>,
       ativosRH.length ? <HBarList data={contagem(ativosRH, 'setor')} format={(v) => `${num(v)}`} /> : <p className="muted pad">Nenhum colaborador cadastrado.</p>),
   });

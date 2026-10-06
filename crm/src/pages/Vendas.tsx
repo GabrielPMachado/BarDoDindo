@@ -118,7 +118,7 @@ export function Consumo() {
   const canEdit = pode('atd', 'criar');
   const canDelete = pode('atd', 'excluir');
   const clientes = useResource<Cliente[]>('/crm/clientes');
-  const produtos = useResource<{ id: string; nome: string; categoria: string; preco: number }[]>('/crm/produtos-venda').data ?? [];
+  const produtos = useResource<{ id: string; nome: string; categoria: string; preco: number; foto?: string }[]>('/crm/produtos-venda').data ?? [];
   // a lista mostra os lançamentos recentes: basta o último mês
   const consumos = useCollection('consumos', true, isoFromToday(-30));
   const cfg = useResource<Config>('/crm/config').data;
@@ -204,7 +204,7 @@ export function Consumo() {
 
             <h2 className="panel-title">2. Itens</h2>
             {!produtos.length ? (
-              <p className="muted">Nenhum produto ativo. Os produtos são cadastrados em Marketing e Vendas → Produtos e cardápio.</p>
+              <p className="muted">Nenhum produto ativo. Os produtos são cadastrados em Vendas → Produtos e cardápio.</p>
             ) : (
               <>
                 <label className="search"><Search size={16} />
@@ -213,6 +213,7 @@ export function Consumo() {
                 <div className="product-grid">
                   {produtosFiltrados.map((p) => (
                     <button key={p.id} className="product" onClick={() => addItem(p.id)}>
+                      {p.foto && <img className="product__foto" src={p.foto} alt="" loading="lazy" />}
                       <span>{String(p.nome)}</span>
                       <strong>{brl(Number(p.preco) || 0)}</strong>
                     </button>
