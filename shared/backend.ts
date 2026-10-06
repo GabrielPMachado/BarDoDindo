@@ -9,8 +9,8 @@ import {
   reauthenticateWithCredential, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, updatePassword, type UserCredential,
 } from 'firebase/auth';
 import {
-  arrayRemove, arrayUnion, collection, connectFirestoreEmulator, doc, getDoc, increment, initializeFirestore, limit, onSnapshot, orderBy, query, runTransaction, where, writeBatch,
-  type Query, type WriteBatch,
+  arrayRemove, arrayUnion, collection, connectFirestoreEmulator, doc, getDoc, getDocs, increment, initializeFirestore, limit, onSnapshot, orderBy, query, runTransaction, where, writeBatch,
+  type DocumentReference, type Query, type WriteBatch,
 } from 'firebase/firestore';
 import { EMULADOR, EMULADOR_AUTH, EMULADOR_FIRESTORE, firebaseConfig } from './firebase-config';
 
@@ -175,7 +175,8 @@ export function createBackend(kind: 'app' | 'crm') {
   // cada sistema tem a própria sessão, mesmo quando abertos no mesmo navegador
   const app = initializeApp(firebaseConfig, kind);
   const auth = getAuth(app);
-  const db = initializeFirestore(app, { ignoreUndefinedProperties: true });
+  // VITE_LONG_POLLING=1 só em builds locais de teste atrás de proxy, onde a conexão contínua do Firestore não passa
+  const db = initializeFirestore(app, { ignoreUndefinedProperties: true, ...(import.meta.env.VITE_LONG_POLLING === '1' ? { experimentalForceLongPolling: true } : {}) });
   if (EMULADOR) {
     connectAuthEmulator(auth, EMULADOR_AUTH, { disableWarnings: true });
     connectFirestoreEmulator(db, EMULADOR_FIRESTORE.host, EMULADOR_FIRESTORE.port);
@@ -189,21 +190,27 @@ export function createBackend(kind: 'app' | 'crm') {
   const vigias = new Map<string, Vigia>();
   let versao = 1;
 
-  function vigiar<T>(chave: string, iniciar: (ok: (v: T) => void, erro: (e: Error) => void) => () => void): Promise<T> {
+  // a primeira resposta só vale quando vem do servidor: a cópia local pode estar desatualizada (ex.: um saldo que o
+  // cliente mudou pelo app depois da última gravação feita daqui). Sem resposta do servidor em 2,5 s, usa a cópia local.
+  function vigiar<T>(chave: string, iniciar: (ok: (v: T, doServidor: boolean) => void, erro: (e: Error) => void) => () => void): Promise<T> {
     let v = vigias.get(chave);
     if (!v) {
       let primeiro = true;
       let resolver!: () => void, rejeitar!: (e: Error) => void;
       const novo: Vigia = { valor: undefined, pronto: new Promise<void>((a, b) => { resolver = a; rejeitar = b; }), parar: () => undefined };
       vigias.set(chave, novo);
+      let espera: ReturnType<typeof setTimeout> | undefined;
+      const pronto = () => { if (primeiro) { primeiro = false; clearTimeout(espera); resolver(); } };
       const erro = (e: Error) => {
         if (vigias.get(chave) === novo) vigias.delete(chave);
-        if (primeiro) { primeiro = false; rejeitar(e); } else versao++;
+        if (primeiro) { primeiro = false; clearTimeout(espera); rejeitar(e); } else versao++;
       };
       const desligar = iniciar(
-        (valor) => {
+        (valor, doServidor) => {
           novo.valor = valor;
-          if (primeiro) { primeiro = false; resolver(); } else versao++;
+          if (!primeiro) versao++;
+          else if (doServidor) pronto();
+          else espera ??= setTimeout(pronto, 2500);
         },
         erro,
       );
@@ -216,9 +223,9 @@ export function createBackend(kind: 'app' | 'crm') {
   }
   const ordenar = (rows: Dados[]) => rows.sort((a, b) => String(b.criadoEm ?? '').localeCompare(String(a.criadoEm ?? '')));
   const lista = (chave: string, q: Query) =>
-    vigiar<Dados[]>(chave, (ok, erro) => onSnapshot(q, (s) => ok(ordenar(s.docs.map((d) => ({ ...d.data(), id: d.id })))), erro));
+    vigiar<Dados[]>(chave, (ok, erro) => onSnapshot(q, { includeMetadataChanges: true }, (s) => ok(ordenar(s.docs.map((d) => ({ ...d.data(), id: d.id }))), !s.metadata.fromCache), erro));
   const documento = (caminho: string) =>
-    vigiar<Dados | null>(caminho, (ok, erro) => onSnapshot(doc(db, caminho), (s) => ok(s.exists() ? { ...s.data(), id: s.id } : null), erro));
+    vigiar<Dados | null>(caminho, (ok, erro) => onSnapshot(doc(db, caminho), { includeMetadataChanges: true }, (s) => ok(s.exists() ? { ...s.data(), id: s.id } : null, !s.metadata.fromCache), erro));
   const colecao = (nome: string) => lista(nome, collection(db, nome));
   const doCliente = (nome: string, uid: string) => lista(`${nome}@${uid}`, query(collection(db, nome), where('clienteUid', '==', uid)));
   function pararVigias() {
@@ -747,6 +754,80 @@ export function createBackend(kind: 'app' | 'crm') {
       .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
   });
 
+  /** Apaga muitos documentos em lotes (o Firestore aceita até 500 gravações por lote). `primeiro` grava junto no primeiro lote. */
+  async function apagarEmLotes(refs: DocumentReference[], primeiro?: (lote: WriteBatch) => void) {
+    const unicos = [...new Map(refs.map((r) => [r.path, r])).values()];
+    for (let i = 0; i === 0 || i < unicos.length; i += 450) {
+      const lote = writeBatch(db);
+      if (i === 0) primeiro?.(lote);
+      for (const r of unicos.slice(i, i + 450)) lote.delete(r);
+      await lote.commit();
+    }
+    return unicos.length;
+  }
+  const pad3 = (n: number) => String(n).padStart(3, '0');
+
+  /* CRM: excluir um afilhado (a pedido dele, como manda a LGPD): cadastro, saldo, consumos com as receitas, vouchers e reservas */
+  rota('DELETE', '/crm/clientes/:numero', async ({ p }) => {
+    const ctx = await requireUsuario();
+    requireAccess(ctx, 'vnd', 'excluir');
+    requireAccess(ctx, 'atd', 'excluir');
+    const c = (await colecao('clientes')).find((x) => x.numero === Number(p.numero));
+    if (!c) return fail(404, 'Afilhado não encontrado.');
+    const [consumos, resgates, reservas] = await Promise.all([doCliente('consumos', c.id), doCliente('resgates', c.id), doCliente('reservas', c.id)]);
+    const refs = [
+      doc(db, 'clientes', c.id), doc(db, 'saldos', c.id),
+      ...consumos.flatMap((x) => [doc(db, 'consumos', x.id), ...(x.receitaId ? [doc(db, 'receitas', x.receitaId)] : [])]),
+      ...resgates.map((x) => doc(db, 'resgates', x.id)), ...reservas.map((x) => doc(db, 'reservas', x.id)),
+    ];
+    await apagarEmLotes(refs, (lote) => registrar(lote, ctx, 'vnd', 'excluiu o afilhado', {
+      colecao: 'clientes', alvo: `${c.nome} (#${pad3(c.numero)})`,
+      detalhe: `${consumos.length} consumo(s), ${resgates.length} voucher(s) e ${reservas.length} reserva(s) apagados`,
+    }));
+    return { ok: true };
+  });
+
+  /* CRM: numeração dos afilhados — o próximo número volta a seguir o maior número em uso (ex.: depois de excluir afilhados de teste) */
+  rota('POST', '/crm/clientes/numeracao', async () => {
+    const ctx = await requireUsuario();
+    requireAccess(ctx, 'cfg', 'editar');
+    const maior = Math.max(0, ...(await colecao('clientes')).map((c) => Number(c.numero) || 0));
+    const lote = writeBatch(db);
+    lote.set(doc(db, 'meta', 'contadores'), { clientes: maior });
+    registrar(lote, ctx, 'cfg', 'ajustou a numeração dos afilhados', { alvo: `próximo número: #${pad3(maior + 1)}` });
+    await lote.commit();
+    return { proximo: maior + 1 };
+  });
+
+  /* CRM: zerar o sistema (só a função Administrador). Apaga TODOS os dados, inclusive usuários, funções e parâmetros:
+   * o sistema volta ao "primeiro acesso". As contas de login (Firebase Auth) continuam existindo. */
+  rota('POST', '/crm/admin/zerar', async ({ b }) => {
+    const ctx = await requireUsuario();
+    if (!ctx.funcao?.sistema) fail(403, 'Só a função Administrador pode zerar o sistema.');
+    if (b.confirmacao !== 'ZERAR TUDO') fail(400, 'Para zerar, confirme com "ZERAR TUDO".');
+    const todos = async (...caminho: string[]) => (await getDocs(collection(db, caminho.join('/')))).docs.map((d) => d.ref);
+    const cols = [...Object.keys(COLLECTIONS).filter((c) => c !== 'funcoes'), 'clientes', 'saldos', 'cardapio', 'ref_colaboradores', 'ref_fornecedores', 'config'];
+    const refs: DocumentReference[] = [];
+    for (const c of cols) refs.push(...(await todos(c)));
+    for (const a of AREAS) refs.push(...(await todos('atividades', a, 'itens')));
+    refs.push(doc(db, 'meta', 'contadores'));
+    const usuarios = await todos('usuarios');
+    // preferências de cada usuário (só a própria pessoa lê; o Administrador apaga pela lista de usuários)
+    refs.push(...usuarios.map((r) => doc(db, 'preferencias', r.id)));
+    refs.push(...usuarios.filter((r) => r.id !== ctx.usuario.id));
+    refs.push(...(await todos('funcoes')).filter((r) => r.id !== ctx.funcao?.id && r.id !== ctx.usuario.funcaoId));
+    let n = await apagarEmLotes(refs);
+    // por último, num lote só: o próprio usuário, a função Administrador e o registro do primeiro acesso
+    const fim = writeBatch(db);
+    fim.delete(doc(db, 'usuarios', ctx.usuario.id));
+    fim.delete(doc(db, 'funcoes', ctx.usuario.funcaoId));
+    fim.delete(doc(db, 'meta', 'setup'));
+    await fim.commit();
+    n += 3;
+    await sair();
+    return { apagados: n };
+  });
+
   /* CRM: listas para vincular registros (só nome e identificação — sem salários ou dados sensíveis) */
   rota('GET', '/crm/referencias/:tipo', async ({ p }) => {
     const ctx = await requireUsuario();
@@ -1056,8 +1137,8 @@ export function createBackend(kind: 'app' | 'crm') {
     }
   }
 
-  // só nos builds de teste (emulador): permite chamar as rotas pelo console do navegador
-  if (EMULADOR) (globalThis as Dados)[`__dindo_${kind}`] = request;
+  // só nos builds de teste (emulador, ou VITE_EXPOR_API=1 num build local que nunca é publicado): permite chamar as rotas pelo console
+  if (EMULADOR || import.meta.env.VITE_EXPOR_API === '1') (globalThis as Dados)[`__dindo_${kind}`] = request;
 
   return {
     request,

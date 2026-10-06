@@ -76,6 +76,9 @@ await negado('refazer o primeiro acesso', () => setDoc(doc(db, 'meta/setup'), { 
 await negado('alterar o contador de afilhados', () => updateDoc(doc(db, 'meta/contadores'), { clientes: increment(1) }));
 await negado('gravar no cardápio', () => setDoc(doc(db, 'cardapio/x'), { nome: 'x', preco: 0 }));
 await negado('ver atualizações da equipe', () => getDocs(collection(db, 'atividades', 'cfg', 'itens')));
+await negado('apagar o próprio cadastro de afilhado', () => deleteDoc(doc(db, 'clientes', uid)));
+await negado('apagar o registro do primeiro acesso', () => deleteDoc(doc(db, 'meta/setup')));
+await negado('zerar o contador de afilhados', () => setDoc(doc(db, 'meta/contadores'), { clientes: 0 }));
 await signOut(auth);
 
 if (senhaAtendente) {
@@ -120,6 +123,19 @@ if (senhaAtendente) {
   await permitido('ler as próprias preferências', () => getDoc(doc(db, 'preferencias', eq.user.uid)));
   await negado('salvar preferências de outro usuário', () => setDoc(doc(db, 'preferencias', 'outro'), { painel, atualizadoEm: 'x' }));
   await negado('ler preferências de outro usuário', () => getDoc(doc(db, 'preferencias', 'outro')));
+  // zerar o sistema e mexer na numeração são só do Administrador
+  await negado('excluir afilhado (sem permissão em Vendas)', async () => {
+    const c = (await getDocs(collection(db, 'clientes'))).docs[0];
+    await deleteDoc(c.ref);
+  });
+  await negado('ajustar a numeração dos afilhados', () => setDoc(doc(db, 'meta/contadores'), { clientes: 0 }));
+  await negado('apagar o histórico de atualizações', async () => {
+    const it = (await getDocs(collection(db, 'atividades', 'atd', 'itens'))).docs[0];
+    await deleteDoc(it.ref);
+  });
+  await negado('apagar o registro do primeiro acesso', () => deleteDoc(doc(db, 'meta/setup')));
+  await negado('excluir a si mesmo', () => deleteDoc(doc(db, 'usuarios', eq.user.uid)));
+  await negado('excluir a função Administrador', () => deleteDoc(doc(db, 'funcoes', 'admin')));
   await signOut(auth);
 }
 

@@ -32,6 +32,14 @@ const numero = (n: number) => `#${String(n).padStart(3, '0')}`;
 /* ---------------- Clientes ---------------- */
 export function Clientes() {
   const { data, loading, error } = useResource<Cliente[]>('/crm/clientes');
+  const { pode } = useSession();
+  // excluir apaga também consumos, vouchers e reservas do afilhado, por isso exige as duas permissões
+  const podeExcluir = pode('vnd', 'excluir') && pode('atd', 'excluir');
+  const excluir = async (c: Cliente) => {
+    await api(`/crm/clientes/${c.numero}`, { method: 'DELETE' });
+    await reload('/crm/clientes');
+    notify(`${c.nome} foi excluído(a).`);
+  };
   const [q, setQ] = useState('');
   const clientes = data ?? [];
   const term = q.trim().toLowerCase();
@@ -64,7 +72,7 @@ export function Clientes() {
               <thead>
                 <tr>
                   <th>Afilhado</th><th>Contato</th><th>Nível</th>
-                  <th className="num">Pontos</th><th className="num">Visitas</th><th className="num">Consumo total</th><th>Última visita</th><th>Cliente desde</th>
+                  <th className="num">Pontos</th><th className="num">Visitas</th><th className="num">Consumo total</th><th>Última visita</th><th>Cliente desde</th>{podeExcluir && <th aria-label="Ações" />}
                 </tr>
               </thead>
               <tbody>
@@ -78,6 +86,15 @@ export function Clientes() {
                     <td data-label="Consumo total" className="num">{brl(c.totalGasto)}</td>
                     <td data-label="Última visita" className="nowrap">{c.ultimaVisita ? dateBR(c.ultimaVisita) : <span className="muted">—</span>}</td>
                     <td data-label="Cliente desde" className="nowrap">{dateBR(c.desde)}</td>
+                    {podeExcluir && (
+                      <td className="actions">
+                        <AsyncButton
+                          className="icon-btn"
+                          confirm={{ title: `Excluir ${c.nome} (${numero(c.numero)})?`, message: 'Apaga o cadastro, os pontos, os consumos (e as receitas deles), os vouchers e as reservas deste afilhado. Não dá para desfazer.', confirmLabel: 'Excluir afilhado', danger: true }}
+                          onClick={() => excluir(c)}
+                        ><Trash2 size={15} aria-label={`Excluir ${c.nome}`} /></AsyncButton>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

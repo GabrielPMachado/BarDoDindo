@@ -397,6 +397,7 @@ export function Parametros() {
           <button type="button" className="btn btn--ghost btn--sm" onClick={() => setCfg({ ...cfg, niveis: [...cfg.niveis, { nome: '', minimo: 0 }] })}><Plus size={14} /> Adicionar nível</button>
         </section>
 
+        <Numeracao podeAjustar={canEdit} />
         <section className="panel pad-lg">
           <h2 className="panel-title">Folha de pagamento</h2>
           <p className="muted small">Tabela progressiva de contribuição do empregado ao INSS. Atualize sempre que a portaria anual for publicada.</p>
@@ -413,5 +414,25 @@ export function Parametros() {
         </section>
       </fieldset>
     </div>
+  );
+}
+
+/** Numeração dos afilhados: mostra o próximo número e, depois de excluir afilhados (ex.: de teste), volta a seguir o maior número em uso. */
+function Numeracao({ podeAjustar }: { podeAjustar: boolean }) {
+  const { data } = useResource<{ total: number }>('/public/afilhados');
+  const proximo = (data?.total ?? 0) + 1;
+  const ajustar = async () => {
+    const r = await api<{ proximo: number }>('/crm/clientes/numeracao', { method: 'POST' });
+    await reload('/public/afilhados');
+    notify(`Pronto. O próximo afilhado será o #${String(r.proximo).padStart(3, '0')}.`);
+  };
+  return (
+    <section className="panel pad-lg">
+      <h2 className="panel-title">Numeração dos afilhados</h2>
+      <p className="muted small">O próximo cadastro recebe o número <strong>#{String(proximo).padStart(3, '0')}</strong>. Depois de excluir afilhados (por exemplo, cadastros de teste), ajuste para a numeração voltar a seguir o maior número em uso.</p>
+      {podeAjustar && (
+        <AsyncButton className="btn btn--ghost" onClick={ajustar} confirm={{ title: 'Ajustar a numeração?', message: 'O próximo afilhado receberá o número seguinte ao maior número em uso.', confirmLabel: 'Ajustar' }}>Ajustar numeração</AsyncButton>
+      )}
+    </section>
   );
 }

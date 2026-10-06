@@ -234,12 +234,15 @@ import { api as dados } from '../src/api';
   const me = () => dados('/app/me');
 
   /* ---------- prova social ---------- */
-  api('/public/afilhados').then(({ total }) => {
+  // o total de afilhados acompanha os cadastros ao vivo (a cada 1,5 s, sem leituras extras no banco)
+  const atualizarTotal = () => api('/public/afilhados').then(({ total }) => {
     if (total > 0) {
       $('proof-n').textContent = total.toLocaleString('pt-BR');
       $('proof').hidden = false;
     }
   }).catch(() => {});
+  atualizarTotal();
+  setInterval(() => document.visibilityState === 'visible' && atualizarTotal(), 1500);
 
   /* ---------- máscara de celular e mostrar senha ---------- */
   $('tel').addEventListener('input', (e) => {
