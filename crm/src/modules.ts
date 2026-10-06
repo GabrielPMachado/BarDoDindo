@@ -33,6 +33,19 @@ export function acoesDe(p: unknown): Acao[] {
   if (p === 'view') return ['ver'];
   return [];
 }
+/** Os 4 níveis escolhidos na tela de funções; por baixo cada um vira uma lista de permissões. */
+export type Nivel = 'none' | 'ver' | 'editar' | 'total';
+export const NIVEIS: { key: Nivel; label: string; dica: string; acoes: Acao[] }[] = [
+  { key: 'none', label: 'Sem acesso', dica: 'A área não aparece para o usuário', acoes: [] },
+  { key: 'ver', label: 'Ver', dica: 'Abrir e consultar, sem alterar nada', acoes: ['ver'] },
+  { key: 'editar', label: 'Editar', dica: 'Ver, cadastrar e alterar (sem excluir)', acoes: ['ver', 'criar', 'editar'] },
+  { key: 'total', label: 'Total', dica: 'Editar e também excluir (inclui estornos)', acoes: ['ver', 'criar', 'editar', 'excluir'] },
+];
+/** Nível que corresponde a uma lista de permissões (combinações fora dos 4 níveis ficam "personalizado"). */
+export function nivelDe(acoes: Acao[]): Nivel | null {
+  const n = NIVEIS.find((x) => x.acoes.length === acoes.length && x.acoes.every((a) => acoes.includes(a)));
+  return n ? n.key : null;
+}
 export const resumoAcesso = (acoes: Acao[]): Access => (!acoes.includes('ver') ? 'none' : acoes.length > 1 ? 'edit' : 'view');
 
 export interface SubModule {
