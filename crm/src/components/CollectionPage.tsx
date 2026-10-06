@@ -5,6 +5,7 @@ import { maskCnpj, maskPhone } from '../lib/masks';
 import { useCollection, type Row } from '../lib/data';
 import { brl, dateBR, num, pct } from '../lib/format';
 import { useSession } from '../lib/session';
+import { desdeDe, PERIODO_PADRAO, PERIODOS, type PeriodoKey } from '../lib/periodo';
 import { AsyncButton, Badge, checkRange, EmptyState, ErrorBox, FieldInput, KpiRow, Loading, Modal, PageHead, notify } from './ui';
 import { RefPicker } from './pickers';
 
@@ -56,9 +57,14 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   newDefaults?: Record<string, unknown>;
   filterRows?: (r: Row) => boolean;
 }) {
-  const { access } = useSession();
-  const canEdit = access(def.area) === 'edit';
-  const col = useCollection(def.id);
+  const { pode } = useSession();
+  const canCreate = pode(def.area, 'criar');
+  const canEdit = pode(def.area, 'editar');
+  const canDelete = pode(def.area, 'excluir');
+  // receitas, despesas, consumos e reservas carregam só um período (escolhido na barra da tabela)
+  const padraoPeriodo = PERIODO_PADRAO[def.id];
+  const [periodo, setPeriodo] = useState<PeriodoKey>(padraoPeriodo ?? 'tudo');
+  const col = useCollection(def.id, true, padraoPeriodo ? desdeDe(periodo) : undefined);
   const all = filterRows ? col.rows.filter(filterRows) : col.rows;
 
   const [q, setQ] = useState('');
@@ -115,7 +121,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
         actions={
           <>
             <button className="btn btn--ghost" onClick={exportCsv} disabled={!rows.length}><Download size={16} /> Exportar</button>
-            {canEdit && <button className="btn btn--primary" onClick={() => setEditing('new')}><Plus size={16} /> {termos(def).novo}</button>}
+            {canCreate && <button className="btn btn--primary" onClick={() => setEditing('new')}><Plus size={16} /> {termos(def).novo}</button>}
           </>
         }
       />
@@ -135,6 +141,11 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
               {filterField.options.map((o) => <option key={o} value={o}>{o}</option>)}
             </select>
           )}
+          {padraoPeriodo && (
+            <select className="input input--sm" value={periodo} onChange={(e) => { setPeriodo(e.target.value as PeriodoKey); setPage(0); }} aria-label="Período">
+              {PERIODOS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+            </select>
+          )}
           <span className="muted toolbar__count">{num(rows.length)} {rows.length === 1 ? 'registro' : 'registros'}</span>
         </div>
 
@@ -144,9 +155,9 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
         ) : all.length === 0 ? (
           <EmptyState
             title={termos(def).nenhum}
-            action={canEdit ? <button className="btn btn--primary" onClick={() => setEditing('new')}><Plus size={16} /> Cadastrar</button> : undefined}
+            action={canCreate ? <button className="btn btn--primary" onClick={() => setEditing('new')}><Plus size={16} /> Cadastrar</button> : undefined}
           >
-            {canEdit ? 'Comece cadastrando o primeiro registro.' : 'Ainda não há registros nesta área.'}
+            {canCreate ? 'Comece cadastrando o primeiro registro.' : 'Ainda não há registros nesta área.'}
           </EmptyState>
         ) : rows.length === 0 ? (
           <EmptyState title="Nenhum resultado">Ajuste a busca ou o filtro.</EmptyState>
@@ -204,7 +215,8 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
         <RecordForm
           def={def}
           row={editing === 'new' ? null : editing}
-          canEdit={canEdit}
+          // registro novo depende de "Criar"; um existente, de "Editar"
+          canEdit={editing === 'new' ? canCreate : canEdit}
           defaults={newDefaults}
           onClose={() => setEditing(null)}
           onSave={async (data) => {
@@ -214,7 +226,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
             setEditing(null);
           }}
           onDelete={
-            editing !== 'new'
+            editing !== 'new' && canDelete
               ? async () => {
                   await col.remove(editing.id);
                   notify('Registro excluído');
@@ -285,7 +297,7 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
       onClose={onClose}
       footer={
         <>
-          {onDelete && canEdit && (
+          {onDelete && (
             <AsyncButton className="btn btn--danger" onClick={onDelete} confirm={{ title: `Excluir ${def.feminino ? 'esta' : 'este'} ${def.singular}?`, message: 'Esta ação não pode ser desfeita.', confirmLabel: 'Excluir', danger: true }}>
               <Trash2 size={16} /> Excluir
             </AsyncButton>

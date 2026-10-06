@@ -6,7 +6,7 @@ import { AsyncButton, Badge, EmptyState, ErrorBox, KpiRow, Loading, PageHead, no
 import { api } from '../lib/api';
 import { SelectPicker } from '../components/pickers';
 import { reload, useCollection, useResource, type Row } from '../lib/data';
-import { brl, dateBR, num } from '../lib/format';
+import { brl, dateBR, isoFromToday, num } from '../lib/format';
 import { maskPhone } from '../lib/masks';
 import { currentMonth, monthOf } from '../lib/finance';
 import { useSession, type Config } from '../lib/session';
@@ -113,11 +113,14 @@ export function Reservas() {
 
 /* ---------------- Lançar consumo ---------------- */
 export function Consumo() {
-  const { access } = useSession();
-  const canEdit = access('atd') === 'edit';
+  const { pode } = useSession();
+  // lançar consumo é "Criar"; apagar um lançamento (estorna pontos e receita) é "Excluir"
+  const canEdit = pode('atd', 'criar');
+  const canDelete = pode('atd', 'excluir');
   const clientes = useResource<Cliente[]>('/crm/clientes');
   const produtos = useResource<{ id: string; nome: string; categoria: string; preco: number }[]>('/crm/produtos-venda').data ?? [];
-  const consumos = useCollection('consumos');
+  // a lista mostra os lançamentos recentes: basta o último mês
+  const consumos = useCollection('consumos', true, isoFromToday(-30));
   const cfg = useResource<Config>('/crm/config').data;
 
   const [clienteQ, setClienteQ] = useState('');
@@ -150,7 +153,7 @@ export function Consumo() {
     setError(null);
     try {
       await api('/crm/consumos', { method: 'POST', body: { clienteId, itens, formaPagamento: forma } });
-      await Promise.all([reload('/crm/c/consumos'), reload('/crm/clientes'), reload('/crm/c/receitas')]);
+      await Promise.all([consumos.reload(), reload('/crm/clientes')]);
       notify(`Consumo lançado: ${pontos} pontos creditados para ${cliente?.nome}`);
       setItens([]);
       setClienteId(null);
@@ -268,7 +271,7 @@ export function Consumo() {
                     <td className="num">{brl(Number(c.valor))}</td>
                     <td className="num">{num(Number(c.pontos))}</td>
                     <td className="actions-col">
-                      {canEdit && (
+                      {canDelete && (
                         <AsyncButton className="icon-btn" confirm={{ title: 'Estornar este consumo?', message: 'Os pontos do cliente e a receita correspondente serão removidos.', confirmLabel: 'Estornar', danger: true }}
                           onClick={async () => {
                             await consumos.remove(c.id);
@@ -292,8 +295,9 @@ export function Consumo() {
 
 /* ---------------- Resgates ---------------- */
 export function Resgates() {
-  const { access } = useSession();
-  const canEdit = access('atd') === 'edit';
+  const { pode } = useSession();
+  // dar baixa num voucher altera o resgate
+  const canEdit = pode('atd', 'editar');
   const col = useCollection('resgates');
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('Disponível');

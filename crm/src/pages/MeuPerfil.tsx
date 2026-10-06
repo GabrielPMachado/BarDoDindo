@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { CalendarClock, KeyRound, Mail, Save, ShieldCheck, UserRound } from 'lucide-react';
+import { Camera, CalendarClock, KeyRound, Mail, Save, ShieldCheck, Trash2, UserRound } from 'lucide-react';
+import { Avatar, reduzirFoto } from '../components/Avatar';
 import { ErrorBox, PageHead, notify } from '../components/ui';
 import { DatePicker } from '../components/pickers';
 import { api } from '../lib/api';
-import { initials } from '../lib/format';
 import { maskPhone } from '../lib/masks';
 import { useSession } from '../lib/session';
 
@@ -16,6 +16,29 @@ export default function MeuPerfil() {
   const { usuario, funcao, refresh } = useSession();
   const { state } = useLocation() as { state?: { foco?: string } | null };
   const senhaRef = useRef<HTMLInputElement>(null);
+  const fotoRef = useRef<HTMLInputElement>(null);
+  const [enviandoFoto, setEnviandoFoto] = useState(false);
+
+  const salvarFoto = async (foto: string | null) => {
+    setEnviandoFoto(true);
+    try {
+      await api('/crm/me/foto', { method: 'PUT', body: { foto } });
+      await refresh();
+      notify(foto ? 'Foto atualizada.' : 'Foto removida.');
+    } catch (err) {
+      notify(err instanceof Error ? err.message : 'Não foi possível salvar a foto.', 'error');
+    } finally {
+      setEnviandoFoto(false);
+    }
+  };
+  const escolherFoto = async (arquivo?: File) => {
+    if (!arquivo) return;
+    try {
+      await salvarFoto(await reduzirFoto(arquivo));
+    } catch (err) {
+      notify(err instanceof Error ? err.message : 'Não foi possível ler a imagem.', 'error');
+    }
+  };
 
   const [form, setForm] = useState({ nome: '', telefone: '', nascimento: '', sobre: '' });
   const [erro, setErro] = useState<string | null>(null);
@@ -76,7 +99,16 @@ export default function MeuPerfil() {
       <PageHead title="Meus dados" description="Suas informações no sistema. E-mail de acesso, função e status são definidos pelo administrador." />
 
       <section className="panel profile-card">
-        <span className="profile-card__avatar">{initials(usuario.nome)}</span>
+        <div className="profile-card__photo">
+          <Avatar className="profile-card__avatar" nome={usuario.nome} foto={usuario.foto} />
+          <button className="profile-card__cam" onClick={() => fotoRef.current?.click()} disabled={enviandoFoto} aria-label="Trocar foto" title="Trocar foto">
+            <Camera size={15} />
+          </button>
+          <input ref={fotoRef} type="file" accept="image/*" hidden onChange={(e) => { void escolherFoto(e.target.files?.[0]); e.target.value = ''; }} />
+          {usuario.foto && (
+            <button className="link small profile-card__remove" onClick={() => salvarFoto(null)} disabled={enviandoFoto}><Trash2 size={12} /> Remover foto</button>
+          )}
+        </div>
         <div className="profile-card__main">
           <h2>{usuario.nome}</h2>
           <span className="profile-card__role"><ShieldCheck size={14} /> {funcao?.nome ?? 'Sem função'}</span>

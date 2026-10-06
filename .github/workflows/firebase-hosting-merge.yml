@@ -1,4 +1,5 @@
-# Publica o site (app, pré-cadastro e CRM) e as regras do Firestore a cada push no main.
+# Publica o site (app, pré-cadastro e CRM) e as regras do Firestore a cada push no main,
+# depois de testar as regras nos emuladores (se algum teste falhar, nada é publicado).
 
 name: Deploy to Firebase Hosting on merge
 on:
@@ -20,6 +21,13 @@ jobs:
       - run: npm ci
       - run: npm --prefix crm ci
       - run: npm run build:all
+      # regras de segurança do Firestore: roda os testes nos emuladores antes de publicar
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Testar regras do Firestore
+        run: npm run testar:regras
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}

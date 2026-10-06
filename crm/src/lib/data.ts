@@ -73,10 +73,11 @@ export function useResource<T>(path: string | null) {
   };
 }
 
-export function useCollection<T extends Row = Row>(name: string, enabled = true) {
-  const path = enabled ? `/crm/c/${name}` : null;
-  const res = useResource<T[]>(path);
+/** `desde` (AAAA-MM-DD): carrega só os registros a partir dessa data (receitas, despesas, consumos e reservas). */
+export function useCollection<T extends Row = Row>(name: string, enabled = true, desde?: string) {
   const base = `/crm/c/${name}`;
+  const path = enabled ? (desde ? `${base}?desde=${desde}` : base) : null;
+  const res = useResource<T[]>(path);
   return {
     rows: res.data ?? [],
     loading: res.loading && enabled,
@@ -84,17 +85,17 @@ export function useCollection<T extends Row = Row>(name: string, enabled = true)
     reload: res.reload,
     add: async (data: Partial<T>) => {
       const row = await api<T>(base, { method: 'POST', body: data });
-      await reload(base);
+      await reload(path ?? base);
       return row;
     },
     update: async (id: string, data: Partial<T>) => {
       const row = await api<T>(`${base}/${id}`, { method: 'PUT', body: data });
-      await reload(base);
+      await reload(path ?? base);
       return row;
     },
     remove: async (id: string) => {
       await api(`${base}/${id}`, { method: 'DELETE' });
-      await reload(base);
+      await reload(path ?? base);
     },
   };
 }

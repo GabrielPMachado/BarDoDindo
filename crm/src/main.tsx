@@ -4,7 +4,7 @@ import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ShieldOff } from 'lucide-react';
 import { SessionProvider, useSession } from './lib/session';
 import { startLiveUpdates, stopLiveUpdates } from './lib/data';
-import { AREAS, findModule, type AreaKey } from './modules';
+import { AREAS_VISIVEIS as AREAS, findModule, type AreaKey } from './modules';
 import { COLLECTIONS } from './collections';
 import { Layout } from './components/Layout';
 import { CollectionPage } from './components/CollectionPage';

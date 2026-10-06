@@ -17,14 +17,22 @@ export function BarChart({ data, format, height = 240, ariaLabel }: {
   data: Datum[]; format: (v: number) => string; height?: number; ariaLabel: string;
 }) {
   const [hover, setHover] = useState<number | null>(null);
-  const W = 640, H = height, padL = 64, padR = 12, padT = 16, padB = 28;
-  const max = niceMax(Math.max(0, ...data.map((d) => d.value)));
-  const min = Math.min(0, ...data.map((d) => d.value));
+  // os dois extremos arredondados ("bonitos"), inclusive quando há valores negativos
+  const maior = Math.max(0, ...data.map((d) => d.value));
+  const menor = Math.min(0, ...data.map((d) => d.value));
+  const max = maior > 0 ? niceMax(maior) : menor < 0 ? 0 : 1;
+  const min = menor < 0 ? -niceMax(-menor) : 0;
   const range = max - min || 1;
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => {
+    const v = min + t * range;
+    return range >= 4 ? Math.round(v) : v;
+  });
+  // a margem esquerda cresce com o rótulo mais longo, para os valores do eixo não ficarem cortados
+  const W = 640, H = height, padR = 12, padT = 16, padB = 28;
+  const padL = Math.max(48, Math.max(...ticks.map((t) => format(t).length)) * 6.6 + 14);
   const y = (v: number) => padT + ((max - v) / range) * (H - padT - padB);
   const band = (W - padL - padR) / Math.max(1, data.length);
   const bw = Math.min(44, band * 0.6);
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => min + t * range);
 
   return (
     <div className="chart">
