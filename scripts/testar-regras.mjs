@@ -70,6 +70,7 @@ await negado('lançar consumo para si mesmo', () => addDoc(collection(db, 'consu
 await negado('criar reserva já confirmada', () => addDoc(collection(db, 'reservas'), { clienteUid: uid, status: 'Confirmada', origem: 'Aplicativo' }));
 await negado('criar reserva em nome de outro', () => addDoc(collection(db, 'reservas'), { clienteUid: 'outro', status: 'Pendente', origem: 'Aplicativo' }));
 await negado('virar usuário do CRM', () => setDoc(doc(db, 'usuarios', uid), { nome: 'x', email: 'x@x.x', funcaoId: 'admin', status: 'Ativo' }));
+await negado('gravar preferências do CRM', () => setDoc(doc(db, 'preferencias', uid), { painel: { ordem: [], fixados: [], ocultos: [] } }));
 await negado('refazer o primeiro acesso', () => setDoc(doc(db, 'meta/setup'), { feitoEm: 'x' }));
 await negado('alterar o contador de afilhados', () => updateDoc(doc(db, 'meta/contadores'), { clientes: increment(1) }));
 await negado('gravar no cardápio', () => setDoc(doc(db, 'cardapio/x'), { nome: 'x', preco: 0 }));
@@ -103,6 +104,11 @@ if (senhaAtendente) {
   await permitido('registrar atualização no Atendimento', () => addDoc(collection(db, 'atividades', 'atd', 'itens'), atividade('atd')));
   await negado('registrar atualização em nome de outro', () => addDoc(collection(db, 'atividades', 'atd', 'itens'), atividade('atd', { usuarioNome: 'Outra pessoa' })));
   await negado('registrar atualização no Financeiro', () => addDoc(collection(db, 'atividades', 'fin', 'itens'), atividade('fin')));
+  const painel = { ordem: [], fixados: ['k-receita'], ocultos: [] };
+  await permitido('salvar as próprias preferências', () => setDoc(doc(db, 'preferencias', eq.user.uid), { painel, atualizadoEm: 'x' }));
+  await permitido('ler as próprias preferências', () => getDoc(doc(db, 'preferencias', eq.user.uid)));
+  await negado('salvar preferências de outro usuário', () => setDoc(doc(db, 'preferencias', 'outro'), { painel, atualizadoEm: 'x' }));
+  await negado('ler preferências de outro usuário', () => getDoc(doc(db, 'preferencias', 'outro')));
   await signOut(auth);
 }
 

@@ -533,6 +533,24 @@ export function createBackend(kind: 'app' | 'crm') {
   /* CRM: sinal de mudança (as telas consultam a cada poucos segundos e recarregam quando muda) */
   rota('GET', '/crm/versao', async () => { await requireUsuario(); return { versao }; });
 
+  /* CRM: preferências de cada usuário (ex.: como fica o painel executivo), valem em qualquer computador */
+  rota('GET', '/crm/preferencias', async () => {
+    const ctx = await requireUsuario();
+    const { id: _id, ...prefs } = (await documento(`preferencias/${ctx.usuario.id}`)) ?? {};
+    return prefs;
+  });
+  rota('PUT', '/crm/preferencias', async ({ b }) => {
+    const ctx = await requireUsuario();
+    // listas curtas de identificadores de blocos do painel; qualquer outra coisa é descartada
+    const ids = (v: unknown) => (Array.isArray(v) ? v : []).filter((x): x is string => typeof x === 'string' && /^[a-z0-9-]{1,40}$/.test(x)).slice(0, 60);
+    const p = (b.painel ?? {}) as Dados;
+    const painel = { ordem: ids(p.ordem), fixados: ids(p.fixados), ocultos: ids(p.ocultos) };
+    const lote = writeBatch(db);
+    lote.set(doc(db, 'preferencias', ctx.usuario.id), { painel, atualizadoEm: now() }, { merge: true });
+    await lote.commit();
+    return { painel };
+  });
+
   /* CRM: painel de atualizações (as últimas alterações das áreas que a pessoa acessa) */
   rota('GET', '/crm/atividades', async () => {
     const ctx = await requireUsuario();

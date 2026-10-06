@@ -8,6 +8,7 @@ import { useLastSync } from '../lib/data';
 import { usePins } from '../lib/pins';
 import { AtividadesButton, PainelAtualizacoes, usePainelAoAbrir } from './Atividades';
 import { notify } from './ui';
+import { ContextMenu, type MenuPos } from './ContextMenu';
 import logoUrl from '../../../shared/assets/logo.webp';
 
 export function Brand({ large = false }: { large?: boolean }) {
@@ -26,36 +27,11 @@ export function Brand({ large = false }: { large?: boolean }) {
 /** Endereço completo de uma página do CRM, para abrir em outra guia ou copiar. */
 const fullUrl = (path: string) => `${location.origin}${location.pathname}${location.search}#${path}`;
 
-interface MenuState { x: number; y: number; path: string }
+interface MenuState extends MenuPos { path: string }
 
 /** Menu do botão direito sobre uma página: abrir em outra guia/janela, copiar o link e fixar no topo. */
-function ContextMenu({ menu, pinned, onPin, onClose }: { menu: MenuState; pinned: boolean; onPin: () => void; onClose: () => void }) {
+function PageMenu({ menu, pinned, onPin, onClose }: { menu: MenuState; pinned: boolean; onPin: () => void; onClose: () => void }) {
   const navigate = useNavigate();
-  const ref = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState({ left: menu.x, top: menu.y });
-
-  useEffect(() => {
-    // mantém o menu dentro da tela
-    const r = ref.current?.getBoundingClientRect();
-    if (r) setPos({ left: Math.min(menu.x, innerWidth - r.width - 8), top: Math.min(menu.y, innerHeight - r.height - 8) });
-    const fora = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && onClose();
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    document.addEventListener('mousedown', fora);
-    document.addEventListener('keydown', esc);
-    window.addEventListener('blur', onClose);
-    window.addEventListener('resize', onClose);
-    return () => {
-      document.removeEventListener('mousedown', fora);
-      document.removeEventListener('keydown', esc);
-      window.removeEventListener('blur', onClose);
-      window.removeEventListener('resize', onClose);
-    };
-  }, [menu, onClose]);
-
-  const run = (fn: () => void) => () => {
-    fn();
-    onClose();
-  };
   const copiar = async () => {
     try {
       await navigator.clipboard.writeText(fullUrl(menu.path));
@@ -64,18 +40,17 @@ function ContextMenu({ menu, pinned, onPin, onClose }: { menu: MenuState; pinned
       notify('Não foi possível copiar o link.', 'error');
     }
   };
-
   return (
-    <div className="ctx" ref={ref} style={pos} role="menu" onContextMenu={(e) => e.preventDefault()}>
-      <button role="menuitem" onClick={run(() => navigate(menu.path))}><MousePointerClick size={15} /> Abrir</button>
-      <button role="menuitem" onClick={run(() => window.open(fullUrl(menu.path), '_blank'))}><ExternalLink size={15} /> Abrir em nova guia</button>
-      <button role="menuitem" onClick={run(() => window.open(fullUrl(menu.path), '_blank', 'popup,width=1320,height=860'))}><AppWindow size={15} /> Abrir em nova janela</button>
-      <button role="menuitem" onClick={run(copiar)}><Copy size={15} /> Copiar link</button>
+    <ContextMenu at={menu} onClose={onClose}>
+      <button role="menuitem" onClick={() => navigate(menu.path)}><MousePointerClick size={15} /> Abrir</button>
+      <button role="menuitem" onClick={() => window.open(fullUrl(menu.path), '_blank')}><ExternalLink size={15} /> Abrir em nova guia</button>
+      <button role="menuitem" onClick={() => window.open(fullUrl(menu.path), '_blank', 'popup,width=1320,height=860')}><AppWindow size={15} /> Abrir em nova janela</button>
+      <button role="menuitem" onClick={copiar}><Copy size={15} /> Copiar link</button>
       <div className="ctx__sep" />
-      <button role="menuitem" onClick={run(onPin)}>
+      <button role="menuitem" onClick={onPin}>
         {pinned ? <><PinOff size={15} /> Desafixar</> : <><Pin size={15} /> Fixar</>}
       </button>
-    </div>
+    </ContextMenu>
   );
 }
 
@@ -220,7 +195,7 @@ export function Layout({ children, onChangePassword }: { children: ReactNode; on
         <main className="content">{children}</main>
       </div>
 
-      {ctx && <ContextMenu menu={ctx} pinned={isPinned(ctx.path)} onPin={() => toggle(ctx.path)} onClose={() => setCtx(null)} />}
+      {ctx && <PageMenu menu={ctx} pinned={isPinned(ctx.path)} onPin={() => toggle(ctx.path)} onClose={() => setCtx(null)} />}
       {painel.aberto && <PainelAtualizacoes piscar={painel.piscar} onClose={painel.fechar} />}
     </div>
   );
