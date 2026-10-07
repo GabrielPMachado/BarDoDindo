@@ -520,6 +520,20 @@ select.input { appearance: none; padding-right: 30px; background-image: linear-g
 .login__card label { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
 .login__card .input { height: 44px; }
 .login__card .btn { margin-top: 14px; }
+
+/* ---------- boas-vindas (logo depois de entrar) ---------- */
+.welcome {
+  position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; cursor: pointer;
+  background: radial-gradient(60% 50% at 50% 40%, #31201a 0%, transparent 70%), linear-gradient(160deg, #16100e, #0a0909);
+  animation: welcome-out .5s ease 2.1s forwards;
+}
+.welcome > * { animation: pop .6s ease both; }
+.welcome h1 { font: 700 32px/1.2 var(--serif); margin-top: 18px; animation-delay: .15s; }
+.welcome p { color: var(--muted); font-size: 16px; letter-spacing: .04em; animation-delay: .3s; }
+@keyframes welcome-out { to { opacity: 0; visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) {
+  .welcome, .welcome > * { animation: none; }
+}
 .matrix__role { min-width: 150px; max-width: 190px; overflow-wrap: break-word; }
 .matrix th span { max-width: 66px; font-size: 10px; }
 .select-btn { display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; cursor: pointer; }
