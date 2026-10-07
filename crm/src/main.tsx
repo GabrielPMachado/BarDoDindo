@@ -6,7 +6,7 @@ import { SessionProvider, useSession } from './lib/session';
 import { startLiveUpdates, stopLiveUpdates, vigiarNovaVersao } from './lib/data';
 import { AREAS_VISIVEIS as AREAS, CAMINHOS_ANTIGOS, findModule, type AreaKey } from './modules';
 import { COLLECTIONS } from './collections';
-import { Layout } from './components/Layout';
+import { Brand, Layout } from './components/Layout';
 import { CollectionPage } from './components/CollectionPage';
 import { EmptyState, Toasts } from './components/ui';
 import { ConfirmHost } from './components/pickers';
@@ -81,8 +81,24 @@ function Home() {
   return <Navigate to={first ? first.items[0].path : '/perfil/painel'} replace />;
 }
 
+/** Tela de passagem logo depois de entrar; some sozinha ou ao clicar. */
+function BoasVindas({ nome, onDone }: { nome: string; onDone: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 2600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return (
+    <div className="welcome" role="status" onClick={onDone}>
+      <Brand />
+      <h1>Seja bem-vindo ao Cérebro</h1>
+      <p>{nome.split(' ')[0]}</p>
+    </div>
+  );
+}
+
 function App() {
-  const { ready, usuario } = useSession();
+  const { ready, usuario, boasVindas, dispensarBoasVindas } = useSession();
 
   useEffect(() => {
     if (!usuario) return;
@@ -95,6 +111,8 @@ function App() {
 
   const paths = AREAS.flatMap((a) => a.items.map((i) => i.path));
   return (
+    <>
+    {boasVindas && <BoasVindas nome={usuario.nome} onDone={dispensarBoasVindas} />}
     <Layout>
       <Routes>
         <Route path="/" element={<Home />} />
@@ -107,6 +125,7 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
+    </>
   );
 }
 

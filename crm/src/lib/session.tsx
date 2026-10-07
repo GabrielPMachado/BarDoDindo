@@ -47,6 +47,9 @@ interface Session {
   access: (area: AreaKey) => Access;
   /** Se a função do usuário tem uma permissão (ver, criar, editar, excluir) na área. */
   pode: (area: AreaKey, acao: Acao) => boolean;
+  /** Acabou de entrar (login ou primeiro acesso): mostra a tela de boas-vindas até ser dispensada. */
+  boasVindas: boolean;
+  dispensarBoasVindas: () => void;
   login: (email: string, senha: string) => Promise<void>;
   setup: (nome: string, email: string, senha: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -62,11 +65,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [funcao, setFuncao] = useState<Funcao | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [boasVindas, setBoasVindas] = useState(false);
 
   const reset = useCallback(() => {
     setToken(null);
     setUsuario(null);
     setFuncao(null);
+    setBoasVindas(false);
     clearCache();
   }, []);
 
@@ -107,16 +112,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     // a função Administrador (de sistema) tem acesso total, inclusive a áreas criadas depois
     access,
     pode: (area, acao) => acoes(area).includes(acao),
+    boasVindas,
+    dispensarBoasVindas: () => setBoasVindas(false),
     login: async (email, senha) => {
       const { token } = await api<{ token: string }>('/crm/login', { method: 'POST', body: { email, senha } });
       clearCache();
       setToken(token);
       await refresh();
+      setBoasVindas(true);
     },
     setup: async (nome, email, senha) => {
       const { token } = await api<{ token: string }>('/crm/setup', { method: 'POST', body: { nome, email, senha } });
       setToken(token);
       await refresh();
+      setBoasVindas(true);
     },
     logout: async () => {
       await api('/crm/logout', { method: 'POST' }).catch(() => undefined);

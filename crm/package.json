@@ -10,12 +10,12 @@
   },
   "dependencies": {
     "exceljs": "^4.4.0",
-    "jspdf": "^3.0.4",
+    "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "lucide-react": "^1.50.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "react-grid-layout": "^1.5.2",
+    "react-grid-layout": "^1.5.4",
     "react-router-dom": "^7.18.4"
   },
   "devDependencies": {
@@ -25,5 +25,8 @@
     "@vitejs/plugin-react": "^6.1.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.2"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
   }
 }
