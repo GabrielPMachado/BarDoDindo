@@ -979,6 +979,11 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     return { ...consumo, id: consumoRef.id };
   });
 
+  async function saldoDe(uid: string) {
+    const d = (await getDoc(doc(db, 'saldos', uid))).data() ?? {};
+    return { acumulados: Number(d.acumulados) || 0, usados: Number(d.usados) || 0 };
+  }
+
   /* CRM: coleções genéricas */
   function collectionArea(name: string) {
     const area = COLLECTIONS[name];
@@ -1068,6 +1073,10 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       lote.update(doc(db, 'resgates', p.id), { status, atualizadoEm: patch.atualizadoEm });
       // cancelar um voucher devolve os pontos; reativar volta a debitar
       const antes = cur.status === 'Cancelado', depois = status === 'Cancelado';
+      if (antes && !depois && cur.clienteUid) {
+        const s = await saldoDe(cur.clienteUid);
+        if (s.acumulados - s.usados < (Number(cur.custo) || 0)) fail(400, 'O cliente não tem pontos suficientes para reativar este voucher.');
+      }
       if (antes !== depois && cur.clienteUid) {
         lote.set(doc(db, 'saldos', cur.clienteUid), { usados: increment((depois ? -1 : 1) * (Number(cur.custo) || 0)) }, { merge: true });
       }
@@ -1098,6 +1107,14 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     }
     if (p.col === 'receitas' && cur.consumoId) fail(400, 'Esta receita veio de um consumo. Exclua o consumo para estorná-la.');
     if (p.col === 'resgates') fail(400, 'Resgates não são excluídos. Altere o status para Cancelado.');
+    if (p.col === 'consumos' && cur.clienteUid) {
+      // o estorno não pode deixar o saldo negativo: pontos já trocados por vouchers não voltam sozinhos
+      const s = await saldoDe(cur.clienteUid);
+      const pontos = Number(cur.pontos) || 0;
+      if (s.acumulados - pontos < s.usados) {
+        fail(400, `O cliente já usou parte destes pontos em vouchers (saldo atual: ${s.acumulados - s.usados}, o estorno retira ${pontos}). Cancele os vouchers antes de estornar o consumo.`);
+      }
+    }
     const lote = writeBatch(db);
     if (p.col === 'consumos') {
       // excluir o lançamento estorna a receita e os pontos

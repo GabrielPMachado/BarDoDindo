@@ -197,11 +197,17 @@ service cloud.firestore {
 
     // saldo de pontos usado para validar resgates: quem credita é a equipe; o cliente só debita junto com um voucher
     match /saldos/{uid} {
+      function liquido(d) { return d.get('acumulados', 0) - d.get('usados', 0); }
+      function saldoValido() {
+        return request.resource == null || liquido(request.resource.data) >= 0
+          || (resource != null && liquido(request.resource.data) >= liquido(resource.data));
+      }
       allow read: if logado() && (request.auth.uid == uid || podeVer('atd') || podeVer('vnd') || podeVer('mkt'));
       allow create: if logado() && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(['acumulados', 'usados', 'ultimoResgate'])
         && request.resource.data.acumulados == 0 && request.resource.data.usados == 0;
-      allow write: if podeAlterar('atd');
+      // a equipe ajusta o saldo, mas nunca o deixa negativo (só pode melhorar um saldo que já estava negativo)
+      allow write: if podeAlterar('atd') && saldoValido();
       allow update: if logado() && request.auth.uid == uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usados', 'ultimoResgate'])
         && request.resource.data.ultimoResgate != resource.data.ultimoResgate

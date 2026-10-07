@@ -97,6 +97,14 @@ if (senhaAtendente) {
     await permitido('alterar reserva (tem "editar")', () => updateDoc(reserva, { status: 'Confirmada' }));
     await negado('excluir reserva (não tem "excluir")', () => deleteDoc(reserva));
   }
+  // saldo do afilhado: a equipe credita e estorna, mas nunca deixa o saldo negativo
+  const saldo = doc(db, 'saldos', uid);
+  await permitido('creditar pontos de um consumo', () => setDoc(saldo, { acumulados: increment(50) }, { merge: true }));
+  await permitido('debitar pontos de um voucher', () => setDoc(saldo, { usados: increment(40) }, { merge: true }));
+  await negado('estornar pontos já usados (saldo ficaria negativo)', () => setDoc(saldo, { acumulados: increment(-25) }, { merge: true }));
+  await negado('reativar voucher sem pontos (saldo ficaria negativo)', () => setDoc(saldo, { usados: increment(25) }, { merge: true }));
+  await permitido('estornar pontos que ainda estão no saldo', () => setDoc(saldo, { acumulados: increment(-10) }, { merge: true }));
+  await permitido('zerar o saldo de teste', () => setDoc(saldo, { acumulados: 0, usados: 0 }, { merge: true }));
   await negado('alterar produto', () => addDoc(collection(db, 'produtos'), { nome: 'x', preco: 1 }));
   await negado('lançar receita avulsa', () => addDoc(collection(db, 'receitas'), { descricao: 'x', valor: 1 }));
   await permitido('editar o próprio perfil', () => updateDoc(doc(db, 'usuarios', eq.user.uid), { telefone: '(11) 91234-5678', sobre: 'Atendente do salão' }));
