@@ -18,6 +18,7 @@ Nenhum dado vem pré-cadastrado: cardápio, recompensas, clientes, equipe e lan�
 - **Recompensas**: o catálogo é cadastrado no CRM e aparece no app. O resgate do cliente gera um voucher que a equipe vê em *Resgates* e dá baixa ao entregar.
 - **Reservas**: o cliente solicita pelo app. A equipe confirma ou recusa em *Reservas* e o cliente vê o status no app.
 - **Consumo e pontos**: em *Lançar consumo* a equipe registra a comanda do afilhado pelo número (#001…). Os pontos aparecem no app e o valor entra automaticamente em *Financeiro → Receita*. Excluir o lançamento estorna pontos e receita.
+- **Despesas no DRE**: o *Resultado (DRE)* soma só o que está em *Financeiro → Receitas* e *Despesas*. Em *Serviços terceirizados*, *Contratos*, *Gestão de mídias* e *Projetos*, o botão *Lançar despesa* de cada linha abre uma tela já preenchida e cria a despesa "A pagar" na competência escolhida. Quem lança é a área dona do cadastro (precisa de "Editar" nela), sem ganhar acesso ao Financeiro; o cadastro guarda o que já foi lançado em cada mês e avisa antes de repetir.
 - **Parâmetros** (*Configurações*): dias e horários de reserva, ambientes, pontos por real, níveis de fidelidade e tabela do INSS.
 
 ## Áreas do CRM

@@ -8,6 +8,7 @@ const FS = `http://127.0.0.1:8080/v1/projects/${PROJETO}/databases/(default)/doc
 export const SENHA_CLIENTE = 'senha-cliente-123';
 export const SENHA_ATENDENTE = 'senha-atendente-123';
 export const SENHA_MARKETING = 'senha-marketing-123';
+export const SENHA_ADMINISTRATIVO = 'senha-administrativo-123';
 
 /** Converte um valor JS para o formato da API REST do Firestore. */
 function valor(v) {
@@ -39,6 +40,7 @@ const agora = new Date().toISOString();
 const cliente = await conta('cliente2@teste.local', SENHA_CLIENTE);
 const atendente = await conta('atendente@teste.local', SENHA_ATENDENTE);
 const marketing = await conta('marketing@teste.local', SENHA_MARKETING);
+const administrativo = await conta('administrativo@teste.local', SENHA_ADMINISTRATIVO);
 
 await gravar('meta/setup', { feitoEm: agora });
 await gravar('meta/contadores', { clientes: 2 });
@@ -46,6 +48,11 @@ await gravar('funcoes/atendente', { nome: 'Atendente', descricao: 'Salão', perm
 // função no formato antigo, de antes de Vendas sair de Marketing: "view" em Marketing
 await gravar('funcoes/marketing', { nome: 'Marketing (antiga)', descricao: '', permissoes: { mkt: 'view' }, sistema: false, criadoEm: agora });
 await gravar(`usuarios/${marketing}`, { nome: 'Marketing Teste', email: 'marketing@teste.local', funcaoId: 'marketing', status: 'Ativo', criadoEm: agora });
+// Administrativo (ver, criar e editar), sem acesso ao Financeiro: lança no DRE só as despesas dos próprios cadastros
+await gravar('funcoes/administrativo', { nome: 'Administrativo', descricao: '', permissoes: { adm: ['ver', 'criar', 'editar'] }, sistema: false, criadoEm: agora });
+await gravar(`usuarios/${administrativo}`, { nome: 'Administrativo Teste', email: 'administrativo@teste.local', funcaoId: 'administrativo', status: 'Ativo', criadoEm: agora });
+await gravar('terceirizados/seguranca', { servico: 'Segurança', empresa: 'Vigia Ltda', categoria: 'Segurança', valor: 1500, periodicidade: 'Mensal', status: 'Ativo', criadoEm: agora });
+await gravar('midias/post', { conteudo: 'Post de inauguração', canal: 'Instagram', data: '2026-10-01', investimento: 200, status: 'Publicado', criadoEm: agora });
 await gravar('produtos/chopp', { nome: 'Chopp', categoria: 'Chopes', preco: 12, status: 'Ativo', criadoEm: agora });
 await gravar(`usuarios/${atendente}`, { nome: 'Atendente Teste', email: 'atendente@teste.local', funcaoId: 'atendente', status: 'Ativo', criadoEm: agora });
 await gravar(`clientes/${cliente}`, { numero: 2, nome: 'Cliente Teste', email: 'cliente2@teste.local', telefone: '', criadoEm: agora });

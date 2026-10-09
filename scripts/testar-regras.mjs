@@ -8,7 +8,7 @@ import {
   addDoc, collection, connectFirestoreEmulator, deleteDoc, doc, getDoc, getDocs, getFirestore, increment, query, setDoc, updateDoc, where, writeBatch,
 } from 'firebase/firestore';
 
-const [senhaCliente, senhaAtendente, senhaMarketing] = process.argv.slice(2);
+const [senhaCliente, senhaAtendente, senhaMarketing, senhaAdministrativo] = process.argv.slice(2);
 const app = initializeApp({ apiKey: 'teste', projectId: 'demo-bardodindo' });
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -154,6 +154,50 @@ if (senhaMarketing) {
   await permitido('ver recompensas (Marketing)', () => getDocs(collection(db, 'recompensas')));
   await negado('cadastrar produto (só "ver")', () => addDoc(collection(db, 'produtos'), { nome: 'x', preco: 1 }));
   await negado('listar despesas', () => getDocs(collection(db, 'despesas')));
+  await signOut(auth);
+}
+
+if (senhaAdministrativo) {
+  console.log('— equipe: função só com Administrativo (ver, criar e editar) — lança despesas dos próprios cadastros —');
+  await signInWithEmailAndPassword(auth, 'administrativo@teste.local', senhaAdministrativo);
+  const uidAdm = auth.currentUser.uid;
+  const despesa = (extra = {}) => ({
+    descricao: 'Segurança · Vigia Ltda', categoria: 'Terceirizados', data: '2026-10-01', vencimento: '', valor: 1500, status: 'A pagar', observacoes: '',
+    origem: 'Lançamento de Serviços terceirizados', origemColecao: 'terceirizados', origemId: 'seguranca', criadoPor: uidAdm, criadoEm: 'x', atualizadoEm: 'x', ...extra,
+  });
+  // como o CRM faz: a despesa e a anotação no cadastro de origem vão no mesmo lote
+  const lancar = async (extra = {}) => {
+    const d = despesa(extra);
+    const ref = doc(collection(db, 'despesas'));
+    const lote = writeBatch(db);
+    lote.set(ref, d);
+    lote.update(doc(db, d.origemColecao, d.origemId), { [`lancamentos.${String(d.data).slice(0, 7)}`]: { despesaId: ref.id, valor: d.valor, em: 'x', vezes: 1 } });
+    await lote.commit();
+    return ref;
+  };
+  let lancada = null;
+  await permitido('lançar a despesa de um serviço terceirizado', async () => { lancada = await lancar(); });
+  await permitido('lançar outra competência do mesmo serviço', () => lancar({ data: '2026-11-01' }));
+  await negado('listar despesas (Financeiro)', () => getDocs(collection(db, 'despesas')));
+  await negado('ler a despesa que acabou de lançar', () => getDoc(lancada));
+  await negado('alterar a despesa que acabou de lançar', () => updateDoc(lancada, { valor: 1, status: 'Pago' }));
+  await negado('apagar a despesa que acabou de lançar', () => deleteDoc(lancada));
+  await negado('lançar despesa sem anotar no cadastro de origem', () => addDoc(collection(db, 'despesas'), despesa()));
+  await negado('lançar despesa avulsa, sem origem', () => addDoc(collection(db, 'despesas'), { descricao: 'Avulsa', categoria: 'Outras despesas', data: '2026-10-01', valor: 10, status: 'A pagar' }));
+  await negado('lançar despesa em nome de outra pessoa', () => lancar({ criadoPor: 'outro' }));
+  await negado('lançar despesa de um serviço que não existe', () => addDoc(collection(db, 'despesas'), despesa({ origemId: 'inexistente' })));
+  await negado('lançar despesa com origem apontando para um subcaminho', () => addDoc(collection(db, 'despesas'), despesa({ origemId: 'seguranca/x/y' })));
+  await negado('lançar despesa a partir de outra área (Marketing)', () => addDoc(collection(db, 'despesas'), despesa({ origemColecao: 'midias', origemId: 'post' })));
+  await negado('lançar despesa a partir de um cadastro que não gera despesa', () => addDoc(collection(db, 'despesas'), despesa({ origemColecao: 'fornecedores', origemId: 'x' })));
+  await negado('lançar despesa já marcada como paga', () => lancar({ status: 'Pago' }));
+  await negado('lançar despesa com valor zerado', () => lancar({ valor: 0 }));
+  await negado('lançar despesa com valor em texto', () => lancar({ valor: '10' }));
+  await negado('lançar despesa com valor acima do limite', () => lancar({ valor: 5000000 }));
+  await negado('lançar despesa com data impossível', () => lancar({ data: '2026-13-45' }));
+  await negado('lançar despesa com vencimento fora do formato', () => lancar({ vencimento: 'amanhã' }));
+  await negado('lançar despesa com descrição gigante', () => lancar({ descricao: 'x'.repeat(201) }));
+  await negado('lançar despesa com campo extra (ex.: folha)', () => lancar({ competenciaFolha: '2026-10' }));
+  await negado('lançar receita', () => addDoc(collection(db, 'receitas'), { descricao: 'x', valor: 1, data: '2026-10-01' }));
   await signOut(auth);
 }
 

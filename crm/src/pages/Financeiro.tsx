@@ -241,9 +241,10 @@ export function Despesas() {
 /* ---------------- Resultado (DRE) ---------------- */
 export function Resultado() {
   const [mes, setMes] = useState(currentMonth());
-  // só o necessário para o mês escolhido
-  const receitas = useCollection('receitas', true, `${mes}-01`).rows;
-  const despesas = useCollection('despesas', true, `${mes}-01`).rows.filter(despesaValida);
+  // carrega do mês escolhido em diante, e nunca menos que os 12 meses do gráfico
+  const desde = `${[mes, lastMonths(12)[0]].sort()[0]}-01`;
+  const receitas = useCollection('receitas', true, desde).rows;
+  const despesas = useCollection('despesas', true, desde).rows.filter(despesaValida);
 
   const rec = receitas.filter((r) => monthOf(r.data) === mes);
   const des = despesas.filter((r) => monthOf(r.data) === mes);
@@ -295,7 +296,7 @@ export function Resultado() {
         </section>
         <section className="panel">
           <div className="panel__head"><h2>Resultado mensal</h2><span className="muted small">Últimos 12 meses</span></div>
-          {receitas.length || despesas.length ? (
+          {serie.some((p) => p.value !== 0) ? (
             <BarChart data={serie} format={(v) => brl(v).replace(',00', '')} ariaLabel="Resultado mensal dos últimos doze meses" />
           ) : (
             <p className="muted pad">Sem lançamentos financeiros.</p>

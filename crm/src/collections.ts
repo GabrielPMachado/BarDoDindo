@@ -73,12 +73,23 @@ export interface CollectionDef {
   sortDir?: 'asc' | 'desc';
   /** Cada registro pode ter uma foto (miniatura na tabela, campo no formulário e imagem nas exportações). */
   comFoto?: boolean;
+  /** Como um registro deste módulo vira despesa no DRE: pré-preenche a tela "Lançar despesa" (a pessoa confere antes de lançar). */
+  despesa?: (r: Row) => DespesaSugerida;
+}
+
+export interface DespesaSugerida {
+  descricao: string;
+  categoria: string;
+  valor: number;
 }
 
 const n = (v: unknown) => Number(v) || 0;
 const s = (v: unknown) => String(v ?? '');
 const count = (rows: Row[], key: string, values: string[]) => rows.filter((r) => values.includes(s(r[key]))).length;
 const sum = (rows: Row[], key: string) => rows.reduce((t, r) => t + n(r[key]), 0);
+const juntar = (...partes: unknown[]) => partes.map(s).filter(Boolean).join(' · ');
+/** Categoria de despesa sugerida para cada tipo de contrato. */
+const CATEGORIA_DO_CONTRATO: Record<string, string> = { Locação: 'Aluguel', 'Prestação de serviço': 'Terceirizados', Fornecimento: 'Fornecedores' };
 
 /** Tons de status reconhecidos em todos os módulos. */
 const TONES: Record<string, Tone> = {
@@ -175,6 +186,8 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   /* ---------------- DP Estrutura ---------------- */
   projetos: {
     id: 'projetos', area: 'dp', title: 'Projetos', singular: 'projeto',
+    // o "Realizado" do projeto é acumulado: o valor de cada lançamento é digitado, para não contar o mesmo gasto duas vezes
+    despesa: (r) => ({ descricao: juntar('Projeto', r.nome), categoria: 'Outras despesas', valor: 0 }),
     description: 'Obras, reformas, melhorias e implantações.',
     filterKey: 'status', sortKey: 'prazo', sortDir: 'asc',
     fields: [
@@ -261,6 +274,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   /* ---------------- Administrativo ---------------- */
   terceirizados: {
     id: 'terceirizados', area: 'adm', title: 'Serviços terceirizados', singular: 'serviço',
+    despesa: (r) => ({ descricao: juntar(r.servico, r.empresa), categoria: 'Terceirizados', valor: n(r.valor) }),
     description: 'Prestadores recorrentes: segurança, limpeza, manutenção, música e outros.',
     filterKey: 'categoria', sortKey: 'proximo', sortDir: 'asc',
     fields: [
@@ -303,6 +317,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   },
   contratos: {
     id: 'contratos', area: 'adm', title: 'Contratos', singular: 'contrato',
+    despesa: (r) => ({ descricao: juntar(r.titulo, r.parte), categoria: CATEGORIA_DO_CONTRATO[s(r.tipo)] ?? 'Outras despesas', valor: n(r.valor) }),
     description: 'Contratos vigentes, vencimentos e renovações.',
     filterKey: 'status', sortKey: 'vencimento', sortDir: 'asc',
     fields: [
@@ -399,6 +414,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   },
   midias: {
     id: 'midias', comFoto: true, feminino: true, area: 'mkt', title: 'Gestão de mídias', singular: 'publicação',
+    despesa: (r) => ({ descricao: juntar('Mídia', r.conteudo, r.canal), categoria: 'Marketing', valor: n(r.investimento) }),
     description: 'Calendário de publicações e resultados por canal.',
     filterKey: 'canal', sortKey: 'data', sortDir: 'desc',
     fields: [
