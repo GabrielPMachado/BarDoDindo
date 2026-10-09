@@ -78,6 +78,18 @@ const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', curren
 /** Valor em dinheiro do registro, quando houver (receitas, despesas, consumos, contratos…). */
 const valorDe = (d: Dados) => (typeof d.valor === 'number' && d.valor > 0 ? brl(d.valor) : '');
 
+/** Cadastros que podem lançar despesas no DRE (o mesmo conjunto vale em `firestore.rules`) e como aparecem na origem da despesa. */
+const ORIGENS_DESPESA: Record<string, string> = {
+  terceirizados: 'Serviços terceirizados', contratos: 'Contratos', midias: 'Gestão de mídias', projetos: 'Projetos',
+};
+const VALOR_MAXIMO_DESPESA = 1_000_000;
+const DATA_ISO = /^\d{4}-\d{2}-\d{2}$/;
+/** Data AAAA-MM-DD que existe no calendário (31/02 e mês 13 não passam). */
+function dataValida(v: string) {
+  const t = DATA_ISO.test(v) ? Date.parse(`${v}T00:00:00Z`) : NaN;
+  return !Number.isNaN(t) && new Date(t).toISOString().startsWith(v);
+}
+
 const DEFAULT_CONFIG = {
   nomeEstabelecimento: 'Bar do Dindo',
   pontosPorReal: 1,
@@ -936,6 +948,40 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     });
     await lote.commit();
     return { ok: true, despesas: criadas.length };
+  });
+
+  /* CRM: lançar no DRE a despesa de um cadastro (serviço terceirizado, contrato, mídia ou projeto).
+   * Quem lança é a área dona do cadastro; a despesa nasce "A pagar" e o Financeiro acompanha o pagamento. */
+  rota('POST', '/crm/c/:col/:id/lancar-despesa', async ({ p, b }) => {
+    const ctx = await requireUsuario();
+    const origem = ORIGENS_DESPESA[p.col];
+    if (!origem) return fail(404, 'Este cadastro não gera despesas.');
+    const area = collectionArea(p.col);
+    requireAccess(ctx, area, 'editar');
+    const cur = await registro(p.col, p.id);
+    if (!cur) return fail(404, 'Registro não encontrado.');
+    const descricao = str(b.descricao, 200), categoria = str(b.categoria, 40), data = str(b.data, 10), vencimento = str(b.vencimento, 10);
+    const valor = typeof b.valor === 'number' && Number.isFinite(b.valor) ? Math.round(b.valor * 100) / 100 : NaN;
+    if (descricao.length < 3) fail(400, 'Informe a descrição da despesa.');
+    if (!categoria) fail(400, 'Selecione a categoria da despesa.');
+    if (!dataValida(data)) fail(400, 'Informe a data de competência.');
+    if (vencimento && !dataValida(vencimento)) fail(400, 'Data de vencimento inválida.');
+    if (!(valor > 0 && valor <= VALOR_MAXIMO_DESPESA)) fail(400, `Informe um valor entre R$ 0,01 e ${brl(VALOR_MAXIMO_DESPESA)}.`);
+    const t = now();
+    const ref = doc(collection(db, 'despesas'));
+    const competencia = data.slice(0, 7);
+    const vezes = (Number(cur.lancamentos?.[competencia]?.vezes) || 0) + 1;
+    const lote = writeBatch(db);
+    lote.set(ref, {
+      descricao, categoria, data, vencimento, valor, status: 'A pagar', observacoes: str(b.observacoes, 1000),
+      origem: `Lançamento de ${origem}`, origemColecao: p.col, origemId: p.id, criadoPor: ctx.usuario.id, criadoEm: t, atualizadoEm: t,
+    });
+    // o cadastro guarda o que já foi lançado por aqui em cada competência: as regras exigem essa anotação no mesmo lote,
+    // e a tela usa para avisar antes de lançar duas vezes o mesmo mês
+    lote.update(doc(db, p.col, p.id), { [`lancamentos.${competencia}`]: { despesaId: ref.id, valor, em: t, vezes } });
+    registrar(lote, ctx, area, 'lançou como despesa', { colecao: p.col, alvo: nomeDe(cur) || descricao, detalhe: `${brl(valor)} · competência ${data.slice(5, 7)}/${data.slice(0, 4)}` });
+    await lote.commit();
+    return { ok: true };
   });
 
   /* CRM: lançamento de consumo (credita pontos e gera receita) */

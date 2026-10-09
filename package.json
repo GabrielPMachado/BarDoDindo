@@ -14,7 +14,7 @@
     "publicar": "npm run build:all && firebase deploy",
     "serve": "npm run build && node scripts/static-server.mjs dist 5173",
     "serve:crm": "npm --prefix crm run build && node scripts/static-server.mjs crm/dist 5174",
-    "testar:regras": "npx -y firebase-tools@15 emulators:exec --only auth,firestore --project demo-bardodindo \"node scripts/semear-testes.mjs && node scripts/testar-regras.mjs senha-cliente-123 senha-atendente-123 senha-marketing-123\""
+    "testar:regras": "npx -y firebase-tools@15 emulators:exec --only auth,firestore --project demo-bardodindo \"node scripts/semear-testes.mjs && node scripts/testar-regras.mjs senha-cliente-123 senha-atendente-123 senha-marketing-123 senha-administrativo-123\""
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",

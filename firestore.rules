@@ -19,13 +19,16 @@ service cloud.firestore {
     // A função Administrador (de sistema) pode tudo, inclusive em áreas criadas depois.
     // Vendas foi separada de Marketing: sem permissões próprias para Vendas, valem as de Marketing
     function legado(area) { return { 'vnd': 'mkt' }.get(area, '-'); }
-    function permissao(area) { return funcao().get('permissoes', {}).get(area, funcao().get('permissoes', {}).get(legado(area), 'none')); }
-    function pode(area, acao) {
-      return daEquipe() && (
-        funcao().get('sistema', false) == true
-        || (permissao(area) is list && acao in permissao(area))
-        || (permissao(area) is string && (permissao(area) == 'edit' || (permissao(area) == 'view' && acao == 'ver'))));
+    // a função é lida uma vez só e guardada em variáveis: cada pedido tem um limite de expressões avaliadas,
+    // e os lotes do CRM (registro + espelhos + histórico) passam por esta checagem várias vezes
+    function podeNaFuncao(f, area, acao) {
+      let permissoes = f.get('permissoes', {});
+      let p = permissoes.get(area, permissoes.get(legado(area), 'none'));
+      return f.get('sistema', false) == true
+        || (p is list && acao in p)
+        || (p is string && (p == 'edit' || (p == 'view' && acao == 'ver')));
     }
+    function pode(area, acao) { return daEquipe() && podeNaFuncao(funcao(), area, acao); }
     function podeVer(area) { return pode(area, 'ver'); }
     // cópias espelhadas, histórico e saldos acompanham qualquer alteração na área
     function podeAlterar(area) { return pode(area, 'criar') || pode(area, 'editar') || pode(area, 'excluir'); }
@@ -167,6 +170,37 @@ service cloud.firestore {
     match /receitas/{id} {
       allow create: if pode('atd', 'criar') && request.resource.data.consumoId is string;
       allow delete: if pode('atd', 'excluir') && resource.data.get('consumoId', null) != null;
+    }
+
+    // cada área lança no DRE as despesas dos próprios cadastros (botão "Lançar despesa"), sem ganhar acesso ao Financeiro:
+    // só cria, sempre "A pagar", em nome próprio, ligada a um registro que existe e que a pessoa pode editar.
+    // O mesmo lote anota o lançamento no cadastro de origem (rastro para a área e aviso de repetição na competência).
+    function origensDeDespesa() { return ['terceirizados', 'contratos', 'midias', 'projetos']; }
+    function dataIso(v) { return v is string && v.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$'); }
+    function textoAte(v, max) { return v is string && v.size() <= max; }
+    // as variáveis (let) e a ordem das condições mantêm a avaliação dentro do limite de expressões das regras:
+    // primeiro o que só olha para a própria despesa, por último o que consulta outros documentos
+    function despesaDeOrigem(id) {
+      let d = request.resource.data;
+      let col = d.get('origemColecao', '');
+      return col in origensDeDespesa()
+        && d.keys().hasOnly(['descricao', 'categoria', 'data', 'vencimento', 'valor', 'status', 'observacoes', 'origem', 'origemColecao', 'origemId', 'criadoPor', 'criadoEm', 'atualizadoEm'])
+        && d.criadoPor == request.auth.uid
+        && textoAte(d.origemId, 128) && d.origemId.size() > 0 && !d.origemId.matches('.*/.*')
+        && dataIso(d.data)
+        && d.status == 'A pagar'
+        && d.valor is number && d.valor > 0 && d.valor <= 1000000
+        && textoAte(d.descricao, 200) && d.descricao.size() >= 3
+        && textoAte(d.categoria, 40) && d.categoria.size() >= 1
+        && (d.get('vencimento', '') == '' || dataIso(d.vencimento))
+        && textoAte(d.get('observacoes', ''), 1000)
+        && textoAte(d.origem, 80) && textoAte(d.criadoEm, 40) && textoAte(d.atualizadoEm, 40)
+        && pode(areas()[col], 'editar')
+        && exists(caminho(col, d.origemId))
+        && getAfter(caminho(col, d.origemId)).data.lancamentos[d.data[0:7]].despesaId == id;
+    }
+    match /despesas/{id} {
+      allow create: if despesaDeOrigem(id);
     }
 
     /* ---------- afilhados (aplicativo) ---------- */

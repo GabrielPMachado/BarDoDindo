@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, Camera, ChevronDown, Download, FileSpreadsheet, FileText, ImageOff, Pencil, Plus, Search, Sheet, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Camera, ChevronDown, Download, FileSpreadsheet, FileText, ImageOff, Pencil, Plus, Receipt, Search, Sheet, Trash2 } from 'lucide-react';
 import { numberSpec, STATUS_KEYS, termos, toneOf, type CollectionDef, type Computed, type Field } from '../collections';
 import { maskCnpj, maskPhone } from '../lib/masks';
 import { useCollection, type Row } from '../lib/data';
@@ -11,6 +11,7 @@ import { RefPicker } from './pickers';
 import { reduzirFoto } from './Avatar';
 import { ContextMenu, type MenuPos } from './ContextMenu';
 import { colunasDe, exportarCsv, exportarExcel, exportarPdf } from '../lib/exportar';
+import { LancarDespesa } from './LancarDespesa';
 
 const PAGE = 50;
 
@@ -70,6 +71,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   const [sort, setSort] = useState<{ key: string; dir: 'asc' | 'desc' }>({ key: def.sortKey ?? def.fields[0].key, dir: def.sortDir ?? 'asc' });
   const [page, setPage] = useState(0);
   const [editing, setEditing] = useState<Row | 'new' | null>(null);
+  const [lancando, setLancando] = useState<Row | null>(null);
 
   const tableFields = def.fields.filter((f) => !f.formOnly);
   const filterField = def.fields.find((f) => f.key === def.filterKey);
@@ -214,6 +216,11 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
                     <td className="actions-col" onClick={(e) => e.stopPropagation()}>
                       <div className="row-actions">
                         {rowActions?.(r, canEdit)}
+                        {def.despesa && canEdit && (
+                          <button className="icon-btn" onClick={() => setLancando(r)} aria-label="Lançar despesa no DRE" title="Lançar despesa no DRE">
+                            <Receipt size={16} />
+                          </button>
+                        )}
                         <button className="icon-btn" onClick={() => setEditing(r)} aria-label={canEdit ? 'Editar' : 'Visualizar'} title={canEdit ? 'Editar' : 'Visualizar'}>
                           <Pencil size={16} />
                         </button>
@@ -234,6 +241,10 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
           </div>
         )}
       </div>
+
+      {lancando && def.despesa && (
+        <LancarDespesa def={def} row={lancando} sugestao={def.despesa(lancando)} onClose={() => setLancando(null)} onDone={col.reload} />
+      )}
 
       {editing && (
         <RecordForm
