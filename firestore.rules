@@ -203,6 +203,42 @@ service cloud.firestore {
       allow create: if despesaDeOrigem(id);
     }
 
+    /* ---------- PDFs anexados aos cadastros ---------- */
+    // o arquivo fica fora do registro (que guarda só nome e tamanho), em partes de até 900 mil caracteres (base64).
+    // Vale a permissão da área do cadastro de origem: quem vê o cadastro abre o PDF; quem cria ou edita anexa.
+    function colecoesComAnexo() {
+      return ['metas', 'colaboradores', 'ferias', 'projetos', 'materiais', 'terceirizados', 'fornecedores', 'contratos',
+        'receitas', 'despesas', 'criacao', 'trabalhista', 'consultoria', 'qualidade', 'naoconformidades'];
+    }
+    function anexaEm(col) { return col in colecoesComAnexo() && (pode(areas()[col], 'criar') || pode(areas()[col], 'editar')); }
+    // apaga quem edita ou exclui na área, ou quem enviou o arquivo (desfaz um envio quando o registro não chega a ser gravado)
+    function apagaAnexo(a) {
+      return pode(areas()[a.colecao], 'editar') || pode(areas()[a.colecao], 'excluir') || (a.criadoPor == request.auth.uid && anexaEm(a.colecao));
+    }
+    match /anexos/{id} {
+      allow read: if podeVer(areas()[resource.data.colecao]);
+      allow create: if request.resource.data.keys().hasOnly(['colecao', 'registroId', 'nome', 'tamanho', 'partes', 'criadoPor', 'criadoEm'])
+        && request.resource.data.criadoPor == request.auth.uid
+        && textoAte(request.resource.data.nome, 160) && request.resource.data.nome.size() > 0
+        && textoAte(request.resource.data.registroId, 128) && request.resource.data.registroId.size() > 0
+        && textoAte(request.resource.data.criadoEm, 40)
+        && request.resource.data.tamanho is int && request.resource.data.tamanho > 0 && request.resource.data.tamanho <= 5242880
+        && request.resource.data.partes is int && request.resource.data.partes >= 1 && request.resource.data.partes <= 8
+        && anexaEm(request.resource.data.colecao);
+      allow delete: if apagaAnexo(resource.data);
+
+      match /partes/{n} {
+        allow read: if podeVer(areas()[get(caminho('anexos', id)).data.colecao]);
+        // só junto com o registro do arquivo (mesmo lote) e dentro do número de partes declarado
+        allow create: if !exists(caminho('anexos', id)) && existsAfter(caminho('anexos', id))
+          && request.resource.data.keys().hasOnly(['dados'])
+          && request.resource.data.dados is string && request.resource.data.dados.size() > 0 && request.resource.data.dados.size() <= 900000
+          && n.matches('^[0-7]$') && int(n) < getAfter(caminho('anexos', id)).data.partes
+          && anexaEm(getAfter(caminho('anexos', id)).data.colecao);
+        allow delete: if apagaAnexo(get(caminho('anexos', id)).data);
+      }
+    }
+
     /* ---------- afilhados (aplicativo) ---------- */
     function novoCliente() {
       return logado() && !exists(caminho('clientes', request.auth.uid)) && existsAfter(caminho('clientes', request.auth.uid));

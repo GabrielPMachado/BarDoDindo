@@ -198,6 +198,50 @@ if (senhaAdministrativo) {
   await negado('lançar despesa com descrição gigante', () => lancar({ descricao: 'x'.repeat(201) }));
   await negado('lançar despesa com campo extra (ex.: folha)', () => lancar({ competenciaFolha: '2026-10' }));
   await negado('lançar receita', () => addDoc(collection(db, 'receitas'), { descricao: 'x', valor: 1, data: '2026-10-01' }));
+
+  // PDFs anexados: como o CRM faz, o registro do arquivo e as partes vão no mesmo lote
+  const pdf = 'JVBERi0xLjQK';
+  const anexar = async (meta = {}, partes = [pdf]) => {
+    const ref = doc(collection(db, 'anexos'));
+    const lote = writeBatch(db);
+    lote.set(ref, { colecao: 'contratos', registroId: 'contrato-1', nome: 'contrato.pdf', tamanho: 9, partes: partes.length, criadoPor: uidAdm, criadoEm: 'x', ...meta });
+    partes.forEach((dados, i) => lote.set(doc(db, 'anexos', ref.id, 'partes', String(i)), { dados }));
+    await lote.commit();
+    return ref;
+  };
+  let anexo = null;
+  await permitido('anexar PDF a um contrato (Administrativo)', async () => { anexo = await anexar(); });
+  await permitido('anexar PDF em duas partes', () => anexar({}, [pdf, pdf]));
+  await permitido('abrir o PDF anexado', async () => { await getDoc(anexo); await getDoc(doc(db, 'anexos', anexo.id, 'partes', '0')); });
+  await negado('anexar PDF a um cadastro de outra área (RH)', () => anexar({ colecao: 'colaboradores' }));
+  await negado('anexar PDF a um cadastro que não aceita anexos', () => anexar({ colecao: 'reservas' }));
+  await negado('anexar PDF em nome de outra pessoa', () => anexar({ criadoPor: 'outro' }));
+  await negado('anexar PDF acima de 5 MB', () => anexar({ tamanho: 6 * 1024 * 1024 }));
+  await negado('anexar PDF com campo extra', () => anexar({ publico: true }));
+  await negado('anexar mais partes do que o declarado', async () => {
+    const ref = await anexar();
+    await setDoc(doc(db, 'anexos', ref.id, 'partes', '1'), { dados: pdf });
+  });
+  await negado('trocar o conteúdo de um PDF já anexado', () => setDoc(doc(db, 'anexos', anexo.id, 'partes', '0'), { dados: 'JVBERi0xLjUK' }));
+  await negado('alterar o registro de um PDF já anexado', () => updateDoc(anexo, { colecao: 'colaboradores' }));
+  await permitido('apagar o PDF anexado (partes e registro)', async () => {
+    const lote = writeBatch(db);
+    lote.delete(doc(db, 'anexos', anexo.id, 'partes', '0'));
+    lote.delete(anexo);
+    await lote.commit();
+  });
+  await signOut(auth);
+
+  console.log('— equipe: função só com Atendimento — PDFs de outras áreas —');
+  await signInWithEmailAndPassword(auth, 'atendente@teste.local', senhaAtendente);
+  await negado('listar os PDFs anexados', () => getDocs(collection(db, 'anexos')));
+  await negado('anexar PDF a um contrato (Administrativo)', async () => {
+    const ref = doc(collection(db, 'anexos'));
+    const lote = writeBatch(db);
+    lote.set(ref, { colecao: 'contratos', registroId: 'contrato-1', nome: 'contrato.pdf', tamanho: 9, partes: 1, criadoPor: auth.currentUser.uid, criadoEm: 'x' });
+    lote.set(doc(db, 'anexos', ref.id, 'partes', '0'), { dados: pdf });
+    await lote.commit();
+  });
   await signOut(auth);
 }
 
