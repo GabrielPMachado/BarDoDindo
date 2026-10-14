@@ -5,7 +5,7 @@
 import { initializeApp } from 'firebase/app';
 import { connectAuthEmulator, getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import {
-  addDoc, collection, connectFirestoreEmulator, deleteDoc, doc, getDoc, getDocs, getFirestore, increment, query, setDoc, updateDoc, where, writeBatch,
+  addDoc, Bytes, collection, connectFirestoreEmulator, deleteDoc, doc, getDoc, getDocs, getFirestore, increment, query, setDoc, updateDoc, where, writeBatch,
 } from 'firebase/firestore';
 
 const [senhaCliente, senhaAtendente, senhaMarketing, senhaAdministrativo] = process.argv.slice(2);
@@ -198,6 +198,55 @@ if (senhaAdministrativo) {
   await negado('lançar despesa com descrição gigante', () => lancar({ descricao: 'x'.repeat(201) }));
   await negado('lançar despesa com campo extra (ex.: folha)', () => lancar({ competenciaFolha: '2026-10' }));
   await negado('lançar receita', () => addDoc(collection(db, 'receitas'), { descricao: 'x', valor: 1, data: '2026-10-01' }));
+
+  console.log('— documentos anexados (PDF): cada área anexa e lê os dos próprios cadastros —');
+  const meuNome = (await getDoc(doc(db, 'usuarios', uidAdm))).data().nome;
+  const anexo = (extra = {}) => ({
+    registroId: 'aluguel', nome: 'contrato-assinado.pdf', tipo: 'application/pdf', tamanho: 1200, partes: 1,
+    criadoPor: uidAdm, criadoPorNome: meuNome, criadoEm: 'x', pronto: false, ...extra,
+  });
+  const pedaco = (n, tamanho) => ({ n, dados: Bytes.fromUint8Array(new Uint8Array(tamanho)) });
+  const itensDe = (col) => collection(db, 'anexos', col, 'itens');
+  const doc1 = doc(itensDe('contratos'));
+  await negado('enviar parte sem o registro do arquivo (pedaço solto)', () => setDoc(doc(doc(itensDe('contratos')), 'partes', '0'), pedaco(0, 10)));
+  await permitido('começar o envio de um PDF para o contrato', () => setDoc(doc1, anexo({ partes: 2 })));
+  await negado('concluir o envio sem as partes', () => updateDoc(doc1, { pronto: true }));
+  await permitido('enviar a primeira parte', () => setDoc(doc(doc1, 'partes', '0'), pedaco(0, 1200)));
+  await negado('enviar parte com número diferente do endereço', () => setDoc(doc(doc1, 'partes', '1'), pedaco(0, 10)));
+  await negado('enviar parte com endereço que não é número', () => setDoc(doc(doc1, 'partes', 'abc'), pedaco(0, 10)));
+  await negado('enviar parte além das anunciadas', () => setDoc(doc(doc1, 'partes', '2'), pedaco(2, 10)));
+  await negado('enviar parte acima de 1 MB', () => setDoc(doc(doc1, 'partes', '1'), pedaco(1, 1000001)));
+  await negado('enviar parte com texto no lugar do arquivo', () => setDoc(doc(doc1, 'partes', '1'), { n: 1, dados: 'texto' }));
+  await negado('concluir o envio sem a última parte', () => updateDoc(doc1, { pronto: true }));
+  await permitido('enviar a última parte', () => setDoc(doc(doc1, 'partes', '1'), pedaco(1, 500)));
+  await negado('concluir mudando outro campo junto', () => updateDoc(doc1, { pronto: true, nome: 'outro.pdf' }));
+  await permitido('concluir o envio', () => updateDoc(doc1, { pronto: true }));
+  await permitido('listar os documentos do contrato', () => getDocs(query(itensDe('contratos'), where('registroId', '==', 'aluguel'))));
+  await permitido('ler as partes do PDF', () => getDocs(collection(doc1, 'partes')));
+  await negado('voltar um documento pronto para "em envio"', () => updateDoc(doc1, { pronto: false }));
+  await negado('enviar parte a um documento já pronto', () => setDoc(doc(doc1, 'partes', '1'), pedaco(1, 10)));
+  await negado('apagar uma parte e deixar o documento (trocar o conteúdo)', () => deleteDoc(doc(doc1, 'partes', '0')));
+  await negado('começar envio de arquivo que não é PDF', () => setDoc(doc(itensDe('contratos')), anexo({ tipo: 'application/x-msdownload' })));
+  await negado('começar envio com nome que não termina em .pdf', () => setDoc(doc(itensDe('contratos')), anexo({ nome: 'fatura.exe' })));
+  await negado('começar envio com nome com barra', () => setDoc(doc(itensDe('contratos')), anexo({ nome: '../x.pdf' })));
+  await negado('começar envio já marcado como pronto', () => setDoc(doc(itensDe('contratos')), anexo({ pronto: true })));
+  await negado('anexar PDF acima de 5 MB', () => setDoc(doc(itensDe('contratos')), anexo({ tamanho: 6000000 })));
+  await negado('anexar PDF com partes demais', () => setDoc(doc(itensDe('contratos')), anexo({ partes: 50 })));
+  await negado('anexar a um contrato que não existe', () => setDoc(doc(itensDe('contratos')), anexo({ registroId: 'inexistente' })));
+  await negado('anexar a um registro de outro cadastro', () => setDoc(doc(itensDe('contratos')), anexo({ registroId: 'seguranca' })));
+  await negado('anexar em nome de outra pessoa', () => setDoc(doc(itensDe('contratos')), anexo({ criadoPor: 'outro' })));
+  await negado('anexar com nome de autor falso', () => setDoc(doc(itensDe('contratos')), anexo({ criadoPorNome: 'Diretor' })));
+  await negado('anexar com campo extra', () => setDoc(doc(itensDe('contratos')), anexo({ aprovado: true })));
+  await negado('ler currículos (Pessoal) sem acesso à área', () => getDocs(query(itensDe('colaboradores'), where('registroId', '==', 'maria'))));
+  await negado('anexar a um colaborador sem acesso à área', () => setDoc(doc(itensDe('colaboradores')), anexo({ registroId: 'maria' })));
+  await negado('anexar a um cadastro que não aceita documentos', () => setDoc(doc(itensDe('produtos')), anexo({ registroId: 'chopp' })));
+  await permitido('remover o documento junto com as partes', async () => {
+    const lote = writeBatch(db);
+    lote.delete(doc1);
+    lote.delete(doc(doc1, 'partes', '0'));
+    lote.delete(doc(doc1, 'partes', '1'));
+    await lote.commit();
+  });
   await signOut(auth);
 }
 

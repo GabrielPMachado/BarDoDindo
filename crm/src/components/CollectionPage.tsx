@@ -12,6 +12,7 @@ import { reduzirFoto } from './Avatar';
 import { ContextMenu, type MenuPos } from './ContextMenu';
 import { colunasDe, exportarCsv, exportarExcel, exportarPdf } from '../lib/exportar';
 import { LancarDespesa } from './LancarDespesa';
+import { Anexos } from './Anexos';
 
 const PAGE = 50;
 
@@ -358,6 +359,9 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
             )}
           </div>
         ))}
+        {def.anexos && (row
+          ? <Anexos titulo={def.anexos} col={def.id} registroId={row.id} canEdit={canEdit} />
+          : <p className="muted small form-field--wide">Depois de salvar, abra o registro para anexar documentos em PDF ({def.anexos.toLowerCase()}).</p>)}
         {row?.criadoEm && (
           <p className="muted small form-field--wide">
             Criado em {new Date(String(row.criadoEm)).toLocaleString('pt-BR')}

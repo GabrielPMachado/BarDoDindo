@@ -17,6 +17,22 @@ export function setToken(token: string | null) {
 let onUnauthorized: (() => void) | null = null;
 export const setUnauthorizedHandler = (fn: () => void) => (onUnauthorized = fn);
 
+/** Sessão expirada (401) leva ao login, como em qualquer chamada do CRM. */
+async function comSessao<T>(operacao: () => Promise<T>): Promise<T> {
+  try {
+    return await operacao();
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401 && getToken()) onUnauthorized?.();
+    throw e;
+  }
+}
+
+/** Documentos em PDF dos cadastros: anexar e obter o arquivo. */
+export const anexos = {
+  enviar: (col: string, registroId: string, arquivo: File) => comSessao(() => backend.anexos.enviar(col, registroId, arquivo)),
+  baixar: (col: string, anexoId: string) => comSessao(() => backend.anexos.baixar(col, anexoId)),
+};
+
 export async function api<T>(path: string, options: { method?: string; body?: unknown } = {}): Promise<T> {
   try {
     return await backend.request<T>(path, options);

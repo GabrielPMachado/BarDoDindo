@@ -203,6 +203,60 @@ service cloud.firestore {
       allow create: if despesaDeOrigem(id);
     }
 
+    /* ---------- documentos anexados (PDF) ---------- */
+    // currículo, contrato assinado, nota fiscal… Ficam em `anexos/{cadastro}/itens`, com o arquivo dividido em partes
+    // (cada documento do Firestore guarda até 1 MB). Quem vê o cadastro lê; quem edita anexa e remove.
+    // Gravação em três passos: o registro nasce "em envio" (pronto == false), as partes entram só nessa fase e só
+    // pelo autor, e o autor marca "pronto". Depois disso nada muda; as partes só saem junto com o registro.
+    function colecoesComAnexo() { return ['colaboradores', 'ferias', 'contratos', 'terceirizados', 'fornecedores', 'trabalhista', 'consultoria', 'despesas']; }
+    function anexoValido(col) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['registroId', 'nome', 'tipo', 'tamanho', 'partes', 'criadoPor', 'criadoPorNome', 'criadoEm', 'pronto'])
+        && d.pronto == false
+        && d.tipo == 'application/pdf'
+        && d.tamanho is int && d.tamanho > 0 && d.tamanho <= 5242880
+        && d.partes is int && d.partes >= 1 && d.partes <= 6
+        && textoAte(d.nome, 160) && d.nome.matches('.+[.][pP][dD][fF]') && !d.nome.matches('.*[/\\\\].*')
+        && textoAte(d.registroId, 128) && d.registroId.size() > 0 && !d.registroId.matches('.*/.*')
+        && d.criadoPor == request.auth.uid
+        && textoAte(d.criadoEm, 40)
+        && pode(areas()[col], 'editar')
+        && d.criadoPorNome == get(caminho('usuarios', request.auth.uid)).data.nome
+        && exists(caminho(col, d.registroId));
+    }
+    match /anexos/{col}/itens/{id} {
+      function registroDoArquivo() { return /databases/$(database)/documents/anexos/$(col)/itens/$(id); }
+      allow read: if col in colecoesComAnexo() && podeVer(areas()[col]);
+      allow create: if col in colecoesComAnexo() && anexoValido(col);
+      // só o autor conclui o envio, uma vez, e só com a primeira e a última parte gravadas
+      allow update: if col in colecoesComAnexo()
+        && resource.data.criadoPor == request.auth.uid
+        && resource.data.pronto == false && request.resource.data.pronto == true
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pronto'])
+        && pode(areas()[col], 'editar')
+        && exists(/databases/$(database)/documents/anexos/$(col)/itens/$(id)/partes/0)
+        && exists(/databases/$(database)/documents/anexos/$(col)/itens/$(id)/partes/$(string(resource.data.partes - 1)));
+      // quem exclui o cadastro também leva os documentos dele
+      allow delete: if col in colecoesComAnexo() && (pode(areas()[col], 'editar') || pode(areas()[col], 'excluir'));
+
+      match /partes/{n} {
+        allow read: if col in colecoesComAnexo() && podeVer(areas()[col]);
+        allow create: if col in colecoesComAnexo()
+          && n in ['0', '1', '2', '3', '4', '5']
+          && request.resource.data.keys().hasOnly(['n', 'dados'])
+          && request.resource.data.n is int && string(request.resource.data.n) == n
+          && request.resource.data.dados is bytes && request.resource.data.dados.size() <= 1000000
+          && pode(areas()[col], 'editar')
+          && get(registroDoArquivo()).data.criadoPor == request.auth.uid
+          && get(registroDoArquivo()).data.pronto == false
+          && request.resource.data.n < get(registroDoArquivo()).data.partes;
+        // as partes só saem junto com o registro do arquivo (mesmo lote): o conteúdo de um PDF pronto não pode ser trocado
+        allow delete: if col in colecoesComAnexo()
+          && (pode(areas()[col], 'editar') || pode(areas()[col], 'excluir'))
+          && !existsAfter(registroDoArquivo());
+      }
+    }
+
     /* ---------- afilhados (aplicativo) ---------- */
     function novoCliente() {
       return logado() && !exists(caminho('clientes', request.auth.uid)) && existsAfter(caminho('clientes', request.auth.uid));

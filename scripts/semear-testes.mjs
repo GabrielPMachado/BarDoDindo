@@ -52,6 +52,8 @@ await gravar(`usuarios/${marketing}`, { nome: 'Marketing Teste', email: 'marketi
 await gravar('funcoes/administrativo', { nome: 'Administrativo', descricao: '', permissoes: { adm: ['ver', 'criar', 'editar'] }, sistema: false, criadoEm: agora });
 await gravar(`usuarios/${administrativo}`, { nome: 'Administrativo Teste', email: 'administrativo@teste.local', funcaoId: 'administrativo', status: 'Ativo', criadoEm: agora });
 await gravar('terceirizados/seguranca', { servico: 'Segurança', empresa: 'Vigia Ltda', categoria: 'Segurança', valor: 1500, periodicidade: 'Mensal', status: 'Ativo', criadoEm: agora });
+await gravar('contratos/aluguel', { titulo: 'Aluguel do salão', parte: 'Imobiliária', valor: 4000, status: 'Vigente', criadoEm: agora });
+await gravar('colaboradores/maria', { nome: 'Maria Souza', cargo: 'Bartender', salario: 2500, status: 'Ativo', criadoEm: agora });
 await gravar('midias/post', { conteudo: 'Post de inauguração', canal: 'Instagram', data: '2026-10-01', investimento: 200, status: 'Publicado', criadoEm: agora });
 await gravar('produtos/chopp', { nome: 'Chopp', categoria: 'Chopes', preco: 12, status: 'Ativo', criadoEm: agora });
 await gravar(`usuarios/${atendente}`, { nome: 'Atendente Teste', email: 'atendente@teste.local', funcaoId: 'atendente', status: 'Ativo', criadoEm: agora });

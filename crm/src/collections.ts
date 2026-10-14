@@ -75,6 +75,8 @@ export interface CollectionDef {
   comFoto?: boolean;
   /** Como um registro deste módulo vira despesa no DRE: pré-preenche a tela "Lançar despesa" (a pessoa confere antes de lançar). */
   despesa?: (r: Row) => DespesaSugerida;
+  /** O registro aceita documentos em PDF; o texto é o título da seção no formulário (ex.: "Currículo e documentos"). */
+  anexos?: string;
 }
 
 export interface DespesaSugerida {
@@ -134,6 +136,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   /* ---------------- RH ---------------- */
   colaboradores: {
     id: 'colaboradores', comFoto: true, area: 'rh', title: 'Colaboradores', singular: 'colaborador',
+    anexos: 'Currículo e documentos',
     description: 'Cadastro da equipe, cargos e vínculos.',
     filterKey: 'setor', sortKey: 'nome',
     fields: [
@@ -159,6 +162,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   },
   ferias: {
     id: 'ferias', area: 'rh', title: 'Férias e afastamentos', singular: 'registro',
+    anexos: 'Atestados e documentos',
     description: 'Programação de férias, atestados e licenças.',
     filterKey: 'tipo', sortKey: 'inicio',
     fields: [
@@ -274,6 +278,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   /* ---------------- Administrativo ---------------- */
   terceirizados: {
     id: 'terceirizados', area: 'adm', title: 'Serviços terceirizados', singular: 'serviço',
+    anexos: 'Contrato e documentos do serviço',
     despesa: (r) => ({ descricao: juntar(r.servico, r.empresa), categoria: 'Terceirizados', valor: n(r.valor) }),
     description: 'Prestadores recorrentes: segurança, limpeza, manutenção, música e outros.',
     filterKey: 'categoria', sortKey: 'proximo', sortDir: 'asc',
@@ -297,6 +302,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   },
   fornecedores: {
     id: 'fornecedores', area: 'adm', title: 'Fornecedores', singular: 'fornecedor',
+    anexos: 'Documentos do fornecedor',
     description: 'Cadastro e avaliação de fornecedores.',
     filterKey: 'categoria', sortKey: 'nome',
     fields: [
@@ -317,6 +323,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   },
   contratos: {
     id: 'contratos', area: 'adm', title: 'Contratos', singular: 'contrato',
+    anexos: 'Contrato assinado e aditivos',
     despesa: (r) => ({ descricao: juntar(r.titulo, r.parte), categoria: CATEGORIA_DO_CONTRATO[s(r.tipo)] ?? 'Outras despesas', valor: n(r.valor) }),
     description: 'Contratos vigentes, vencimentos e renovações.',
     filterKey: 'status', sortKey: 'vencimento', sortDir: 'asc',
@@ -372,6 +379,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   },
   despesas: {
     id: 'despesas', feminino: true, area: 'fin', title: 'Despesas', singular: 'despesa',
+    anexos: 'Nota fiscal e comprovantes',
     description: 'Contas a pagar e lançamentos de despesa, inclusive a folha de pagamento.',
     filterKey: 'status', sortKey: 'vencimento', sortDir: 'asc',
     fields: [
@@ -511,6 +519,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   /* ---------------- Jurídico ---------------- */
   trabalhista: {
     id: 'trabalhista', area: 'jur', title: 'Trabalhista', singular: 'processo',
+    anexos: 'Peças do processo',
     description: 'Reclamações trabalhistas, audiências e valores envolvidos.',
     filterKey: 'status', sortKey: 'audiencia', sortDir: 'asc',
     fields: [
@@ -535,6 +544,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   },
   consultoria: {
     id: 'consultoria', feminino: true, area: 'jur', title: 'Consultoria empresarial', singular: 'demanda',
+    anexos: 'Pareceres e documentos',
     description: 'Pareceres, revisões contratuais, licenças e questões societárias.',
     filterKey: 'tipo', sortKey: 'prazo', sortDir: 'asc',
     fields: [

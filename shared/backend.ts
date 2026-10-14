@@ -13,6 +13,7 @@ import {
   type DocumentReference, type Query, type WriteBatch,
 } from 'firebase/firestore';
 import { EMULADOR, EMULADOR_AUTH, EMULADOR_FIRESTORE, firebaseConfig } from './firebase-config';
+import { criarAnexos } from './anexos';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Dados = Record<string, any>;
@@ -838,6 +839,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     refs.push(...usuarios.map((r) => doc(db, 'preferencias', r.id)));
     refs.push(...usuarios.filter((r) => r.id !== ctx.usuario.id));
     refs.push(...(await todos('funcoes')).filter((r) => r.id !== ctx.funcao?.id && r.id !== ctx.usuario.funcaoId));
+    await anexos.apagarTudo();
     let n = await apagarEmLotes(refs);
     // por último, num lote só: o próprio usuário, a função Administrador e o registro do primeiro acesso
     const fim = writeBatch(db);
@@ -1076,6 +1078,12 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const s = await getDoc(doc(db, col, id));
     return s.exists() ? { ...s.data(), id: s.id } : null;
   }
+  /* CRM: documentos em PDF anexados aos cadastros (currículo, contrato assinado, nota fiscal…) */
+  const anexos = criarAnexos<Ctx>({
+    db, fail, rota, lista, requireUsuario, requireAccess, registro, registrar, nomeDe,
+    autor: (ctx) => ({ id: ctx.usuario.id, nome: ctx.usuario.nome }), areaDe: collectionArea, agora: now,
+  });
+
   rota('GET', '/crm/c/:col', async ({ p, q }) => {
     const ctx = await requireUsuario();
     // consumos e resgates também alimentam o resumo de clientes, visto por Vendas e Marketing
@@ -1175,6 +1183,9 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
         }, { merge: true });
       }
     }
+    // os documentos anexados saem antes do registro: se algo falhar no meio, ele continua na tela e a exclusão pode ser repetida
+    // (o contrário deixaria currículos e documentos sem dono, invisíveis e ainda guardados)
+    await anexos.apagarDoRegistro(p.col, p.id);
     lote.delete(doc(db, p.col, p.id));
     espelhar(lote, p.col, p.id, null);
     registrar(lote, ctx, collectionArea(p.col), `excluiu ${REGISTRO[p.col] ?? 'o registro'}`, { colecao: p.col, alvo: nomeDe(cur), detalhe: valorDe(cur) });
@@ -1199,14 +1210,27 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       }
       return fail(404, 'Rota não encontrada.');
     } catch (e) {
-      if (e instanceof ApiError) throw e;
-      const c = codigo(e);
-      if (c === 'permission-denied') return fail(403, semPermissao);
-      if (c === 'unavailable' || c === 'auth/network-request-failed') return fail(0, 'Sem conexão com o servidor. Verifique sua internet.');
-      if (c === 'auth/too-many-requests') return fail(429, 'Muitas tentativas. Aguarde alguns minutos e tente de novo.');
-      if (c === 'auth/weak-password') return fail(400, 'Senha muito fraca. Use pelo menos 6 caracteres.');
-      console.error(e);
-      return fail(500, 'Não foi possível concluir a operação.');
+      return erroTraduzido(e);
+    }
+  }
+  /** Erros do Firebase viram mensagens para a tela; os que o próprio backend levantou passam direto. */
+  function erroTraduzido(e: unknown): never {
+    if (e instanceof ApiError) throw e;
+    const c = codigo(e);
+    if (c === 'permission-denied') return fail(403, semPermissao);
+    if (c === 'unavailable' || c === 'auth/network-request-failed') return fail(0, 'Sem conexão com o servidor. Verifique sua internet.');
+    if (c === 'auth/too-many-requests') return fail(429, 'Muitas tentativas. Aguarde alguns minutos e tente de novo.');
+    if (c === 'auth/weak-password') return fail(400, 'Senha muito fraca. Use pelo menos 6 caracteres.');
+    console.error(e);
+    return fail(500, 'Não foi possível concluir a operação.');
+  }
+  /** Operações com arquivos não cabem nas rotas (que só trafegam JSON), mas tratam sessão e erros do mesmo jeito. */
+  async function comArquivo<T>(operacao: () => Promise<T>): Promise<T> {
+    try {
+      await auth.authStateReady();
+      return await operacao();
+    } catch (e) {
+      return erroTraduzido(e);
     }
   }
 
@@ -1218,5 +1242,10 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     /** Identificador da sessão atual (só é confiável depois da primeira chamada a `request`). */
     uid: () => auth.currentUser?.uid ?? null,
     sair,
+    /** Documentos em PDF dos cadastros: anexar e obter o arquivo. A lista e a remoção são rotas (`/crm/anexos/...`). */
+    anexos: {
+      enviar: (col: string, registroId: string, arquivo: File) => comArquivo(() => anexos.enviar(col, registroId, arquivo)),
+      baixar: (col: string, anexoId: string) => comArquivo(() => anexos.baixar(col, anexoId)),
+    },
   };
 }
