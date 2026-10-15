@@ -13,7 +13,13 @@ export interface NotaLida {
   total: number;
 }
 
-const MODELO_PADRAO = 'gemini-2.5-flash';
+/**
+ * Modelos tentados em ordem: o Google aposenta modelos antigos para contas novas e às vezes um
+ * modelo fica sobrecarregado (503) — aí a leitura passa para o próximo da lista.
+ */
+const MODELOS = ['gemini-3.1-flash-lite', 'gemini-flash-lite-latest', 'gemini-3.5-flash', 'gemini-flash-latest'];
+/** Um modelo que demora mais que isso (sobrecarga) dá a vez ao próximo. */
+const ESPERA_MS = 40_000;
 
 const PROMPT = `Você lê notas fiscais e cupons de compra brasileiros (NF-e, NFC-e, cupom, recibo) de um bar.
 Extraia: nome do fornecedor (razão social ou nome fantasia), CNPJ (só números), número da nota, data de emissão
@@ -71,22 +77,34 @@ export async function lerNotaComIA(arquivo: File): Promise<NotaLida> {
   if (arquivo.size > 15 * 1024 * 1024) throw new Error('Arquivo grande demais (máximo 15 MB).');
   const conteudo = pdf ? { mime: 'application/pdf', dados: await arquivoBase64(arquivo) } : await imagemReduzida(arquivo);
 
-  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo || MODELO_PADRAO}:generateContent?key=${encodeURIComponent(chave)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: PROMPT }, { inline_data: { mime_type: conteudo.mime, data: conteudo.dados } }] }],
-      generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: ESQUEMA },
-    }),
-  }).catch(() => { throw new Error('Sem conexão com a IA. Verifique a internet e tente de novo.'); });
-  const corpo = await resp.json().catch(() => ({}));
-  if (!resp.ok) {
-    const msg = String(corpo?.error?.message ?? '');
-    if (resp.status === 429) throw new Error('A cota gratuita da IA acabou por agora. Tente de novo em alguns minutos.');
+  const corpoPedido = JSON.stringify({
+    contents: [{ parts: [{ text: PROMPT }, { inline_data: { mime_type: conteudo.mime, data: conteudo.dados } }] }],
+    generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: ESQUEMA },
+  });
+  let corpo: { candidates?: { content?: { parts?: { text?: string }[] } }[] } = {};
+  let ultimoErro = '';
+  for (const m of [...new Set([modelo, ...MODELOS].filter(Boolean))]) {
+    const parar = new AbortController();
+    const relogio = setTimeout(() => parar.abort(), ESPERA_MS);
+    const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(chave)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: corpoPedido, signal: parar.signal,
+    }).catch(() => {
+      if (parar.signal.aborted) return null;
+      throw new Error('Sem conexão com a IA. Verifique a internet e tente de novo.');
+    }).finally(() => clearTimeout(relogio));
+    if (!resp) { ultimoErro = 'A IA do Google está demorando demais agora. Tente de novo em alguns minutos.'; continue; }
+    const json = await resp.json().catch(() => ({}));
+    if (resp.ok) { corpo = json; ultimoErro = ''; break; }
+    const msg = String(json?.error?.message ?? '');
     if (resp.status === 400 && /API key/i.test(msg)) throw new Error('A chave da IA é inválida. Confira em Configurações → Parâmetros.');
     if (resp.status === 403) throw new Error('A chave da IA não permite este endereço. Confira as restrições da chave no Google AI Studio.');
-    throw new Error(`A IA não conseguiu ler a nota${msg ? `: ${msg}` : '.'}`);
+    // modelo aposentado (404), sobrecarregado (503/500) ou sem cota (429): tenta o próximo
+    ultimoErro = resp.status === 429 ? 'A cota gratuita da IA acabou por agora. Tente de novo em alguns minutos.'
+      : resp.status >= 500 ? 'A IA do Google está sobrecarregada agora. Tente de novo em alguns minutos.'
+      : `A IA não conseguiu ler a nota${msg ? `: ${msg}` : '.'}`;
+    if (![404, 429, 500, 503].includes(resp.status)) break;
   }
+  if (ultimoErro) throw new Error(ultimoErro);
   const texto = corpo?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? '').join('') ?? '';
   let lida: Partial<NotaLida>;
   try { lida = JSON.parse(texto); } catch { throw new Error('A IA não devolveu a nota num formato legível. Tente uma foto mais nítida.'); }
