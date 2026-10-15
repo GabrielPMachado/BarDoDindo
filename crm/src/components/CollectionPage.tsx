@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, Camera, ChevronDown, Download, FileSpreadsheet, FileText, ImageOff, Paperclip, Pencil, Plus, Receipt, Search, Sheet, Trash2 } from 'lucide-react';
 import { numberSpec, STATUS_KEYS, termos, toneOf, type CollectionDef, type Computed, type Field } from '../collections';
 import { maskCnpj, maskPhone } from '../lib/masks';
@@ -13,6 +13,8 @@ import { ContextMenu, type MenuPos } from './ContextMenu';
 import { colunasDe, exportarCsv, exportarExcel, exportarPdf } from '../lib/exportar';
 import { LancarDespesa } from './LancarDespesa';
 import { AnexosCampo, anexosDe, type AnexoNovo } from './Anexos';
+import { FichaTecnica } from './FichaTecnica';
+import { calcularFicha, fichaDe, type Ficha } from '../lib/ficha';
 
 const PAGE = 50;
 
@@ -294,6 +296,10 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [anexosNovos, setAnexosNovos] = useState<AnexoNovo[]>([]);
+  // com a ficha técnica preenchida, o custo do produto é o custo por porção calculado nela
+  const mudarFicha = useCallback((ficha: Ficha) => setData((d) => ({
+    ...d, ficha, ...(ficha.itens.length ? { custo: calcularFicha(ficha, Number(d.preco) || 0).custoPorcao } : {}),
+  })), []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -314,6 +320,13 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
         return setError('O CNPJ deve ter 14 dígitos.');
       }
     }
+    if (def.fichaTecnica) {
+      const itens = fichaDe(data.ficha).itens;
+      const vazio = itens.findIndex((i) => !String(i.insumo ?? '').trim());
+      if (vazio >= 0) return setError(`Ficha técnica: informe o insumo da linha ${vazio + 1}.`);
+      const semQtd = itens.find((i) => !(Number(i.quantidade) > 0));
+      if (semQtd) return setError(`Ficha técnica: informe a quantidade de "${semQtd.insumo}".`);
+    }
     setBusy(true);
     setError(null);
     try {
@@ -324,6 +337,7 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
         for (const extra of Object.keys(f.fill ?? {})) if (!def.fields.some((x) => x.key === extra)) payload[extra] = data[extra] ?? '';
       }
       if (def.comFoto) payload.foto = data.foto ?? '';
+      if (def.fichaTecnica) payload.ficha = fichaDe(data.ficha);
       if (def.anexos) {
         // a lista dos que ficam (os removidos são apagados ao salvar) e os PDFs novos
         payload.anexos = anexosDe(data.anexos).map((a) => a.id);
@@ -370,6 +384,13 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
             )}
           </div>
         ))}
+        {def.fichaTecnica && (
+          <FichaTecnica
+            ficha={fichaDe(data.ficha)} preco={Number(data.preco) || 0} nome={String(data.nome ?? '')} disabled={!canEdit}
+            onChange={mudarFicha}
+            onUsarPreco={(preco) => setData((d) => ({ ...d, preco }))}
+          />
+        )}
         {def.anexos && (
           <AnexosCampo
             rotulo={def.anexos} salvos={anexosDe(data.anexos)} novos={anexosNovos} disabled={!canEdit}

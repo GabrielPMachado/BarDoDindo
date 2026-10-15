@@ -1,11 +1,12 @@
 import type { AreaKey } from './modules';
 import type { Row } from './lib/data';
 import { brl, daysUntil, isoToday, num, pct } from './lib/format';
+import { fichaDe } from './lib/ficha';
 
 export type FieldType = 'text' | 'textarea' | 'number' | 'money' | 'date' | 'select' | 'email' | 'phone' | 'percent' | 'cnpj' | 'time' | 'ref';
 
 /** Listas que podem ser vinculadas (servidas por /api/crm/referencias/:tipo). */
-export type RefSource = 'pessoas' | 'colaboradores' | 'fornecedores' | 'clientes';
+export type RefSource = 'pessoas' | 'colaboradores' | 'fornecedores' | 'clientes' | 'insumos';
 
 export interface Field {
   key: string;
@@ -75,6 +76,8 @@ export interface CollectionDef {
   comFoto?: boolean;
   /** Aceita PDFs anexados (currículo, contratos, notas fiscais…): o texto é o rótulo do campo no formulário. */
   anexos?: string;
+  /** Produtos: ficha técnica com insumos, custo por porção, CMV e preço sugerido. */
+  fichaTecnica?: boolean;
   /** Como um registro deste módulo vira despesa no DRE: pré-preenche a tela "Lançar despesa" (a pessoa confere antes de lançar). */
   despesa?: (r: Row) => DespesaSugerida;
 }
@@ -444,7 +447,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     },
   },
   produtos: {
-    id: 'produtos', comFoto: true, area: 'vnd', title: 'Produtos e cardápio', singular: 'produto',
+    id: 'produtos', comFoto: true, fichaTecnica: true, area: 'vnd', title: 'Produtos e cardápio', singular: 'produto',
     description: 'Produtos marcados como "No cardápio" e ativos aparecem no aplicativo dos clientes.',
     filterKey: 'categoria', sortKey: 'nome',
     fields: [
@@ -458,6 +461,10 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'descricao', label: 'Descrição no cardápio', type: 'textarea', formOnly: true, wide: true },
     ],
     computed: [
+      {
+        label: 'Ficha técnica', format: 'text',
+        get: (r) => { const q = fichaDe(r.ficha).itens.length; return q ? `${q} ${q === 1 ? 'insumo' : 'insumos'}` : null; },
+      },
       {
         label: 'Margem', format: 'percent',
         get: (r) => (n(r.preco) && n(r.custo) ? (n(r.preco) - n(r.custo)) / n(r.preco) : null),

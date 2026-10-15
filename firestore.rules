@@ -162,6 +162,10 @@ service cloud.firestore {
     match /colaboradores/{id} {
       allow read: if podeVer('fin');
     }
+    // Vendas monta a ficha técnica dos produtos com os insumos e custos do Estoque
+    match /estoque/{id} {
+      allow read: if podeVer('vnd');
+    }
     // o Atendimento lança consumo com os preços do cadastro de produtos
     match /produtos/{id} {
       allow read: if podeVer('atd');

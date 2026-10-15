@@ -914,6 +914,14 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       case 'fornecedores':
         return (await colecao('ref_fornecedores'))
           .map((f) => ({ id: f.id, nome: f.nome, detalhe: [f.categoria, f.status !== 'Ativo' ? f.status : null].filter(Boolean).join(' · '), inativo: f.status === 'Inativo' }));
+      case 'insumos':
+        // ficha técnica dos produtos (Vendas): itens do Estoque com unidade e custo, sem quantidades nem validade
+        requireAnyAccess(ctx, ['vnd', 'dp'], 'ver');
+        return (await colecao('estoque'))
+          .map((e) => ({
+            id: e.id, nome: e.item, unidade: e.unidade || 'un', custo: Number(e.custo) || 0,
+            detalhe: [e.categoria, Number(e.custo) ? `${brl(Number(e.custo))}/${e.unidade || 'un'}` : 'sem custo cadastrado'].filter(Boolean).join(' · '),
+          }));
       case 'clientes':
         requireAnyAccess(ctx, ['atd', 'vnd', 'mkt'], 'ver');
         return (await colecao('clientes'))

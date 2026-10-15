@@ -827,4 +827,41 @@ button.anexos__nome:hover { text-decoration: underline; }
 .anexos__acoes label.btn { cursor: pointer; }
 .anexos__acoes label.btn.is-disabled { opacity: .6; pointer-events: none; }
 .icon-btn.anexos__contagem { width: auto; padding: 0 8px; gap: 4px; display: inline-flex; align-items: center; font-size: 12px; }
+/* ---------- ficha técnica dos produtos ---------- */
+.ficha { display: flex; flex-direction: column; gap: 12px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+.ficha__titulo { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ficha__titulo label { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.ficha__itens { display: flex; flex-direction: column; gap: 8px; }
+.ficha__cab, .ficha__item { display: grid; grid-template-columns: minmax(140px, 2fr) 84px 72px minmax(150px, 1.5fr) 76px 32px; gap: 8px; align-items: center; }
+.ficha__cab { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.ficha__cab .num, .ficha__custo { text-align: right; }
+.ficha__insumo { min-width: 0; }
+.ficha__base { white-space: nowrap; }
+.ficha__params { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.ficha__resumo { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.ficha__resumo > div { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); border-left-width: 3px; }
+.ficha__resumo span { font-size: 12px; color: var(--muted); }
+.ficha__resumo strong { font-size: 17px; }
+.ficha__kpi--good { border-left-color: var(--good) !important; }
+.ficha__kpi--good strong { color: var(--good); }
+.ficha__kpi--warn { border-left-color: var(--warn) !important; }
+.ficha__kpi--warn strong { color: var(--warn); }
+.ficha__kpi--bad { border-left-color: var(--bad) !important; }
+.ficha__kpi--bad strong { color: var(--bad); }
+.ficha__sugerido { border-left-color: var(--brand) !important; }
+.ficha__sugerido .btn { align-self: flex-start; margin-top: 4px; }
+@media (max-width: 760px) {
+  .ficha { padding: 12px; }
+  .ficha__cab { display: none; }
+  /* cada insumo vira um cartão: nome em cima; quantidade, unidade e custo embaixo */
+  .ficha__item { grid-template-columns: 1fr 72px; grid-template-areas: 'insumo insumo' 'qtd un' 'base base' 'custo del'; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  .ficha__item > :nth-child(1) { grid-area: insumo; }
+  .ficha__item > :nth-child(2) { grid-area: qtd; }
+  .ficha__item > :nth-child(3) { grid-area: un; }
+  .ficha__item > :nth-child(4) { grid-area: base; }
+  .ficha__item > :nth-child(5) { grid-area: custo; text-align: left; }
+  .ficha__item > :nth-child(6) { grid-area: del; justify-self: end; }
+  .ficha__params { grid-template-columns: 1fr 1fr; }
+  .ficha__resumo { grid-template-columns: 1fr 1fr; }
+}
 @media (max-width: 640px) { .perm .segmented { width: 100%; } .perm .segmented button { flex: 1; padding: 6px 4px; } }

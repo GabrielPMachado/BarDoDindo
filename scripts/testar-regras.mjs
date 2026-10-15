@@ -153,6 +153,8 @@ if (senhaMarketing) {
   await permitido('ver produtos (Vendas herda o "ver" de Marketing)', () => getDocs(collection(db, 'produtos')));
   await permitido('ver recompensas (Marketing)', () => getDocs(collection(db, 'recompensas')));
   await negado('cadastrar produto (só "ver")', () => addDoc(collection(db, 'produtos'), { nome: 'x', preco: 1 }));
+  await permitido('ver o Estoque (insumos da ficha técnica)', () => getDocs(collection(db, 'estoque')));
+  await negado('alterar o Estoque (só leitura para Vendas)', () => addDoc(collection(db, 'estoque'), { item: 'x', quantidade: 1 }));
   await negado('listar despesas', () => getDocs(collection(db, 'despesas')));
   await signOut(auth);
 }
@@ -235,6 +237,7 @@ if (senhaAdministrativo) {
   console.log('— equipe: função só com Atendimento — PDFs de outras áreas —');
   await signInWithEmailAndPassword(auth, 'atendente@teste.local', senhaAtendente);
   await negado('listar os PDFs anexados', () => getDocs(collection(db, 'anexos')));
+  await negado('ver o Estoque (sem Vendas nem Estrutura)', () => getDocs(collection(db, 'estoque')));
   await negado('anexar PDF a um contrato (Administrativo)', async () => {
     const ref = doc(collection(db, 'anexos'));
     const lote = writeBatch(db);
