@@ -33,7 +33,7 @@ export default function Perfil() {
 
   return (
     <div className="page">
-      <PageHeader title="Meu Perfil" />
+      <PageHeader title="Meu perfil" />
 
       <div className="profile-card">
         <Avatar editable />
