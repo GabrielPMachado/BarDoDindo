@@ -1,84 +1,98 @@
-import { useEffect, useRef, useState } from 'react';
-import { Check, ImageOff, RefreshCw, Sparkles, X } from 'lucide-react';
-import { gerarFotoNoPadrao } from '../lib/iaFoto';
+import { useState } from 'react';
+import { Check, Copy, Download, ExternalLink, ImageOff, Sparkles, Upload } from 'lucide-react';
+import { FOTO_MODELO_URL, GEMINI_URL, promptDaFoto } from '../lib/iaFoto';
+import { reduzirFoto } from './Avatar';
 import { notify } from './ui';
 
-type Estado = { fase: 'parado' } | { fase: 'gerando'; inicio: number } | { fase: 'pronto'; foto: string } | { fase: 'erro'; msg: string };
+async function copiar(texto: string) {
+  try {
+    await navigator.clipboard.writeText(texto);
+    return true;
+  } catch {
+    // navegadores antigos: copia por uma caixa de texto escondida
+    const t = document.createElement('textarea'); t.value = texto; t.style.position = 'fixed'; t.style.opacity = '0';
+    document.body.appendChild(t); t.select();
+    const ok = document.execCommand('copy'); t.remove();
+    return ok;
+  }
+}
 
-const ETAPAS: [number, string][] = [
-  [0, 'Preparando o cenário do Dindo…'],
-  [3, 'Enviando o pedido para a IA…'],
-  [8, 'A IA está criando a foto…'],
-  [35, 'Quase pronto, dando os últimos retoques…'],
-];
+function baixarModelo() {
+  const a = document.createElement('a');
+  a.href = FOTO_MODELO_URL; a.download = 'foto-modelo-bar-do-dindo.jpg';
+  document.body.appendChild(a); a.click(); a.remove();
+}
 
 /**
- * "Gerar foto no padrão do Dindo": a IA recria a foto do produto no cenário modelo (mesa do bar com a placa do Dindo).
- * Mostra o progresso, depois a foto atual ao lado da nova para escolher: usar, gerar outra ou descartar.
+ * "Foto no padrão do Dindo", de graça pelo app do Gemini: o Cérebro copia o pedido pronto do drink e
+ * entrega a foto modelo; depois de gerar, a pessoa envia a foto e compara a atual com a nova antes de usar.
  */
 export function GerarFotoIA({ data, onUsar }: { data: Record<string, unknown>; onUsar: (foto: string) => void }) {
-  const [estado, setEstado] = useState<Estado>({ fase: 'parado' });
-  const [agora, setAgora] = useState(Date.now());
-  const cancelar = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    if (estado.fase !== 'gerando') return;
-    const t = setInterval(() => setAgora(Date.now()), 250);
-    return () => clearInterval(t);
-  }, [estado.fase]);
-  useEffect(() => () => cancelar.current?.abort(), []);
-
+  const [aberto, setAberto] = useState(false);
+  const [nova, setNova] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
   const fotoAtual = typeof data.foto === 'string' ? data.foto : '';
+  const nome = String(data.nome ?? '').trim();
+  const prompt = () => promptDaFoto({ nome, resumo: String(data.resumo ?? ''), ingredientes: String(data.ingredientes ?? '') });
 
-  const gerar = async () => {
-    cancelar.current?.abort();
-    const ctl = new AbortController(); cancelar.current = ctl;
-    setEstado({ fase: 'gerando', inicio: Date.now() }); setAgora(Date.now());
-    try {
-      const foto = await gerarFotoNoPadrao({
-        nome: String(data.nome ?? ''), resumo: String(data.resumo ?? ''), ingredientes: String(data.ingredientes ?? ''), fotoAtual,
-      }, ctl.signal);
-      if (!ctl.signal.aborted) setEstado({ fase: 'pronto', foto });
-    } catch (e) {
-      if (ctl.signal.aborted) return;
-      setEstado({ fase: 'erro', msg: e instanceof Error ? e.message : 'Não foi possível gerar a foto.' });
-    }
+  const abrirGemini = async () => {
+    if (!nome) { notify('Informe o nome do produto antes.', 'error'); return; }
+    // abre a aba já no clique (senão o navegador bloqueia) e copia o pedido
+    window.open(GEMINI_URL, '_blank', 'noopener');
+    const ok = await copiar(prompt());
+    notify(ok ? 'Pedido copiado! No Gemini: anexe a foto modelo, cole o pedido e envie.' : 'Não deu para copiar sozinho: use "Copiar pedido".', ok ? 'ok' : 'error');
   };
 
-  const parar = () => { cancelar.current?.abort(); setEstado({ fase: 'parado' }); };
+  const receber = async (arquivo?: File) => {
+    if (!arquivo) return;
+    setErro(null);
+    try { setNova(await reduzirFoto(arquivo, 640, false)); } catch (e) { setErro(e instanceof Error ? e.message : 'Não foi possível ler a imagem.'); }
+  };
 
-  const segundos = estado.fase === 'gerando' ? (agora - estado.inicio) / 1000 : 0;
-  // a IA não informa o andamento: a barra avança rápido no começo e desacelera até a resposta chegar
-  const progresso = estado.fase === 'gerando' ? Math.min(95, 95 * (1 - Math.exp(-segundos / 22))) : 0;
-  const etapa = [...ETAPAS].reverse().find(([s]) => segundos >= s)?.[1] ?? ETAPAS[0][1];
-
-  return (
-    <div className="form-field form-field--wide gerar-foto">
-      {estado.fase === 'parado' && (
+  if (!aberto && !nova) {
+    return (
+      <div className="form-field form-field--wide gerar-foto">
         <div className="gerar-foto__chamada">
           <div>
             <strong><Sparkles size={15} /> Foto no padrão do Dindo</strong>
-            <p className="muted small">A IA cria a foto deste drink na mesa do bar, com a placa do Dindo ao fundo, igual às outras fotos do cardápio.</p>
+            <p className="muted small">Crie de graça no Gemini a foto deste drink na mesa do bar, com a placa do Dindo ao fundo, igual às outras fotos do cardápio.</p>
           </div>
-          <button type="button" className="btn btn--primary" onClick={() => void gerar()}><Sparkles size={16} /> Gerar foto</button>
+          <button type="button" className="btn btn--primary" onClick={() => setAberto(true)}><Sparkles size={16} /> Criar foto</button>
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {estado.fase === 'gerando' && (
-        <div className="gerar-foto__progresso" role="status" aria-live="polite">
-          <div className="gerar-foto__topo">
-            <strong><Sparkles size={15} className="gerar-foto__brilho" /> {etapa}</strong>
-            <span className="muted small">{Math.round(progresso)}%</span>
-          </div>
-          <div className="gerar-foto__barra" aria-hidden="true"><i style={{ width: `${progresso}%` }} /></div>
-          <div className="gerar-foto__rodape">
-            <span className="muted small">Leva de 15 a 60 segundos.</span>
-            <button type="button" className="btn btn--ghost btn--sm" onClick={parar}><X size={14} /> Cancelar</button>
-          </div>
-        </div>
-      )}
-
-      {estado.fase === 'pronto' && (
+  return (
+    <div className="form-field form-field--wide gerar-foto">
+      {!nova ? (
+        <>
+          <strong className="gerar-foto__titulo"><Sparkles size={15} /> Foto no padrão do Dindo · grátis pelo Gemini</strong>
+          <ol className="gerar-foto__passos">
+            <li>
+              <span><b>Baixe a foto modelo</b> (só precisa na primeira vez).</span>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={baixarModelo}><Download size={14} /> Foto modelo</button>
+            </li>
+            <li>
+              <span><b>Abra o Gemini</b>: o pedido deste drink já vai copiado.</span>
+              <button type="button" className="btn btn--primary btn--sm" onClick={() => void abrirGemini()}><ExternalLink size={14} /> Abrir o Gemini</button>
+            </li>
+            <li>
+              <span>No Gemini, <b>anexe a foto modelo</b>, <b>cole o pedido</b> e envie. Salve a imagem que ele criar.</span>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={async () => notify(await copiar(prompt()) ? 'Pedido copiado.' : 'Não foi possível copiar.')}><Copy size={14} /> Copiar pedido</button>
+            </li>
+            <li>
+              <span><b>Envie a foto pronta</b> aqui para comparar com a atual.</span>
+              <label className="btn btn--primary btn--sm">
+                <Upload size={14} /> Enviar foto
+                <input type="file" accept="image/*" hidden onChange={(e) => { void receber(e.target.files?.[0]); e.target.value = ''; }} />
+              </label>
+            </li>
+          </ol>
+          {erro && <p className="error">{erro}</p>}
+          <div className="gerar-foto__botoes"><button type="button" className="btn btn--ghost btn--sm" onClick={() => setAberto(false)}>Fechar</button></div>
+        </>
+      ) : (
         <div className="gerar-foto__resultado">
           <div className="gerar-foto__comparar">
             <figure>
@@ -87,26 +101,19 @@ export function GerarFotoIA({ data, onUsar }: { data: Record<string, unknown>; o
             </figure>
             <figure className="is-nova">
               <figcaption>Nova</figcaption>
-              <img src={estado.foto} alt="Foto gerada pela IA" />
+              <img src={nova} alt="Foto nova" />
             </figure>
           </div>
           <div className="gerar-foto__botoes">
             <button type="button" className="btn btn--primary" onClick={() => {
-              onUsar(estado.foto); setEstado({ fase: 'parado' });
+              onUsar(nova); setNova(null); setAberto(false);
               notify('Foto trocada. Clique em Salvar para publicar no app.');
             }}><Check size={16} /> Usar esta foto</button>
-            <button type="button" className="btn btn--ghost" onClick={() => void gerar()}><RefreshCw size={15} /> Gerar outra</button>
-            <button type="button" className="btn btn--ghost" onClick={parar}>Descartar</button>
-          </div>
-        </div>
-      )}
-
-      {estado.fase === 'erro' && (
-        <div className="gerar-foto__erro">
-          <p className="error">{estado.msg}</p>
-          <div className="gerar-foto__botoes">
-            <button type="button" className="btn btn--ghost btn--sm" onClick={() => void gerar()}><RefreshCw size={14} /> Tentar de novo</button>
-            <button type="button" className="btn btn--ghost btn--sm" onClick={parar}>Fechar</button>
+            <label className="btn btn--ghost">
+              <Upload size={15} /> Escolher outra
+              <input type="file" accept="image/*" hidden onChange={(e) => { void receber(e.target.files?.[0]); e.target.value = ''; }} />
+            </label>
+            <button type="button" className="btn btn--ghost" onClick={() => setNova(null)}>Descartar</button>
           </div>
         </div>
       )}

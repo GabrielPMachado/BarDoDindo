@@ -1135,17 +1135,14 @@ button.anexos__nome:hover { text-decoration: underline; }
   background: radial-gradient(120% 140% at 100% 0%, #c4572a26, transparent 60%), var(--surface-2); }
 .gerar-foto__chamada { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
 .gerar-foto__chamada > div { flex: 1; min-width: 220px; }
-.gerar-foto__chamada strong, .gerar-foto__topo strong { display: inline-flex; align-items: center; gap: 6px; }
-.gerar-foto__chamada strong svg, .gerar-foto__topo strong svg { color: var(--brand-light); }
+.gerar-foto__chamada strong, .gerar-foto__titulo { display: inline-flex; align-items: center; gap: 6px; }
+.gerar-foto__chamada strong svg, .gerar-foto__titulo svg { color: var(--brand-light); }
+.gerar-foto__passos { margin: 12px 0 0; padding: 0; list-style: none; counter-reset: passo; display: flex; flex-direction: column; gap: 8px; }
+.gerar-foto__passos li { counter-increment: passo; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); }
+.gerar-foto__passos li::before { content: counter(passo); width: 24px; height: 24px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: var(--surface-3); color: var(--brand-light); }
+.gerar-foto__passos li > span { flex: 1; min-width: 200px; font-size: 13.5px; }
+.gerar-foto__passos label.btn, .gerar-foto__botoes label.btn { cursor: pointer; }
 .gerar-foto__chamada p { margin-top: 4px; }
-.gerar-foto__progresso { display: flex; flex-direction: column; gap: 10px; }
-.gerar-foto__topo, .gerar-foto__rodape { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.gerar-foto__brilho { animation: brilho-ia 1.4s ease-in-out infinite; }
-@keyframes brilho-ia { 50% { opacity: .35; transform: scale(.85) rotate(12deg); } }
-.gerar-foto__barra { height: 8px; border-radius: 99px; background: var(--surface-3); overflow: hidden; }
-.gerar-foto__barra i { display: block; height: 100%; border-radius: 99px; transition: width .25s linear;
-  background: linear-gradient(90deg, var(--brand-dark), var(--brand-light), var(--brand-dark)); background-size: 200% 100%; animation: faixa-ia 1.6s linear infinite; }
-@keyframes faixa-ia { to { background-position: -200% 0; } }
 .gerar-foto__comparar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .gerar-foto__comparar figure { margin: 0; display: flex; flex-direction: column; gap: 6px; }
 .gerar-foto__comparar figcaption { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
@@ -1155,4 +1152,7 @@ button.anexos__nome:hover { text-decoration: underline; }
 .gerar-foto__vazio { display: grid; place-items: center; gap: 4px; color: var(--muted); font-size: 12px; background: var(--surface-3); }
 .gerar-foto__botoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 .gerar-foto__erro .error { margin: 0; }
-@media (prefers-reduced-motion: reduce) { .gerar-foto__brilho, .gerar-foto__barra i { animation: none; } }
+.gerar-foto label.btn { font-weight: 600; color: var(--text); }
+.gerar-foto label.btn--primary { color: var(--on-brand); }
+.gerar-foto label.btn--sm { font-size: 12.5px; }
+.gerar-foto label.btn:not(.btn--sm) { font-size: 14px; }
