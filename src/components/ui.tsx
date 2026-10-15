@@ -109,7 +109,10 @@ export function TopBar() {
         <button className="icon-btn topbar__menu" onClick={() => setDrawer(true)} aria-label="Abrir menu">
           <Menu size={22} />
         </button>
-        <span className="topbar__title">{TITULOS[pathname] ?? 'Bar do Dindo'}</span>
+        <Link to="/" className="topbar__marca" aria-label="Bar do Dindo — início">
+          <img src={logoUrl} width={32} height={32} alt="" />
+          <span className="topbar__title">{TITULOS[pathname] ?? 'Bar do Dindo'}</span>
+        </Link>
         <button className="topbar-btn" onClick={openNotif} aria-label="Notificações">
           <Bell size={18} />
           {unread && <span className="dot" />}
