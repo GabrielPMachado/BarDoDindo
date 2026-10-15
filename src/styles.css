@@ -502,3 +502,32 @@ button.hist-row { width: 100%; text-align: left; }
 .overlay--top { z-index: 70; }
 .success-icon--danger { color: var(--red); border-color: #e5484d99; background: #e5484d14; }
 .btn--danger { background: #c9303a; color: #fff; }
+
+/* ---------- Layout centralizado ---------- */
+/* Cabeçalhos de página e títulos de seção (sem link) centralizados */
+.page-header { align-items: center; text-align: center; }
+.section-header:not(:has(.section-link)) { justify-content: center; }
+.section-title { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+
+/* Início: foto, nome e número do afilhado empilhados no centro */
+.profile { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; }
+.profile .avatar { grid-area: auto; }
+.profile__info { width: 100%; }
+.profile__name { white-space: normal; font-size: 24px; }
+.profile__member { font-size: 15px; letter-spacing: .04em; }
+.profile .points-chip { width: 100%; justify-content: center; margin-top: 4px; }
+.points-chip > span:nth-child(2) { flex: 0 0 auto; text-align: left; }
+.points-chip > svg:last-child { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); }
+
+/* Recompensas: saldo no centro */
+.points-hero__top { flex-direction: column; text-align: center; gap: 10px; }
+
+/* Catálogo: conteúdo do cartão centralizado; um item só fica no meio */
+.reward { align-items: center; text-align: center; }
+.reward__foot { align-self: stretch; }
+.reward__foot .gold { justify-content: center; }
+.reward:only-child { grid-column: 1 / -1; justify-self: center; width: min(100%, 260px); }
+
+/* Entrar / Quero ser afilhado */
+.auth__title { justify-content: center; }
+.auth__card > p.muted { text-align: center; }
