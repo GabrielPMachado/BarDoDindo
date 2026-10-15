@@ -25,11 +25,16 @@ export interface ItemFicha {
   fornecedor?: string;
 }
 
+/** Guarnição ou item de valor fixo por porção (gelo, rodela de laranja, canudo…): não se pesa, só se marca. */
+export interface FixoFicha { id: string; nome: string; custo: number }
+
 export interface Ficha {
   itens: ItemFicha[];
+  /** Itens de valor fixo marcados nesta ficha (cadastro "Guarnições e itens fixos"). */
+  fixos: FixoFicha[];
   /** Quantas porções a receita rende. */
   rendimento: number;
-  /** Perdas, quebras e guarnições não listadas, em % sobre o custo dos insumos. */
+  /** Perdas e quebras, em % sobre o custo dos insumos (não vale para os itens fixos). */
   perdas: number;
   /** CMV desejado (% do preço de venda) para sugerir o preço. */
   cmvAlvo: number;
@@ -37,13 +42,14 @@ export interface Ficha {
   montagem: string;
 }
 
-export const FICHA_VAZIA: Ficha = { itens: [], rendimento: 1, perdas: 0, cmvAlvo: 30, preparo: '', montagem: '' };
+export const FICHA_VAZIA: Ficha = { itens: [], fixos: [], rendimento: 1, perdas: 0, cmvAlvo: 30, preparo: '', montagem: '' };
 
 export function fichaDe(v: unknown): Ficha {
   const f = (v && typeof v === 'object' ? v : {}) as Partial<Ficha>;
   return {
     ...FICHA_VAZIA, ...f,
     itens: Array.isArray(f.itens) ? f.itens : [],
+    fixos: Array.isArray(f.fixos) ? f.fixos : [],
     rendimento: Number(f.rendimento) > 0 ? Number(f.rendimento) : 1,
     perdas: Number(f.perdas) || 0,
     cmvAlvo: Number(f.cmvAlvo) > 0 ? Number(f.cmvAlvo) : FICHA_VAZIA.cmvAlvo,
@@ -82,12 +88,14 @@ const centavos = (v: number) => Math.round(v * 100) / 100;
 /** Todos os números da ficha, a partir do preço de venda atual. */
 export function calcularFicha(f: Ficha, preco: number) {
   const insumos = f.itens.reduce((t, i) => t + custoDoItem(i), 0);
-  const total = insumos * (1 + (f.perdas || 0) / 100);
-  const porcao = total / (f.rendimento || 1);
+  // itens fixos (gelo, guarnições) entram por porção, com o valor cadastrado, sem pesar nem aplicar perdas
+  const fixos = f.fixos.reduce((t, x) => t + (Number(x.custo) || 0), 0);
+  const porcao = (insumos * (1 + (f.perdas || 0) / 100)) / (f.rendimento || 1) + fixos;
+  const total = porcao * (f.rendimento || 1);
   const cmv = preco > 0 ? porcao / preco : null;
   const sugerido = f.cmvAlvo > 0 ? porcao / (f.cmvAlvo / 100) : 0;
   return {
-    insumos, total, porcao,
+    insumos, fixos, total, porcao,
     /** Custo por porção arredondado: é o que vai para o campo "Custo" do produto. */
     custoPorcao: centavos(porcao),
     cmv,
@@ -146,8 +154,15 @@ export const usarOpcao = (i: ItemFicha, o: Opcao): ItemFicha =>
  * Atualiza os itens com o custo de hoje: o preço do fornecedor escolhido (Tabela de preços) ou o custo do Estoque.
  * Devolve a ficha nova e quantos itens mudaram (para avisar a pessoa).
  */
-export function atualizarCustos(f: Ficha, insumos: Insumo[], cotacoes: Cotacao[] = []) {
+export function atualizarCustos(f: Ficha, insumos: Insumo[], cotacoes: Cotacao[] = [], guarnicoes: FixoFicha[] = []) {
   let mudou = 0;
+  // itens fixos pegam o valor de hoje do cadastro (apagados ficam com o último valor)
+  const fixos = f.fixos.map((x) => {
+    const g = guarnicoes.find((y) => y.id === x.id);
+    if (!g || (Math.abs(g.custo - Number(x.custo)) < 1e-9 && g.nome === x.nome)) return x;
+    mudou++;
+    return { ...x, nome: g.nome, custo: g.custo };
+  });
   const itens = f.itens.map((i) => {
     if (!i.insumoId) return i;
     const c = i.precoId ? cotacoes.find((x) => x.id === i.precoId) : undefined;
@@ -161,5 +176,5 @@ export function atualizarCustos(f: Ficha, insumos: Insumo[], cotacoes: Cotacao[]
     const unidade = unidadesCompativeis(novo.unidadeBase).includes(i.unidade) ? i.unidade : novo.unidadeBase;
     return { ...i, ...novo, unidade };
   });
-  return { ficha: { ...f, itens }, mudou };
+  return { ficha: { ...f, itens, fixos }, mudou };
 }

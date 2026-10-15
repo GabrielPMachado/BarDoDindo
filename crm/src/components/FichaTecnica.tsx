@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { ClipboardList, PackagePlus, Plus, Printer, Trash2 } from 'lucide-react';
+import { Check, ClipboardList, PackagePlus, Plus, Printer, Trash2 } from 'lucide-react';
 import type { Field } from '../collections';
 import { api } from '../lib/api';
-import { reload, useResource } from '../lib/data';
+import { reload, useResource, type Row } from '../lib/data';
 import { brl, num, pct } from '../lib/format';
 import {
   atualizarCustos, calcularFicha, custoBaseTxt, custoDoItem, opcoesDoItem, UNIDADES, unidadesCompativeis, usarOpcao,
-  type Cotacao, type Ficha, type Insumo, type ItemFicha, type Opcao,
+  type Cotacao, type Ficha, type FixoFicha, type Insumo, type ItemFicha, type Opcao,
 } from '../lib/ficha';
 import { imprimirFicha } from '../lib/fichaPdf';
 import { useSession } from '../lib/session';
@@ -39,8 +39,10 @@ const unidadeDaReceita = (base: string, atual: string) => {
  * Ficha técnica do produto: insumos com quantidade e custo (do Estoque ou do fornecedor escolhido),
  * rendimento e perdas. Calcula custo por porção, CMV, margem e o preço sugerido para o CMV desejado.
  */
-export function FichaTecnica({ ficha, preco, nome, disabled, onChange, onUsarPreco }: {
+export function FichaTecnica({ ficha, preco, nome, disabled, preMarcar, onChange, onUsarPreco }: {
   ficha: Ficha; preco: number; nome: string; disabled: boolean;
+  /** Ficha nova (tela "Fichas técnicas"): já marca os itens fixos "padrão", como o gelo. */
+  preMarcar?: boolean;
   onChange: (f: Ficha) => void;
   onUsarPreco: (preco: number) => void;
 }) {
@@ -48,19 +50,33 @@ export function FichaTecnica({ ficha, preco, nome, disabled, onChange, onUsarPre
   const cotacoes = useResource<Cotacao[]>(PRECOS);
   const listaInsumos = insumos.data ?? [];
   const listaCotacoes = cotacoes.data ?? [];
+  const guarnicoes = useResource<Row[]>('/crm/c/guarnicoes');
+  const fixosAtivos: (FixoFicha & { padrao: boolean })[] = (guarnicoes.data ?? [])
+    .filter((g) => g.status !== 'Inativo')
+    .map((g) => ({ id: g.id, nome: String(g.nome ?? ''), custo: Number(g.custo) || 0, padrao: g.padrao === 'Sim' }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  // os marcados que saíram do cadastro (inativos ou apagados) continuam visíveis para poder desmarcar
+  const fixosNaTela = [...fixosAtivos, ...ficha.fixos.filter((x) => !fixosAtivos.some((g) => g.id === x.id)).map((x) => ({ ...x, padrao: false }))];
+  const temReceita = ficha.itens.length > 0 || ficha.fixos.length > 0;
   const c = calcularFicha(ficha, preco);
 
   // ao abrir, cada item pega o custo de hoje (do fornecedor escolhido ou do Estoque), uma vez só, quando as listas chegam
   const atualizado = useRef(false);
   useEffect(() => {
-    if (atualizado.current || disabled || !insumos.data || (!cotacoes.data && !cotacoes.error)) return;
+    if (atualizado.current || disabled || !insumos.data || (!cotacoes.data && !cotacoes.error) || (!guarnicoes.data && !guarnicoes.error)) return;
     atualizado.current = true;
-    const { ficha: nova, mudou } = atualizarCustos(ficha, insumos.data, cotacoes.data ?? []);
-    if (mudou) {
-      onChange(nova);
-      notify(`Custo de ${mudou} ${mudou === 1 ? 'insumo atualizado' : 'insumos atualizados'} com os preços de hoje. Salve para gravar.`);
-    }
-  }, [insumos.data, cotacoes.data, cotacoes.error, disabled, ficha, onChange]);
+    const lista = (guarnicoes.data ?? []).map((g) => ({ id: g.id, nome: String(g.nome ?? ''), custo: Number(g.custo) || 0 }));
+    const { ficha: atual, mudou } = atualizarCustos(ficha, insumos.data, cotacoes.data ?? [], lista);
+    // ficha ainda vazia: já vêm marcados os itens fixos "padrão" (ex.: gelo)
+    const padroes = preMarcar && !atual.itens.length && !atual.fixos.length ? fixosAtivos.filter((g) => g.padrao).map(({ id, nome, custo }) => ({ id, nome, custo })) : [];
+    if (mudou || padroes.length) onChange(padroes.length ? { ...atual, fixos: padroes } : atual);
+    if (mudou) notify(`Custo de ${mudou} ${mudou === 1 ? 'item atualizado' : 'itens atualizados'} com os preços de hoje. Salve para gravar.`);
+  }, [insumos.data, cotacoes.data, cotacoes.error, guarnicoes.data, guarnicoes.error, disabled, preMarcar, ficha, onChange, fixosAtivos]);
+
+  const alternarFixo = (g: FixoFicha) => {
+    const marcado = ficha.fixos.some((x) => x.id === g.id);
+    onChange({ ...ficha, fixos: marcado ? ficha.fixos.filter((x) => x.id !== g.id) : [...ficha.fixos, { id: g.id, nome: g.nome, custo: g.custo }] });
+  };
 
   const trocarItem = (idx: number, item: ItemFicha) => onChange({ ...ficha, itens: ficha.itens.map((it, i) => (i === idx ? item : it)) });
   const mudarItem = (idx: number, patch: Partial<ItemFicha>) => trocarItem(idx, { ...ficha.itens[idx], ...patch });
@@ -117,7 +133,7 @@ export function FichaTecnica({ ficha, preco, nome, disabled, onChange, onUsarPre
     <div className="form-field form-field--wide ficha">
       <div className="ficha__titulo">
         <label><ClipboardList size={15} /> Ficha técnica</label>
-        {ficha.itens.length > 0 && (
+        {temReceita && (
           <button type="button" className="btn btn--ghost btn--sm" onClick={() => void imprimir()}><Printer size={14} /> Imprimir ficha</button>
         )}
       </div>
@@ -151,7 +167,29 @@ export function FichaTecnica({ ficha, preco, nome, disabled, onChange, onUsarPre
       )}
       {insumos.error && <p className="error small">Não foi possível carregar o Estoque: {insumos.error}</p>}
 
-      {ficha.itens.length > 0 && (
+      <div className="ficha__fixos">
+        <div className="ficha__fixos-cab">
+          <span>Guarnições e itens fixos <span className="muted small">· valor fixo por porção, sem pesar</span></span>
+          {c.fixos > 0 && <strong className="small">{brl(c.fixos)} por porção</strong>}
+        </div>
+        {fixosNaTela.length > 0 ? (
+          <div className="ficha__fixos-lista">
+            {fixosNaTela.map((g) => {
+              const marcado = ficha.fixos.some((x) => x.id === g.id);
+              return (
+                <button key={g.id} type="button" className={`ficha__fixo ${marcado ? 'is-on' : ''}`} aria-pressed={marcado} disabled={disabled} onClick={() => alternarFixo(g)}>
+                  <span className="ficha__fixo-check">{marcado && <Check size={12} />}</span>
+                  {g.nome} <span className="muted">{brl(g.custo)}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <span className="muted small">{guarnicoes.error ? 'Não foi possível carregar os itens fixos.' : 'Cadastre gelo, rodelas de fruta, canudos etc. em Vendas → Guarnições e itens fixos, com o valor de cada um por drink.'}</span>
+        )}
+      </div>
+
+      {temReceita && (
         <>
           <div className="ficha__params">
             <div className="form-field">
@@ -159,7 +197,7 @@ export function FichaTecnica({ ficha, preco, nome, disabled, onChange, onUsarPre
               <NumberInput spec={{ decimals: 1, min: 0.1, max: 10_000 }} value={ficha.rendimento} disabled={disabled} onChange={(v) => onChange({ ...ficha, rendimento: v === '' ? 1 : Math.max(0.1, v) })} />
             </div>
             <div className="form-field">
-              <label>Perdas e guarnições</label>
+              <label>Perdas e quebras</label>
               <NumberInput spec={{ decimals: 1, min: 0, max: 100 }} suffix="%" value={ficha.perdas} disabled={disabled} onChange={(v) => onChange({ ...ficha, perdas: v === '' ? 0 : v })} />
             </div>
             <div className="form-field">
