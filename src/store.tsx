@@ -24,6 +24,9 @@ export interface Produto {
   /** de 0 a 5; 0 = não informado */
   perfil?: { docura?: number; amargor?: number; acidez?: number; intensidade?: number };
   notas?: string[];
+  /** descrição curta para a lista; a `descricao` é a história completa */
+  resumo?: string;
+  ingredientes?: string[];
 }
 
 export interface Recompensa {

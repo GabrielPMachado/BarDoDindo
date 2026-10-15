@@ -199,7 +199,7 @@ export default function Home() {
                 <div className="banner__text">
                   <small>Destaque da casa</small>
                   <h3>{p.nome}</h3>
-                  {p.descricao && <p>{p.descricao}</p>}
+                  {(p.resumo || p.descricao) && <p>{p.resumo || p.descricao}</p>}
                   <span className="banner__preco">{brl(p.preco)} <em>+{Math.floor(p.preco * pontosPorReal)} pts</em></span>
                 </div>
                 <ItemFoto foto={p.foto} categoria={p.categoria} size="xl" alt={p.nome} />
@@ -242,7 +242,7 @@ export default function Home() {
           <ItemFoto foto={destaques[0].foto} categoria={destaques[0].categoria} size="xl" alt={destaques[0].nome} />
           <span className="vitrine-produto__info">
             <strong>{destaques[0].nome}</strong>
-            {destaques[0].descricao && <span>{destaques[0].descricao}</span>}
+            {(destaques[0].resumo || destaques[0].descricao) && <span>{destaques[0].resumo || destaques[0].descricao}</span>}
             <b>{brl(destaques[0].preco)}</b>
           </span>
         </Link>

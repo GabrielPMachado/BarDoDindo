@@ -422,6 +422,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
         id: p.id, nome: p.nome, categoria: p.categoria, descricao: p.descricao ?? '', preco: Number(p.preco) || 0, destaque: p.destaque === true,
         foto: typeof p.foto === 'string' ? p.foto : '', teor: Number(p.teor) || 0,
         perfil: (p.perfil ?? {}) as Record<string, number>, notas: Array.isArray(p.notas) ? p.notas : [],
+        resumo: typeof p.resumo === 'string' ? p.resumo : '', ingredientes: Array.isArray(p.ingredientes) ? p.ingredientes : [],
       }))
       .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR')),
   );
@@ -1163,6 +1164,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       teor: Number.isFinite(teor) && teor > 0 ? Math.min(100, Math.round(teor * 10) / 10) : 0,
       perfil: { docura: nota(d.docura), amargor: nota(d.amargor), acidez: nota(d.acidez), intensidade: nota(d.intensidade) },
       notas: String(d.notas ?? '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 8),
+      resumo: String(d.resumo ?? '').trim().slice(0, 200),
+      ingredientes: String(d.ingredientes ?? '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 20),
     };
   }
   const noCardapio = (d: Dados) => d.status === 'Ativo' && d.noCardapio !== 'Não';

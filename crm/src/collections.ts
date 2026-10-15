@@ -525,7 +525,9 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'noCardapio', label: 'No cardápio do app', type: 'select', options: ['Sim', 'Não'], default: 'Sim' },
       { key: 'destaque', label: 'Destaque', type: 'select', options: ['Não', 'Sim'], default: 'Não' },
       { key: 'status', label: 'Status', type: 'select', options: ['Ativo', 'Sazonal', 'Inativo'], default: 'Ativo' },
-      { key: 'descricao', label: 'Descrição no cardápio', type: 'textarea', formOnly: true, wide: true },
+      { key: 'resumo', label: 'Descrição curta (aparece na lista do app)', type: 'text', formOnly: true, wide: true, placeholder: 'Ex.: Aperol, espumante e um toque de laranja. Leve e refrescante.' },
+      { key: 'descricao', label: 'História / descrição completa', type: 'textarea', formOnly: true, wide: true },
+      { key: 'ingredientes', label: 'Ingredientes (separados por vírgula)', type: 'text', formOnly: true, wide: true, placeholder: 'Ex.: Aperol, Espumante brut, Água com gás, Rodela de laranja, Gelo' },
       // perfil da bebida, mostrado no app ao tocar no item (0 = não mostrar)
       { key: 'teor', label: 'Teor alcoólico', type: 'percent', decimals: 1, max: 100, formOnly: true, placeholder: 'Ex.: 11 (deixe vazio se não tiver álcool)' },
       { key: 'docura', label: 'Doçura (0 a 5)', type: 'number', min: 0, max: 5, formOnly: true },
