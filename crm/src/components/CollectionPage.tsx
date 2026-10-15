@@ -17,6 +17,7 @@ import { FichaTecnica } from './FichaTecnica';
 import { LocaisCampo, TransferirModal } from './Locais';
 import { CelulaRapida, editavelNaTabela } from './EdicaoRapida';
 import { PreencherProdutoIA } from './PreencherProdutoIA';
+import { GerarFotoIA } from './GerarFotoIA';
 import { CompraItens, itemVazio, totalItens, type ItemCompra } from './CompraItens';
 import { camposDosLocais, locaisDe, locaisNoFormulario } from '../lib/locais';
 import { calcularFicha, fichaDe, type Ficha } from '../lib/ficha';
@@ -427,6 +428,7 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
         {def.comFoto && (
           <FotoCampo valor={typeof data.foto === 'string' ? data.foto : ''} disabled={!canEdit} onChange={(foto) => setData((d) => ({ ...d, foto }))} />
         )}
+        {def.iaProduto && canEdit && <GerarFotoIA data={data} onUsar={(foto) => setData((d) => ({ ...d, foto }))} />}
         {def.fichaPrimeiro && fichaCampo}
         {def.fields.map((f) => (def.porLocal && f.key === 'local') || (def.compra && f.key === 'valor') ? null : def.porLocal && f.key === 'quantidade' ? (
           <LocaisCampo
