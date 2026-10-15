@@ -29,7 +29,7 @@
   .muted { color: var(--muted); }
   .wrap { max-width: 460px; margin: 0 auto; padding: 24px 16px calc(32px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 22px; }
 
-  /* topo no estilo da tela de acesso do CRM: logo e lema numa faixa */
+  /* topo no estilo da tela de acesso do CRM: logo numa faixa */
   .art {
     display: flex; flex-direction: column; align-items: center; gap: 16px;
     padding: calc(32px + env(safe-area-inset-top)) 24px 26px;
@@ -37,11 +37,6 @@
     border-bottom: 1px solid var(--border);
   }
   .art .logo { box-shadow: 0 10px 30px #000c; }
-  .lema { display: flex; align-items: center; gap: 10px; width: min(320px, 100%); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--brand-light); white-space: nowrap; }
-  .linha { flex: 1; min-width: 14px; height: 1px; position: relative; background: linear-gradient(90deg, transparent, var(--brand-dark)); }
-  .linha::after { content: ''; position: absolute; right: -3px; top: -2.5px; width: 6px; height: 6px; transform: rotate(45deg); background: var(--brand); }
-  .linha--dir { background: linear-gradient(270deg, transparent, var(--brand-dark)); }
-  .linha--dir::after { right: auto; left: -3px; }
 
   /* marca */
   .logo { display: block; margin: 0 auto; border-radius: 50%; }
@@ -150,7 +145,6 @@
 <body>
 <header class="art">
   <img class="logo" id="logo" src="../shared/assets/logo.webp" width="132" height="132" alt="Bar do Dindo" />
-  <div class="lema"><span class="linha"></span><span>Aqui a amizade sempre vale mais</span><span class="linha linha--dir"></span></div>
 </header>
 <main class="wrap">
 
