@@ -6,7 +6,7 @@ import { calcularFicha, fichaDe, precoNormalizado } from './lib/ficha';
 export type FieldType = 'text' | 'textarea' | 'number' | 'money' | 'date' | 'select' | 'email' | 'phone' | 'percent' | 'cnpj' | 'time' | 'ref';
 
 /** Listas que podem ser vinculadas (servidas por /api/crm/referencias/:tipo). */
-export type RefSource = 'pessoas' | 'colaboradores' | 'fornecedores' | 'clientes' | 'insumos';
+export type RefSource = 'pessoas' | 'colaboradores' | 'fornecedores' | 'clientes' | 'insumos' | 'copos' | 'utensilios';
 
 export interface Field {
   key: string;

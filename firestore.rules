@@ -167,6 +167,10 @@ service cloud.firestore {
     match /estoque/{id} {
       allow read: if podeVer('vnd') || podeVer('adm');
     }
+    // o preparo da ficha técnica escolhe copos e utensílios do cadastro de Materiais
+    match /materiais/{id} {
+      allow read: if podeVer('vnd');
+    }
     // a ficha técnica compara os preços de cada fornecedor (Tabela de preços do Administrativo)
     match /precos/{id} {
       allow read: if podeVer('vnd') || podeVer('dp');

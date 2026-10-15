@@ -38,11 +38,35 @@ export interface Ficha {
   perdas: number;
   /** CMV desejado (% do preço de venda) para sugerir o preço. */
   cmvAlvo: number;
+  /** Texto livre das fichas antigas; ao abrir, vira a lista de passos. */
   preparo: string;
+  /** Técnica de preparo (montado, batido, mexido…). */
+  tecnica: string;
+  /** Copo ou recipiente; `copoId` liga ao cadastro ("e:" Estoque, "m:" Materiais, "s:" sugestão). */
+  copo: string;
+  copoId: string | null;
+  /** Copo descartável do Estoque: custo por drink, somado à porção. */
+  copoCusto: number;
+  utensilios: Ligado[];
+  /** Passo a passo, na ordem. */
+  passos: string[];
+  /** Finalização e decoração. */
   montagem: string;
 }
 
-export const FICHA_VAZIA: Ficha = { itens: [], fixos: [], rendimento: 1, perdas: 0, cmvAlvo: 30, preparo: '', montagem: '' };
+/** Item ligado a um cadastro (Estoque, Materiais) ou digitado (`id` nulo). */
+export interface Ligado { id: string | null; nome: string }
+/** Copo ou utensílio como vem de /crm/referencias/copos|utensilios. */
+export interface Recipiente extends Ligado { id: string; detalhe?: string; custo: number; descartavel: boolean }
+
+export const TECNICAS = ['Montado', 'Batido', 'Mexido', 'Macerado', 'Liquidificador'];
+
+export const FICHA_VAZIA: Ficha = {
+  itens: [], fixos: [], rendimento: 1, perdas: 0, cmvAlvo: 30, preparo: '', tecnica: '', copo: '', copoId: null, copoCusto: 0, utensilios: [], passos: [], montagem: '',
+};
+
+/** Texto de preparo antigo ("1. Macerar…\n2. Completar…") em passos, sem a numeração. */
+const passosDoTexto = (t: string) => t.split(/\r?\n/).map((l) => l.replace(/^\s*(\d+\s*[.)\-–]|[-•*])\s*/, '').trim()).filter(Boolean);
 
 export function fichaDe(v: unknown): Ficha {
   const f = (v && typeof v === 'object' ? v : {}) as Partial<Ficha>;
@@ -50,6 +74,12 @@ export function fichaDe(v: unknown): Ficha {
     ...FICHA_VAZIA, ...f,
     itens: Array.isArray(f.itens) ? f.itens : [],
     fixos: Array.isArray(f.fixos) ? f.fixos : [],
+    utensilios: Array.isArray(f.utensilios) ? f.utensilios.map((u) => (typeof u === 'string' ? { id: null, nome: u } : { id: u?.id ?? null, nome: String(u?.nome ?? '') })) : [],
+    copoCusto: Number(f.copoCusto) || 0,
+    // fichas antigas: o texto de preparo vira a lista de passos
+    ...(Array.isArray(f.passos) && f.passos.length ? { passos: f.passos.map(String), preparo: f.preparo ?? '' }
+      : { passos: passosDoTexto(String(f.preparo ?? '')), preparo: '' }),
+    copo: String(f.copo ?? ''), copoId: f.copoId ?? null, tecnica: String(f.tecnica ?? ''), montagem: String(f.montagem ?? ''),
     rendimento: Number(f.rendimento) > 0 ? Number(f.rendimento) : 1,
     perdas: Number(f.perdas) || 0,
     cmvAlvo: Number(f.cmvAlvo) > 0 ? Number(f.cmvAlvo) : FICHA_VAZIA.cmvAlvo,
@@ -89,7 +119,8 @@ const centavos = (v: number) => Math.round(v * 100) / 100;
 export function calcularFicha(f: Ficha, preco: number) {
   const insumos = f.itens.reduce((t, i) => t + custoDoItem(i), 0);
   // itens fixos (gelo, guarnições) entram por porção, com o valor cadastrado, sem pesar nem aplicar perdas
-  const fixos = f.fixos.reduce((t, x) => t + (Number(x.custo) || 0), 0);
+  // copo descartável também é um custo fixo por porção
+  const fixos = f.fixos.reduce((t, x) => t + (Number(x.custo) || 0), 0) + (Number(f.copoCusto) || 0);
   const porcao = (insumos * (1 + (f.perdas || 0) / 100)) / (f.rendimento || 1) + fixos;
   const total = porcao * (f.rendimento || 1);
   const cmv = preco > 0 ? porcao / preco : null;
@@ -154,8 +185,18 @@ export const usarOpcao = (i: ItemFicha, o: Opcao): ItemFicha =>
  * Atualiza os itens com o custo de hoje: o preço do fornecedor escolhido (Tabela de preços) ou o custo do Estoque.
  * Devolve a ficha nova e quantos itens mudaram (para avisar a pessoa).
  */
-export function atualizarCustos(f: Ficha, insumos: Insumo[], cotacoes: Cotacao[] = [], guarnicoes: FixoFicha[] = []) {
+export function atualizarCustos(f: Ficha, insumos: Insumo[], cotacoes: Cotacao[] = [], guarnicoes: FixoFicha[] = [], copos: Recipiente[] = [], utensilios: Recipiente[] = []) {
   let mudou = 0;
+  // copo e utensílios ligados aos cadastros acompanham nome e custo de hoje (apagados ficam como estavam)
+  const copo = f.copoId ? copos.find((x) => x.id === f.copoId) : undefined;
+  const copoNovo = copo ? { copo: copo.nome, copoCusto: copo.descartavel ? copo.custo : 0 } : { copo: f.copo, copoCusto: f.copoCusto };
+  if (copoNovo.copo !== f.copo || Math.abs(copoNovo.copoCusto - f.copoCusto) > 1e-9) mudou++;
+  const utens = f.utensilios.map((u) => {
+    const r = u.id ? utensilios.find((x) => x.id === u.id) : undefined;
+    if (!r || r.nome === u.nome) return u;
+    mudou++;
+    return { ...u, nome: r.nome };
+  });
   // itens fixos pegam o valor de hoje do cadastro (apagados ficam com o último valor)
   const fixos = f.fixos.map((x) => {
     const g = guarnicoes.find((y) => y.id === x.id);
@@ -176,5 +217,57 @@ export function atualizarCustos(f: Ficha, insumos: Insumo[], cotacoes: Cotacao[]
     const unidade = unidadesCompativeis(novo.unidadeBase).includes(i.unidade) ? i.unidade : novo.unidadeBase;
     return { ...i, ...novo, unidade };
   });
-  return { ficha: { ...f, itens, fixos }, mudou };
+  return { ficha: { ...f, ...copoNovo, utensilios: utens, itens, fixos }, mudou };
+}
+
+/* ---------- preparo ---------- */
+
+/** Utensílios de costume para cada técnica (sugeridos ao gerar o passo a passo). */
+export const UTENSILIOS_DA_TECNICA: Record<string, string[]> = {
+  Montado: ['Dosador (jigger)', 'Bailarina'],
+  Batido: ['Coqueteleira', 'Dosador (jigger)', 'Peneira (strainer)'],
+  Mexido: ['Mixing glass', 'Bailarina', 'Dosador (jigger)', 'Peneira (strainer)'],
+  Macerado: ['Socador', 'Dosador (jigger)', 'Bailarina'],
+  Liquidificador: ['Liquidificador', 'Dosador (jigger)'],
+};
+
+const qtdTxt = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+/** "a, b e c" */
+const juntarLista = (l: string[]) => (l.length <= 1 ? l.join('') : `${l.slice(0, -1).join(', ')} e ${l[l.length - 1]}`);
+const comQtd = (i: ItemFicha) => `${qtdTxt(Number(i.quantidade) || 0)} ${i.unidade} de ${i.insumo}`;
+
+/**
+ * Rascunho do passo a passo a partir da técnica, dos insumos, do copo e das guarnições marcadas.
+ * A pessoa revisa e ajusta; é só um ponto de partida.
+ */
+export function gerarPassos(f: Ficha): string[] {
+  const copo = f.copo.trim() ? f.copo.trim().replace(/^copo /i, 'copo ') : 'copo';
+  const noCopo = /^(taça|caneca|tulipa|jarra)/i.test(copo) ? `na ${copo.toLowerCase()}` : `no ${copo.toLowerCase()}`;
+  const temGelo = f.fixos.some((x) => /gelo/i.test(x.nome));
+  const guarnicoes = f.fixos.filter((x) => !/gelo|canudo/i.test(x.nome)).map((x) => x.nome.toLowerCase());
+  const itens = f.itens.filter((i) => i.insumo.trim() && Number(i.quantidade) > 0);
+  const liquidos = itens.filter((i) => ['ml', 'L', 'dose'].includes(i.unidade));
+  const solidos = itens.filter((i) => !['ml', 'L', 'dose'].includes(i.unidade));
+  const todos = juntarLista(itens.map(comQtd)) || 'os ingredientes';
+  const fim = [
+    ...(guarnicoes.length ? [`Finalize com ${juntarLista(guarnicoes)}.`] : []),
+    ...(f.fixos.some((x) => /canudo/i.test(x.nome)) ? ['Sirva com canudo.'] : []),
+  ];
+  switch (f.tecnica) {
+    case 'Batido':
+      return [`Coloque ${todos} na coqueteleira com gelo.`, 'Bata vigorosamente por cerca de 10 segundos.', `Coe ${noCopo}${temGelo ? ' com gelo novo' : ''}.`, ...fim];
+    case 'Mexido':
+      return [`Coloque ${todos} no mixing glass com gelo.`, 'Mexa com a bailarina por cerca de 20 segundos.', `Coe ${noCopo}${temGelo ? ' com gelo' : ''}.`, ...fim];
+    case 'Macerado':
+      return [
+        solidos.length ? `${noCopo[0].toUpperCase()}${noCopo.slice(1)}, macere ${juntarLista(solidos.map(comQtd))}.` : `Macere os ingredientes ${noCopo}.`,
+        temGelo ? 'Complete com gelo.' : '',
+        liquidos.length ? `Adicione ${juntarLista(liquidos.map(comQtd))}.` : '',
+        'Mexa com a bailarina.', ...fim,
+      ].filter(Boolean);
+    case 'Liquidificador':
+      return [`Bata ${todos} no liquidificador${temGelo ? ' com gelo' : ''} até ficar homogêneo.`, `Sirva ${noCopo}.`, ...fim];
+    default:
+      return [temGelo ? `Encha o ${copo.toLowerCase()} com gelo.` : `Separe o ${copo.toLowerCase()}.`, `Adicione ${todos}.`, 'Mexa levemente com a bailarina.', ...fim];
+  }
 }

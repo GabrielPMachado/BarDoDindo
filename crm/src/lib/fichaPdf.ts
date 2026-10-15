@@ -28,7 +28,9 @@ export async function imprimirFicha(nome: string, ficha: Ficha, preco: number) {
       i.custoBase ? `${i.precoId && i.fornecedor ? `${i.fornecedor} · ` : ''}${custoBaseTxt(i)}` : '—', brl(custoDoItem(i)),
     ]).concat(ficha.fixos.map((x) => [
       x.nome, ficha.rendimento === 1 ? '1 por porção' : `${qtd(ficha.rendimento)} (1 por porção)`, `valor fixo · ${brl(x.custo)}`, brl(x.custo * ficha.rendimento),
-    ])),
+    ])).concat(ficha.copoCusto > 0 ? [[
+      `${ficha.copo} (descartável)`, ficha.rendimento === 1 ? '1 por porção' : `${qtd(ficha.rendimento)} (1 por porção)`, `Estoque · ${brl(ficha.copoCusto)}`, brl(ficha.copoCusto * ficha.rendimento),
+    ]] : []),
     foot: [
       ['Custo da receita', '', ficha.perdas ? `+ ${num(ficha.perdas, 1)}% de perdas nos insumos` : '', brl(c.total)],
       ['Custo por porção', '', '', brl(c.porcao)],
@@ -55,21 +57,44 @@ export async function imprimirFicha(nome: string, ficha: Ficha, preco: number) {
   linha('Margem por porção', c.margem === null ? '—' : brl(c.margem));
   linha(`Preço sugerido (CMV ${num(ficha.cmvAlvo, 1)}%)`, c.sugerido ? brl(c.sugerido) : '—');
 
-  const bloco = (titulo: string, texto: string) => {
-    if (!texto.trim()) return;
+  const titulo = (t: string) => {
+    if (y > 270) { doc.addPage(); y = 16; }
     y += 4;
     doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(196, 87, 42);
-    doc.text(titulo, 12, y);
+    doc.text(t, 12, y);
     y += 6;
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(40, 40, 40);
-    for (const l of doc.splitTextToSize(texto.trim(), W - 24) as string[]) {
-      if (y > 285) { doc.addPage(); y = 16; }
-      doc.text(l, 12, y);
-      y += 5;
-    }
   };
-  bloco('Modo de preparo', ficha.preparo);
-  bloco('Montagem e apresentação', ficha.montagem);
+  /** Texto com quebra de linha; `recuo` alinha as linhas seguintes depois do número do passo. */
+  const paragrafo = (texto: string, prefixo = '', recuo = 0) => {
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(40, 40, 40);
+    (doc.splitTextToSize(texto.trim(), W - 24 - recuo) as string[]).forEach((l, i) => {
+      if (y > 285) { doc.addPage(); y = 16; }
+      if (i === 0 && prefixo) {
+        // número do passo em negrito; rótulo (ex.: "Utensílios") no mesmo estilo das linhas "Técnica" e "Copo"
+        if (recuo > 20) { doc.setTextColor(90, 90, 90); doc.text(prefixo, 12, y); doc.setFont('helvetica', 'bold'); doc.setTextColor(26, 26, 26); }
+        else { doc.setFont('helvetica', 'bold'); doc.text(prefixo, 12, y); doc.setFont('helvetica', 'normal'); }
+      }
+      doc.text(l, 12 + recuo, y);
+      y += 5;
+    });
+  };
+  const temPreparo = ficha.tecnica || ficha.copo || ficha.utensilios.length || ficha.passos.some((p) => p.trim()) || ficha.preparo.trim();
+  if (temPreparo) {
+    titulo('Preparo');
+    if (ficha.tecnica) linha('Técnica', ficha.tecnica);
+    if (ficha.copo) linha('Copo', ficha.copo);
+    if (ficha.utensilios.length) paragrafo(ficha.utensilios.map((u) => u.nome).join(', '), 'Utensílios', 68);
+    const passos = ficha.passos.filter((p) => p.trim());
+    if (passos.length) {
+      y += 2;
+      passos.forEach((p, i) => paragrafo(p, `${i + 1}.`, 7));
+    }
+    if (ficha.preparo.trim()) paragrafo(ficha.preparo);
+  }
+  if (ficha.montagem.trim()) {
+    titulo('Finalização e decoração');
+    paragrafo(ficha.montagem);
+  }
 
   doc.save(`ficha-tecnica-${nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}.pdf`);
 }
