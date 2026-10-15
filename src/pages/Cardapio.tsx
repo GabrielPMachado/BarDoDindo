@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, Star, Utensils, X } from 'lucide-react';
+import { BookOpen, ChevronDown, Gauge, Leaf, Search, Star, Utensils, X, type LucideIcon } from 'lucide-react';
 import { brl, sortCategories } from '../data';
 import { Empty, PageHeader } from '../components/ui';
 import { ItemFoto } from '../components/ItemIcon';
@@ -22,7 +22,7 @@ export default function Cardapio() {
   const term = q.trim().toLowerCase();
   const items = cardapio.filter((i) =>
     term
-      ? (i.nome + ' ' + i.descricao).toLowerCase().includes(term)
+      ? [i.nome, i.resumo, i.descricao, ...(i.ingredientes ?? [])].join(' ').toLowerCase().includes(term)
       : active === 'Destaques' ? i.destaque : i.categoria === active,
   );
 
@@ -66,7 +66,7 @@ export default function Cardapio() {
               <ItemFoto foto={i.foto} categoria={i.categoria} size="lg" />
               <div className="menu-row__main">
                 <strong>{i.nome}</strong>
-                {i.descricao && <span className="muted small menu-row__desc">{i.descricao}</span>}
+                {(i.resumo || i.descricao) && <span className="muted small menu-row__desc">{i.resumo || i.descricao}</span>}
                 {(i.teor ?? 0) > 0 && <span className="menu-row__teor">{i.teor!.toLocaleString('pt-BR')}% álc.</span>}
               </div>
               <div className="hist-row__value">
@@ -86,11 +86,31 @@ const PERFIL: { key: 'docura' | 'amargor' | 'acidez' | 'intensidade'; label: str
   { key: 'docura', label: 'Doçura' }, { key: 'amargor', label: 'Amargor' }, { key: 'acidez', label: 'Acidez' }, { key: 'intensidade', label: 'Intensidade' },
 ];
 
-/** Detalhes do produto: foto grande, perfil da bebida e a descrição completa. */
+/** Botão que abre (ou fecha) uma parte dos detalhes, para quem quiser saber mais. */
+function Secao({ id, titulo, icon: Icon, aberta, onToggle, children }: {
+  id: string; titulo: string; icon: LucideIcon; aberta: boolean; onToggle: () => void; children: ReactNode;
+}) {
+  return (
+    <section className={`secao-prod ${aberta ? 'is-aberta' : ''}`}>
+      <button type="button" className="secao-prod__botao" aria-expanded={aberta} aria-controls={`sec-${id}`} onClick={onToggle}>
+        <Icon size={18} /> <span>{titulo}</span> <ChevronDown size={18} className="secao-prod__seta" />
+      </button>
+      {aberta && <div className="secao-prod__corpo" id={`sec-${id}`}>{children}</div>}
+    </section>
+  );
+}
+
+/** Detalhes do produto: foto grande, o básico em uma linha e botões para ingredientes, perfil e história. */
 function ProdutoSheet({ p, pontos, onClose }: { p: Produto; pontos: number; onClose: () => void }) {
   const perfil = PERFIL.filter((x) => (p.perfil?.[x.key] ?? 0) > 0);
   const notas = p.notas ?? [];
+  const ingredientes = p.ingredientes ?? [];
   const temPerfil = (p.teor ?? 0) > 0 || perfil.length > 0 || notas.length > 0;
+  // sem descrição curta, a história fica visível direto (é a única descrição que existe)
+  const resumo = p.resumo || '';
+  const historia = p.resumo ? p.descricao : '';
+  const [aberta, setAberta] = useState<string | null>(null);
+  const alternar = (id: string) => setAberta((a) => (a === id ? null : id));
   return (
     <div className="overlay" onClick={onClose}>
       <div className="sheet produto" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={p.nome}>
@@ -99,34 +119,41 @@ function ProdutoSheet({ p, pontos, onClose }: { p: Produto; pontos: number; onCl
           {p.foto ? <img src={p.foto} alt={p.nome} /> : <ItemFoto categoria={p.categoria} size="xl" />}
         </div>
         <div className="produto__topo">
-          <span className="produto__cat">{p.categoria}</span>
+          <span className="produto__cat">{p.categoria}{(p.teor ?? 0) > 0 ? ` · ${p.teor!.toLocaleString('pt-BR')}% álc.` : ''}</span>
           <h2>{p.nome}</h2>
+          {(resumo || (!historia && p.descricao)) && <p className="produto__resumo">{resumo || p.descricao}</p>}
           <div className="produto__preco"><b>{brl(p.preco)}</b><span className="gold">+{pontos} pts</span></div>
         </div>
 
-        {temPerfil && (
-          <section className="produto__perfil">
-            <h3 className="section-title">Perfil da bebida</h3>
-            {(p.teor ?? 0) > 0 && (
-              <div className="produto__teor"><span>Teor alcoólico</span><b>{p.teor!.toLocaleString('pt-BR')}%</b></div>
+        {(ingredientes.length > 0 || temPerfil || historia) && (
+          <div className="produto__secoes">
+            {ingredientes.length > 0 && (
+              <Secao id="ing" titulo="Ingredientes" icon={Leaf} aberta={aberta === 'ing'} onToggle={() => alternar('ing')}>
+                <ul className="produto__ingredientes">{ingredientes.map((x) => <li key={x}>{x}</li>)}</ul>
+              </Secao>
             )}
-            {perfil.map((x) => (
-              <div key={x.key} className="medidor" aria-label={`${x.label}: ${p.perfil![x.key]} de 5`}>
-                <span>{x.label}</span>
-                <span className="medidor__pontos" aria-hidden="true">
-                  {[1, 2, 3, 4, 5].map((n) => <i key={n} className={n <= (p.perfil![x.key] ?? 0) ? 'is-on' : ''} />)}
-                </span>
-              </div>
-            ))}
-            {notas.length > 0 && <div className="produto__notas">{notas.map((n) => <span key={n}>{n}</span>)}</div>}
-          </section>
-        )}
-
-        {p.descricao && (
-          <section className="produto__sobre">
-            <h3 className="section-title">Sobre</h3>
-            <p>{p.descricao}</p>
-          </section>
+            {temPerfil && (
+              <Secao id="perfil" titulo="Perfil da bebida" icon={Gauge} aberta={aberta === 'perfil'} onToggle={() => alternar('perfil')}>
+                {(p.teor ?? 0) > 0 && (
+                  <div className="produto__teor"><span>Teor alcoólico</span><b>{p.teor!.toLocaleString('pt-BR')}%</b></div>
+                )}
+                {perfil.map((x) => (
+                  <div key={x.key} className="medidor" aria-label={`${x.label}: ${p.perfil![x.key]} de 5`}>
+                    <span>{x.label}</span>
+                    <span className="medidor__pontos" aria-hidden="true">
+                      {[1, 2, 3, 4, 5].map((n) => <i key={n} className={n <= (p.perfil![x.key] ?? 0) ? 'is-on' : ''} />)}
+                    </span>
+                  </div>
+                ))}
+                {notas.length > 0 && <div className="produto__notas">{notas.map((n) => <span key={n}>{n}</span>)}</div>}
+              </Secao>
+            )}
+            {historia && (
+              <Secao id="hist" titulo="História" icon={BookOpen} aberta={aberta === 'hist'} onToggle={() => alternar('hist')}>
+                <p className="produto__historia">{historia}</p>
+              </Secao>
+            )}
+          </div>
         )}
       </div>
     </div>

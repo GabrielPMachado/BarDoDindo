@@ -647,12 +647,11 @@ button.menu-row:active { background: var(--surface-2); }
 .produto__capa img { width: 100%; height: 100%; object-fit: cover; }
 .produto__capa .thumb--xl { width: 120px; height: 120px; }
 .produto__capa .thumb--xl svg { width: 56px; height: 56px; }
-.produto__topo, .produto__perfil, .produto__sobre { padding: 0 18px; display: flex; flex-direction: column; gap: 8px; }
+.produto__topo { padding: 0 18px; display: flex; flex-direction: column; gap: 8px; }
 .produto__cat { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--brand-light); font-weight: 600; }
 .produto__topo h2 { margin: 0; font: 800 26px/1.15 var(--serif); }
 .produto__preco { display: flex; align-items: baseline; gap: 10px; }
 .produto__preco b { font: 700 22px var(--serif); }
-.produto__perfil { padding-top: 16px; border-top: 1px solid var(--border); margin: 0 18px; padding-left: 0; padding-right: 0; gap: 12px; }
 .produto__teor { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); }
 .produto__teor b { font: 800 20px var(--serif); color: var(--brand-light); }
 .medidor { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 12px; font-size: 14px; }
@@ -661,5 +660,18 @@ button.menu-row:active { background: var(--surface-2); }
 .medidor__pontos i.is-on { background: linear-gradient(90deg, var(--brand-dark), var(--brand-light)); }
 .produto__notas { display: flex; flex-wrap: wrap; gap: 6px; }
 .produto__notas span { padding: 5px 12px; border-radius: 99px; font-size: 13px; background: #c4572a1f; border: 1px solid #c4572a55; color: #f0a47f; }
-.produto__sobre { padding-top: 16px; border-top: 1px solid var(--border); margin: 0 18px; padding-left: 0; padding-right: 0; }
-.produto__sobre p { margin: 0; color: var(--muted); line-height: 1.6; font-size: 14.5px; }
+
+.produto__resumo { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.5; }
+.produto__secoes { display: flex; flex-direction: column; margin: 0 18px; border-top: 1px solid var(--border); }
+.secao-prod { border-bottom: 1px solid var(--border); }
+.secao-prod__botao { width: 100%; min-height: 54px; display: flex; align-items: center; gap: 12px; padding: 0 2px; font-size: 15px; font-weight: 600; color: var(--text); text-align: left; }
+.secao-prod__botao > svg:first-child { color: var(--brand-light); }
+.secao-prod__botao span { flex: 1; }
+.secao-prod__seta { color: var(--muted); transition: transform .2s; }
+.secao-prod.is-aberta .secao-prod__seta { transform: rotate(180deg); }
+.secao-prod__corpo { display: flex; flex-direction: column; gap: 12px; padding: 2px 2px 18px; animation: fadein .2s ease; }
+.produto__ingredientes { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.produto__ingredientes li { padding: 9px 0; border-bottom: 1px dashed var(--border); font-size: 14.5px; display: flex; align-items: center; gap: 10px; }
+.produto__ingredientes li:last-child { border-bottom: 0; }
+.produto__ingredientes li::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--brand); flex-shrink: 0; }
+.produto__historia { margin: 0; color: var(--muted); line-height: 1.65; font-size: 14.5px; }
