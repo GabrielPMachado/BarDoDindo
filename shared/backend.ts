@@ -418,7 +418,11 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   });
   rota('GET', '/public/cardapio', async () =>
     (await colecao('cardapio'))
-      .map((p) => ({ id: p.id, nome: p.nome, categoria: p.categoria, descricao: p.descricao ?? '', preco: Number(p.preco) || 0, destaque: p.destaque === true }))
+      .map((p) => ({
+        id: p.id, nome: p.nome, categoria: p.categoria, descricao: p.descricao ?? '', preco: Number(p.preco) || 0, destaque: p.destaque === true,
+        foto: typeof p.foto === 'string' ? p.foto : '', teor: Number(p.teor) || 0,
+        perfil: (p.perfil ?? {}) as Record<string, number>, notas: Array.isArray(p.notas) ? p.notas : [],
+      }))
       .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR')),
   );
   const recompensasAtivas = () => lista('recompensas@ativas', query(collection(db, 'recompensas'), where('status', '==', 'Ativa')));
@@ -1149,13 +1153,25 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     if (!area) return fail(404, 'Módulo inexistente.');
     return area;
   }
+  /** O que o cardápio público mostra de um produto (sem custo, margem nem ficha técnica). */
+  function itemDoCardapio(d: Dados) {
+    const nota = (v: unknown) => { const x = Math.round(Number(v)); return Number.isFinite(x) && x > 0 ? Math.min(5, x) : 0; };
+    const teor = Number(d.teor);
+    return {
+      nome: d.nome ?? '', categoria: d.categoria ?? '', descricao: d.descricao ?? '', preco: Number(d.preco) || 0, destaque: d.destaque === 'Sim',
+      foto: typeof d.foto === 'string' && d.foto.startsWith('data:image/') ? d.foto : '',
+      teor: Number.isFinite(teor) && teor > 0 ? Math.min(100, Math.round(teor * 10) / 10) : 0,
+      perfil: { docura: nota(d.docura), amargor: nota(d.amargor), acidez: nota(d.acidez), intensidade: nota(d.intensidade) },
+      notas: String(d.notas ?? '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 8),
+    };
+  }
+  const noCardapio = (d: Dados) => d.status === 'Ativo' && d.noCardapio !== 'Não';
   /** Cópias só com o que pode ser visto por mais gente: cardápio (público) e nomes para vincular registros (equipe). */
   function espelhar(lote: WriteBatch, col: string, id: string, d: Dados | null) {
     if (col === 'produtos') {
       const ref = doc(db, 'cardapio', id);
-      if (d && d.status === 'Ativo' && d.noCardapio !== 'Não') {
-        lote.set(ref, { nome: d.nome ?? '', categoria: d.categoria ?? '', descricao: d.descricao ?? '', preco: Number(d.preco) || 0, destaque: d.destaque === 'Sim' });
-      } else lote.delete(ref);
+      if (d && noCardapio(d)) lote.set(ref, itemDoCardapio(d));
+      else lote.delete(ref);
     }
     if (col === 'colaboradores') {
       const ref = doc(db, 'ref_colaboradores', id);
@@ -1344,8 +1360,30 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     if (['consumos', 'resgates'].includes(p.col)) requireAnyAccess(ctx, ['atd', 'vnd', 'mkt'], 'ver');
     else requireAccess(ctx, collectionArea(p.col), 'ver');
     // ?desde=AAAA-MM-DD carrega só o período (receitas, despesas, consumos e reservas)
-    return colecaoDesde(p.col, q.get('desde'));
+    const linhas = await colecaoDesde(p.col, q.get('desde'));
+    // ao abrir os produtos, quem edita Vendas acerta o cardápio público com o que mudou (fotos, perfil da bebida…)
+    if (p.col === 'produtos' && ctx.acoes('vnd').includes('editar')) await sincronizarCardapio(linhas).catch(() => undefined);
+    return linhas;
   });
+  /** JSON com as chaves em ordem, para comparar dois objetos. */
+  const canon = (v: unknown): string => Array.isArray(v) ? `[${v.map(canon).join(',')}]`
+    : v && typeof v === 'object' ? `{${Object.keys(v as object).sort().map((k) => `${JSON.stringify(k)}:${canon((v as Dados)[k])}`).join(',')}}`
+    : JSON.stringify(v);
+  async function sincronizarCardapio(produtos: Dados[]) {
+    const atual = new Map((await colecao('cardapio')).map((c) => { const { id, ...resto } = c; return [String(id), JSON.stringify(resto)]; }));
+    const lote = writeBatch(db);
+    let n = 0;
+    for (const prod of produtos) {
+      if (n >= 400) break;
+      const id = String(prod.id), ref = doc(db, 'cardapio', id);
+      if (noCardapio(prod)) {
+        const item = itemDoCardapio(prod);
+        const salvo = atual.get(id);
+        if (!salvo || canon(JSON.parse(salvo)) !== canon(item)) { lote.set(ref, item); n++; }
+      } else if (atual.has(id)) { lote.delete(ref); n++; }
+    }
+    if (n) await lote.commit();
+  }
   rota('POST', '/crm/c/:col', async ({ p, b }) => {
     const ctx = await requireUsuario();
     requireAccess(ctx, collectionArea(p.col), 'criar');

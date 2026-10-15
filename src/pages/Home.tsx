@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, CalendarDays, Camera, ChevronRight, Clock, Gift, Info, MapPin, ReceiptText, Star, Utensils } from 'lucide-react';
-import { ItemIcon } from '../components/ItemIcon';
+import { ItemFoto, ItemIcon } from '../components/ItemIcon';
 import { brl, sortCategories } from '../data';
 import { memberNumber, upcoming, useMe, useStore } from '../store';
 
@@ -202,7 +202,7 @@ export default function Home() {
                   {p.descricao && <p>{p.descricao}</p>}
                   <span className="banner__preco">{brl(p.preco)} <em>+{Math.floor(p.preco * pontosPorReal)} pts</em></span>
                 </div>
-                <ItemIcon categoria={p.categoria} size="xl" />
+                <ItemFoto foto={p.foto} categoria={p.categoria} size="xl" alt={p.nome} />
               </div>
             </Link>
           ))}
@@ -239,7 +239,7 @@ export default function Home() {
       {destaques[0] && (
         <Link to={`/cardapio?cat=${encodeURIComponent('Destaques')}`} className="vitrine-produto">
           <span className="vitrine-produto__tag"><Star size={13} fill="currentColor" /> Destaque</span>
-          <ItemIcon categoria={destaques[0].categoria} size="xl" />
+          <ItemFoto foto={destaques[0].foto} categoria={destaques[0].categoria} size="xl" alt={destaques[0].nome} />
           <span className="vitrine-produto__info">
             <strong>{destaques[0].nome}</strong>
             {destaques[0].descricao && <span>{destaques[0].descricao}</span>}

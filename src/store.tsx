@@ -11,13 +11,19 @@ interface Config {
   niveis: { nome: string; minimo: number }[];
 }
 
-interface Produto {
+export interface Produto {
   id: string;
   nome: string;
   categoria: string;
   descricao: string;
   preco: number;
   destaque: boolean;
+  foto?: string;
+  /** teor alcoólico em %, 0 = não informado */
+  teor?: number;
+  /** de 0 a 5; 0 = não informado */
+  perfil?: { docura?: number; amargor?: number; acidez?: number; intensidade?: number };
+  notas?: string[];
 }
 
 export interface Recompensa {
