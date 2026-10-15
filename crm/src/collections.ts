@@ -85,6 +85,8 @@ export interface CollectionDef {
   lancarAoCriar?: boolean;
   /** Quantidade guardada por local (Bar, Depósito…), com botão de transferir entre locais. */
   porLocal?: boolean;
+  /** Botão "Preencher com IA" (descrição, ingredientes e perfil da bebida) no cadastro do produto. */
+  iaProduto?: boolean;
   /** A ficha técnica vem antes dos outros campos no formulário (tela "Fichas técnicas"). */
   fichaPrimeiro?: boolean;
   /** Como um registro deste módulo vira despesa no DRE: pré-preenche a tela "Lançar despesa" (a pessoa confere antes de lançar). */
@@ -514,7 +516,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     },
   },
   produtos: {
-    id: 'produtos', comFoto: true, fichaTecnica: true, area: 'vnd', title: 'Produtos e cardápio', singular: 'produto',
+    id: 'produtos', comFoto: true, fichaTecnica: true, iaProduto: true, area: 'vnd', title: 'Produtos e cardápio', singular: 'produto',
     description: 'Produtos marcados como "No cardápio" e ativos aparecem no aplicativo dos clientes.',
     filterKey: 'categoria', sortKey: 'nome',
     fields: [

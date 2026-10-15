@@ -133,7 +133,7 @@ function ProdutoSheet({ p, pontos, onClose }: { p: Produto; pontos: number; onCl
               </Secao>
             )}
             {temPerfil && (
-              <Secao id="perfil" titulo="Perfil da bebida" icon={Gauge} aberta={aberta === 'perfil'} onToggle={() => alternar('perfil')}>
+              <Secao id="perfil" titulo={(p.teor ?? 0) > 0 || perfil.length ? 'Perfil da bebida' : 'Sabor'} icon={Gauge} aberta={aberta === 'perfil'} onToggle={() => alternar('perfil')}>
                 {(p.teor ?? 0) > 0 && (
                   <div className="produto__teor"><span>Teor alcoólico</span><b>{p.teor!.toLocaleString('pt-BR')}%</b></div>
                 )}
