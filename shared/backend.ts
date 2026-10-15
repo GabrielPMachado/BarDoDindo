@@ -83,6 +83,17 @@ const ORIGENS_DESPESA: Record<string, string> = {
   terceirizados: 'Serviços terceirizados', contratos: 'Contratos', midias: 'Gestão de mídias', projetos: 'Projetos',
 };
 const VALOR_MAXIMO_DESPESA = 1_000_000;
+/** Sugestões para o preparo na ficha técnica, além do que estiver em Materiais (Estrutura). */
+const SUGESTOES_COPOS = [
+  'Copo long drink', 'Copo old fashioned', 'Copo americano', 'Copo shot', 'Taça de gin', 'Taça de vinho', 'Taça martini',
+  'Taça coupé', 'Taça de champanhe', 'Caneca de chope', 'Tulipa', 'Copo de caipirinha', 'Jarra',
+];
+const SUGESTOES_UTENSILIOS = [
+  'Coqueteleira', 'Mixing glass', 'Bailarina', 'Dosador (jigger)', 'Socador', 'Peneira (strainer)', 'Coador fino',
+  'Liquidificador', 'Espremedor', 'Pinça', 'Faca e tábua', 'Descascador', 'Maçarico',
+];
+const PARECE_COPO = /copo|ta[cç]a|caneca|tulipa|jarra|x[ií]cara|cumbuca/i;
+const PARECE_UTENSILIO = /coqueteleira|shaker|mixing|bailarina|dosador|jigger|socador|pilão|peneira|strainer|coador|liquidificador|espremedor|pin[cç]a|faca|t[aá]bua|descascador|ma[cç]arico|abridor|saca-rolha|colher|funil|ralador/i;
 /** Unidades de medida que a ficha técnica converte entre si (ml/L e g/kg). */
 const MEDIDAS = ['ml', 'L', 'g', 'kg'];
 const DATA_ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -931,6 +942,32 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
               detalhe: [e.categoria, custo ? `${brl(custo)}/${un}${converte ? ` de ${conteudo.toLocaleString('pt-BR')} ${medida}` : ''}` : 'sem custo cadastrado'].filter(Boolean).join(' · '),
             };
           });
+      case 'copos':
+      case 'utensilios': {
+        // ficha técnica (preparo): copos e utensílios ligados aos cadastros de Estoque e de Materiais
+        // (com quanto tem de cada), mais sugestões comuns de bar para o que ainda não foi cadastrado
+        requireAnyAccess(ctx, ['vnd', 'dp'], 'ver');
+        const copos = p.tipo === 'copos';
+        const parece = copos ? PARECE_COPO : PARECE_UTENSILIO;
+        const qtd = (v: unknown, un: unknown) => `${(Number(v) || 0).toLocaleString('pt-BR')} ${un || 'un'}`;
+        const doEstoque = (await colecao('estoque'))
+          .filter((e) => e.item && (parece.test(String(e.item)) || (copos && e.categoria === 'Descartáveis' && /copo|ta[cç]a/i.test(String(e.item)))))
+          .map((e) => ({
+            id: 'e:' + e.id, nome: String(e.item), custo: Number(e.custo) || 0, descartavel: e.categoria === 'Descartáveis',
+            detalhe: ['Estoque', qtd(e.quantidade, e.unidade), e.categoria === 'Descartáveis' && Number(e.custo) ? `${brl(Number(e.custo))}/${e.unidade || 'un'} (descartável)` : ''].filter(Boolean).join(' · '),
+          }));
+        const materiais = (await colecao('materiais'))
+          .filter((m) => ['Utensílio', 'Equipamento'].includes(m.tipo) && m.estado !== 'Descartar' && m.material)
+          // copos: só o que parece copo; utensílios: o que não parece copo
+          .filter((m) => (copos ? PARECE_COPO.test(String(m.material)) : !PARECE_COPO.test(String(m.material))))
+          .map((m) => ({ id: 'm:' + m.id, nome: String(m.material), custo: 0, descartavel: false, detalhe: ['Materiais', m.local, qtd(m.quantidade, 'un')].filter(Boolean).join(' · ') }));
+        const cadastrados = [...doEstoque, ...materiais];
+        const nomes = new Set(cadastrados.map((m) => m.nome.toLowerCase()));
+        const sugestoes = (copos ? SUGESTOES_COPOS : SUGESTOES_UTENSILIOS)
+          .filter((n) => !nomes.has(n.toLowerCase()))
+          .map((n) => ({ id: 's:' + n, nome: n, custo: 0, descartavel: false, detalhe: 'Sugestão (não cadastrado)' }));
+        return [...cadastrados, ...sugestoes];
+      }
       case 'precos':
         // ficha técnica: preço de cada fornecedor para cada insumo (Tabela de preços do Administrativo)
         requireAnyAccess(ctx, ['vnd', 'dp', 'adm'], 'ver');

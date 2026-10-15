@@ -6,10 +6,11 @@ import { reload, useResource, type Row } from '../lib/data';
 import { brl, num, pct } from '../lib/format';
 import {
   atualizarCustos, calcularFicha, custoBaseTxt, custoDoItem, opcoesDoItem, UNIDADES, unidadesCompativeis, usarOpcao,
-  type Cotacao, type Ficha, type FixoFicha, type Insumo, type ItemFicha, type Opcao,
+  type Cotacao, type Ficha, type FixoFicha, type Insumo, type ItemFicha, type Opcao, type Recipiente,
 } from '../lib/ficha';
 import { imprimirFicha } from '../lib/fichaPdf';
 import { useSession } from '../lib/session';
+import { PreparoFicha } from './PreparoFicha';
 import { RefPicker } from './pickers';
 import { NumberInput, notify } from './ui';
 
@@ -51,6 +52,8 @@ export function FichaTecnica({ ficha, preco, nome, disabled, preMarcar, onChange
   const listaInsumos = insumos.data ?? [];
   const listaCotacoes = cotacoes.data ?? [];
   const guarnicoes = useResource<Row[]>('/crm/c/guarnicoes');
+  const copos = useResource<Recipiente[]>('/crm/referencias/copos');
+  const utensilios = useResource<Recipiente[]>('/crm/referencias/utensilios');
   const fixosAtivos: (FixoFicha & { padrao: boolean })[] = (guarnicoes.data ?? [])
     .filter((g) => g.status !== 'Inativo')
     .map((g) => ({ id: g.id, nome: String(g.nome ?? ''), custo: Number(g.custo) || 0, padrao: g.padrao === 'Sim' }))
@@ -63,15 +66,16 @@ export function FichaTecnica({ ficha, preco, nome, disabled, preMarcar, onChange
   // ao abrir, cada item pega o custo de hoje (do fornecedor escolhido ou do Estoque), uma vez só, quando as listas chegam
   const atualizado = useRef(false);
   useEffect(() => {
-    if (atualizado.current || disabled || !insumos.data || (!cotacoes.data && !cotacoes.error) || (!guarnicoes.data && !guarnicoes.error)) return;
+    const pronta = (r: { data?: unknown; error: string | null }) => !!r.data || !!r.error;
+    if (atualizado.current || disabled || !insumos.data || ![cotacoes, guarnicoes, copos, utensilios].every(pronta)) return;
     atualizado.current = true;
     const lista = (guarnicoes.data ?? []).map((g) => ({ id: g.id, nome: String(g.nome ?? ''), custo: Number(g.custo) || 0 }));
-    const { ficha: atual, mudou } = atualizarCustos(ficha, insumos.data, cotacoes.data ?? [], lista);
+    const { ficha: atual, mudou } = atualizarCustos(ficha, insumos.data, cotacoes.data ?? [], lista, copos.data ?? [], utensilios.data ?? []);
     // ficha ainda vazia: já vêm marcados os itens fixos "padrão" (ex.: gelo)
     const padroes = preMarcar && !atual.itens.length && !atual.fixos.length ? fixosAtivos.filter((g) => g.padrao).map(({ id, nome, custo }) => ({ id, nome, custo })) : [];
     if (mudou || padroes.length) onChange(padroes.length ? { ...atual, fixos: padroes } : atual);
     if (mudou) notify(`Custo de ${mudou} ${mudou === 1 ? 'item atualizado' : 'itens atualizados'} com os preços de hoje. Salve para gravar.`);
-  }, [insumos.data, cotacoes.data, cotacoes.error, guarnicoes.data, guarnicoes.error, disabled, preMarcar, ficha, onChange, fixosAtivos]);
+  }, [insumos.data, cotacoes, guarnicoes, copos, utensilios, disabled, preMarcar, ficha, onChange, fixosAtivos]);
 
   const alternarFixo = (g: FixoFicha) => {
     const marcado = ficha.fixos.some((x) => x.id === g.id);
@@ -225,14 +229,7 @@ export function FichaTecnica({ ficha, preco, nome, disabled, preMarcar, onChange
           <EconomiaPossivel ficha={ficha} insumos={listaInsumos} cotacoes={listaCotacoes} />
           <p className="muted small">O campo "Custo" do produto passa a ser o custo por porção calculado aqui.</p>
 
-          <div className="form-field">
-            <label htmlFor="ficha-preparo">Modo de preparo</label>
-            <textarea id="ficha-preparo" className="input" rows={4} maxLength={3000} disabled={disabled} value={ficha.preparo} onChange={(e) => onChange({ ...ficha, preparo: e.target.value })} placeholder="Passo a passo da receita" />
-          </div>
-          <div className="form-field">
-            <label htmlFor="ficha-montagem">Montagem e apresentação</label>
-            <textarea id="ficha-montagem" className="input" rows={2} maxLength={1000} disabled={disabled} value={ficha.montagem} onChange={(e) => onChange({ ...ficha, montagem: e.target.value })} placeholder="Copo ou prato, guarnição, decoração" />
-          </div>
+          <PreparoFicha ficha={ficha} copos={copos.data ?? []} utensilios={utensilios.data ?? []} disabled={disabled} onChange={onChange} />
         </>
       )}
     </div>

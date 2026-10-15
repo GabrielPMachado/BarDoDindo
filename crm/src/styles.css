@@ -858,6 +858,29 @@ button.anexos__nome:hover { text-decoration: underline; }
 .ficha__fixo.is-on { border-color: var(--brand); background: #c4572a1f; }
 .ficha__fixo-check { width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--border-strong); display: grid; place-items: center; color: #fff; }
 .ficha__fixo.is-on .ficha__fixo-check { background: var(--brand); border-color: var(--brand); }
+/* preparo da ficha técnica */
+.preparo { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.preparo__cab { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+.preparo__grade { display: grid; grid-template-columns: 1.4fr 1fr; gap: 12px; align-items: start; }
+.preparo__tecnicas { display: flex; flex-wrap: wrap; gap: 6px; }
+.preparo__utensilios { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.preparo__tag { display: inline-flex; align-items: center; gap: 4px; padding: 5px 6px 5px 10px; border-radius: 999px; border: 1px dashed var(--border-strong); background: var(--surface); font-size: 13px; }
+.preparo__tag.is-ligado { border-style: solid; border-color: var(--brand); }
+.preparo__tag button { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; color: var(--muted); }
+.preparo__tag button:hover { color: var(--text); background: var(--surface-2); }
+.preparo__novo-utensilio { flex: 1 1 200px; min-width: 180px; }
+.preparo__passos-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.preparo__passos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.preparo__passo { display: grid; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: center; }
+.preparo__num { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--brand); color: #fff; font-size: 12px; font-weight: 700; }
+.preparo__acoes { display: flex; }
+.preparo__acoes .icon-btn { width: 28px; height: 28px; }
+.preparo__add { align-self: flex-start; margin-top: 6px; }
+@media (max-width: 760px) {
+  .preparo__grade { grid-template-columns: 1fr; }
+  .preparo__passo { grid-template-columns: 26px 1fr; }
+  .preparo__acoes { grid-column: 2; justify-content: flex-end; }
+}
 /* calculadora de guarnições pelo Estoque */
 .calc-guar { margin-bottom: 16px; padding: 0; overflow: hidden; }
 .calc-guar__cab { width: 100%; display: flex; align-items: center; gap: 10px; padding: 14px 16px; text-align: left; flex-wrap: wrap; }
