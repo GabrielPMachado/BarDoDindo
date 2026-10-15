@@ -43,7 +43,7 @@
 
   /* chamada */
   .hero { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
-  .eyebrow { align-self: center; font-size: 12px; font-weight: 500; color: var(--brand-light); border: 1px solid var(--border-strong); padding: 2px 10px; border-radius: 999px; background: #c4572a14; }
+  .eyebrow { align-self: center; font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; padding-top: 4px; padding-bottom: 4px; color: var(--brand-light); border: 1px solid var(--border-strong); padding: 2px 10px; border-radius: 999px; background: #c4572a14; }
   .hero h1 { margin: 0; font: 700 30px/1.15 var(--serif); }
   .hero h1 span { color: var(--brand-light); }
   .hero p { margin: 0; color: var(--muted); }
@@ -58,22 +58,23 @@
   .card h2 { margin: 0 0 6px; font: 700 20px var(--serif); text-align: center; }
   #form-login > p.muted { text-align: center; }
   label.lbl { font-size: 12.5px; color: var(--muted); font-weight: 500; margin-top: 8px; }
-  .input { width: 100%; height: 46px; padding: 0 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font: inherit; }
+  .input { width: 100%; height: 48px; padding: 0 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font: inherit; }
   .input:focus { outline: 0; border-color: var(--brand); }
   .pw { position: relative; }
-  .pw button { position: absolute; right: 6px; top: 6px; height: 36px; padding: 0 10px; color: var(--brand); font-size: 13px; font-weight: 600; }
+  .pw button { position: absolute; right: 6px; top: 6px; height: 36px; border-radius: 8px; padding: 0 10px; color: var(--brand); font-size: 13px; font-weight: 600; }
   .check { display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; font-size: 13px; color: var(--muted); line-height: 1.4; cursor: pointer; }
   .check input { appearance: none; flex-shrink: 0; width: 20px; height: 20px; margin-top: 1px; border-radius: 6px; border: 1.5px solid var(--border-strong); background: var(--surface-2); display: grid; place-items: center; cursor: pointer; }
   .check input:checked { background: var(--brand); border-color: var(--brand); }
   .check input:checked::after { content: ''; width: 5px; height: 10px; border: solid var(--on-brand); border-width: 0 2px 2px 0; transform: rotate(45deg) translate(-1px, -1px); }
-  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 46px; border-radius: 8px; font-weight: 600; font-size: 14.5px; width: 100%; margin-top: 14px; transition: transform .12s, filter .15s; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 48px; border-radius: 10px; font-weight: 600; font-size: 15px; width: 100%; margin-top: 14px; transition: transform .12s, filter .15s; }
   .btn:active:not(:disabled) { transform: scale(.98); }
   .btn--brand { background: linear-gradient(135deg, var(--brand-light), var(--brand) 55%, var(--brand-dark)); color: var(--on-brand); }
   .btn--brand:hover:not(:disabled) { filter: brightness(1.07); }
   .btn--ghost { border: 1px solid var(--border-strong); color: var(--text); }
   .error { color: var(--red); font-size: 13px; margin: 8px 0 0; min-height: 0; }
   .link { color: var(--brand); font-weight: 600; text-align: center; padding: 10px; }
-  .perks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .perks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .secao { margin: 22px 0 10px; text-align: center; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
   /* vantagens: cartões centralizados, no padrão do app do afilhado */
   .perk { display: flex; flex-direction: column; align-items: center; text-align: center; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 8px; font-size: 12px; color: var(--muted); }
   .perk svg { color: var(--brand); display: block; margin: 0 0 8px; }
@@ -172,10 +173,11 @@
       <label class="check"><input type="checkbox" id="aceite" /> <span>Concordo que o Bar do Dindo use meus dados para o programa de afilhados e para me avisar sobre o lançamento do aplicativo.</span></label>
       <p class="error" id="erro-cadastro" role="alert"></p>
       <button class="btn btn--brand" id="btn-cadastro" type="submit">Quero meu número</button>
-      <p class="muted" style="font-size:12px;text-align:center;margin:10px 0 0">Guarde seu e-mail e senha: eles darão acesso ao aplicativo oficial.</p>
+      <p class="muted" style="font-size:12px;text-align:center;margin:10px 0 0">Guarde seu e‑mail e senha: eles darão acesso ao aplicativo oficial.</p>
     </form>
 
-    <div class="perks" style="margin-top:18px">
+    <h2 class="secao">Vantagens de ser afilhado</h2>
+    <div class="perks">
       <div class="perk"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><strong>Pontos</strong>a cada visita</div>
       <div class="perk"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/></svg><strong>Recompensas</strong>exclusivas</div>
       <div class="perk"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><strong>Reservas</strong>pelo celular</div>
@@ -188,7 +190,7 @@
   <section id="view-login" hidden>
     <form class="card" id="form-login" novalidate>
       <h2>Ver meu número</h2>
-      <p class="muted" style="margin:0 0 4px;font-size:14px">Entre com o e-mail e a senha do seu cadastro.</p>
+      <p class="muted" style="margin:0 0 4px;font-size:14px">Entre com o e‑mail e a senha do seu cadastro.</p>
       <label class="lbl" for="l-email">E-mail</label>
       <input class="input" id="l-email" type="email" inputmode="email" autocomplete="email" maxlength="160" required />
       <label class="lbl" for="l-senha">Senha</label>
@@ -331,7 +333,7 @@ import { api as dados } from '../src/api';
     const desde = new Date(cliente.desde).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
     $('ola').textContent = novo ? `Bem-vindo, ${primeiro}!` : `Olá de novo, ${primeiro}!`;
     $('reveal-text').textContent = novo
-      ? 'Seu número está garantido. Você será avisado quando o aplicativo for lançado; use este e-mail e senha para entrar.'
+      ? 'Seu número está garantido. Você será avisado quando o aplicativo for lançado; use este e‑mail e senha para entrar.'
       : 'Este é o seu número de afilhado. Ele continua garantido para o lançamento do aplicativo.';
     $('c-num').textContent = '#' + pad(n);
     $('c-nome').textContent = cliente.nome;
