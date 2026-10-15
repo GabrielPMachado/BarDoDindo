@@ -1,11 +1,12 @@
 import type { AreaKey } from './modules';
 import type { Row } from './lib/data';
 import { brl, daysUntil, isoToday, num, pct } from './lib/format';
+import { calcularFicha, fichaDe, precoNormalizado } from './lib/ficha';
 
 export type FieldType = 'text' | 'textarea' | 'number' | 'money' | 'date' | 'select' | 'email' | 'phone' | 'percent' | 'cnpj' | 'time' | 'ref';
 
 /** Listas que podem ser vinculadas (servidas por /api/crm/referencias/:tipo). */
-export type RefSource = 'pessoas' | 'colaboradores' | 'fornecedores' | 'clientes';
+export type RefSource = 'pessoas' | 'colaboradores' | 'fornecedores' | 'clientes' | 'insumos';
 
 export interface Field {
   key: string;
@@ -75,6 +76,10 @@ export interface CollectionDef {
   comFoto?: boolean;
   /** Aceita PDFs anexados (currículo, contratos, notas fiscais…): o texto é o rótulo do campo no formulário. */
   anexos?: string;
+  /** Produtos: ficha técnica com insumos, custo por porção, CMV e preço sugerido. */
+  fichaTecnica?: boolean;
+  /** A ficha técnica vem antes dos outros campos no formulário (tela "Fichas técnicas"). */
+  fichaPrimeiro?: boolean;
   /** Como um registro deste módulo vira despesa no DRE: pré-preenche a tela "Lançar despesa" (a pessoa confere antes de lançar). */
   despesa?: (r: Row) => DespesaSugerida;
 }
@@ -274,6 +279,34 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   },
 
   /* ---------------- Administrativo ---------------- */
+  precos: {
+    id: 'precos', area: 'adm', title: 'Tabela de preços', singular: 'preço de fornecedor',
+    description: 'Quanto cada fornecedor cobra por insumo. A ficha técnica dos produtos compara os preços e mostra o mais barato.',
+    filterKey: 'status', sortKey: 'insumo',
+    fields: [
+      { key: 'insumo', label: 'Insumo (do Estoque)', type: 'ref', ref: 'insumos', refKey: 'insumoId', required: true, wide: true },
+      { key: 'fornecedor', label: 'Fornecedor', type: 'ref', ref: 'fornecedores', refKey: 'fornecedorId', required: true },
+      { key: 'embalagem', label: 'Embalagem', type: 'text', placeholder: 'Ex.: Garrafa 750 ml' },
+      { key: 'conteudo', label: 'Conteúdo da embalagem', type: 'number', decimals: 3, min: 0.001, max: 1_000_000, required: true, placeholder: 'Ex.: 750' },
+      { key: 'unidade', label: 'Unidade do conteúdo', type: 'select', options: ['ml', 'L', 'g', 'kg', 'un', 'dose'], default: 'ml', required: true },
+      { key: 'preco', label: 'Preço da embalagem', type: 'money', required: true, min: 0.01, max: 100_000 },
+      { key: 'data', label: 'Data da cotação', type: 'date' },
+      { key: 'status', label: 'Situação', type: 'select', options: ['Ativo', 'Inativo'], default: 'Ativo' },
+      { key: 'observacoes', label: 'Observações', type: 'textarea', formOnly: true, wide: true, placeholder: 'Prazo de entrega, pedido mínimo, condições de pagamento…' },
+    ],
+    computed: [
+      { label: 'Preço por L / kg / un', format: 'text', get: (r) => precoNormalizado(n(r.preco), n(r.conteudo), s(r.unidade)) },
+    ],
+    kpis: (rows) => {
+      const ativos = rows.filter((r) => r.status !== 'Inativo');
+      const antigas = ativos.filter((r) => r.data && daysUntil(r.data) < -90).length;
+      return [
+        { label: 'Insumos cotados', value: num(new Set(ativos.map((r) => r.insumoId || r.insumo)).size) },
+        { label: 'Fornecedores', value: num(new Set(ativos.map((r) => r.fornecedorId || r.fornecedor)).size) },
+        { label: 'Cotações com mais de 90 dias', value: num(antigas), tone: antigas ? 'warn' : 'good' },
+      ];
+    },
+  },
   terceirizados: {
     id: 'terceirizados', anexos: 'Contrato, orçamentos e notas fiscais', area: 'adm', title: 'Serviços terceirizados', singular: 'serviço',
     despesa: (r) => ({ descricao: juntar(r.servico, r.empresa), categoria: 'Terceirizados', valor: n(r.valor) }),
@@ -444,7 +477,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     },
   },
   produtos: {
-    id: 'produtos', comFoto: true, area: 'vnd', title: 'Produtos e cardápio', singular: 'produto',
+    id: 'produtos', comFoto: true, fichaTecnica: true, area: 'vnd', title: 'Produtos e cardápio', singular: 'produto',
     description: 'Produtos marcados como "No cardápio" e ativos aparecem no aplicativo dos clientes.',
     filterKey: 'categoria', sortKey: 'nome',
     fields: [
@@ -458,6 +491,10 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'descricao', label: 'Descrição no cardápio', type: 'textarea', formOnly: true, wide: true },
     ],
     computed: [
+      {
+        label: 'Ficha técnica', format: 'text',
+        get: (r) => { const q = fichaDe(r.ficha).itens.length; return q ? `${q} ${q === 1 ? 'insumo' : 'insumos'}` : null; },
+      },
       {
         label: 'Margem', format: 'percent',
         get: (r) => (n(r.preco) && n(r.custo) ? (n(r.preco) - n(r.custo)) / n(r.preco) : null),
@@ -600,6 +637,34 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
         { label: 'Prazo vencido', value: num(abertas.filter((r) => daysUntil(r.prazo) < 0).length), tone: 'bad' },
       ];
     },
+  },
+};
+
+/** Fichas técnicas (Vendas): os mesmos produtos, vistos pela receita. Um registro novo aqui cria o produto do cardápio. */
+const cmvDe = (r: Row) => (fichaDe(r.ficha).itens.length ? calcularFicha(fichaDe(r.ficha), n(r.preco)) : null);
+const acimaDoAlvo = (r: Row) => { const c = cmvDe(r)?.cmv; return c != null && c > fichaDe(r.ficha).cmvAlvo / 100; };
+COLLECTIONS.fichas = {
+  ...COLLECTIONS.produtos,
+  title: 'Fichas técnicas', singular: 'ficha técnica', feminino: true, fichaPrimeiro: true,
+  description: 'Monte a receita com os insumos do Estoque e os preços dos fornecedores: o sistema calcula custo, CMV e preço sugerido e cria o produto do cardápio.',
+  fields: COLLECTIONS.produtos.fields.map((f) => (['nome', 'categoria', 'preco'].includes(f.key) ? f : { ...f, formOnly: true })),
+  computed: [
+    { label: 'Insumos', format: 'number', get: (r) => fichaDe(r.ficha).itens.length || null },
+    { label: 'Custo por porção', format: 'money', get: (r) => cmvDe(r)?.porcao ?? (n(r.custo) || null) },
+    {
+      label: 'CMV', format: 'percent', get: (r) => cmvDe(r)?.cmv ?? null,
+      tone: (r) => { const c = cmvDe(r)?.cmv; const alvo = fichaDe(r.ficha).cmvAlvo / 100; return c == null ? 'neutral' : c <= alvo ? 'good' : c <= alvo + 0.05 ? 'warn' : 'bad'; },
+    },
+    { label: 'Preço sugerido', format: 'money', get: (r) => cmvDe(r)?.sugerido || null },
+  ],
+  kpis: (rows) => {
+    const cmvs = rows.map((r) => cmvDe(r)?.cmv).filter((c): c is number => c != null);
+    const acima = rows.filter(acimaDoAlvo).length;
+    return [
+      { label: 'Produtos com ficha', value: `${num(rows.filter((r) => fichaDe(r.ficha).itens.length).length)} de ${num(rows.length)}` },
+      { label: 'CMV médio', value: cmvs.length ? pct(cmvs.reduce((t, c) => t + c, 0) / cmvs.length) : '—' },
+      { label: 'Acima do CMV desejado', value: num(acima), tone: acima ? 'bad' : 'good' },
+    ];
   },
 };
 

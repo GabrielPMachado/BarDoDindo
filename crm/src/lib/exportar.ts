@@ -107,7 +107,7 @@ function medidas(src: string): Promise<{ w: number; h: number }> {
 
 /** A logo é WebP; Excel e PDF precisam de PNG. */
 let logoPng: Promise<string> | null = null;
-function logoEmPng() {
+export function logoEmPng() {
   logoPng ??= new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {

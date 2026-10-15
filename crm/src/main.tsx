@@ -31,6 +31,8 @@ const GENERIC: Record<string, string> = {
   '/estrutura/materiais': 'materiais',
   '/adm/terceirizados': 'terceirizados',
   '/adm/fornecedores': 'fornecedores',
+  '/adm/precos': 'precos',
+  '/vendas/fichas': 'fichas',
   '/adm/contratos': 'contratos',
   '/marketing/criacao': 'criacao',
   '/marketing/midias': 'midias',

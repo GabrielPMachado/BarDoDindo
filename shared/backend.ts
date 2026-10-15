@@ -32,7 +32,7 @@ const COLLECTIONS: Record<string, string> = {
   metas: 'dir',
   colaboradores: 'rh', ferias: 'rh',
   projetos: 'dp', estoque: 'dp', materiais: 'dp',
-  terceirizados: 'adm', fornecedores: 'adm', contratos: 'adm',
+  terceirizados: 'adm', fornecedores: 'adm', contratos: 'adm', precos: 'adm',
   receitas: 'fin', despesas: 'fin',
   reservas: 'atd', consumos: 'atd', resgates: 'atd',
   criacao: 'mkt', midias: 'mkt', recompensas: 'mkt',
@@ -57,7 +57,7 @@ const AREAS = ['dir', 'atd', 'vnd', 'mkt', 'rh', 'dp', 'adm', 'fin', 'jur', 'fis
 const REGISTRO: Record<string, string> = {
   metas: 'a meta', colaboradores: 'o colaborador', ferias: 'o registro de férias/afastamento',
   projetos: 'o projeto', estoque: 'o item de estoque', materiais: 'o material',
-  terceirizados: 'o serviço terceirizado', fornecedores: 'o fornecedor', contratos: 'o contrato',
+  terceirizados: 'o serviço terceirizado', fornecedores: 'o fornecedor', contratos: 'o contrato', precos: 'o preço de fornecedor',
   receitas: 'a receita', despesas: 'a despesa',
   reservas: 'a reserva', consumos: 'o consumo', resgates: 'o voucher',
   criacao: 'a peça', midias: 'a publicação', produtos: 'o produto', recompensas: 'a recompensa',
@@ -68,7 +68,7 @@ const REGISTRO: Record<string, string> = {
 /** Nome legível de um registro qualquer, para o painel de atualizações. */
 function nomeDe(d: Dados | null | undefined) {
   if (!d) return '';
-  for (const k of ['nome', 'titulo', 'descricao', 'assunto', 'item', 'servico', 'processo', 'colaborador', 'clienteNome', 'recompensa', 'codigo']) {
+  for (const k of ['nome', 'titulo', 'descricao', 'assunto', 'item', 'servico', 'processo', 'colaborador', 'clienteNome', 'recompensa', 'codigo', 'insumo']) {
     const v = d[k];
     if (typeof v === 'string' && v.trim()) return v.trim().slice(0, 120);
   }
@@ -914,6 +914,24 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       case 'fornecedores':
         return (await colecao('ref_fornecedores'))
           .map((f) => ({ id: f.id, nome: f.nome, detalhe: [f.categoria, f.status !== 'Ativo' ? f.status : null].filter(Boolean).join(' · '), inativo: f.status === 'Inativo' }));
+      case 'insumos':
+        // ficha técnica dos produtos (Vendas): itens do Estoque com unidade e custo, sem quantidades nem validade
+        // (o Administrativo também escolhe o insumo ao cadastrar um preço de fornecedor)
+        requireAnyAccess(ctx, ['vnd', 'dp', 'adm'], 'ver');
+        return (await colecao('estoque'))
+          .map((e) => ({
+            id: e.id, nome: e.item, unidade: e.unidade || 'un', custo: Number(e.custo) || 0,
+            detalhe: [e.categoria, Number(e.custo) ? `${brl(Number(e.custo))}/${e.unidade || 'un'}` : 'sem custo cadastrado'].filter(Boolean).join(' · '),
+          }));
+      case 'precos':
+        // ficha técnica: preço de cada fornecedor para cada insumo (Tabela de preços do Administrativo)
+        requireAnyAccess(ctx, ['vnd', 'dp', 'adm'], 'ver');
+        return (await colecao('precos'))
+          .filter((x) => x.status !== 'Inativo' && x.insumoId && Number(x.preco) > 0 && Number(x.conteudo) > 0)
+          .map((x) => ({
+            id: x.id, nome: x.fornecedor || 'Fornecedor', insumoId: x.insumoId, insumo: x.insumo, fornecedorId: x.fornecedorId ?? null,
+            embalagem: x.embalagem ?? '', conteudo: Number(x.conteudo), unidade: x.unidade || 'un', preco: Number(x.preco), data: x.data ?? '',
+          }));
       case 'clientes':
         requireAnyAccess(ctx, ['atd', 'vnd', 'mkt'], 'ver');
         return (await colecao('clientes'))
