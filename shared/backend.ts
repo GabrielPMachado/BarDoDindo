@@ -1305,6 +1305,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
         requireAccess(ctx, 'dp', 'editar');
         const patch: Dados = { locais, quantidade, atualizadoEm: t };
         if (col === 'materiais') patch.local = principal;
+        // a unidade trocada na nota corrige o cadastro (ex.: gin cadastrado em "ml" que é comprado por garrafa)
+        if (sinal > 0 && col === 'estoque' && it.unidade && it.unidade !== cur.unidade) patch.unidade = it.unidade;
         if (sinal > 0 && col === 'estoque') Object.assign(patch, { custo: it.valorUnitario, ...(compra.fornecedor ? { fornecedor: compra.fornecedor, fornecedorId: compra.fornecedorId ?? null } : {}) });
         if (sinal > 0 && col === 'materiais') Object.assign(patch, { valor: it.valorUnitario, aquisicao: compra.data || '' });
         lote.update(doc(db, col, cur.id), patch);
