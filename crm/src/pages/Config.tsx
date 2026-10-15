@@ -446,7 +446,7 @@ function ChaveIA() {
   useEffect(() => { if (atual.data) setModelo(atual.data.modelo); }, [atual.data]);
   const configurada = !!atual.data?.chave;
   const salvar = async (remover = false) => {
-    await api('/crm/ia/chave', { method: 'PUT', body: { chave: remover ? '' : chave.trim() || atual.data?.chave || '', modelo: modelo.trim() } });
+    await api('/crm/ia/chave', { method: 'PUT', body: { chave: remover ? '' : chave.replace(/\s+/g, '') || atual.data?.chave || '', modelo: modelo.trim() } });
     await reload('/crm/ia/chave');
     setChave('');
     notify(remover ? 'Chave da IA removida.' : 'IA de leitura de notas configurada.');

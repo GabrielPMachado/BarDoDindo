@@ -1240,8 +1240,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   rota('PUT', '/crm/ia/chave', async ({ b }) => {
     const ctx = await requireUsuario();
     requireAccess(ctx, 'cfg', 'editar');
-    const chave = str(b.chave, 200), modelo = str(b.modelo, 80);
-    if (chave && !/^[A-Za-z0-9_-]{20,200}$/.test(chave)) fail(400, 'Chave inválida. Copie a chave inteira do Google AI Studio.');
+    const chave = str(b.chave, 300).replace(/\s+/g, ''), modelo = str(b.modelo, 80);
+    if (chave && !/^[A-Za-z0-9._-]{20,300}$/.test(chave)) fail(400, 'Chave inválida. Copie a chave inteira do Google AI Studio.');
     const lote = writeBatch(db);
     lote.set(doc(db, 'segredos', 'ia'), { chave, modelo, atualizadoEm: now(), atualizadoPor: ctx.usuario.id });
     registrar(lote, ctx, 'cfg', chave ? 'configurou a IA de leitura de notas' : 'removeu a chave da IA de leitura de notas');
