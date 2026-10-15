@@ -1122,3 +1122,5 @@ button.anexos__nome:hover { text-decoration: underline; }
 .celula-rapida__campo .input, .celula-rapida__campo .input-affix { height: 32px; font-size: 13px; }
 .celula-rapida__campo input[type=date] { min-width: 140px; }
 .celula-rapida__campo.is-salvando { opacity: .6; pointer-events: none; }
+.celula-rapida__locais { display: flex; flex-direction: column; gap: 4px; }
+.celula-rapida__locais .input-affix > span { font-size: 11.5px; }
