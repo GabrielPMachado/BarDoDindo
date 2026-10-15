@@ -817,4 +817,14 @@ select.input { appearance: none; padding-right: 30px; background-image: linear-g
   .table--cards td.foto-col::before { content: none; }
   .table--cards .thumb { width: 64px; height: 64px; }
 }
+/* ---------- PDFs anexados aos cadastros ---------- */
+.anexos__lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.anexos__item { display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); color: var(--brand); min-width: 0; }
+.anexos__item--novo { border-style: dashed; }
+.anexos__nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; color: var(--text); font-weight: 500; }
+button.anexos__nome:hover { text-decoration: underline; }
+.anexos__acoes { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+.anexos__acoes label.btn { cursor: pointer; }
+.anexos__acoes label.btn.is-disabled { opacity: .6; pointer-events: none; }
+.icon-btn.anexos__contagem { width: auto; padding: 0 8px; gap: 4px; display: inline-flex; align-items: center; font-size: 12px; }
 @media (max-width: 640px) { .perm .segmented { width: 100%; } .perm .segmented button { flex: 1; padding: 6px 4px; } }

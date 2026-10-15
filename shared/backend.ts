@@ -183,6 +183,44 @@ function inssEmpregado(salario: number, faixas: { ate: number; aliquota: number 
   return Math.round(total * 100) / 100;
 }
 
+/* ---------- anexos (PDF) dos cadastros ----------
+ * O arquivo fica fora do registro, em `anexos/{id}` + `anexos/{id}/partes/{n}` (o Firestore aceita até 1 MB por documento),
+ * e o registro guarda só a lista com nome e tamanho: abrir a tabela não baixa nenhum PDF. */
+/** Cadastros que aceitam PDF (currículo, contratos, notas fiscais, laudos…). Igual a `colecoesComAnexo()` em firestore.rules. */
+export const COM_ANEXOS = [
+  'metas', 'colaboradores', 'ferias', 'projetos', 'materiais', 'terceirizados', 'fornecedores', 'contratos',
+  'receitas', 'despesas', 'criacao', 'trabalhista', 'consultoria', 'qualidade', 'naoconformidades',
+];
+export const ANEXO_MAX_BYTES = 5 * 1024 * 1024;
+export const ANEXOS_POR_REGISTRO = 10;
+/** Tamanho de cada parte do arquivo (em caracteres base64). */
+const ANEXO_PARTE = 900_000;
+interface Anexo { id: string; nome: string; tamanho: number; partes: number; criadoEm: string }
+interface AnexoNovo { nome: string; tamanho: number; dados: string }
+
+const anexosDe = (d: Dados | null | undefined): Anexo[] => (Array.isArray(d?.anexos) ? d.anexos : []);
+
+/** PDFs enviados pelo formulário: `dados` é o arquivo em base64 (sem o prefixo "data:"). */
+function validarAnexosNovos(v: unknown): AnexoNovo[] {
+  if (v === undefined || v === null) return [];
+  if (!Array.isArray(v)) return fail(400, 'Anexos inválidos.');
+  return v.map((a: Dados) => {
+    const dados = typeof a?.dados === 'string' ? a.dados : '';
+    // "%PDF" em base64 começa com "JVBER"
+    if (!dados.startsWith('JVBER') || !/^[A-Za-z0-9+/]+={0,2}$/.test(dados)) fail(400, 'Só é possível anexar arquivos PDF.');
+    const tamanho = Math.floor((dados.length * 3) / 4) - (dados.endsWith('==') ? 2 : dados.endsWith('=') ? 1 : 0);
+    if (tamanho > ANEXO_MAX_BYTES) fail(413, `O PDF "${str(a.nome, 80)}" passa de 5 MB.`);
+    let nome = str(a.nome, 150).replace(/[\\/]/g, '-') || 'documento';
+    if (!/\.pdf$/i.test(nome)) nome += '.pdf';
+    return { nome, tamanho, dados };
+  });
+}
+/** Separa os campos de anexo do corpo da requisição (o resto segue para o registro). */
+function separarAnexos(b: Dados) {
+  const { anexos, anexosNovos, ...resto } = b ?? {};
+  return { resto, manter: Array.isArray(anexos) ? new Set(anexos.map((a: Dados) => String(a?.id ?? a))) : null, novos: validarAnexosNovos(anexosNovos) };
+}
+
 export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   // cada sistema tem a própria sessão, mesmo quando abertos no mesmo navegador
   // (`instancia` permite várias sessões no mesmo processo, ex.: roteiros de teste com vários afilhados)
@@ -832,6 +870,10 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const refs: DocumentReference[] = [];
     for (const c of cols) refs.push(...(await todos(c)));
     for (const a of AREAS) refs.push(...(await todos('atividades', a, 'itens')));
+    // PDFs anexados: as partes antes do registro de cada arquivo (as regras consultam o registro ao apagar uma parte)
+    const anexos = await todos('anexos');
+    for (const a of anexos) refs.push(...(await todos('anexos', a.id, 'partes')));
+    refs.push(...anexos);
     refs.push(doc(db, 'meta', 'contadores'));
     const usuarios = await todos('usuarios');
     // preferências de cada usuário (só a própria pessoa lê; o Administrador apaga pela lista de usuários)
@@ -1076,6 +1118,58 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const s = await getDoc(doc(db, col, id));
     return s.exists() ? { ...s.data(), id: s.id } : null;
   }
+  /** Grava cada PDF novo (registro do anexo + partes) num lote próprio; se algum falhar, apaga os que já foram. */
+  async function enviarAnexos(ctx: Ctx, col: string, registroId: string, novos: AnexoNovo[]): Promise<Anexo[]> {
+    const feitos: Anexo[] = [];
+    try {
+      for (const a of novos) {
+        const ref = doc(collection(db, 'anexos'));
+        const partes = Math.max(1, Math.ceil(a.dados.length / ANEXO_PARTE));
+        const criadoEm = now();
+        const lote = writeBatch(db);
+        lote.set(ref, { colecao: col, registroId, nome: a.nome, tamanho: a.tamanho, partes, criadoPor: ctx.usuario.id, criadoEm });
+        for (let i = 0; i < partes; i++) {
+          lote.set(doc(db, 'anexos', ref.id, 'partes', String(i)), { dados: a.dados.slice(i * ANEXO_PARTE, (i + 1) * ANEXO_PARTE) });
+        }
+        await lote.commit();
+        feitos.push({ id: ref.id, nome: a.nome, tamanho: a.tamanho, partes, criadoEm });
+      }
+    } catch (e) {
+      if (feitos.length) {
+        const lote = writeBatch(db);
+        apagarAnexos(lote, feitos);
+        await lote.commit().catch(() => undefined);
+      }
+      throw e;
+    }
+    return feitos;
+  }
+  function apagarAnexos(lote: WriteBatch, anexos: Anexo[]) {
+    for (const a of anexos) {
+      for (let i = 0; i < (Number(a.partes) || 1); i++) lote.delete(doc(db, 'anexos', a.id, 'partes', String(i)));
+      lote.delete(doc(db, 'anexos', a.id));
+    }
+  }
+  /** Confere a quantidade de anexos e se o cadastro aceita PDF. */
+  function conferirAnexos(col: string, total: number, novos: AnexoNovo[]) {
+    if (novos.length && !COM_ANEXOS.includes(col)) fail(400, 'Este cadastro não aceita anexos.');
+    if (total > ANEXOS_POR_REGISTRO) fail(400, `Cada registro aceita até ${ANEXOS_POR_REGISTRO} PDFs.`);
+  }
+  const resumoAnexos = (novos: number, removidos: number) =>
+    [novos ? `${novos} PDF${novos > 1 ? 's' : ''} anexado${novos > 1 ? 's' : ''}` : '', removidos ? `${removidos} PDF${removidos > 1 ? 's' : ''} removido${removidos > 1 ? 's' : ''}` : '']
+      .filter(Boolean).join(' · ');
+
+  /* CRM: abrir um PDF anexado (junta as partes) */
+  rota('GET', '/crm/anexos/:id', async ({ p }) => {
+    const ctx = await requireUsuario();
+    const meta = (await getDoc(doc(db, 'anexos', p.id))).data();
+    if (!meta) return fail(404, 'Arquivo não encontrado.');
+    requireAccess(ctx, collectionArea(meta.colecao), 'ver');
+    const partes = await Promise.all(Array.from({ length: Number(meta.partes) || 1 }, (_, i) => getDoc(doc(db, 'anexos', p.id, 'partes', String(i)))));
+    if (partes.some((s) => !s.exists())) fail(404, 'Arquivo incompleto. Envie o PDF novamente.');
+    return { nome: meta.nome, tamanho: meta.tamanho, dados: partes.map((s) => String(s.data()?.dados ?? '')).join('') };
+  });
+
   rota('GET', '/crm/c/:col', async ({ p, q }) => {
     const ctx = await requireUsuario();
     // consumos e resgates também alimentam o resumo de clientes, visto por Vendas e Marketing
@@ -1089,24 +1183,42 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     requireAccess(ctx, collectionArea(p.col), 'criar');
     if (['consumos', 'resgates'].includes(p.col)) fail(400, 'Use o fluxo próprio deste módulo.');
     const t = now();
-    const dados: Dados = { ...limpar(validarRegistro(b)), criadoEm: t, atualizadoEm: t };
+    const { resto, novos } = separarAnexos(b);
+    conferirAnexos(p.col, novos.length, novos);
+    const dados: Dados = { ...limpar(validarRegistro(resto)), criadoEm: t, atualizadoEm: t };
     if (p.col === 'funcoes') dados.sistema = false;
     await vincularCliente(p.col, dados);
     const ref = doc(collection(db, p.col));
+    // os PDFs sobem antes (cada um no seu lote, por causa do tamanho); se o registro não for gravado, são apagados
+    const enviados = await enviarAnexos(ctx, p.col, ref.id, novos);
+    if (enviados.length) dados.anexos = enviados;
     const lote = writeBatch(db);
     lote.set(ref, dados);
     espelhar(lote, p.col, ref.id, dados);
-    registrar(lote, ctx, collectionArea(p.col), `cadastrou ${REGISTRO[p.col] ?? 'o registro'}`, { colecao: p.col, alvo: nomeDe(dados), detalhe: valorDe(dados) });
-    await lote.commit();
+    registrar(lote, ctx, collectionArea(p.col), `cadastrou ${REGISTRO[p.col] ?? 'o registro'}`, {
+      colecao: p.col, alvo: nomeDe(dados), detalhe: [valorDe(dados), resumoAnexos(enviados.length, 0)].filter(Boolean).join(' · '),
+    });
+    try {
+      await lote.commit();
+    } catch (e) {
+      if (enviados.length) { const l = writeBatch(db); apagarAnexos(l, enviados); await l.commit().catch(() => undefined); }
+      throw e;
+    }
     return { ...dados, id: ref.id };
   });
   rota('PUT', '/crm/c/:col/:id', async ({ p, b }) => {
     const ctx = await requireUsuario();
     requireAccess(ctx, collectionArea(p.col), 'editar');
-    validarRegistro(b);
+    const { resto, manter, novos } = separarAnexos(b);
+    validarRegistro(resto);
     const cur = await registro(p.col, p.id);
     if (!cur) return fail(404, 'Registro não encontrado.');
-    const patch: Dados = { ...limpar(b), atualizadoEm: now() };
+    const patch: Dados = { ...limpar(resto), atualizadoEm: now() };
+    // sem a lista `anexos` no corpo (ex.: ações rápidas da tabela), os anexos ficam como estão
+    const atuais = anexosDe(cur);
+    const mantidos = manter ? atuais.filter((a) => manter.has(a.id)) : atuais;
+    const removidos = atuais.filter((a) => !mantidos.includes(a));
+    conferirAnexos(p.col, mantidos.length + novos.length, novos);
     if (p.col === 'funcoes') {
       if (cur.sistema) fail(400, 'A função Administrador não pode ser alterada.');
       patch.sistema = false;
@@ -1133,13 +1245,22 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       return { ...cur, status };
     }
     await vincularCliente(p.col, patch);
+    const enviados = await enviarAnexos(ctx, p.col, p.id, novos);
+    if (enviados.length || removidos.length) patch.anexos = [...mantidos, ...enviados];
     lote.update(doc(db, p.col, p.id), patch);
+    apagarAnexos(lote, removidos);
     espelhar(lote, p.col, p.id, { ...cur, ...patch });
     const novoStatus = typeof patch.status === 'string' && patch.status !== cur.status ? `Status: ${cur.status ?? '—'} → ${patch.status}` : '';
     registrar(lote, ctx, collectionArea(p.col), `alterou ${REGISTRO[p.col] ?? 'o registro'}`, {
-      colecao: p.col, alvo: nomeDe({ ...cur, ...patch }), detalhe: [novoStatus, valorDe({ ...cur, ...patch })].filter(Boolean).join(' · '),
+      colecao: p.col, alvo: nomeDe({ ...cur, ...patch }),
+      detalhe: [novoStatus, valorDe({ ...cur, ...patch }), resumoAnexos(enviados.length, removidos.length)].filter(Boolean).join(' · '),
     });
-    await lote.commit();
+    try {
+      await lote.commit();
+    } catch (e) {
+      if (enviados.length) { const l = writeBatch(db); apagarAnexos(l, enviados); await l.commit().catch(() => undefined); }
+      throw e;
+    }
     return { ...cur, ...patch };
   });
   rota('DELETE', '/crm/c/:col/:id', async ({ p }) => {
@@ -1176,6 +1297,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       }
     }
     lote.delete(doc(db, p.col, p.id));
+    apagarAnexos(lote, anexosDe(cur));
     espelhar(lote, p.col, p.id, null);
     registrar(lote, ctx, collectionArea(p.col), `excluiu ${REGISTRO[p.col] ?? 'o registro'}`, { colecao: p.col, alvo: nomeDe(cur), detalhe: valorDe(cur) });
     await lote.commit();

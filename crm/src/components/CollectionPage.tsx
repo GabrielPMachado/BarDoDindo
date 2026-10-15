@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, Camera, ChevronDown, Download, FileSpreadsheet, FileText, ImageOff, Pencil, Plus, Receipt, Search, Sheet, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Camera, ChevronDown, Download, FileSpreadsheet, FileText, ImageOff, Paperclip, Pencil, Plus, Receipt, Search, Sheet, Trash2 } from 'lucide-react';
 import { numberSpec, STATUS_KEYS, termos, toneOf, type CollectionDef, type Computed, type Field } from '../collections';
 import { maskCnpj, maskPhone } from '../lib/masks';
 import { useCollection, type Row } from '../lib/data';
@@ -12,6 +12,7 @@ import { reduzirFoto } from './Avatar';
 import { ContextMenu, type MenuPos } from './ContextMenu';
 import { colunasDe, exportarCsv, exportarExcel, exportarPdf } from '../lib/exportar';
 import { LancarDespesa } from './LancarDespesa';
+import { AnexosCampo, anexosDe, type AnexoNovo } from './Anexos';
 
 const PAGE = 50;
 
@@ -215,6 +216,11 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
                     ))}
                     <td className="actions-col" onClick={(e) => e.stopPropagation()}>
                       <div className="row-actions">
+                        {def.anexos && anexosDe(r.anexos).length > 0 && (
+                          <button className="icon-btn anexos__contagem" onClick={() => setEditing(r)} aria-label={`${anexosDe(r.anexos).length} PDF(s) anexado(s)`} title="PDFs anexados">
+                            <Paperclip size={15} /> {anexosDe(r.anexos).length}
+                          </button>
+                        )}
                         {rowActions?.(r, canEdit)}
                         {def.despesa && canEdit && (
                           <button className="icon-btn" onClick={() => setLancando(r)} aria-label="Lançar despesa no DRE" title="Lançar despesa no DRE">
@@ -287,6 +293,7 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
   });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [anexosNovos, setAnexosNovos] = useState<AnexoNovo[]>([]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -317,6 +324,11 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
         for (const extra of Object.keys(f.fill ?? {})) if (!def.fields.some((x) => x.key === extra)) payload[extra] = data[extra] ?? '';
       }
       if (def.comFoto) payload.foto = data.foto ?? '';
+      if (def.anexos) {
+        // a lista dos que ficam (os removidos são apagados ao salvar) e os PDFs novos
+        payload.anexos = anexosDe(data.anexos).map((a) => a.id);
+        payload.anexosNovos = anexosNovos.map(({ nome, dados }) => ({ nome, dados }));
+      }
       await onSave(payload);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível salvar.');
@@ -358,6 +370,12 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
             )}
           </div>
         ))}
+        {def.anexos && (
+          <AnexosCampo
+            rotulo={def.anexos} salvos={anexosDe(data.anexos)} novos={anexosNovos} disabled={!canEdit}
+            onChange={(salvos, novos) => { setData((d) => ({ ...d, anexos: salvos })); setAnexosNovos(novos); }}
+          />
+        )}
         {row?.criadoEm && (
           <p className="muted small form-field--wide">
             Criado em {new Date(String(row.criadoEm)).toLocaleString('pt-BR')}
