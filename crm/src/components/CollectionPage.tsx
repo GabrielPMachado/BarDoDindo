@@ -15,6 +15,7 @@ import { LancarDespesa } from './LancarDespesa';
 import { AnexosCampo, anexosDe, type AnexoNovo } from './Anexos';
 import { FichaTecnica } from './FichaTecnica';
 import { LocaisCampo, TransferirModal } from './Locais';
+import { CelulaRapida, editavelNaTabela } from './EdicaoRapida';
 import { CompraItens, itemVazio, totalItens, type ItemCompra } from './CompraItens';
 import { camposDosLocais, locaisDe, locaisNoFormulario } from '../lib/locais';
 import { calcularFicha, fichaDe, type Ficha } from '../lib/ficha';
@@ -214,7 +215,11 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
                         {typeof r.foto === 'string' && r.foto ? <img className="thumb" src={r.foto} alt="" loading="lazy" /> : <span className="thumb thumb--vazio"><ImageOff size={14} /></span>}
                       </td>
                     )}
-                    {tableFields.map((f) => (
+                    {tableFields.map((f) => canEdit && editavelNaTabela(def, f) ? (
+                      <td key={f.key} data-label={f.label} className={cellClass(f)} onClick={(e) => e.stopPropagation()}>
+                        <CelulaRapida def={def} field={f} row={r} onSalvar={(dados) => col.update(r.id, dados)}>{formatField(f, r[f.key])}</CelulaRapida>
+                      </td>
+                    ) : (
                       <td key={f.key} data-label={f.label} className={cellClass(f)}>{formatField(f, r[f.key])}</td>
                     ))}
                     {def.computed?.map((c) => (

@@ -1112,3 +1112,13 @@ button.anexos__nome:hover { text-decoration: underline; }
 .ia-chave { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
 .ia-chave__passos { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
 .ia-chave__link { display: inline-flex; align-items: center; gap: 5px; align-self: flex-start; }
+
+/* edição rápida na tabela: tocar no valor vira campo */
+.celula-rapida { all: unset; box-sizing: border-box; cursor: pointer; display: inline-block; min-width: 28px; padding: 3px 6px; margin: -3px -6px; border-radius: 6px;
+  border-bottom: 1px dashed transparent; transition: background .15s, border-color .15s; }
+.table tr:hover .celula-rapida { border-bottom-color: var(--border-strong); }
+.celula-rapida:hover, .celula-rapida:focus-visible { background: var(--surface-3); border-bottom-color: var(--brand-light); }
+.celula-rapida__campo { display: inline-block; min-width: 110px; max-width: 170px; }
+.celula-rapida__campo .input, .celula-rapida__campo .input-affix { height: 32px; font-size: 13px; }
+.celula-rapida__campo input[type=date] { min-width: 140px; }
+.celula-rapida__campo.is-salvando { opacity: .6; pointer-events: none; }
