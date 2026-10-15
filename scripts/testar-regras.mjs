@@ -155,6 +155,8 @@ if (senhaMarketing) {
   await negado('cadastrar produto (só "ver")', () => addDoc(collection(db, 'produtos'), { nome: 'x', preco: 1 }));
   await permitido('ver o Estoque (insumos da ficha técnica)', () => getDocs(collection(db, 'estoque')));
   await negado('alterar o Estoque (só leitura para Vendas)', () => addDoc(collection(db, 'estoque'), { item: 'x', quantidade: 1 }));
+  await permitido('ver a Tabela de preços dos fornecedores (ficha técnica)', () => getDocs(collection(db, 'precos')));
+  await negado('cadastrar preço de fornecedor (só Administrativo)', () => addDoc(collection(db, 'precos'), { insumo: 'x', preco: 1 }));
   await negado('listar despesas', () => getDocs(collection(db, 'despesas')));
   await signOut(auth);
 }
@@ -201,6 +203,11 @@ if (senhaAdministrativo) {
   await negado('lançar despesa com campo extra (ex.: folha)', () => lancar({ competenciaFolha: '2026-10' }));
   await negado('lançar receita', () => addDoc(collection(db, 'receitas'), { descricao: 'x', valor: 1, data: '2026-10-01' }));
 
+  // Tabela de preços: o Administrativo cadastra; escolhe o insumo no Estoque (só leitura)
+  await permitido('cadastrar preço de fornecedor', () => addDoc(collection(db, 'precos'), { insumo: 'Aperol', insumoId: 'x', fornecedor: 'Distribuidora', conteudo: 750, unidade: 'ml', preco: 52, status: 'Ativo' }));
+  await permitido('ver o Estoque para escolher o insumo', () => getDocs(collection(db, 'estoque')));
+  await negado('alterar o Estoque (Administrativo)', () => addDoc(collection(db, 'estoque'), { item: 'x', quantidade: 1 }));
+
   // PDFs anexados: como o CRM faz, o registro do arquivo e as partes vão no mesmo lote
   const pdf = 'JVBERi0xLjQK';
   const anexar = async (meta = {}, partes = [pdf]) => {
@@ -238,6 +245,7 @@ if (senhaAdministrativo) {
   await signInWithEmailAndPassword(auth, 'atendente@teste.local', senhaAtendente);
   await negado('listar os PDFs anexados', () => getDocs(collection(db, 'anexos')));
   await negado('ver o Estoque (sem Vendas nem Estrutura)', () => getDocs(collection(db, 'estoque')));
+  await negado('ver a Tabela de preços (sem Vendas nem Administrativo)', () => getDocs(collection(db, 'precos')));
   await negado('anexar PDF a um contrato (Administrativo)', async () => {
     const ref = doc(collection(db, 'anexos'));
     const lote = writeBatch(db);

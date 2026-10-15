@@ -20,6 +20,9 @@ export interface ItemFicha {
   /** Unidade de compra e custo por essa unidade (ex.: L e R$ 40,00), copiados do Estoque. */
   unidadeBase: string;
   custoBase: number;
+  /** De onde vem o custo: preço de um fornecedor (Tabela de preços) ou, sem `precoId`, o custo do Estoque. */
+  precoId?: string | null;
+  fornecedor?: string;
 }
 
 export interface Ficha {
@@ -60,6 +63,18 @@ export function conversao(unidade: string, base: string) {
   return 1;
 }
 
+/** Preço de uma embalagem por L, kg ou unidade, para comparar fornecedores (ex.: R$ 52,00 por 750 ml → "R$ 69,33/L"). */
+export function precoNormalizado(preco: number, conteudo: number, unidade: string) {
+  if (!(preco > 0) || !(conteudo > 0)) return null;
+  const grande = unidade === 'ml' ? 'L' : unidade === 'g' ? 'kg' : unidade;
+  const v = (preco / conteudo) * conversao(grande, unidade);
+  return `${v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/${grande}`;
+}
+
+/** Custo de compra legível: o que custa em ml ou g aparece por L ou kg (R$ 0,0693/ml → "R$ 69,33/L"). */
+export const custoBaseTxt = (i: Pick<ItemFicha, 'custoBase' | 'unidadeBase'>) =>
+  precoNormalizado(Number(i.custoBase) || 0, 1, i.unidadeBase) ?? '—';
+
 export const custoDoItem = (i: ItemFicha) => (Number(i.quantidade) || 0) * conversao(i.unidade, i.unidadeBase) * (Number(i.custoBase) || 0);
 
 const centavos = (v: number) => Math.round(v * 100) / 100;
@@ -84,20 +99,67 @@ export function calcularFicha(f: Ficha, preco: number) {
 }
 
 export interface Insumo { id: string; nome: string; unidade: string; custo: number }
+/** Preço de um fornecedor para um insumo (Tabela de preços): `preco` pela embalagem com `conteudo` em `unidade`. */
+export interface Cotacao { id: string; nome: string; insumoId: string; fornecedorId: string | null; embalagem: string; conteudo: number; unidade: string; preco: number; data: string }
+
+/** Uma origem de custo possível para o item: o Estoque ou um fornecedor. */
+export interface Opcao {
+  precoId: string | null;
+  fornecedor: string;
+  detalhe: string;
+  unidadeBase: string;
+  custoBase: number;
+  /** A unidade da receita se converte na desta origem (ml × garrafa em "un" não se compara). */
+  compativel: boolean;
+  /** Custo da quantidade usada na receita. */
+  custo: number;
+  /** Custo de 1 unidade da receita (ex.: 1 ml): ordena as opções mesmo antes de a quantidade ser informada. */
+  unitario: number;
+}
+
+const brlTxt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+/** Estoque e fornecedores que podem dar o custo do item, do mais barato ao mais caro. */
+export function opcoesDoItem(i: ItemFicha, insumos: Insumo[], cotacoes: Cotacao[]): Opcao[] {
+  if (!i.insumoId) return [];
+  const opcoes: Opcao[] = [];
+  const e = insumos.find((x) => x.id === i.insumoId);
+  const montar = (precoId: string | null, fornecedor: string, detalhe: string, unidadeBase: string, custoBase: number): Opcao => {
+    const compativel = unidadesCompativeis(unidadeBase).includes(i.unidade);
+    const unitario = compativel ? conversao(i.unidade, unidadeBase) * custoBase : 0;
+    return { precoId, fornecedor, detalhe, unidadeBase, custoBase, compativel, unitario, custo: compativel ? custoDoItem({ ...i, unidadeBase, custoBase }) : 0 };
+  };
+  if (e && e.custo > 0) opcoes.push(montar(null, 'Custo do Estoque', `${brlTxt(e.custo)}/${e.unidade}`, e.unidade, e.custo));
+  for (const c of cotacoes.filter((x) => x.insumoId === i.insumoId)) {
+    const emb = c.embalagem || `${num(c.conteudo)} ${c.unidade}`;
+    opcoes.push(montar(c.id, c.nome, `${brlTxt(c.preco)} · ${emb}`, c.unidade, c.preco / c.conteudo));
+  }
+  return opcoes.sort((a, b) => Number(b.compativel) - Number(a.compativel) || a.unitario - b.unitario);
+}
+const num = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+
+/** Aplica uma origem de custo ao item. */
+export const usarOpcao = (i: ItemFicha, o: Opcao): ItemFicha =>
+  ({ ...i, precoId: o.precoId, fornecedor: o.precoId ? o.fornecedor : '', unidadeBase: o.unidadeBase, custoBase: o.custoBase });
 
 /**
- * Atualiza os itens vinculados ao Estoque com o custo e a unidade de hoje.
+ * Atualiza os itens com o custo de hoje: o preço do fornecedor escolhido (Tabela de preços) ou o custo do Estoque.
  * Devolve a ficha nova e quantos itens mudaram (para avisar a pessoa).
  */
-export function atualizarCustos(f: Ficha, insumos: Insumo[]) {
+export function atualizarCustos(f: Ficha, insumos: Insumo[], cotacoes: Cotacao[] = []) {
   let mudou = 0;
   const itens = f.itens.map((i) => {
-    const e = i.insumoId ? insumos.find((x) => x.id === i.insumoId) : undefined;
-    if (!e) return i;
-    if (e.custo === Number(i.custoBase) && e.unidade === i.unidadeBase) return i;
+    if (!i.insumoId) return i;
+    const c = i.precoId ? cotacoes.find((x) => x.id === i.precoId) : undefined;
+    const e = insumos.find((x) => x.id === i.insumoId);
+    // preço de fornecedor apagado ou desativado: volta para o custo do Estoque
+    const novo = c ? { custoBase: c.preco / c.conteudo, unidadeBase: c.unidade, precoId: c.id, fornecedor: c.nome }
+      : e ? { custoBase: e.custo, unidadeBase: e.unidade, precoId: null, fornecedor: '' } : null;
+    if (!novo) return i;
+    if (Math.abs(novo.custoBase - Number(i.custoBase)) < 1e-9 && novo.unidadeBase === i.unidadeBase && (novo.precoId ?? null) === (i.precoId ?? null)) return i;
     mudou++;
-    const unidade = unidadesCompativeis(e.unidade).includes(i.unidade) ? i.unidade : e.unidade;
-    return { ...i, custoBase: e.custo, unidadeBase: e.unidade, unidade };
+    const unidade = unidadesCompativeis(novo.unidadeBase).includes(i.unidade) ? i.unidade : novo.unidadeBase;
+    return { ...i, ...novo, unidade };
   });
   return { ficha: { ...f, itens }, mudou };
 }

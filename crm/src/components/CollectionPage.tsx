@@ -351,6 +351,15 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
     }
   };
 
+  // na tela "Fichas técnicas" a receita vem antes dos dados do produto; em "Produtos", depois
+  const fichaCampo = def.fichaTecnica && (
+    <FichaTecnica
+      ficha={fichaDe(data.ficha)} preco={Number(data.preco) || 0} nome={String(data.nome ?? '')} disabled={!canEdit}
+      onChange={mudarFicha}
+      onUsarPreco={(preco) => setData((d) => ({ ...d, preco }))}
+    />
+  );
+
   const title = row ? (canEdit ? `Editar ${def.singular}` : termos(def).detalhes) : termos(def).novo;
 
   return (
@@ -374,6 +383,7 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
         {def.comFoto && (
           <FotoCampo valor={typeof data.foto === 'string' ? data.foto : ''} disabled={!canEdit} onChange={(foto) => setData((d) => ({ ...d, foto }))} />
         )}
+        {def.fichaPrimeiro && fichaCampo}
         {def.fields.map((f) => (
           <div key={f.key} className={`form-field ${f.wide || f.type === 'textarea' ? 'form-field--wide' : ''}`}>
             <label htmlFor={`f-${f.key}`}>{f.label}{f.required && canEdit && <span className="req"> *</span>}</label>
@@ -384,13 +394,7 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
             )}
           </div>
         ))}
-        {def.fichaTecnica && (
-          <FichaTecnica
-            ficha={fichaDe(data.ficha)} preco={Number(data.preco) || 0} nome={String(data.nome ?? '')} disabled={!canEdit}
-            onChange={mudarFicha}
-            onUsarPreco={(preco) => setData((d) => ({ ...d, preco }))}
-          />
-        )}
+        {def.fichaTecnica && !def.fichaPrimeiro && fichaCampo}
         {def.anexos && (
           <AnexosCampo
             rotulo={def.anexos} salvos={anexosDe(data.anexos)} novos={anexosNovos} disabled={!canEdit}

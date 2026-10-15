@@ -88,9 +88,10 @@ export const AREAS: Area[] = [
   },
   {
     key: 'vnd', label: 'Vendas', icon: ShoppingBag,
-    description: 'Produtos e cardápio do aplicativo e os clientes (afilhados).',
+    description: 'Produtos e cardápio do aplicativo, fichas técnicas e os clientes (afilhados).',
     items: [
       { path: '/vendas/produtos', label: 'Produtos e cardápio' },
+      { path: '/vendas/fichas', label: 'Fichas técnicas' },
       { path: '/vendas/clientes', label: 'Clientes (afilhados)' },
     ],
   },
@@ -123,10 +124,11 @@ export const AREAS: Area[] = [
   },
   {
     key: 'adm', label: 'Administrativo', icon: Briefcase,
-    description: 'Serviços terceirizados, fornecedores e contratos.',
+    description: 'Serviços terceirizados, fornecedores, tabela de preços e contratos.',
     items: [
       { path: '/adm/terceirizados', label: 'Serviços terceirizados' },
       { path: '/adm/fornecedores', label: 'Fornecedores' },
+      { path: '/adm/precos', label: 'Tabela de preços' },
       { path: '/adm/contratos', label: 'Contratos' },
     ],
   },
@@ -214,7 +216,7 @@ export const COLLECTION_PAGE: Record<string, string> = {
   produtos: '/vendas/produtos', recompensas: '/marketing/recompensas', criacao: '/marketing/criacao', midias: '/marketing/midias',
   colaboradores: '/rh/colaboradores', ferias: '/rh/ferias',
   projetos: '/estrutura/projetos', estoque: '/estrutura/estoque', materiais: '/estrutura/materiais',
-  terceirizados: '/adm/terceirizados', fornecedores: '/adm/fornecedores', contratos: '/adm/contratos',
+  terceirizados: '/adm/terceirizados', fornecedores: '/adm/fornecedores', contratos: '/adm/contratos', precos: '/adm/precos',
   receitas: '/financeiro/receitas', despesas: '/financeiro/despesas',
   trabalhista: '/juridico/trabalhista', consultoria: '/juridico/consultoria',
   qualidade: '/fiscalizacao/qualidade', naoconformidades: '/fiscalizacao/nao-conformidades',

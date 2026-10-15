@@ -1,6 +1,6 @@
 /** PDF da ficha técnica de um produto, para imprimir e deixar no bar ou na cozinha. */
 import { brl, num, pct } from './format';
-import { calcularFicha, custoDoItem, type Ficha } from './ficha';
+import { calcularFicha, custoBaseTxt, custoDoItem, type Ficha } from './ficha';
 import { logoEmPng } from './exportar';
 
 const qtd = (v: number) => (Number.isInteger(v) ? num(v) : num(v, 3).replace(/0+$/, '').replace(/,$/, ''));
@@ -22,10 +22,10 @@ export async function imprimirFicha(nome: string, ficha: Ficha, preco: number) {
   autoTable(doc, {
     startY: 32,
     margin: { left: 12, right: 12 },
-    head: [['Insumo', 'Quantidade', 'Custo de compra', 'Custo']],
+    head: [['Insumo', 'Quantidade', 'Preço usado', 'Custo']],
     body: ficha.itens.map((i) => [
       i.insumo || '—', `${qtd(Number(i.quantidade) || 0)} ${i.unidade}`,
-      i.custoBase ? `${brl(i.custoBase)}/${i.unidadeBase}` : '—', brl(custoDoItem(i)),
+      i.custoBase ? `${i.precoId && i.fornecedor ? `${i.fornecedor} · ` : ''}${custoBaseTxt(i)}` : '—', brl(custoDoItem(i)),
     ]),
     foot: [
       ['Custo da receita', '', ficha.perdas ? `+ ${num(ficha.perdas, 1)}% de perdas` : '', brl(c.total)],

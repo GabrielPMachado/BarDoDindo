@@ -1,10 +1,15 @@
-import { useEffect, useRef } from 'react';
-import { ClipboardList, Plus, Printer, Trash2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ClipboardList, PackagePlus, Plus, Printer, Trash2 } from 'lucide-react';
 import type { Field } from '../collections';
-import { useResource } from '../lib/data';
+import { api } from '../lib/api';
+import { reload, useResource } from '../lib/data';
 import { brl, num, pct } from '../lib/format';
-import { atualizarCustos, calcularFicha, custoDoItem, unidadesCompativeis, type Ficha, type Insumo, type ItemFicha } from '../lib/ficha';
+import {
+  atualizarCustos, calcularFicha, custoBaseTxt, custoDoItem, opcoesDoItem, unidadesCompativeis, usarOpcao,
+  type Cotacao, type Ficha, type Insumo, type ItemFicha, type Opcao,
+} from '../lib/ficha';
 import { imprimirFicha } from '../lib/fichaPdf';
+import { useSession } from '../lib/session';
 import { RefPicker } from './pickers';
 import { NumberInput, notify } from './ui';
 
@@ -15,53 +20,76 @@ const CAMPO_INSUMO: Field = {
 const QTD = { decimals: 3, min: 0, max: 100_000 };
 const DINHEIRO = { money: true, decimals: 2, min: 0, max: 100_000 };
 const ITEM_NOVO: ItemFicha = { insumo: '', insumoId: null, quantidade: 0, unidade: 'ml', unidadeBase: 'ml', custoBase: 0 };
+const UNIDADES_LIVRES = ['ml', 'L', 'g', 'kg', 'un', 'dose', 'pct'];
+const INSUMOS = '/crm/referencias/insumos';
+const PRECOS = '/crm/referencias/precos';
 
 /** CMV dentro do alvo fica verde; até 5 pontos acima, amarelo; mais que isso, vermelho. */
 function tomCmv(cmv: number | null, alvo: number) {
   if (cmv === null) return 'neutral';
   return cmv * 100 <= alvo ? 'good' : cmv * 100 <= alvo + 5 ? 'warn' : 'bad';
 }
+/** Na receita, um insumo comprado em L ou kg é medido em ml ou g. */
+const unidadeDaReceita = (base: string, atual: string) => {
+  const opcoes = unidadesCompativeis(base);
+  return opcoes.includes(atual) ? atual : (opcoes.find((u) => u === 'ml' || u === 'g') ?? base);
+};
 
 /**
- * Ficha técnica do produto: insumos com quantidade e custo, rendimento e perdas.
- * Calcula custo por porção, CMV, margem e o preço sugerido para o CMV desejado.
+ * Ficha técnica do produto: insumos com quantidade e custo (do Estoque ou do fornecedor escolhido),
+ * rendimento e perdas. Calcula custo por porção, CMV, margem e o preço sugerido para o CMV desejado.
  */
 export function FichaTecnica({ ficha, preco, nome, disabled, onChange, onUsarPreco }: {
   ficha: Ficha; preco: number; nome: string; disabled: boolean;
   onChange: (f: Ficha) => void;
   onUsarPreco: (preco: number) => void;
 }) {
-  const insumos = useResource<Insumo[]>('/crm/referencias/insumos');
+  const insumos = useResource<Insumo[]>(INSUMOS);
+  const cotacoes = useResource<Cotacao[]>(PRECOS);
+  const listaInsumos = insumos.data ?? [];
+  const listaCotacoes = cotacoes.data ?? [];
   const c = calcularFicha(ficha, preco);
 
-  // ao abrir, os itens ligados ao Estoque pegam o custo de hoje (uma vez só, quando a lista chega)
+  // ao abrir, cada item pega o custo de hoje (do fornecedor escolhido ou do Estoque), uma vez só, quando as listas chegam
   const atualizado = useRef(false);
   useEffect(() => {
-    if (atualizado.current || !insumos.data || disabled) return;
+    if (atualizado.current || disabled || !insumos.data || (!cotacoes.data && !cotacoes.error)) return;
     atualizado.current = true;
-    const { ficha: nova, mudou } = atualizarCustos(ficha, insumos.data);
+    const { ficha: nova, mudou } = atualizarCustos(ficha, insumos.data, cotacoes.data ?? []);
     if (mudou) {
       onChange(nova);
-      notify(`Custo de ${mudou} ${mudou === 1 ? 'insumo atualizado' : 'insumos atualizados'} com o Estoque. Salve para gravar.`);
+      notify(`Custo de ${mudou} ${mudou === 1 ? 'insumo atualizado' : 'insumos atualizados'} com os preços de hoje. Salve para gravar.`);
     }
-  }, [insumos.data, disabled, ficha, onChange]);
+  }, [insumos.data, cotacoes.data, cotacoes.error, disabled, ficha, onChange]);
 
-  const mudarItem = (idx: number, patch: Partial<ItemFicha>) => {
-    onChange({ ...ficha, itens: ficha.itens.map((it, i) => (i === idx ? { ...it, ...patch } : it)) });
+  const trocarItem = (idx: number, item: ItemFicha) => onChange({ ...ficha, itens: ficha.itens.map((it, i) => (i === idx ? item : it)) });
+  const mudarItem = (idx: number, patch: Partial<ItemFicha>) => trocarItem(idx, { ...ficha.itens[idx], ...patch });
+
+  /** Vincula o item a um insumo do Estoque e já escolhe a origem de custo mais barata (fornecedor ou Estoque). */
+  const vincular = (idx: number, insumo: Insumo) => {
+    const atual = ficha.itens[idx];
+    let item: ItemFicha = {
+      ...atual, insumo: insumo.nome, insumoId: insumo.id, unidadeBase: insumo.unidade, custoBase: insumo.custo,
+      precoId: null, fornecedor: '', unidade: unidadeDaReceita(insumo.unidade, atual.unidade),
+    };
+    let ops = opcoesDoItem(item, listaInsumos.some((x) => x.id === insumo.id) ? listaInsumos : [...listaInsumos, insumo], listaCotacoes);
+    // insumo sem custo no Estoque e com preço só em outra unidade (ex.: Estoque em "un", fornecedor em ml)
+    if (!ops.some((o) => o.compativel) && ops.length) {
+      item = { ...item, unidade: unidadeDaReceita(ops[0].unidadeBase, item.unidade) };
+      ops = opcoesDoItem(item, listaInsumos, listaCotacoes);
+    }
+    const melhor = ops.find((o) => o.compativel);
+    trocarItem(idx, melhor ? usarOpcao(item, melhor) : item);
   };
+
   const escolherInsumo = (idx: number, patch: Record<string, unknown>) => {
     const atual = ficha.itens[idx];
-    const vinculou = 'insumoId' in patch && patch.insumoId;
-    if (vinculou) {
-      // unidade de compra do Estoque; a receita usa a menor unidade do grupo (L → ml, kg → g)
-      const base = String(patch.unidadeBase ?? 'un');
-      const opcoes = unidadesCompativeis(base);
-      const unidade = opcoes.includes(atual.unidade) ? atual.unidade : (opcoes.find((u) => u === 'ml' || u === 'g') ?? base);
-      mudarItem(idx, { insumo: String(patch.insumo ?? ''), insumoId: String(patch.insumoId), unidadeBase: base, custoBase: Number(patch.custoBase) || 0, unidade });
+    if ('insumoId' in patch && patch.insumoId) {
+      vincular(idx, { id: String(patch.insumoId), nome: String(patch.insumo ?? ''), unidade: String(patch.unidadeBase ?? 'un'), custo: Number(patch.custoBase) || 0 });
     } else {
       // digitado à mão: o custo é informado na própria linha, na unidade da receita
       mudarItem(idx, atual.insumoId
-        ? { insumo: String(patch.insumo ?? atual.insumo), insumoId: null, unidadeBase: atual.unidade, custoBase: 0 }
+        ? { insumo: String(patch.insumo ?? atual.insumo), insumoId: null, unidadeBase: atual.unidade, custoBase: 0, precoId: null, fornecedor: '' }
         : { insumo: String(patch.insumo ?? atual.insumo) });
     }
   };
@@ -87,39 +115,18 @@ export function FichaTecnica({ ficha, preco, nome, disabled, onChange, onUsarPre
       {ficha.itens.length > 0 && (
         <div className="ficha__itens">
           <div className="ficha__cab" aria-hidden>
-            <span>Insumo</span><span>Quantidade</span><span>Unidade</span><span>Custo de compra</span><span className="num">Custo</span><span />
+            <span>Insumo</span><span>Quantidade</span><span>Unidade</span><span>Preço usado</span><span className="num">Custo</span><span />
           </div>
-          {ficha.itens.map((it, idx) => {
-            const vinculado = !!it.insumoId;
-            const unidades = vinculado ? unidadesCompativeis(it.unidadeBase) : ['ml', 'L', 'g', 'kg', 'un', 'dose', 'pct'];
-            return (
-              <div key={idx} className="ficha__item">
-                <div className="ficha__insumo">
-                  <RefPicker field={CAMPO_INSUMO} value={it.insumo} linkedId={it.insumoId} disabled={disabled} onChange={(p) => escolherInsumo(idx, p)} />
-                </div>
-                <NumberInput ariaLabel="Quantidade" spec={QTD} value={it.quantidade || ''} disabled={disabled} onChange={(v) => mudarItem(idx, { quantidade: v === '' ? 0 : v })} />
-                <select
-                  className="input" aria-label="Unidade" disabled={disabled} value={it.unidade}
-                  onChange={(e) => mudarItem(idx, vinculado ? { unidade: e.target.value } : { unidade: e.target.value, unidadeBase: e.target.value })}
-                >
-                  {unidades.map((u) => <option key={u} value={u}>{u}</option>)}
-                </select>
-                {vinculado ? (
-                  <span className="ficha__base muted small" title="Custo cadastrado no Estoque">
-                    {it.custoBase ? `${brl(it.custoBase)}/${it.unidadeBase}` : 'sem custo no Estoque'}
-                  </span>
-                ) : (
-                  <NumberInput ariaLabel={`Custo por ${it.unidade}`} spec={DINHEIRO} prefix="R$" suffix={`/${it.unidade}`} value={it.custoBase || ''} disabled={disabled} onChange={(v) => mudarItem(idx, { custoBase: v === '' ? 0 : v })} />
-                )}
-                <strong className="ficha__custo num">{brl(custoDoItem(it))}</strong>
-                {!disabled && (
-                  <button type="button" className="icon-btn" aria-label="Remover insumo" title="Remover" onClick={() => onChange({ ...ficha, itens: ficha.itens.filter((_, i) => i !== idx) })}>
-                    <Trash2 size={15} />
-                  </button>
-                )}
-              </div>
-            );
-          })}
+          {ficha.itens.map((it, idx) => (
+            <LinhaFicha
+              key={idx} item={it} disabled={disabled}
+              opcoes={opcoesDoItem(it, listaInsumos, listaCotacoes)}
+              onChange={(item) => trocarItem(idx, item)}
+              onInsumo={(p) => escolherInsumo(idx, p)}
+              onCriado={(insumo) => vincular(idx, insumo)}
+              onRemover={() => onChange({ ...ficha, itens: ficha.itens.filter((_, i) => i !== idx) })}
+            />
+          ))}
         </div>
       )}
 
@@ -166,6 +173,7 @@ export function FichaTecnica({ ficha, preco, nome, disabled, onChange, onUsarPre
               )}
             </div>
           </div>
+          <EconomiaPossivel ficha={ficha} insumos={listaInsumos} cotacoes={listaCotacoes} />
           <p className="muted small">O campo "Custo" do produto passa a ser o custo por porção calculado aqui.</p>
 
           <div className="form-field">
@@ -178,6 +186,159 @@ export function FichaTecnica({ ficha, preco, nome, disabled, onChange, onUsarPre
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+/** Uma linha da receita, com a comparação entre fornecedores logo abaixo. */
+function LinhaFicha({ item: it, opcoes, disabled, onChange, onInsumo, onCriado, onRemover }: {
+  item: ItemFicha; opcoes: Opcao[]; disabled: boolean;
+  onChange: (i: ItemFicha) => void;
+  onInsumo: (patch: Record<string, unknown>) => void;
+  onCriado: (insumo: Insumo) => void;
+  onRemover: () => void;
+}) {
+  const { pode } = useSession();
+  const [cadastrando, setCadastrando] = useState(false);
+  const vinculado = !!it.insumoId;
+  const unidades = vinculado ? unidadesCompativeis(it.unidadeBase) : UNIDADES_LIVRES;
+  const escolhida = opcoes.find((o) => o.precoId === (it.precoId ?? null) && o.compativel);
+  const custo = custoDoItem(it);
+  const maisBarata = opcoes.find((o) => o.compativel);
+
+  return (
+    <div className="ficha__item">
+      <div className="fi-insumo">
+        <RefPicker field={CAMPO_INSUMO} value={it.insumo} linkedId={it.insumoId} disabled={disabled} onChange={onInsumo} />
+      </div>
+      <div className="fi-qtd">
+        <NumberInput ariaLabel="Quantidade" spec={QTD} value={it.quantidade || ''} disabled={disabled} onChange={(v) => onChange({ ...it, quantidade: v === '' ? 0 : v })} />
+      </div>
+      <select
+        className="input fi-un" aria-label="Unidade" disabled={disabled} value={it.unidade}
+        onChange={(e) => onChange(vinculado ? { ...it, unidade: e.target.value } : { ...it, unidade: e.target.value, unidadeBase: e.target.value })}
+      >
+        {unidades.map((u) => <option key={u} value={u}>{u}</option>)}
+      </select>
+      <div className="fi-base">
+        {vinculado ? (
+          <span className="muted small" title={it.precoId ? 'Preço do fornecedor (Tabela de preços)' : 'Custo cadastrado no Estoque'}>
+            {it.custoBase ? <><b>{it.precoId ? it.fornecedor : 'Estoque'}</b> · {escolhida?.detalhe ?? custoBaseTxt(it)}</> : 'sem custo no Estoque'}
+          </span>
+        ) : (
+          <NumberInput ariaLabel={`Custo por ${it.unidade}`} spec={DINHEIRO} prefix="R$" suffix={`/${it.unidade}`} value={it.custoBase || ''} disabled={disabled} onChange={(v) => onChange({ ...it, custoBase: v === '' ? 0 : v })} />
+        )}
+      </div>
+      <strong className="fi-custo num">{brl(custo)}</strong>
+      {!disabled && (
+        <button type="button" className="icon-btn fi-del" aria-label="Remover insumo" title="Remover" onClick={onRemover}>
+          <Trash2 size={15} />
+        </button>
+      )}
+
+      {vinculado && opcoes.length > 1 && (
+        <div className="ficha__comparar" role="group" aria-label={`Comparar preços de ${it.insumo}`}>
+          {opcoes.map((o) => {
+            const atual = o.precoId === (it.precoId ?? null);
+            const dif = o.custo - custo;
+            return (
+              <button
+                key={o.precoId ?? 'estoque'} type="button" disabled={disabled || !o.compativel || atual}
+                className={`ficha__opcao ${atual ? 'is-atual' : ''}`}
+                onClick={() => onChange(usarOpcao(it, o))}
+                title={o.compativel ? `Usar o preço de ${o.fornecedor}` : `O preço está em ${o.unidadeBase}: não dá para comparar com ${it.unidade}`}
+              >
+                <span className="ficha__opcao-nome">{o.fornecedor}{o === maisBarata && opcoes.filter((x) => x.compativel).length > 1 && <em> mais barato</em>}</span>
+                <span className="muted small">{o.detalhe}</span>
+                <span className="ficha__opcao-valor">
+                  {o.compativel ? <>{brl(o.custo)} {!atual && it.quantidade > 0 && Math.abs(dif) >= 0.005 && <small className={dif < 0 ? 'text-good' : 'text-bad'}>{dif < 0 ? '−' : '+'}{brl(Math.abs(dif))}</small>}{atual && <small> em uso</small>}</> : <small>outra unidade</small>}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {!vinculado && it.insumo.trim() && !disabled && pode('dp', 'criar') && !cadastrando && (
+        <div className="ficha__comparar">
+          <button type="button" className="btn btn--ghost btn--sm" onClick={() => setCadastrando(true)}>
+            <PackagePlus size={14} /> Cadastrar "{it.insumo.trim()}" no Estoque
+          </button>
+        </div>
+      )}
+      {cadastrando && (
+        <NovoInsumo
+          nome={it.insumo.trim()} unidade={it.unidade} custo={it.custoBase}
+          onCancelar={() => setCadastrando(false)}
+          onCriado={(insumo) => { setCadastrando(false); onCriado(insumo); }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Quanto a receita ficaria mais barata usando, em cada insumo, o fornecedor mais barato. */
+function EconomiaPossivel({ ficha, insumos, cotacoes }: { ficha: Ficha; insumos: Insumo[]; cotacoes: Cotacao[] }) {
+  let economia = 0;
+  for (const it of ficha.itens) {
+    const melhor = opcoesDoItem(it, insumos, cotacoes).find((o) => o.compativel);
+    if (melhor && melhor.custo < custoDoItem(it)) economia += custoDoItem(it) - melhor.custo;
+  }
+  const porPorcao = (economia * (1 + (ficha.perdas || 0) / 100)) / (ficha.rendimento || 1);
+  if (porPorcao < 0.005) return null;
+  return <p className="ficha__economia">Com o fornecedor mais barato em cada insumo, a porção sairia <b>{brl(porPorcao)}</b> mais barata.</p>;
+}
+
+/** Cadastra no Estoque um insumo digitado na receita, sem sair da tela. */
+function NovoInsumo({ nome, unidade, custo, onCancelar, onCriado }: {
+  nome: string; unidade: string; custo: number;
+  onCancelar: () => void; onCriado: (i: Insumo) => void;
+}) {
+  const unidadesEstoque = ['un', 'cx', 'fardo', 'kg', 'g', 'L', 'ml', 'pct'];
+  const [item, setItem] = useState(nome);
+  const [categoria, setCategoria] = useState('Bebidas');
+  const [un, setUn] = useState(unidadesEstoque.includes(unidade) ? unidade : 'un');
+  const [valor, setValor] = useState<number | ''>(custo || '');
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  const salvar = async () => {
+    if (item.trim().length < 2) return setErro('Informe o nome do insumo.');
+    setSalvando(true);
+    setErro(null);
+    try {
+      const novo = await api<{ id: string }>('/crm/c/estoque', {
+        method: 'POST', body: { item: item.trim(), categoria, unidade: un, quantidade: 0, custo: valor === '' ? 0 : valor },
+      });
+      void reload(INSUMOS);
+      notify(`"${item.trim()}" cadastrado no Estoque`);
+      onCriado({ id: novo.id, nome: item.trim(), unidade: un, custo: valor === '' ? 0 : valor });
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Não foi possível cadastrar.');
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <div className="ficha__novo" onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void salvar(); } }}>
+      <strong className="small">Novo item no Estoque</strong>
+      <div className="ficha__novo-campos">
+        <input className="input" aria-label="Nome do insumo" maxLength={120} value={item} onChange={(e) => setItem(e.target.value)} />
+        <select className="input" aria-label="Categoria" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+          {['Bebidas', 'Alimentos', 'Descartáveis', 'Limpeza', 'Outros'].map((c) => <option key={c}>{c}</option>)}
+        </select>
+        <select className="input" aria-label="Unidade de compra" value={un} onChange={(e) => setUn(e.target.value)}>
+          {unidadesEstoque.map((u) => <option key={u}>{u}</option>)}
+        </select>
+        <NumberInput ariaLabel="Custo por unidade" spec={DINHEIRO} prefix="R$" suffix={`/${un}`} value={valor} onChange={setValor} />
+      </div>
+      <span className="muted small">Entra com quantidade 0; ajuste o estoque depois em Estrutura → Estoque.</span>
+      {erro && <p className="error small">{erro}</p>}
+      <div className="ficha__novo-acoes">
+        <button type="button" className="btn btn--ghost btn--sm" onClick={onCancelar}>Cancelar</button>
+        <button type="button" className="btn btn--primary btn--sm" disabled={salvando} onClick={() => void salvar()}>{salvando ? 'Cadastrando…' : 'Cadastrar e usar'}</button>
+      </div>
     </div>
   );
 }
