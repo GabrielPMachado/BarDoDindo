@@ -109,6 +109,7 @@ export default function Home() {
   const slides = destaques.slice(0, 4);
   const trilho = useRef<HTMLDivElement>(null);
   const [atual, setAtual] = useState(0);
+  const [mostrarNumero, setMostrarNumero] = useState(false);
   const total = 1 + slides.length;
   const aoRolar = () => {
     const el = trilho.current;
@@ -136,6 +137,32 @@ export default function Home() {
         </span>
         <ChevronRight size={20} className="local__seta" />
       </Link>
+
+      {/* saldo de pontos */}
+      <section className="saldo">
+        <div className="saldo__topo">
+          <div>
+            <span className="saldo__rotulo">Você tem disponível</span>
+            <strong className="saldo__valor">{me.pontos.toLocaleString('pt-BR')} pts</strong>
+          </div>
+          <button type="button" className="numero-btn" onClick={() => setMostrarNumero(true)} aria-label="Mostrar meu número de afilhado">
+            <span>Afilhado</span>
+            <b>#{memberNumber(me.cliente.numero)}</b>
+            <small>Mostrar</small>
+          </button>
+        </div>
+        <Link to="/recompensas" className="aviso">
+          <Info size={18} />
+          <span>
+            {podeJa.length && !alvo
+              ? <>Você já pode resgatar <b>{podeJa[podeJa.length - 1].nome}</b>.</>
+              : alvo
+                ? <>Faltam <b>{(alvo.custo - me.pontos).toLocaleString('pt-BR')} pts</b> para <b>{alvo.nome}</b>.{podeJa.length ? ' E já dá para resgatar outras.' : ''}</>
+                : <>Informe o número <b>#{memberNumber(me.cliente.numero)}</b> ao fechar a conta e ganhe pontos.</>}
+          </span>
+          <ChevronRight size={18} />
+        </Link>
+      </section>
 
       {/* categorias em bolinhas, rolando para o lado */}
       <nav className="bolinhas" aria-label="Categorias do cardápio">
@@ -187,23 +214,6 @@ export default function Home() {
         )}
       </section>
 
-      {/* saldo de pontos */}
-      <section className="saldo">
-        <span className="saldo__rotulo">Você tem disponível</span>
-        <strong className="saldo__valor">{me.pontos.toLocaleString('pt-BR')} pts</strong>
-        <Link to="/recompensas" className="aviso">
-          <Info size={18} />
-          <span>
-            {podeJa.length && !alvo
-              ? <>Você já pode resgatar <b>{podeJa[podeJa.length - 1].nome}</b>.</>
-              : alvo
-                ? <>Faltam <b>{(alvo.custo - me.pontos).toLocaleString('pt-BR')} pts</b> para <b>{alvo.nome}</b>.{podeJa.length ? ' E já dá para resgatar outras.' : ''}</>
-                : <>Informe o número <b>#{memberNumber(me.cliente.numero)}</b> ao fechar a conta e ganhe pontos.</>}
-          </span>
-          <ChevronRight size={18} />
-        </Link>
-      </section>
-
       {/* recompensas rolando para o lado */}
       {recompensas.length > 0 && (
         <section className="vitrine">
@@ -236,6 +246,20 @@ export default function Home() {
             <b>{brl(destaques[0].preco)}</b>
           </span>
         </Link>
+      )}
+
+      {/* número grande para mostrar ao garçom na hora de fechar a conta */}
+      {mostrarNumero && (
+        <div className="overlay" onClick={() => setMostrarNumero(false)}>
+          <div className="sheet sheet--center numero-sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Meu número de afilhado">
+            <div className="sheet__handle" />
+            <span className="numero-sheet__rotulo">Meu número de afilhado</span>
+            <strong className="numero-sheet__num">#{memberNumber(me.cliente.numero)}</strong>
+            <span className="numero-sheet__nome">{me.cliente.nome}</span>
+            <p className="muted small">Mostre ao garçom ao fechar a conta para ganhar seus pontos.</p>
+            <button type="button" className="btn btn--primary" onClick={() => setMostrarNumero(false)}>Fechar</button>
+          </div>
+        </div>
       )}
     </div>
   );
