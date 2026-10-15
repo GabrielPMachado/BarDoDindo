@@ -69,17 +69,21 @@ function arquivoBase64(arquivo: File): Promise<string> {
   });
 }
 
-export async function lerNotaComIA(arquivo: File): Promise<NotaLida> {
+/** Chave da IA cadastrada em Configurações (erro claro quando ainda não foi configurada). */
+export async function chaveDaIA() {
   const { chave, modelo } = await api<{ chave: string; modelo: string }>('/crm/ia/chave');
   if (!chave) throw new Error('A IA ainda não foi configurada. Peça a quem administra o sistema para cadastrar a chave em Configurações → Parâmetros.');
-  const pdf = arquivo.type === 'application/pdf';
-  if (!pdf && !arquivo.type.startsWith('image/')) throw new Error('Envie uma foto ou um PDF da nota.');
-  if (arquivo.size > 15 * 1024 * 1024) throw new Error('Arquivo grande demais (máximo 15 MB).');
-  const conteudo = pdf ? { mime: 'application/pdf', dados: await arquivoBase64(arquivo) } : await imagemReduzida(arquivo);
+  return { chave, modelo };
+}
 
+/**
+ * Pede ao Gemini uma resposta no formato `esquema` e devolve o texto (JSON).
+ * Tenta os modelos da lista em ordem quando um está aposentado, sobrecarregado, sem cota ou lento.
+ */
+export async function gerarComGemini(chave: string, modelo: string, parts: unknown[], esquema: unknown, acao: string, temperatura = 0): Promise<string> {
   const corpoPedido = JSON.stringify({
-    contents: [{ parts: [{ text: PROMPT }, { inline_data: { mime_type: conteudo.mime, data: conteudo.dados } }] }],
-    generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: ESQUEMA },
+    contents: [{ parts }],
+    generationConfig: { temperature: temperatura, responseMimeType: 'application/json', responseSchema: esquema },
   });
   let corpo: { candidates?: { content?: { parts?: { text?: string }[] } }[] } = {};
   let ultimoErro = '';
@@ -101,11 +105,21 @@ export async function lerNotaComIA(arquivo: File): Promise<NotaLida> {
     // modelo aposentado (404), sobrecarregado (503/500) ou sem cota (429): tenta o próximo
     ultimoErro = resp.status === 429 ? 'A cota gratuita da IA acabou por agora. Tente de novo em alguns minutos.'
       : resp.status >= 500 ? 'A IA do Google está sobrecarregada agora. Tente de novo em alguns minutos.'
-      : `A IA não conseguiu ler a nota${msg ? `: ${msg}` : '.'}`;
+      : `A IA não conseguiu ${acao}${msg ? `: ${msg}` : '.'}`;
     if (![404, 429, 500, 503].includes(resp.status)) break;
   }
   if (ultimoErro) throw new Error(ultimoErro);
-  const texto = corpo?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? '').join('') ?? '';
+  return corpo?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? '').join('') ?? '';
+}
+
+export async function lerNotaComIA(arquivo: File): Promise<NotaLida> {
+  const { chave, modelo } = await chaveDaIA();
+  const pdf = arquivo.type === 'application/pdf';
+  if (!pdf && !arquivo.type.startsWith('image/')) throw new Error('Envie uma foto ou um PDF da nota.');
+  if (arquivo.size > 15 * 1024 * 1024) throw new Error('Arquivo grande demais (máximo 15 MB).');
+  const conteudo = pdf ? { mime: 'application/pdf', dados: await arquivoBase64(arquivo) } : await imagemReduzida(arquivo);
+
+  const texto = await gerarComGemini(chave, modelo, [{ text: PROMPT }, { inline_data: { mime_type: conteudo.mime, data: conteudo.dados } }], ESQUEMA, 'ler a nota');
   let lida: Partial<NotaLida>;
   try { lida = JSON.parse(texto); } catch { throw new Error('A IA não devolveu a nota num formato legível. Tente uma foto mais nítida.'); }
   const itens = (Array.isArray(lida.itens) ? lida.itens : [])

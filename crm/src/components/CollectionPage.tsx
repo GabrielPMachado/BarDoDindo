@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type ReactNode, Fragment } from 'react';
 import { ArrowDown, ArrowLeftRight, ArrowUp, Camera, ChevronDown, Download, FileSpreadsheet, FileText, ImageOff, Paperclip, Pencil, Plus, Receipt, Search, Sheet, Trash2 } from 'lucide-react';
 import { numberSpec, STATUS_KEYS, termos, toneOf, type CollectionDef, type Computed, type Field } from '../collections';
 import { maskCnpj, maskPhone } from '../lib/masks';
@@ -16,6 +16,7 @@ import { AnexosCampo, anexosDe, type AnexoNovo } from './Anexos';
 import { FichaTecnica } from './FichaTecnica';
 import { LocaisCampo, TransferirModal } from './Locais';
 import { CelulaRapida, editavelNaTabela } from './EdicaoRapida';
+import { PreencherProdutoIA } from './PreencherProdutoIA';
 import { CompraItens, itemVazio, totalItens, type ItemCompra } from './CompraItens';
 import { camposDosLocais, locaisDe, locaisNoFormulario } from '../lib/locais';
 import { calcularFicha, fichaDe, type Ficha } from '../lib/ficha';
@@ -433,14 +434,20 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
             onChange={(l) => setData((d) => ({ ...d, ...camposDosLocais(l, def.fields.some((x) => x.key === 'local')) }))}
           />
         ) : (
-          <div key={f.key} className={`form-field ${f.wide || f.type === 'textarea' ? 'form-field--wide' : ''}`}>
-            <label htmlFor={`f-${f.key}`}>{f.label}{f.required && canEdit && <span className="req"> *</span>}</label>
-            {f.type === 'ref' ? (
-              <RefPicker id={`f-${f.key}`} field={f} value={data[f.key]} linkedId={data[f.refKey!]} disabled={!canEdit} onChange={(patch) => setData((d) => ({ ...d, ...patch }))} />
-            ) : (
-              <FieldInput field={f} value={data[f.key]} disabled={!canEdit} onChange={(v) => setData((d) => ({ ...d, [f.key]: v }))} />
+          <Fragment key={f.key}>
+            {/* no produto, o botão da IA fica logo antes dos textos do cardápio */}
+            {def.iaProduto && canEdit && f.key === 'resumo' && (
+              <PreencherProdutoIA data={data} onPreencher={(patch) => setData((d) => ({ ...d, ...patch }))} />
             )}
-          </div>
+            <div className={`form-field ${f.wide || f.type === 'textarea' ? 'form-field--wide' : ''}`}>
+              <label htmlFor={`f-${f.key}`}>{f.label}{f.required && canEdit && <span className="req"> *</span>}</label>
+              {f.type === 'ref' ? (
+                <RefPicker id={`f-${f.key}`} field={f} value={data[f.key]} linkedId={data[f.refKey!]} disabled={!canEdit} onChange={(patch) => setData((d) => ({ ...d, ...patch }))} />
+              ) : (
+                <FieldInput field={f} value={data[f.key]} disabled={!canEdit} onChange={(v) => setData((d) => ({ ...d, [f.key]: v }))} />
+              )}
+            </div>
+          </Fragment>
         ))}
         {def.fichaTecnica && !def.fichaPrimeiro && fichaCampo}
         {def.compra && (
