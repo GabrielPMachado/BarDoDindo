@@ -83,6 +83,8 @@ const ORIGENS_DESPESA: Record<string, string> = {
   terceirizados: 'Serviços terceirizados', contratos: 'Contratos', midias: 'Gestão de mídias', projetos: 'Projetos',
 };
 const VALOR_MAXIMO_DESPESA = 1_000_000;
+/** Unidades de medida que a ficha técnica converte entre si (ml/L e g/kg). */
+const MEDIDAS = ['ml', 'L', 'g', 'kg'];
 const DATA_ISO = /^\d{4}-\d{2}-\d{2}$/;
 /** Data AAAA-MM-DD que existe no calendário (31/02 e mês 13 não passam). */
 function dataValida(v: string) {
@@ -919,10 +921,16 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
         // (o Administrativo também escolhe o insumo ao cadastrar um preço de fornecedor)
         requireAnyAccess(ctx, ['vnd', 'dp', 'adm'], 'ver');
         return (await colecao('estoque'))
-          .map((e) => ({
-            id: e.id, nome: e.item, unidade: e.unidade || 'un', custo: Number(e.custo) || 0,
-            detalhe: [e.categoria, Number(e.custo) ? `${brl(Number(e.custo))}/${e.unidade || 'un'}` : 'sem custo cadastrado'].filter(Boolean).join(' · '),
-          }));
+          .map((e) => {
+            const un = e.unidade || 'un', custo = Number(e.custo) || 0;
+            // item contado em unidades (garrafa, caixa…) com o conteúdo informado: a receita mede em ml/g
+            const conteudo = Number(e.conteudo) || 0, medida = String(e.conteudoUnidade ?? '');
+            const converte = conteudo > 0 && MEDIDAS.includes(medida) && !MEDIDAS.includes(un);
+            return {
+              id: e.id, nome: e.item, unidade: converte ? medida : un, custo: converte ? custo / conteudo : custo,
+              detalhe: [e.categoria, custo ? `${brl(custo)}/${un}${converte ? ` de ${conteudo.toLocaleString('pt-BR')} ${medida}` : ''}` : 'sem custo cadastrado'].filter(Boolean).join(' · '),
+            };
+          });
       case 'precos':
         // ficha técnica: preço de cada fornecedor para cada insumo (Tabela de preços do Administrativo)
         requireAnyAccess(ctx, ['vnd', 'dp', 'adm'], 'ver');
