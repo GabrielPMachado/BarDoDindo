@@ -20,6 +20,8 @@ export interface ItemCompra {
   valorUnitario: number;
   /** Unidade do item no Estoque (garrafa = "un", caixa = "cx"…). */
   unidade: string;
+  /** Unidade do item no Estoque quando a nota foi ligada a ele (para avisar se mudar). */
+  unidadeCadastro?: string;
   /** Para item novo: categoria (Estoque) ou tipo (Materiais). */
   categoria: string;
   tipo: string;
@@ -33,7 +35,7 @@ interface Fornecedor { id: string; nome: string }
 
 const CAMPO_ESTOQUE: Field = {
   key: 'nome', label: 'Item', type: 'ref', ref: 'insumos', refKey: 'itemId', livre: true,
-  fill: { unidade: 'unidadeEstoque', custoSugerido: 'custoEstoque', categoria: 'categoria' },
+  fill: { unidade: 'unidadeEstoque', unidadeCadastro: 'unidadeEstoque', custoSugerido: 'custoEstoque', categoria: 'categoria' },
 };
 const CAMPO_MATERIAL: Field = { key: 'nome', label: 'Item', type: 'ref', ref: 'materiais', refKey: 'itemId', livre: true, fill: { tipo: 'tipo', custoSugerido: 'valor' } };
 const QTD = { decimals: 3, min: 0, max: 1_000_000 };
@@ -98,7 +100,7 @@ export function CompraItens({ itens, somenteLeitura, onChange, onNotaLida }: {
       const ehMaterial = PARECE_MATERIAL.test(l.descricao.normalize('NFD').replace(/[̀-ͯ]/g, ''));
       const insumo = !ehMaterial ? maisParecido(l.descricao, ins) : null;
       const material = !insumo ? maisParecido(l.descricao, mats) : null;
-      if (insumo) return { ...base, destino: 'estoque' as const, itemId: insumo.id, nome: insumo.nome, unidade: insumo.unidadeEstoque || unidadeDaNota(l.unidade), categoria: insumo.categoria || 'Outros' };
+      if (insumo) return { ...base, destino: 'estoque' as const, itemId: insumo.id, nome: insumo.nome, unidade: insumo.unidadeEstoque || unidadeDaNota(l.unidade), unidadeCadastro: insumo.unidadeEstoque, categoria: insumo.categoria || 'Outros' };
       if (material) return { ...base, destino: 'materiais' as const, itemId: material.id, nome: material.nome, tipo: material.tipo || 'Utensílio', local: 'Bar' };
       if (ehMaterial) return { ...base, destino: 'materiais' as const, nome: nomeBonito(l.descricao), tipo: 'Utensílio', local: 'Bar' };
       return { ...base, destino: 'estoque' as const, nome: nomeBonito(l.descricao), unidade: unidadeDaNota(l.unidade), categoria: PARECE_BEBIDA.test(l.descricao) ? 'Bebidas' : 'Outros' };
@@ -197,9 +199,6 @@ export function CompraItens({ itens, somenteLeitura, onChange, onNotaLida }: {
                       <select className="input input--sm" aria-label="Categoria" value={i.categoria} onChange={(e) => mudar(i.chave, { categoria: e.target.value })}>
                         {CATEGORIAS.map((c) => <option key={c}>{c}</option>)}
                       </select>
-                      <select className="input input--sm" aria-label="Unidade" value={i.unidade} onChange={(e) => mudar(i.chave, { unidade: e.target.value })}>
-                        {UNIDADES.map((u) => <option key={u}>{u}</option>)}
-                      </select>
                     </>
                   ) : (
                     <select className="input input--sm" aria-label="Tipo" value={i.tipo} onChange={(e) => mudar(i.chave, { tipo: e.target.value })}>
@@ -211,7 +210,16 @@ export function CompraItens({ itens, somenteLeitura, onChange, onNotaLida }: {
               <div className="compra__valores">
                 <div className="form-field">
                   <label>Quantidade</label>
-                  <NumberInput spec={QTD} suffix={i.destino === 'estoque' ? i.unidade : 'un'} value={i.quantidade || ''} onChange={(v) => mudar(i.chave, { quantidade: v === '' ? 0 : v })} />
+                  {i.destino === 'estoque' ? (
+                    <div className="compra__qtd">
+                      <NumberInput spec={QTD} ariaLabel="Quantidade" value={i.quantidade || ''} onChange={(v) => mudar(i.chave, { quantidade: v === '' ? 0 : v })} />
+                      <select className="input" aria-label="Unidade" value={i.unidade} onChange={(e) => mudar(i.chave, { unidade: e.target.value })}>
+                        {[...new Set([i.unidade, ...UNIDADES])].map((u) => <option key={u}>{u}</option>)}
+                      </select>
+                    </div>
+                  ) : (
+                    <NumberInput spec={QTD} suffix="un" value={i.quantidade || ''} onChange={(v) => mudar(i.chave, { quantidade: v === '' ? 0 : v })} />
+                  )}
                 </div>
                 <div className="form-field">
                   <label>Local</label>
@@ -225,6 +233,9 @@ export function CompraItens({ itens, somenteLeitura, onChange, onNotaLida }: {
                 </div>
                 <div className="compra__sub"><span className="muted small">Subtotal</span><b>{brl((i.quantidade || 0) * (i.valorUnitario || 0))}</b></div>
               </div>
+              {i.destino === 'estoque' && i.itemId && i.unidadeCadastro && i.unidade !== i.unidadeCadastro && (
+                <p className="compra__aviso small">A unidade de “{i.nome}” no Estoque passa de <b>{i.unidadeCadastro}</b> para <b>{i.unidade}</b> ao salvar a nota.</p>
+              )}
             </div>
           );
         })}
