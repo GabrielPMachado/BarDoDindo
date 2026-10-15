@@ -866,6 +866,10 @@ button.anexos__nome:hover { text-decoration: underline; }
 .ficha__dica { grid-column: 1 / -1; margin: 0; }
 .ficha__novo-acoes { display: flex; justify-content: flex-end; gap: 8px; }
 .fi-insumo, .fi-qtd, .fi-base { min-width: 0; }
+/* o aviso "vinculado ao cadastro" deixa o insumo mais alto: as outras colunas se alinham pelo topo, na altura dos campos */
+.ficha__item { align-items: start; }
+.fi-base, .fi-custo, .fi-del { min-height: 38px; display: flex; align-items: center; }
+.fi-custo { justify-content: flex-end; }
 @media (max-width: 760px) {
   .ficha { padding: 12px; }
   .ficha__cab { display: none; }
@@ -875,7 +879,7 @@ button.anexos__nome:hover { text-decoration: underline; }
   .fi-qtd { grid-area: qtd; }
   .fi-un { grid-area: un; }
   .fi-base { grid-area: base; }
-  .fi-custo { grid-area: custo; text-align: left !important; }
+  .fi-custo { grid-area: custo; text-align: left !important; justify-content: flex-start; }
   .fi-del { grid-area: del; justify-self: end; }
   .ficha__opcao { flex: 1 1 140px; }
   .ficha__novo-campos { grid-template-columns: 1fr 1fr; }
