@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, Camera, ChevronDown, Download, FileSpreadsheet, FileText, ImageOff, Paperclip, Pencil, Plus, Receipt, Search, Sheet, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowLeftRight, ArrowUp, Camera, ChevronDown, Download, FileSpreadsheet, FileText, ImageOff, Paperclip, Pencil, Plus, Receipt, Search, Sheet, Trash2 } from 'lucide-react';
 import { numberSpec, STATUS_KEYS, termos, toneOf, type CollectionDef, type Computed, type Field } from '../collections';
 import { maskCnpj, maskPhone } from '../lib/masks';
 import { useCollection, type Row } from '../lib/data';
@@ -14,6 +14,9 @@ import { colunasDe, exportarCsv, exportarExcel, exportarPdf } from '../lib/expor
 import { LancarDespesa } from './LancarDespesa';
 import { AnexosCampo, anexosDe, type AnexoNovo } from './Anexos';
 import { FichaTecnica } from './FichaTecnica';
+import { LocaisCampo, TransferirModal } from './Locais';
+import { CompraItens, itemVazio, totalItens, type ItemCompra } from './CompraItens';
+import { camposDosLocais, locaisDe, locaisNoFormulario } from '../lib/locais';
 import { calcularFicha, fichaDe, type Ficha } from '../lib/ficha';
 
 const PAGE = 50;
@@ -75,6 +78,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   const [page, setPage] = useState(0);
   const [editing, setEditing] = useState<Row | 'new' | null>(null);
   const [lancando, setLancando] = useState<Row | null>(null);
+  const [transferindo, setTransferindo] = useState<Row | null>(null);
 
   const tableFields = def.fields.filter((f) => !f.formOnly);
   const filterField = def.fields.find((f) => f.key === def.filterKey);
@@ -224,6 +228,11 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
                           </button>
                         )}
                         {rowActions?.(r, canEdit)}
+                        {def.porLocal && canEdit && (
+                          <button className="icon-btn" onClick={() => setTransferindo(r)} aria-label="Transferir entre locais" title="Transferir entre locais">
+                            <ArrowLeftRight size={16} />
+                          </button>
+                        )}
                         {def.despesa && canEdit && (
                           <button className="icon-btn" onClick={() => setLancando(r)} aria-label="Lançar despesa no DRE" title="Lançar despesa no DRE">
                             <Receipt size={16} />
@@ -250,6 +259,14 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
         )}
       </div>
 
+      {transferindo && (
+        <TransferirModal
+          row={transferindo} nome={String(transferindo[def.fields[0].key] ?? '')} unidade={typeof transferindo.unidade === 'string' ? transferindo.unidade : undefined}
+          comLocal={def.fields.some((f) => f.key === 'local')}
+          onClose={() => setTransferindo(null)}
+          onSalvar={async (dados) => { await col.update(transferindo.id, dados); }}
+        />
+      )}
       {lancando && def.despesa && (
         <LancarDespesa def={def} row={lancando} sugestao={def.despesa(lancando)} onClose={() => setLancando(null)} onDone={col.reload} />
       )}
@@ -263,9 +280,12 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
           defaults={newDefaults}
           onClose={() => setEditing(null)}
           onSave={async (data) => {
-            if (editing === 'new') await col.add(data);
-            else await col.update(editing.id, data);
-            notify(editing === 'new' ? 'Registro criado' : 'Alterações salvas');
+            if (editing === 'new') {
+              const novo = await col.add(data);
+              // nota de compra: já abre "Lançar despesa" preenchida (dá para fechar e lançar depois)
+              if (def.lancarAoCriar && def.despesa && canEdit) setLancando(novo as Row);
+            } else await col.update(editing.id, data);
+            notify(editing === 'new' ? (def.compra ? 'Nota lançada: as quantidades já entraram no estoque' : 'Registro criado') : 'Alterações salvas');
             setEditing(null);
           }}
           onDelete={
@@ -296,6 +316,11 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [anexosNovos, setAnexosNovos] = useState<AnexoNovo[]>([]);
+  // itens da nota de compra (só se editam numa nota nova; numa lançada, só aparecem)
+  const [itensCompra, setItensCompra] = useState<ItemCompra[]>(() =>
+    !def.compra ? [] : row && Array.isArray(row.itens)
+      ? (row.itens as ItemCompra[]).map((i, k) => ({ ...itemVazio(), ...i, chave: `r${k}` }))
+      : [itemVazio()]);
   // com a ficha técnica preenchida, o custo do produto é o custo por porção calculado nela
   const mudarFicha = useCallback((ficha: Ficha) => setData((d) => ({
     ...d, ficha, ...(ficha.itens.length || ficha.fixos.length ? { custo: calcularFicha(ficha, Number(d.preco) || 0).custoPorcao } : {}),
@@ -304,6 +329,12 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canEdit) return onClose();
+    const itensValidos = itensCompra.filter((i) => i.nome.trim());
+    if (def.compra && !row) {
+      if (!itensValidos.length) return setError('Inclua pelo menos um item na nota.');
+      const semQtd = itensValidos.find((i) => !(Number(i.quantidade) > 0));
+      if (semQtd) return setError(`Informe a quantidade de "${semQtd.nome}".`);
+    }
     const missing = def.fields.find((f) => f.required && (data[f.key] === undefined || data[f.key] === ''));
     if (missing) return setError(`Preencha o campo "${missing.label}".`);
     const semVinculo = def.fields.find((f) => f.type === 'ref' && !f.livre && data[f.key] && (data[f.refKey!] === undefined || data[f.refKey!] === null || data[f.refKey!] === ''));
@@ -337,6 +368,12 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
         for (const extra of Object.keys(f.fill ?? {})) if (!def.fields.some((x) => x.key === extra)) payload[extra] = data[extra] ?? '';
       }
       if (def.comFoto) payload.foto = data.foto ?? '';
+      if (def.compra && !row) {
+        payload.itens = itensValidos.map(({ chave: _c, lido, ...i }) => ({ ...i, ...(lido ? { descricaoNota: lido } : {}) }));
+        payload.valor = totalItens(itensValidos);
+      }
+      if (def.compra && row) delete payload.valor;
+      if (def.porLocal) Object.assign(payload, camposDosLocais(locaisDe(data), def.fields.some((f) => f.key === 'local')));
       if (def.fichaTecnica) payload.ficha = fichaDe(data.ficha);
       if (def.anexos) {
         // a lista dos que ficam (os removidos são apagados ao salvar) e os PDFs novos
@@ -385,7 +422,12 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
           <FotoCampo valor={typeof data.foto === 'string' ? data.foto : ''} disabled={!canEdit} onChange={(foto) => setData((d) => ({ ...d, foto }))} />
         )}
         {def.fichaPrimeiro && fichaCampo}
-        {def.fields.map((f) => (
+        {def.fields.map((f) => (def.porLocal && f.key === 'local') || (def.compra && f.key === 'valor') ? null : def.porLocal && f.key === 'quantidade' ? (
+          <LocaisCampo
+            key="locais" locais={locaisNoFormulario(data)} unidade={typeof data.unidade === 'string' ? data.unidade : undefined} disabled={!canEdit}
+            onChange={(l) => setData((d) => ({ ...d, ...camposDosLocais(l, def.fields.some((x) => x.key === 'local')) }))}
+          />
+        ) : (
           <div key={f.key} className={`form-field ${f.wide || f.type === 'textarea' ? 'form-field--wide' : ''}`}>
             <label htmlFor={`f-${f.key}`}>{f.label}{f.required && canEdit && <span className="req"> *</span>}</label>
             {f.type === 'ref' ? (
@@ -396,6 +438,12 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
           </div>
         ))}
         {def.fichaTecnica && !def.fichaPrimeiro && fichaCampo}
+        {def.compra && (
+          <CompraItens
+            itens={itensCompra} somenteLeitura={!!row || !canEdit} onChange={setItensCompra}
+            onNotaLida={(cab) => setData((d) => ({ ...d, ...Object.fromEntries(Object.entries(cab).filter(([, v]) => v !== undefined)) }))}
+          />
+        )}
         {def.anexos && (
           <AnexosCampo
             rotulo={def.anexos} salvos={anexosDe(data.anexos)} novos={anexosNovos} disabled={!canEdit}

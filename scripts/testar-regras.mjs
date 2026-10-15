@@ -31,6 +31,7 @@ const negado = (nome, fn) => espera('negado', nome, fn);
 const permitido = (nome, fn) => espera('permitido', nome, fn);
 
 console.log('— sem login —');
+await negado('ler a chave da IA sem login', () => getDoc(doc(db, 'segredos', 'ia')));
 await permitido('ler o cardápio público', () => getDocs(collection(db, 'cardapio')));
 await permitido('ler recompensas ativas', () => getDocs(query(collection(db, 'recompensas'), where('status', '==', 'Ativa'))));
 await negado('listar clientes', () => getDocs(collection(db, 'clientes')));
@@ -252,6 +253,9 @@ if (senhaAdministrativo) {
   await negado('ver a Tabela de preços (sem Vendas nem Administrativo)', () => getDocs(collection(db, 'precos')));
   await negado('ver guarnições e itens fixos (sem Vendas)', () => getDocs(collection(db, 'guarnicoes')));
   await negado('ver Materiais (sem Vendas nem Estrutura)', () => getDocs(collection(db, 'materiais')));
+  await negado('ver as notas de compra (Estrutura)', () => getDocs(collection(db, 'compras')));
+  await permitido('ler a chave da IA (equipe logada)', () => getDoc(doc(db, 'segredos', 'ia')));
+  await negado('trocar a chave da IA (sem Configurações)', () => setDoc(doc(db, 'segredos', 'ia'), { chave: 'x' }));
   await negado('anexar PDF a um contrato (Administrativo)', async () => {
     const ref = doc(collection(db, 'anexos'));
     const lote = writeBatch(db);

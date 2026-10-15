@@ -2,11 +2,12 @@ import type { AreaKey } from './modules';
 import type { Row } from './lib/data';
 import { brl, daysUntil, isoToday, num, pct } from './lib/format';
 import { calcularFicha, fichaDe, precoNormalizado } from './lib/ficha';
+import { locaisDe, resumoLocais } from './lib/locais';
 
 export type FieldType = 'text' | 'textarea' | 'number' | 'money' | 'date' | 'select' | 'email' | 'phone' | 'percent' | 'cnpj' | 'time' | 'ref';
 
 /** Listas que podem ser vinculadas (servidas por /api/crm/referencias/:tipo). */
-export type RefSource = 'pessoas' | 'colaboradores' | 'fornecedores' | 'clientes' | 'insumos' | 'copos' | 'utensilios';
+export type RefSource = 'pessoas' | 'colaboradores' | 'fornecedores' | 'clientes' | 'insumos' | 'copos' | 'utensilios' | 'materiais';
 
 export interface Field {
   key: string;
@@ -78,6 +79,12 @@ export interface CollectionDef {
   anexos?: string;
   /** Produtos: ficha técnica com insumos, custo por porção, CMV e preço sugerido. */
   fichaTecnica?: boolean;
+  /** Entrada de notas: itens da compra (somados ao Estoque ou aos Materiais) e leitura da nota por IA. */
+  compra?: boolean;
+  /** Logo depois de cadastrar, abre "Lançar despesa" já preenchida. */
+  lancarAoCriar?: boolean;
+  /** Quantidade guardada por local (Bar, Depósito…), com botão de transferir entre locais. */
+  porLocal?: boolean;
   /** A ficha técnica vem antes dos outros campos no formulário (tela "Fichas técnicas"). */
   fichaPrimeiro?: boolean;
   /** Como um registro deste módulo vira despesa no DRE: pré-preenche a tela "Lançar despesa" (a pessoa confere antes de lançar). */
@@ -225,7 +232,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     },
   },
   estoque: {
-    id: 'estoque', comFoto: true, area: 'dp', title: 'Estoque', singular: 'item de estoque',
+    id: 'estoque', comFoto: true, porLocal: true, area: 'dp', title: 'Estoque', singular: 'item de estoque',
     description: 'Insumos com controle de quantidade mínima e validade.',
     filterKey: 'categoria', sortKey: 'item',
     fields: [
@@ -242,6 +249,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'validade', label: 'Validade', type: 'date' },
     ],
     computed: [
+      { label: 'Locais', format: 'text', get: (r) => resumoLocais(locaisDe(r)) || null },
       { label: 'Valor em estoque', get: (r) => n(r.quantidade) * n(r.custo), format: 'money' },
       {
         label: 'Situação', format: 'badge',
@@ -261,24 +269,50 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     },
   },
   materiais: {
-    id: 'materiais', anexos: 'Fichas técnicas e manuais', comFoto: true, area: 'dp', title: 'Materiais', singular: 'material',
+    id: 'materiais', anexos: 'Fichas técnicas e manuais', comFoto: true, porLocal: true, area: 'dp', title: 'Materiais', singular: 'material',
     description: 'Patrimônio: equipamentos, utensílios, mobiliário e uniformes.',
     filterKey: 'tipo', sortKey: 'material',
     fields: [
       { key: 'material', label: 'Material', type: 'text', required: true, wide: true },
       { key: 'tipo', label: 'Tipo', type: 'select', options: ['Equipamento', 'Utensílio', 'Mobiliário', 'Uniforme', 'Eletrônico', 'Outro'], required: true },
       { key: 'quantidade', label: 'Quantidade', type: 'number', default: 1, min: 1, max: 100_000 },
-      { key: 'local', label: 'Local', type: 'select', options: ['Salão', 'Bar', 'Cozinha', 'Depósito', 'Escritório', 'Área externa'] },
+      { key: 'local', label: 'Local', type: 'select', options: ['Salão', 'Bar', 'Cozinha', 'Depósito', 'Escritório', 'Área externa'], formOnly: true },
       { key: 'estado', label: 'Estado', type: 'select', options: ['Novo', 'Bom', 'Regular', 'Manutenção', 'Descartar'], default: 'Bom' },
       { key: 'valor', label: 'Valor unitário', type: 'money', max: 10_000_000 },
       { key: 'aquisicao', label: 'Aquisição', type: 'date' },
       { key: 'observacoes', label: 'Observações', type: 'textarea', formOnly: true, wide: true },
     ],
+    computed: [{ label: 'Locais', format: 'text', get: (r) => resumoLocais(locaisDe(r)) || null }],
     kpis: (rows) => [
       { label: 'Itens patrimoniais', value: num(sum(rows, 'quantidade')) },
       { label: 'Valor patrimonial', value: brl(rows.reduce((t, r) => t + n(r.quantidade) * n(r.valor), 0)) },
       { label: 'Em manutenção / descarte', value: num(count(rows, 'estado', ['Manutenção', 'Descartar'])) },
     ],
+  },
+
+  compras: {
+    id: 'compras', comFoto: true, anexos: 'Nota fiscal (PDF ou XML em PDF)', compra: true, lancarAoCriar: true, feminino: true, area: 'dp',
+    title: 'Entrada de notas', singular: 'nota de compra',
+    description: 'Lance a nota fiscal de compra (ou leia a foto com a IA): cada item soma no Estoque ou nos Materiais, no local escolhido, e atualiza o custo e a Tabela de preços do fornecedor.',
+    sortKey: 'data', sortDir: 'desc',
+    despesa: (r) => ({ descricao: juntar('Compra', r.fornecedor, r.numero ? `NF ${s(r.numero)}` : ''), categoria: 'Fornecedores', valor: n(r.valor) }),
+    fields: [
+      { key: 'fornecedor', label: 'Fornecedor', type: 'ref', ref: 'fornecedores', refKey: 'fornecedorId', livre: true, required: true, wide: true },
+      { key: 'numero', label: 'Nº da nota', type: 'text', placeholder: 'Ex.: 000123' },
+      { key: 'data', label: 'Data da compra', type: 'date', required: true, default: isoToday() },
+      { key: 'valor', label: 'Total da nota', type: 'money', max: 1_000_000 },
+      { key: 'observacoes', label: 'Observações', type: 'textarea', formOnly: true, wide: true },
+    ],
+    computed: [{ label: 'Itens', format: 'number', get: (r) => (Array.isArray(r.itens) ? r.itens.length : null) }],
+    kpis: (rows) => {
+      const mes = isoToday().slice(0, 7);
+      const doMes = rows.filter((r) => s(r.data).startsWith(mes));
+      return [
+        { label: 'Notas no mês', value: num(doMes.length) },
+        { label: 'Compras no mês', value: brl(sum(doMes, 'valor')) },
+        { label: 'Fornecedores no mês', value: num(new Set(doMes.map((r) => r.fornecedorId || r.fornecedor)).size) },
+      ];
+    },
   },
 
   /* ---------------- Administrativo ---------------- */

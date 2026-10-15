@@ -31,7 +31,7 @@ const codigo = (e: unknown) => String((e as { code?: string } | null)?.code ?? '
 const COLLECTIONS: Record<string, string> = {
   metas: 'dir',
   colaboradores: 'rh', ferias: 'rh',
-  projetos: 'dp', estoque: 'dp', materiais: 'dp',
+  projetos: 'dp', estoque: 'dp', materiais: 'dp', compras: 'dp',
   terceirizados: 'adm', fornecedores: 'adm', contratos: 'adm', precos: 'adm',
   receitas: 'fin', despesas: 'fin',
   reservas: 'atd', consumos: 'atd', resgates: 'atd',
@@ -56,7 +56,7 @@ const AREAS = ['dir', 'atd', 'vnd', 'mkt', 'rh', 'dp', 'adm', 'fin', 'jur', 'fis
 /** Como cada registro é citado no painel de atualizações ("cadastrou o produto …"). */
 const REGISTRO: Record<string, string> = {
   metas: 'a meta', colaboradores: 'o colaborador', ferias: 'o registro de férias/afastamento',
-  projetos: 'o projeto', estoque: 'o item de estoque', materiais: 'o material',
+  projetos: 'o projeto', estoque: 'o item de estoque', materiais: 'o material', compras: 'a nota de compra',
   terceirizados: 'o serviço terceirizado', fornecedores: 'o fornecedor', contratos: 'o contrato', precos: 'o preço de fornecedor',
   receitas: 'a receita', despesas: 'a despesa',
   reservas: 'a reserva', consumos: 'o consumo', resgates: 'o voucher',
@@ -80,7 +80,7 @@ const valorDe = (d: Dados) => (typeof d.valor === 'number' && d.valor > 0 ? brl(
 
 /** Cadastros que podem lançar despesas no DRE (o mesmo conjunto vale em `firestore.rules`) e como aparecem na origem da despesa. */
 const ORIGENS_DESPESA: Record<string, string> = {
-  terceirizados: 'Serviços terceirizados', contratos: 'Contratos', midias: 'Gestão de mídias', projetos: 'Projetos',
+  terceirizados: 'Serviços terceirizados', contratos: 'Contratos', midias: 'Gestão de mídias', projetos: 'Projetos', compras: 'Entrada de notas',
 };
 const VALOR_MAXIMO_DESPESA = 1_000_000;
 /** Sugestões para o preparo na ficha técnica, além do que estiver em Materiais (Estrutura). */
@@ -201,7 +201,7 @@ function inssEmpregado(salario: number, faixas: { ate: number; aliquota: number 
  * e o registro guarda só a lista com nome e tamanho: abrir a tabela não baixa nenhum PDF. */
 /** Cadastros que aceitam PDF (currículo, contratos, notas fiscais, laudos…). Igual a `colecoesComAnexo()` em firestore.rules. */
 export const COM_ANEXOS = [
-  'metas', 'colaboradores', 'ferias', 'projetos', 'materiais', 'terceirizados', 'fornecedores', 'contratos',
+  'metas', 'colaboradores', 'ferias', 'projetos', 'materiais', 'compras', 'terceirizados', 'fornecedores', 'contratos',
   'receitas', 'despesas', 'criacao', 'trabalhista', 'consultoria', 'qualidade', 'naoconformidades',
 ];
 export const ANEXO_MAX_BYTES = 5 * 1024 * 1024;
@@ -879,7 +879,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     if (!ctx.funcao?.sistema) fail(403, 'Só a função Administrador pode zerar o sistema.');
     if (b.confirmacao !== 'ZERAR TUDO') fail(400, 'Para zerar, confirme com "ZERAR TUDO".');
     const todos = async (...caminho: string[]) => (await getDocs(collection(db, caminho.join('/')))).docs.map((d) => d.ref);
-    const cols = [...Object.keys(COLLECTIONS).filter((c) => c !== 'funcoes'), 'clientes', 'saldos', 'cardapio', 'ref_colaboradores', 'ref_fornecedores', 'config'];
+    const cols = [...Object.keys(COLLECTIONS).filter((c) => c !== 'funcoes'), 'clientes', 'saldos', 'cardapio', 'ref_colaboradores', 'ref_fornecedores', 'config', 'segredos'];
     const refs: DocumentReference[] = [];
     for (const c of cols) refs.push(...(await todos(c)));
     for (const a of AREAS) refs.push(...(await todos('atividades', a, 'itens')));
@@ -939,9 +939,17 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
             const converte = conteudo > 0 && MEDIDAS.includes(medida) && !MEDIDAS.includes(un);
             return {
               id: e.id, nome: e.item, unidade: converte ? medida : un, custo: converte ? custo / conteudo : custo,
+              // entrada de notas: a compra é lançada na unidade do Estoque (ex.: garrafas), sem conversão
+              unidadeEstoque: un, custoEstoque: custo, categoria: e.categoria ?? '',
               detalhe: [e.categoria, custo ? `${brl(custo)}/${un}${converte ? ` de ${conteudo.toLocaleString('pt-BR')} ${medida}` : ''}` : 'sem custo cadastrado'].filter(Boolean).join(' · '),
             };
           });
+      case 'materiais':
+        // entrada de notas: materiais (patrimônio) já cadastrados
+        requireAnyAccess(ctx, ['dp'], 'ver');
+        return (await colecao('materiais'))
+          .filter((m) => m.material)
+          .map((m) => ({ id: m.id, nome: String(m.material), tipo: m.tipo ?? '', valor: Number(m.valor) || 0, detalhe: [m.tipo, m.local].filter(Boolean).join(' · ') }));
       case 'copos':
       case 'utensilios': {
         // ficha técnica (preparo): copos e utensílios ligados aos cadastros de Estoque e de Materiais
@@ -1222,6 +1230,25 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     [novos ? `${novos} PDF${novos > 1 ? 's' : ''} anexado${novos > 1 ? 's' : ''}` : '', removidos ? `${removidos} PDF${removidos > 1 ? 's' : ''} removido${removidos > 1 ? 's' : ''}` : '']
       .filter(Boolean).join(' · ');
 
+  /* CRM: chave da IA que lê as notas fiscais (Google Gemini, cota gratuita). Fica no banco, legível só pela equipe logada:
+   * fora do código do site, que é público. Só quem edita Configurações troca a chave. */
+  rota('GET', '/crm/ia/chave', async () => {
+    await requireUsuario();
+    const d = (await getDoc(doc(db, 'segredos', 'ia'))).data();
+    return { chave: d?.chave ?? '', modelo: d?.modelo ?? '' };
+  });
+  rota('PUT', '/crm/ia/chave', async ({ b }) => {
+    const ctx = await requireUsuario();
+    requireAccess(ctx, 'cfg', 'editar');
+    const chave = str(b.chave, 200), modelo = str(b.modelo, 80);
+    if (chave && !/^[A-Za-z0-9_-]{20,200}$/.test(chave)) fail(400, 'Chave inválida. Copie a chave inteira do Google AI Studio.');
+    const lote = writeBatch(db);
+    lote.set(doc(db, 'segredos', 'ia'), { chave, modelo, atualizadoEm: now(), atualizadoPor: ctx.usuario.id });
+    registrar(lote, ctx, 'cfg', chave ? 'configurou a IA de leitura de notas' : 'removeu a chave da IA de leitura de notas');
+    await lote.commit();
+    return { ok: true };
+  });
+
   /* CRM: abrir um PDF anexado (junta as partes) */
   rota('GET', '/crm/anexos/:id', async ({ p }) => {
     const ctx = await requireUsuario();
@@ -1232,6 +1259,82 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     if (partes.some((s) => !s.exists())) fail(404, 'Arquivo incompleto. Envie o PDF novamente.');
     return { nome: meta.nome, tamanho: meta.tamanho, dados: partes.map((s) => String(s.data()?.dados ?? '')).join('') };
   });
+
+  /* ---------- entrada de notas (compras) ----------
+   * Cada item da nota soma no Estoque ou nos Materiais, no local escolhido, e atualiza o custo do item.
+   * Itens do Estoque também atualizam a Tabela de preços daquele fornecedor (se a pessoa tiver acesso ao Administrativo).
+   * Excluir a nota tira as quantidades de volta (sem deixar negativo). */
+  interface ItemCompra { destino: 'estoque' | 'materiais'; itemId: string | null; nome: string; quantidade: number; local: string; valorUnitario: number; unidade: string; categoria: string; tipo: string }
+  function validarItensCompra(v: unknown): ItemCompra[] {
+    if (!Array.isArray(v) || !v.length) return fail(400, 'Inclua pelo menos um item na nota.');
+    if (v.length > 80) fail(400, 'A nota aceita até 80 itens.');
+    return v.map((i: Dados, k) => {
+      const nome = str(i?.nome, 120), quantidade = Number(i?.quantidade), valorUnitario = Number(i?.valorUnitario);
+      if (!nome) fail(400, `Informe o item da linha ${k + 1}.`);
+      if (!(quantidade > 0 && quantidade <= 1_000_000)) fail(400, `Quantidade inválida em "${nome}".`);
+      if (!(valorUnitario >= 0 && valorUnitario <= 1_000_000)) fail(400, `Valor inválido em "${nome}".`);
+      return {
+        destino: i.destino === 'materiais' ? 'materiais' : 'estoque', itemId: i.itemId ? str(i.itemId, 128) : null, nome,
+        quantidade: Math.round(quantidade * 1000) / 1000, local: str(i.local, 40) || 'Depósito', valorUnitario: Math.round(valorUnitario * 100) / 100,
+        unidade: str(i.unidade, 10) || 'un', categoria: str(i.categoria, 40), tipo: str(i.tipo, 40),
+      };
+    });
+  }
+  /** Locais do item (os antigos, só com quantidade e local, viram um local só) com a quantidade somada (ou tirada). */
+  function locaisSomados(cur: Dados | null, local: string, qtd: number) {
+    const l: Record<string, number> = {};
+    if (cur?.locais && typeof cur.locais === 'object') for (const [k, v] of Object.entries(cur.locais)) l[k] = Number(v) || 0;
+    else if (Number(cur?.quantidade) > 0) l[String(cur?.local || 'Depósito')] = Number(cur?.quantidade);
+    l[local] = Math.max(0, Math.round(((l[local] ?? 0) + qtd) * 1000) / 1000);
+    for (const k of Object.keys(l)) if (!l[k]) delete l[k];
+    const quantidade = Math.round(Object.values(l).reduce((t, x) => t + x, 0) * 1000) / 1000;
+    const principal = Object.entries(l).sort((a, b) => b[1] - a[1])[0]?.[0] ?? local;
+    return { locais: l, quantidade, principal };
+  }
+  async function aplicarCompra(lote: WriteBatch, ctx: Ctx, compra: Dados, sinal: 1 | -1) {
+    const t = now();
+    const itens = compra.itens as ItemCompra[];
+    const precos = sinal > 0 && compra.fornecedorId && ctx.acoes('adm').some((a) => a === 'criar' || a === 'editar') ? await colecao('precos') : [];
+    for (const it of itens) {
+      const col = it.destino;
+      const cur = it.itemId ? await registro(col, it.itemId) : null;
+      if (!cur && sinal < 0) continue;
+      const { locais, quantidade, principal } = locaisSomados(cur, it.local, sinal * it.quantidade);
+      let item: Dados;
+      if (cur) {
+        requireAccess(ctx, 'dp', 'editar');
+        const patch: Dados = { locais, quantidade, atualizadoEm: t };
+        if (col === 'materiais') patch.local = principal;
+        if (sinal > 0 && col === 'estoque') Object.assign(patch, { custo: it.valorUnitario, ...(compra.fornecedor ? { fornecedor: compra.fornecedor, fornecedorId: compra.fornecedorId ?? null } : {}) });
+        if (sinal > 0 && col === 'materiais') Object.assign(patch, { valor: it.valorUnitario, aquisicao: compra.data || '' });
+        lote.update(doc(db, col, cur.id), patch);
+        item = { ...cur, ...patch };
+      } else {
+        // item novo: nasce já com a quantidade da nota
+        const ref = doc(collection(db, col));
+        it.itemId = ref.id;
+        item = col === 'estoque'
+          ? { item: it.nome, categoria: it.categoria || 'Outros', unidade: it.unidade || 'un', locais, quantidade, custo: it.valorUnitario, fornecedor: compra.fornecedor ?? '', fornecedorId: compra.fornecedorId ?? null, criadoEm: t, atualizadoEm: t }
+          : { material: it.nome, tipo: it.tipo || 'Utensílio', locais, quantidade, local: principal, estado: 'Novo', valor: it.valorUnitario, aquisicao: compra.data || '', criadoEm: t, atualizadoEm: t };
+        lote.set(ref, item);
+        item.id = ref.id;
+      }
+      // Tabela de preços: o preço desta compra passa a ser o preço do fornecedor para o item
+      if (sinal > 0 && col === 'estoque' && compra.fornecedorId && (precos.length || ctx.acoes('adm').length)) {
+        const un = String(item.unidade || 'un'), conteudo = Number(item.conteudo) || 0, cu = String(item.conteudoUnidade ?? '');
+        const comConteudo = conteudo > 0 && MEDIDAS.includes(cu) && !MEDIDAS.includes(un);
+        const dadosPreco = {
+          insumo: it.nome, insumoId: item.id, fornecedor: compra.fornecedor, fornecedorId: compra.fornecedorId, preco: it.valorUnitario,
+          embalagem: comConteudo ? `1 ${un} (${conteudo.toLocaleString('pt-BR')} ${cu})` : `1 ${un}`,
+          conteudo: comConteudo ? conteudo : 1, unidade: comConteudo ? cu : un, data: compra.data || t.slice(0, 10), status: 'Ativo',
+          observacoes: `Atualizado pela nota ${compra.numero || 'sem número'}.`, atualizadoEm: t,
+        };
+        const existente = precos.find((x) => x.fornecedorId === compra.fornecedorId && x.insumoId === item.id);
+        if (existente) lote.update(doc(db, 'precos', existente.id), dadosPreco);
+        else lote.set(doc(collection(db, 'precos')), { ...dadosPreco, criadoEm: t });
+      }
+    }
+  }
 
   rota('GET', '/crm/c/:col', async ({ p, q }) => {
     const ctx = await requireUsuario();
@@ -1253,9 +1356,14 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     await vincularCliente(p.col, dados);
     const ref = doc(collection(db, p.col));
     // os PDFs sobem antes (cada um no seu lote, por causa do tamanho); se o registro não for gravado, são apagados
+    if (p.col === 'compras') {
+      dados.itens = validarItensCompra(dados.itens);
+      dados.valor = Math.round((dados.itens as ItemCompra[]).reduce((s, i) => s + i.quantidade * i.valorUnitario, 0) * 100) / 100;
+    }
     const enviados = await enviarAnexos(ctx, p.col, ref.id, novos);
     if (enviados.length) dados.anexos = enviados;
     const lote = writeBatch(db);
+    if (p.col === 'compras') await aplicarCompra(lote, ctx, dados, 1);
     lote.set(ref, dados);
     espelhar(lote, p.col, ref.id, dados);
     registrar(lote, ctx, collectionArea(p.col), `cadastrou ${REGISTRO[p.col] ?? 'o registro'}`, {
@@ -1287,6 +1395,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       patch.sistema = false;
     }
     if (p.col === 'consumos') fail(400, 'Consumos não podem ser editados. Exclua e lance novamente.');
+    // os itens de uma nota já foram somados ao estoque: para corrigir, exclua a nota (estorna) e lance de novo
+    if (p.col === 'compras') { delete patch.itens; delete patch.valor; }
     if (p.col === 'receitas' && cur.consumoId) fail(400, 'Receitas geradas por consumo são alteradas pelo lançamento de consumo.');
     const lote = writeBatch(db);
     if (p.col === 'resgates') {
@@ -1359,6 +1469,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
         }, { merge: true });
       }
     }
+    if (p.col === 'compras' && Array.isArray(cur.itens)) await aplicarCompra(lote, ctx, cur, -1);
     lote.delete(doc(db, p.col, p.id));
     apagarAnexos(lote, anexosDe(cur));
     espelhar(lote, p.col, p.id, null);

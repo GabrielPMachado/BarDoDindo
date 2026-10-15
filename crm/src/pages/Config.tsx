@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Lock, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
+import { ExternalLink, Lock, Pencil, Plus, Save, Sparkles, Trash2, X } from 'lucide-react';
 import { AREAS_COM_PERMISSAO as AREAS, NIVEIS, acoesDe, acoesNaArea, nivelDe, type Acao, type AreaKey } from '../modules';
 import { AsyncButton, Badge, EmptyState, ErrorBox, Loading, Modal, NumberInput, PageHead, notify } from '../components/ui';
 import { api } from '../lib/api';
@@ -413,6 +413,7 @@ export function Parametros() {
           <NumberInput id="p-fgts" spec={{ decimals: 2, min: 0, max: 100 }} suffix="%" value={cfg.aliquotaFgts} onChange={(v) => setCfg({ ...cfg, aliquotaFgts: Number(v || 0) })} />
         </section>
       </fieldset>
+      {canEdit && <ChaveIA />}
     </div>
   );
 }
@@ -433,6 +434,52 @@ function Numeracao({ podeAjustar }: { podeAjustar: boolean }) {
       {podeAjustar && (
         <AsyncButton className="btn btn--ghost" onClick={ajustar} confirm={{ title: 'Ajustar a numeração?', message: 'O próximo afilhado receberá o número seguinte ao maior número em uso.', confirmLabel: 'Ajustar' }}>Ajustar numeração</AsyncButton>
       )}
+    </section>
+  );
+}
+
+/** Chave da IA que lê as notas fiscais (Google Gemini, cota gratuita). Fica guardada no banco, fora do código público. */
+function ChaveIA() {
+  const atual = useResource<{ chave: string; modelo: string }>('/crm/ia/chave');
+  const [chave, setChave] = useState('');
+  const [modelo, setModelo] = useState('');
+  useEffect(() => { if (atual.data) setModelo(atual.data.modelo); }, [atual.data]);
+  const configurada = !!atual.data?.chave;
+  const salvar = async (remover = false) => {
+    await api('/crm/ia/chave', { method: 'PUT', body: { chave: remover ? '' : chave.trim() || atual.data?.chave || '', modelo: modelo.trim() } });
+    await reload('/crm/ia/chave');
+    setChave('');
+    notify(remover ? 'Chave da IA removida.' : 'IA de leitura de notas configurada.');
+  };
+  return (
+    <section className="panel pad-lg ia-chave">
+      <h2 className="panel-title"><Sparkles size={16} className="gold" /> Leitura de notas por IA</h2>
+      <p className="muted small">
+        Em <b>Estrutura → Entrada de notas</b>, a IA (Google Gemini, cota gratuita) lê a foto da nota e preenche os itens.
+        A chave fica guardada no banco e só a equipe logada consegue ler.
+      </p>
+      <p className="small">Situação: {configurada ? <Badge tone="good">Configurada</Badge> : <Badge tone="warn">Sem chave</Badge>}</p>
+      <ol className="ia-chave__passos small muted">
+        <li>Abra o Google AI Studio e entre com a conta do bar.</li>
+        <li>Toque em <b>Criar chave de API</b> e copie a chave.</li>
+        <li>Recomendado: nas restrições da chave, permita só o site <b>bardo-c0878.web.app</b>.</li>
+        <li>Cole a chave aqui e salve.</li>
+      </ol>
+      <a className="link small ia-chave__link" href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer"><ExternalLink size={13} /> Abrir o Google AI Studio</a>
+      <div className="form-grid">
+        <div className="form-field">
+          <label htmlFor="ia-chave">{configurada ? 'Trocar a chave' : 'Chave da API'}</label>
+          <input id="ia-chave" className="input" type="password" autoComplete="off" placeholder={configurada ? '•••••••• (deixe em branco para manter)' : 'Cole a chave aqui'} value={chave} onChange={(e) => setChave(e.target.value)} />
+        </div>
+        <div className="form-field">
+          <label htmlFor="ia-modelo">Modelo (opcional)</label>
+          <input id="ia-modelo" className="input" placeholder="gemini-2.5-flash" value={modelo} onChange={(e) => setModelo(e.target.value)} />
+        </div>
+      </div>
+      <div className="profile-actions">
+        {configurada && <AsyncButton className="btn btn--ghost" onClick={() => salvar(true)} confirm={{ title: 'Remover a chave da IA?', message: 'A leitura de notas por IA para de funcionar até cadastrar outra chave.', confirmLabel: 'Remover', danger: true }}>Remover chave</AsyncButton>}
+        <AsyncButton className="btn btn--primary" onClick={() => { if (!chave.trim() && !configurada) throw new Error('Cole a chave da API.'); return salvar(); }}><Save size={16} /> Salvar</AsyncButton>
+      </div>
     </section>
   );
 }

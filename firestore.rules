@@ -42,7 +42,7 @@ service cloud.firestore {
       return {
         'metas': 'dir',
         'colaboradores': 'rh', 'ferias': 'rh',
-        'projetos': 'dp', 'estoque': 'dp', 'materiais': 'dp',
+        'projetos': 'dp', 'estoque': 'dp', 'materiais': 'dp', 'compras': 'dp',
         'terceirizados': 'adm', 'fornecedores': 'adm', 'contratos': 'adm', 'precos': 'adm',
         'receitas': 'fin', 'despesas': 'fin',
         'reservas': 'atd', 'consumos': 'atd', 'resgates': 'atd',
@@ -140,6 +140,11 @@ service cloud.firestore {
       allow read: if true;
       allow write: if pode('cfg', 'editar');
     }
+    // chaves de serviços (ex.: IA que lê as notas fiscais): só a equipe logada lê; só quem edita Configurações grava
+    match /segredos/{id} {
+      allow read: if daEquipe();
+      allow write: if pode('cfg', 'editar');
+    }
 
     /* ---------- cópias com dados reduzidos ---------- */
     // cardápio público (sem custo nem margem dos produtos)
@@ -188,7 +193,7 @@ service cloud.firestore {
     // cada área lança no DRE as despesas dos próprios cadastros (botão "Lançar despesa"), sem ganhar acesso ao Financeiro:
     // só cria, sempre "A pagar", em nome próprio, ligada a um registro que existe e que a pessoa pode editar.
     // O mesmo lote anota o lançamento no cadastro de origem (rastro para a área e aviso de repetição na competência).
-    function origensDeDespesa() { return ['terceirizados', 'contratos', 'midias', 'projetos']; }
+    function origensDeDespesa() { return ['terceirizados', 'contratos', 'midias', 'projetos', 'compras']; }
     function dataIso(v) { return v is string && v.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$'); }
     function textoAte(v, max) { return v is string && v.size() <= max; }
     // as variáveis (let) e a ordem das condições mantêm a avaliação dentro do limite de expressões das regras:
@@ -220,7 +225,7 @@ service cloud.firestore {
     // o arquivo fica fora do registro (que guarda só nome e tamanho), em partes de até 900 mil caracteres (base64).
     // Vale a permissão da área do cadastro de origem: quem vê o cadastro abre o PDF; quem cria ou edita anexa.
     function colecoesComAnexo() {
-      return ['metas', 'colaboradores', 'ferias', 'projetos', 'materiais', 'terceirizados', 'fornecedores', 'contratos',
+      return ['metas', 'colaboradores', 'ferias', 'projetos', 'materiais', 'compras', 'terceirizados', 'fornecedores', 'contratos',
         'receitas', 'despesas', 'criacao', 'trabalhista', 'consultoria', 'qualidade', 'naoconformidades'];
     }
     function anexaEm(col) { return col in colecoesComAnexo() && (pode(areas()[col], 'criar') || pode(areas()[col], 'editar')); }
