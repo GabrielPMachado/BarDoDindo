@@ -72,36 +72,92 @@ function som(tipo: 'bip' | 'erro' | 'ok' | 'boom' | 'alarme') {
   } catch { /* sem som: segue em silêncio */ }
 }
 /**
- * Alarmão: sirene de bombardeio que sobe e desce sem parar (duas ondas desafinadas + modulação lenta).
- * `acelerar` deixa o uivo mais rápido nos últimos segundos; `parar` desliga com um corte curto.
+ * Alarmão: sirene de defesa civil / ataque aéreo, como nas cidades em guerra. O tom sobe devagar (motor ganhando
+ * rotação), fica no alto uivando e desce. Dois rotores em acorde (terça menor), o "picotado" das pás da hélice,
+ * um pouco de saturação e eco de rua. `acelerar` encurta o uivo nos últimos segundos; `parar` desliga.
  */
 function iniciarSirene() {
   try {
     const a = contexto();
+    const VOLUME = 0.26;
     const saida = a.createGain();
     saida.gain.setValueAtTime(0, a.currentTime);
-    saida.gain.linearRampToValueAtTime(mudo ? 0 : 0.22, a.currentTime + 0.4);
+    saida.gain.linearRampToValueAtTime(mudo ? 0 : VOLUME, a.currentTime + 0.6);
+    saida.connect(a.destination);
+
+    // eco de rua: a sirene ecoando entre os prédios
+    const eco = a.createDelay(1), retorno = a.createGain(), mistura = a.createGain();
+    eco.delayTime.value = 0.32; retorno.gain.value = 0.32; mistura.gain.value = 0.35;
+    eco.connect(retorno); retorno.connect(eco); eco.connect(mistura); mistura.connect(saida);
+
+    // saturação leve (alto-falante de poste) e corte dos agudos
+    const satura = a.createWaveShaper();
+    const curva = new Float32Array(1024);
+    for (let i = 0; i < curva.length; i++) { const x = (i / 1023) * 2 - 1; curva[i] = Math.tanh(2.2 * x); }
+    satura.curve = curva;
     const filtro = a.createBiquadFilter();
-    filtro.type = 'lowpass'; filtro.frequency.value = 2600;
-    filtro.connect(saida); saida.connect(a.destination);
-    const lfo = a.createOscillator(), profundidade = a.createGain();
-    lfo.type = 'sine'; lfo.frequency.value = 0.75; profundidade.gain.value = 380;
-    lfo.connect(profundidade);
-    const ondas = (['sawtooth', 'square'] as OscillatorType[]).map((tipo, i) => {
-      const o = a.createOscillator();
-      o.type = tipo; o.frequency.value = 680 + i * 4;
-      profundidade.connect(o.frequency);
-      const g = a.createGain(); g.gain.value = i ? 0.35 : 1;
-      o.connect(g); g.connect(filtro);
+    filtro.type = 'lowpass'; filtro.frequency.value = 2200; filtro.Q.value = 0.8;
+    satura.connect(filtro); filtro.connect(saida); filtro.connect(eco);
+
+    // "picotado" das pás do rotor
+    const picote = a.createGain(), lfoPicote = a.createOscillator(), fundoPicote = a.createGain();
+    picote.gain.value = 0.78; lfoPicote.frequency.value = 23; fundoPicote.gain.value = 0.22;
+    lfoPicote.connect(fundoPicote); fundoPicote.connect(picote.gain);
+    picote.connect(satura);
+
+    // o tom (Hz) que os dois rotores seguem
+    const tom = a.createConstantSource();
+    tom.offset.value = 140;
+    const rotores = [1, 1.2].map((razao, k) => {
+      const o = a.createOscillator(), mult = a.createGain(), g = a.createGain();
+      o.type = k ? 'sawtooth' : 'square';
+      o.frequency.value = 0;
+      mult.gain.value = razao;
+      tom.connect(mult); mult.connect(o.frequency);
+      g.gain.value = k ? 0.5 : 0.6;
+      o.connect(g); g.connect(picote);
       return o;
     });
-    [lfo, ...ondas].forEach((o) => o.start());
+    const nos = [tom, lfoPicote, ...rotores];
+    nos.forEach((n) => n.start());
+
+    // ciclo do uivo: sobe, segura no alto, desce (e agenda o próximo)
+    let rapido = false, ativo = true, proximo = a.currentTime + 0.05;
+    const agendar = () => {
+      if (!ativo) return;
+      while (proximo < a.currentTime + 6) {
+        const [sobe, segura, desce] = rapido ? [0.9, 0.25, 0.8] : [3.6, 1.6, 3.2];
+        const f = tom.offset;
+        f.setValueAtTime(rapido ? 260 : 150, proximo);
+        f.exponentialRampToValueAtTime(rapido ? 660 : 640, proximo + sobe);
+        f.setValueAtTime(rapido ? 660 : 640, proximo + sobe);
+        f.linearRampToValueAtTime(rapido ? 650 : 628, proximo + sobe + segura);
+        f.exponentialRampToValueAtTime(rapido ? 260 : 170, proximo + sobe + segura + desce);
+        proximo += sobe + segura + desce;
+      }
+    };
+    agendar();
+    const relogio = setInterval(agendar, 1000);
+
     return {
-      acelerar: () => lfo.frequency.setTargetAtTime(2.6, a.currentTime, 0.3),
-      volume: (ligado: boolean) => saida.gain.setTargetAtTime(ligado ? 0.22 : 0, a.currentTime, 0.05),
+      acelerar: () => {
+        if (rapido) return;
+        rapido = true;
+        tom.offset.cancelScheduledValues(a.currentTime);
+        tom.offset.setValueAtTime(tom.offset.value, a.currentTime);
+        proximo = a.currentTime + 0.02;
+        agendar();
+      },
+      volume: (ligado: boolean) => saida.gain.setTargetAtTime(ligado ? VOLUME : 0, a.currentTime, 0.05),
       parar: () => {
-        saida.gain.setTargetAtTime(0, a.currentTime, 0.04);
-        setTimeout(() => [lfo, ...ondas].forEach((o) => { try { o.stop(); } catch { /* já parou */ } }), 400);
+        ativo = false;
+        clearInterval(relogio);
+        // o motor perde rotação: o tom cai enquanto o som some
+        tom.offset.cancelScheduledValues(a.currentTime);
+        tom.offset.setValueAtTime(Math.max(60, tom.offset.value), a.currentTime);
+        tom.offset.exponentialRampToValueAtTime(60, a.currentTime + 0.8);
+        saida.gain.setTargetAtTime(0, a.currentTime, 0.15);
+        setTimeout(() => nos.forEach((n) => { try { n.stop(); } catch { /* já parou */ } }), 1200);
       },
     };
   } catch {
