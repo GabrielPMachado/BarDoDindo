@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Search, Star, Utensils } from 'lucide-react';
 import { brl, sortCategories } from '../data';
 import { Empty, PageHeader } from '../components/ui';
@@ -10,7 +11,9 @@ export default function Cardapio() {
   const hasHighlights = cardapio.some((i) => i.destaque);
   const categories = useMemo(() => sortCategories([...new Set(cardapio.map((i) => i.categoria).filter(Boolean))]), [cardapio]);
   const tabs = hasHighlights ? ['Destaques', ...categories] : categories;
-  const [cat, setCat] = useState<string | null>(null);
+  const [params] = useSearchParams();
+  // ?cat=Drinks vem das bolinhas de categoria do início
+  const [cat, setCat] = useState<string | null>(params.get('cat'));
   const [q, setQ] = useState('');
   const active = cat && tabs.includes(cat) ? cat : tabs[0];
   const pontosPorReal = config?.pontosPorReal ?? 1;

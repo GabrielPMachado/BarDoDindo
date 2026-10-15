@@ -1,15 +1,23 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarDays, Camera, ChevronRight, Gift, ReceiptText, Star, Utensils } from 'lucide-react';
-import { ConsumoSheet, Empty, HistoryRow, ReservationCard, SectionHeader } from '../components/ui';
-import { memberNumber, upcoming, useMe, useStore, type Consumption } from '../store';
+import { ArrowRight, CalendarDays, Camera, ChevronRight, Clock, Gift, Info, MapPin, ReceiptText, Star, Utensils } from 'lucide-react';
+import { ItemIcon } from '../components/ItemIcon';
+import { brl, sortCategories } from '../data';
+import { memberNumber, upcoming, useMe, useStore } from '../store';
 
-const ACTIONS = [
-  { to: '/reservas', label: 'Reservar', icon: CalendarDays, primary: true },
-  { to: '/historico', label: 'Histórico', icon: ReceiptText },
+/** Atalhos usados quando o cardápio ainda não tem categorias publicadas. */
+const ATALHOS = [
+  { to: '/reservas', label: 'Reservar', icon: CalendarDays },
   { to: '/cardapio', label: 'Cardápio', icon: Utensils },
-  { to: '/recompensas', label: 'Prêmios', icon: Gift },
+  { to: '/recompensas', label: 'Recompensas', icon: Gift },
+  { to: '/historico', label: 'Histórico', icon: ReceiptText },
 ];
+
+const DIAS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+const dataCurta = (iso: string) => {
+  const d = new Date(iso + 'T12:00:00');
+  return `${DIAS[d.getDay()]}, ${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
+};
 
 export function Avatar({ editable = false, size = 'lg' }: { editable?: boolean; size?: 'lg' | 'md' }) {
   const { cliente } = useMe();
@@ -86,66 +94,149 @@ function BeerGlass() {
 
 export default function Home() {
   const me = useMe();
-  const [detail, setDetail] = useState<Consumption | null>(null);
-  const next = upcoming(me.reservas);
-  const recent = [...me.consumos].sort((a, b) => b.data.localeCompare(a.data)).slice(0, 3);
+  const { cardapio, recompensas, config } = useStore();
+  const proxima = upcoming(me.reservas)[0];
+  const categorias = useMemo(() => sortCategories([...new Set(cardapio.map((i) => i.categoria).filter(Boolean))]), [cardapio]);
+  const destaques = cardapio.filter((i) => i.destaque);
+  const pontosPorReal = config?.pontosPorReal ?? 1;
+  const horarios = config?.horarios ?? [];
+  // próxima recompensa que ainda não dá para resgatar (ou a mais cara que já dá)
+  const ordenadas = [...recompensas].sort((a, b) => a.custo - b.custo);
+  const alvo = ordenadas.find((r) => r.custo > me.pontos);
+  const podeJa = ordenadas.filter((r) => r.custo <= me.pontos);
+
+  // carrossel: boas-vindas + destaques do cardápio
+  const slides = destaques.slice(0, 4);
+  const trilho = useRef<HTMLDivElement>(null);
+  const [atual, setAtual] = useState(0);
+  const total = 1 + slides.length;
+  const aoRolar = () => {
+    const el = trilho.current;
+    if (el) setAtual(Math.round(el.scrollLeft / el.clientWidth));
+  };
 
   return (
-    <div className="page">
-      <section className="profile">
-        <Avatar editable />
-        <div className="profile__info">
-          <h1 className="profile__name">{me.cliente.nome}</h1>
-          <p className="profile__member">Afilhado #{memberNumber(me.cliente.numero)}</p>
+    <div className="page home">
+      {/* cartão do bar: próxima reserva ou convite para reservar (como o "Retirar em") */}
+      <Link to="/reservas" className="local">
+        <span className="local__pin"><MapPin size={18} /></span>
+        <span className="local__info">
+          <strong>{config?.nomeEstabelecimento || 'Bar do Dindo'}</strong>
+          {proxima ? (
+            <>
+              <span className="local__linha"><CalendarDays size={15} /> Sua mesa: {dataCurta(proxima.data)} às {proxima.hora} · {proxima.pessoas} {proxima.pessoas === 1 ? 'pessoa' : 'pessoas'}</span>
+              <span className="local__linha"><Clock size={15} /> <b className={proxima.status === 'Confirmada' ? 'ok' : 'wait'}>{proxima.status === 'Confirmada' ? 'Confirmada' : 'Aguardando confirmação'}</b></span>
+            </>
+          ) : (
+            <>
+              <span className="local__linha"><CalendarDays size={15} /> Reserve sua mesa pelo app</span>
+              {horarios.length > 0 && <span className="local__linha"><Clock size={15} /> Reservas das {horarios[0]} às {horarios[horarios.length - 1]}</span>}
+            </>
+          )}
+        </span>
+        <ChevronRight size={20} className="local__seta" />
+      </Link>
+
+      {/* categorias em bolinhas, rolando para o lado */}
+      <nav className="bolinhas" aria-label="Categorias do cardápio">
+        {categorias.length
+          ? [...(destaques.length ? ['Destaques'] : []), ...categorias].map((c) => (
+            <Link key={c} to={`/cardapio?cat=${encodeURIComponent(c)}`} className="bolinha">
+              <span className="bolinha__img">{c === 'Destaques' ? <Star size={28} strokeWidth={1.5} /> : <ItemIcon categoria={c} size="xl" />}</span>
+              <span className="bolinha__nome">{c}</span>
+            </Link>
+          ))
+          : ATALHOS.map(({ to, label, icon: Icon }) => (
+            <Link key={to} to={to} className="bolinha">
+              <span className="bolinha__img"><Icon size={28} strokeWidth={1.5} /></span>
+              <span className="bolinha__nome">{label}</span>
+            </Link>
+          ))}
+      </nav>
+
+      {/* banners */}
+      <section className="carrossel" aria-label="Destaques">
+        <div className="carrossel__trilho" ref={trilho} onScroll={aoRolar}>
+          <div className="carrossel__slide">
+            <div className="banner">
+              <div className="banner__text">
+                <h2>Bem-vindo,<br /><span>Afilhado!</span></h2>
+                <p>Boa cerveja, boas companhias<br />e sempre um assunto melhor.</p>
+              </div>
+              <BeerGlass />
+            </div>
+          </div>
+          {slides.map((p) => (
+            <Link key={p.id} to={`/cardapio?cat=${encodeURIComponent('Destaques')}`} className="carrossel__slide">
+              <div className="banner banner--produto">
+                <div className="banner__text">
+                  <small>Destaque da casa</small>
+                  <h3>{p.nome}</h3>
+                  {p.descricao && <p>{p.descricao}</p>}
+                  <span className="banner__preco">{brl(p.preco)} <em>+{Math.floor(p.preco * pontosPorReal)} pts</em></span>
+                </div>
+                <ItemIcon categoria={p.categoria} size="xl" />
+              </div>
+            </Link>
+          ))}
         </div>
-        <Link to="/recompensas" className="points-chip" aria-label={`${me.pontos} pontos — ver recompensas`}>
-          <span className="points-chip__star"><Star size={20} fill="currentColor" /></span>
+        {total > 1 && (
+          <div className="carrossel__pontos" aria-hidden="true">
+            {Array.from({ length: total }, (_, k) => <i key={k} className={k === atual ? 'is-on' : ''} />)}
+          </div>
+        )}
+      </section>
+
+      {/* saldo de pontos */}
+      <section className="saldo">
+        <span className="saldo__rotulo">Você tem disponível</span>
+        <strong className="saldo__valor">{me.pontos.toLocaleString('pt-BR')} pts</strong>
+        <Link to="/recompensas" className="aviso">
+          <Info size={18} />
           <span>
-            <strong>{me.pontos.toLocaleString('pt-BR')}</strong>
-            <small>PONTOS</small>
+            {podeJa.length && !alvo
+              ? <>Você já pode resgatar <b>{podeJa[podeJa.length - 1].nome}</b>.</>
+              : alvo
+                ? <>Faltam <b>{(alvo.custo - me.pontos).toLocaleString('pt-BR')} pts</b> para <b>{alvo.nome}</b>.{podeJa.length ? ' E já dá para resgatar outras.' : ''}</>
+                : <>Informe o número <b>#{memberNumber(me.cliente.numero)}</b> ao fechar a conta e ganhe pontos.</>}
           </span>
-          <ChevronRight size={20} />
+          <ChevronRight size={18} />
         </Link>
       </section>
 
-      <section className="banner">
-        <div className="banner__text">
-          <h2>Bem-vindo,<br /><span>Afilhado!</span></h2>
-          <p>Boa cerveja, boas companhias<br />e sempre um assunto melhor.</p>
-        </div>
-        <BeerGlass />
-      </section>
-
-      <section className="actions">
-        {ACTIONS.map(({ to, label, icon: Icon, primary }) => (
-          <Link key={to} to={to} className={`action ${primary ? 'action--primary' : ''}`}>
-            <Icon size={24} strokeWidth={1.8} />
-            <span>{label}</span>
+      {/* recompensas rolando para o lado */}
+      {recompensas.length > 0 && (
+        <section className="vitrine">
+          <Link to="/recompensas" className="vitrine__titulo">
+            <h2>Recompensas</h2>
+            <ArrowRight size={24} />
           </Link>
-        ))}
-      </section>
-
-      <SectionHeader title="Minhas próximas reservas" to="/reservas" />
-      {next.length ? (
-        <ReservationCard r={next[0]} />
-      ) : (
-        <Empty icon={<CalendarDays />}>
-          Nenhuma reserva marcada. <Link to="/reservas" className="gold">Reserve sua mesa</Link>
-        </Empty>
+          <div className="vitrine__trilho">
+            {ordenadas.map((r) => (
+              <Link key={r.id} to="/recompensas" className={`premio ${r.custo <= me.pontos ? 'is-livre' : ''}`}>
+                <span className="premio__img"><Gift size={34} strokeWidth={1.4} /></span>
+                <span className="premio__info">
+                  <span className="premio__pts"><Star size={12} fill="currentColor" /> {r.custo.toLocaleString('pt-BR')} pts</span>
+                  <span className="premio__nome">{r.nome}</span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
       )}
 
-      <SectionHeader title="Meu histórico de consumo" to="/historico" linkLabel="Ver todos" />
-      {recent.length ? (
-        <div className="card list">
-          {recent.map((c) => <HistoryRow key={c.id} c={c} onClick={() => setDetail(c)} />)}
-        </div>
-      ) : (
-        <Empty icon={<ReceiptText />}>
-          Seu consumo aparece aqui quando o bar registrar sua comanda. Informe seu número de afilhado
-          (#{memberNumber(me.cliente.numero)}) ao fechar a conta.
-        </Empty>
+      {/* produto em destaque */}
+      {destaques[0] && (
+        <Link to={`/cardapio?cat=${encodeURIComponent('Destaques')}`} className="vitrine-produto">
+          <span className="vitrine-produto__tag"><Star size={13} fill="currentColor" /> Destaque</span>
+          <ItemIcon categoria={destaques[0].categoria} size="xl" />
+          <span className="vitrine-produto__info">
+            <strong>{destaques[0].nome}</strong>
+            {destaques[0].descricao && <span>{destaques[0].descricao}</span>}
+            <b>{brl(destaques[0].preco)}</b>
+          </span>
+        </Link>
       )}
-      {detail && <ConsumoSheet c={detail} onClose={() => setDetail(null)} />}
     </div>
   );
 }
