@@ -232,6 +232,9 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'item', label: 'Item', type: 'text', required: true, wide: true },
       { key: 'categoria', label: 'Categoria', type: 'select', options: ['Bebidas', 'Alimentos', 'Descartáveis', 'Limpeza', 'Outros'], required: true },
       { key: 'unidade', label: 'Unidade', type: 'select', options: ['un', 'cx', 'fardo', 'kg', 'g', 'L', 'ml', 'pct'], default: 'un' },
+      // para a ficha técnica medir em ml/g um item contado em unidades (ex.: 1 garrafa = 750 ml)
+      { key: 'conteudo', label: 'Conteúdo de cada unidade', type: 'number', decimals: 3, max: 1_000_000, formOnly: true, placeholder: 'Ex.: 750 (garrafa de 750 ml)' },
+      { key: 'conteudoUnidade', label: 'Medida do conteúdo', type: 'select', options: ['ml', 'L', 'g', 'kg'], default: 'ml', formOnly: true },
       { key: 'quantidade', label: 'Quantidade', type: 'number', required: true, decimals: 3, max: 1_000_000 },
       { key: 'minimo', label: 'Estoque mínimo', type: 'number', decimals: 3, max: 1_000_000 },
       { key: 'custo', label: 'Custo unitário', type: 'money', max: 100_000, formOnly: true },

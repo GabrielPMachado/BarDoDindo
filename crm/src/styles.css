@@ -862,7 +862,8 @@ button.anexos__nome:hover { text-decoration: underline; }
 .ficha__economia { margin: 0; padding: 8px 12px; border-radius: 8px; background: #4cc27a14; border: 1px solid #4cc27a40; font-size: 13px; }
 /* cadastro rápido de insumo no Estoque */
 .ficha__novo { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px dashed var(--brand); border-radius: 10px; background: var(--surface); }
-.ficha__novo-campos { display: grid; grid-template-columns: 2fr 1fr 80px 1.3fr; gap: 8px; }
+.ficha__novo-campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+.ficha__dica { grid-column: 1 / -1; margin: 0; }
 .ficha__novo-acoes { display: flex; justify-content: flex-end; gap: 8px; }
 .fi-insumo, .fi-qtd, .fi-base { min-width: 0; }
 @media (max-width: 760px) {

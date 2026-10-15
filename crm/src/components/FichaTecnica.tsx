@@ -5,7 +5,7 @@ import { api } from '../lib/api';
 import { reload, useResource } from '../lib/data';
 import { brl, num, pct } from '../lib/format';
 import {
-  atualizarCustos, calcularFicha, custoBaseTxt, custoDoItem, opcoesDoItem, unidadesCompativeis, usarOpcao,
+  atualizarCustos, calcularFicha, custoBaseTxt, custoDoItem, opcoesDoItem, UNIDADES, unidadesCompativeis, usarOpcao,
   type Cotacao, type Ficha, type Insumo, type ItemFicha, type Opcao,
 } from '../lib/ficha';
 import { imprimirFicha } from '../lib/fichaPdf';
@@ -65,6 +65,16 @@ export function FichaTecnica({ ficha, preco, nome, disabled, onChange, onUsarPre
   const trocarItem = (idx: number, item: ItemFicha) => onChange({ ...ficha, itens: ficha.itens.map((it, i) => (i === idx ? item : it)) });
   const mudarItem = (idx: number, patch: Partial<ItemFicha>) => trocarItem(idx, { ...ficha.itens[idx], ...patch });
 
+  /** Troca a unidade da receita; se a origem de custo atual não se converte nela, usa a mais barata que se converte. */
+  const mudarUnidade = (idx: number, unidade: string) => {
+    const atual = ficha.itens[idx];
+    if (!atual.insumoId) return mudarItem(idx, { unidade, unidadeBase: unidade });
+    const item = { ...atual, unidade };
+    if (unidadesCompativeis(atual.unidadeBase).includes(unidade)) return trocarItem(idx, item);
+    const melhor = opcoesDoItem(item, listaInsumos, listaCotacoes).find((o) => o.compativel);
+    trocarItem(idx, melhor ? usarOpcao(item, melhor) : item);
+  };
+
   /** Vincula o item a um insumo do Estoque e já escolhe a origem de custo mais barata (fornecedor ou Estoque). */
   const vincular = (idx: number, insumo: Insumo) => {
     const atual = ficha.itens[idx];
@@ -122,6 +132,7 @@ export function FichaTecnica({ ficha, preco, nome, disabled, onChange, onUsarPre
               key={idx} item={it} disabled={disabled}
               opcoes={opcoesDoItem(it, listaInsumos, listaCotacoes)}
               onChange={(item) => trocarItem(idx, item)}
+              onUnidade={(u) => mudarUnidade(idx, u)}
               onInsumo={(p) => escolherInsumo(idx, p)}
               onCriado={(insumo) => vincular(idx, insumo)}
               onRemover={() => onChange({ ...ficha, itens: ficha.itens.filter((_, i) => i !== idx) })}
@@ -191,9 +202,10 @@ export function FichaTecnica({ ficha, preco, nome, disabled, onChange, onUsarPre
 }
 
 /** Uma linha da receita, com a comparação entre fornecedores logo abaixo. */
-function LinhaFicha({ item: it, opcoes, disabled, onChange, onInsumo, onCriado, onRemover }: {
+function LinhaFicha({ item: it, opcoes, disabled, onChange, onUnidade, onInsumo, onCriado, onRemover }: {
   item: ItemFicha; opcoes: Opcao[]; disabled: boolean;
   onChange: (i: ItemFicha) => void;
+  onUnidade: (u: string) => void;
   onInsumo: (patch: Record<string, unknown>) => void;
   onCriado: (insumo: Insumo) => void;
   onRemover: () => void;
@@ -201,7 +213,10 @@ function LinhaFicha({ item: it, opcoes, disabled, onChange, onInsumo, onCriado, 
   const { pode } = useSession();
   const [cadastrando, setCadastrando] = useState(false);
   const vinculado = !!it.insumoId;
-  const unidades = vinculado ? unidadesCompativeis(it.unidadeBase) : UNIDADES_LIVRES;
+  // unidades em que o Estoque ou algum fornecedor permite medir o insumo (ex.: Estoque em "un", fornecedor em ml)
+  const unidades = vinculado
+    ? UNIDADES.filter((u) => [it.unidadeBase, ...opcoes.map((o) => o.unidadeBase)].some((b) => unidadesCompativeis(b).includes(u)))
+    : UNIDADES_LIVRES;
   const escolhida = opcoes.find((o) => o.precoId === (it.precoId ?? null) && o.compativel);
   const custo = custoDoItem(it);
   const maisBarata = opcoes.find((o) => o.compativel);
@@ -216,7 +231,7 @@ function LinhaFicha({ item: it, opcoes, disabled, onChange, onInsumo, onCriado, 
       </div>
       <select
         className="input fi-un" aria-label="Unidade" disabled={disabled} value={it.unidade}
-        onChange={(e) => onChange(vinculado ? { ...it, unidade: e.target.value } : { ...it, unidade: e.target.value, unidadeBase: e.target.value })}
+        onChange={(e) => onUnidade(e.target.value)}
       >
         {unidades.map((u) => <option key={u} value={u}>{u}</option>)}
       </select>
@@ -259,6 +274,11 @@ function LinhaFicha({ item: it, opcoes, disabled, onChange, onInsumo, onCriado, 
         </div>
       )}
 
+      {vinculado && !disabled && !unidades.some((u) => ['ml', 'L', 'g', 'kg'].includes(u)) && (
+        <p className="ficha__dica muted small">
+          "{it.insumo}" está no Estoque em {it.unidadeBase}. Para medir em ml ou g, informe em Estrutura → Estoque o conteúdo de cada {it.unidadeBase} (ex.: 1 garrafa = 750 ml) ou cadastre o preço do fornecedor em ml na Tabela de preços.
+        </p>
+      )}
       {!vinculado && it.insumo.trim() && !disabled && pode('dp', 'criar') && !cadastrando && (
         <div className="ficha__comparar">
           <button type="button" className="btn btn--ghost btn--sm" onClick={() => setCadastrando(true)}>
@@ -299,6 +319,9 @@ function NovoInsumo({ nome, unidade, custo, onCancelar, onCriado }: {
   const [categoria, setCategoria] = useState('Bebidas');
   const [un, setUn] = useState(unidadesEstoque.includes(unidade) ? unidade : 'un');
   const [valor, setValor] = useState<number | ''>(custo || '');
+  const [conteudo, setConteudo] = useState<number | ''>('');
+  const [medida, setMedida] = useState(['ml', 'L', 'g', 'kg'].includes(unidade) ? unidade : 'ml');
+  const contado = !['ml', 'L', 'g', 'kg'].includes(un);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -307,12 +330,16 @@ function NovoInsumo({ nome, unidade, custo, onCancelar, onCriado }: {
     setSalvando(true);
     setErro(null);
     try {
+      const c = valor === '' ? 0 : valor;
+      const comConteudo = contado && conteudo !== '' && conteudo > 0;
       const novo = await api<{ id: string }>('/crm/c/estoque', {
-        method: 'POST', body: { item: item.trim(), categoria, unidade: un, quantidade: 0, custo: valor === '' ? 0 : valor },
+        method: 'POST',
+        body: { item: item.trim(), categoria, unidade: un, quantidade: 0, custo: c, ...(comConteudo ? { conteudo, conteudoUnidade: medida } : {}) },
       });
       void reload(INSUMOS);
       notify(`"${item.trim()}" cadastrado no Estoque`);
-      onCriado({ id: novo.id, nome: item.trim(), unidade: un, custo: valor === '' ? 0 : valor });
+      // garrafa com conteúdo informado: a receita já mede em ml/g
+      onCriado(comConteudo ? { id: novo.id, nome: item.trim(), unidade: medida, custo: c / conteudo } : { id: novo.id, nome: item.trim(), unidade: un, custo: c });
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Não foi possível cadastrar.');
     } finally {
@@ -332,6 +359,14 @@ function NovoInsumo({ nome, unidade, custo, onCancelar, onCriado }: {
           {unidadesEstoque.map((u) => <option key={u}>{u}</option>)}
         </select>
         <NumberInput ariaLabel="Custo por unidade" spec={DINHEIRO} prefix="R$" suffix={`/${un}`} value={valor} onChange={setValor} />
+        {contado && (
+          <>
+            <NumberInput ariaLabel={`Conteúdo de cada ${un}`} spec={{ decimals: 3, min: 0, max: 1_000_000 }} prefix={`1 ${un} =`} placeholder="750" value={conteudo} onChange={setConteudo} />
+            <select className="input" aria-label="Medida do conteúdo" value={medida} onChange={(e) => setMedida(e.target.value)}>
+              {['ml', 'L', 'g', 'kg'].map((u) => <option key={u}>{u}</option>)}
+            </select>
+          </>
+        )}
       </div>
       <span className="muted small">Entra com quantidade 0; ajuste o estoque depois em Estrutura → Estoque.</span>
       {erro && <p className="error small">{erro}</p>}

@@ -129,7 +129,7 @@ export function opcoesDoItem(i: ItemFicha, insumos: Insumo[], cotacoes: Cotacao[
     const unitario = compativel ? conversao(i.unidade, unidadeBase) * custoBase : 0;
     return { precoId, fornecedor, detalhe, unidadeBase, custoBase, compativel, unitario, custo: compativel ? custoDoItem({ ...i, unidadeBase, custoBase }) : 0 };
   };
-  if (e && e.custo > 0) opcoes.push(montar(null, 'Custo do Estoque', `${brlTxt(e.custo)}/${e.unidade}`, e.unidade, e.custo));
+  if (e && e.custo > 0) opcoes.push(montar(null, 'Custo do Estoque', custoBaseTxt({ custoBase: e.custo, unidadeBase: e.unidade }), e.unidade, e.custo));
   for (const c of cotacoes.filter((x) => x.insumoId === i.insumoId)) {
     const emb = c.embalagem || `${num(c.conteudo)} ${c.unidade}`;
     opcoes.push(montar(c.id, c.nome, `${brlTxt(c.preco)} · ${emb}`, c.unidade, c.preco / c.conteudo));
