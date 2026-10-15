@@ -36,7 +36,7 @@ export default function Recompensas() {
 
   return (
     <div className="page">
-      <PageHeader title="Minhas Recompensas" subtitle="Troque seus pontos por benefícios exclusivos" />
+      <PageHeader title="Minhas recompensas" subtitle="Troque seus pontos por benefícios exclusivos" />
 
       <section className="points-hero">
         <div className="points-hero__top">

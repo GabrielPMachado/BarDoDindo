@@ -33,7 +33,7 @@ export default function Historico() {
 
   return (
     <div className="page">
-      <PageHeader title="Meu Histórico" subtitle="Tudo o que você consumiu no Dindo" />
+      <PageHeader title="Meu histórico" subtitle="Tudo o que você consumiu no Dindo" />
 
       <div className="stats">
         <div className="stat"><small>Total gasto</small><strong>{brl(total)}</strong></div>

@@ -5,10 +5,10 @@ import { ConsumoSheet, Empty, HistoryRow, ReservationCard, SectionHeader } from 
 import { memberNumber, upcoming, useMe, useStore, type Consumption } from '../store';
 
 const ACTIONS = [
-  { to: '/reservas', label: 'Fazer Reserva', icon: CalendarDays, primary: true },
-  { to: '/historico', label: 'Meu Histórico', icon: ReceiptText },
+  { to: '/reservas', label: 'Fazer reserva', icon: CalendarDays, primary: true },
+  { to: '/historico', label: 'Meu histórico', icon: ReceiptText },
   { to: '/cardapio', label: 'Cardápio', icon: Utensils },
-  { to: '/recompensas', label: 'Minhas Recompensas', icon: Gift },
+  { to: '/recompensas', label: 'Minhas recompensas', icon: Gift },
 ];
 
 export function Avatar({ editable = false, size = 'lg' }: { editable?: boolean; size?: 'lg' | 'md' }) {

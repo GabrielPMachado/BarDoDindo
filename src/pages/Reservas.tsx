@@ -91,7 +91,7 @@ export default function Reservas() {
 
   return (
     <div className="page">
-      <PageHeader title="Fazer Reserva" subtitle="Garanta sua mesa no Dindo" />
+      <PageHeader title="Fazer reserva" subtitle="Garanta sua mesa no Dindo" />
 
       {semConfig ? (
         <Empty icon={<CalendarDays />}>As reservas pelo aplicativo estão temporariamente indisponíveis.</Empty>

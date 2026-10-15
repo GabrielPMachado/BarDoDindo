@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { LogIn, UserPlus } from 'lucide-react';
-import { Logo } from '../components/ui';
+import { Marca } from '../components/ui';
 import { useStore } from '../store';
 import { maskPhone, phoneOk } from '../masks';
 
@@ -36,11 +36,11 @@ export default function Entrar() {
 
   return (
     <div className="auth">
-      <div className="auth__brand">
-        <Logo asLink={false} size={150} />
-        <p className="auth__tagline">Aqui a amizade sempre vale mais</p>
+      <div className="auth__art">
+        <Marca size={150} />
       </div>
 
+      <div className="auth__card">
       <div className="tabs" role="tablist">
         <button role="tab" aria-selected={mode === 'login'} className={mode === 'login' ? 'is-active' : ''} onClick={() => { setMode('login'); setError(null); }}>
           Entrar
@@ -50,7 +50,13 @@ export default function Entrar() {
         </button>
       </div>
 
-      <form className="card form" onSubmit={submit}>
+      <h1 className="auth__title">
+        {mode === 'login' ? <><LogIn size={24} /> Entrar</> : <><UserPlus size={24} /> Quero ser afilhado</>}
+      </h1>
+      <p className="muted">
+        {mode === 'login' ? 'Entre com o e-mail e a senha do seu cadastro.' : 'Crie sua conta e ganhe pontos a cada visita ao Dindo.'}
+      </p>
+      <form className="form auth__form" onSubmit={submit}>
         {mode === 'cadastro' && (
           <>
             <label className="label" htmlFor="nome">Nome completo</label>
@@ -78,6 +84,7 @@ export default function Entrar() {
           <p className="muted small center">Ao se cadastrar você passa a acumular pontos a cada consumo no bar.</p>
         )}
       </form>
+      </div>
     </div>
   );
 }

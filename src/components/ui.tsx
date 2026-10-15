@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import {
-  AlertCircle, Bell, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock, Gift, Home, Menu,
+  AlertCircle, Bell, CalendarDays, CheckCircle2, ChevronRight, Clock, Gift, Home, Menu,
   ReceiptText, Star, Ticket, User, Utensils, X, XCircle,
 } from 'lucide-react';
 import { brl } from '../data';
@@ -26,12 +26,31 @@ const NAV = [
 
 const DRAWER = [
   { to: '/', label: 'Início', icon: Home },
-  { to: '/reservas', label: 'Fazer Reserva', icon: CalendarDays },
-  { to: '/historico', label: 'Meu Histórico', icon: ReceiptText },
+  { to: '/reservas', label: 'Fazer reserva', icon: CalendarDays },
+  { to: '/historico', label: 'Meu histórico', icon: ReceiptText },
   { to: '/cardapio', label: 'Cardápio', icon: Utensils },
-  { to: '/recompensas', label: 'Minhas Recompensas', icon: Gift },
-  { to: '/perfil', label: 'Meu Perfil', icon: User },
+  { to: '/recompensas', label: 'Minhas recompensas', icon: Gift },
+  { to: '/perfil', label: 'Meu perfil', icon: User },
 ];
+/** Título de cada tela no topo, como no CRM. */
+const TITULOS: Record<string, string> = {
+  '/': 'Início', '/reservas': 'Reservas', '/historico': 'Histórico', '/cardapio': 'Cardápio', '/recompensas': 'Recompensas', '/perfil': 'Meu perfil',
+};
+const iniciais = (nome: string) => nome.trim().split(/\s+/).filter(Boolean).map((p) => p[0]).slice(0, 2).join('').toUpperCase() || '?';
+
+/** Marca do Bar do Dindo com o lema entre as linhas (como a marca do CRM, sem o "Cérebro"). */
+export function Marca({ size = 120 }: { size?: number }) {
+  return (
+    <div className="marca">
+      <Logo asLink={false} size={size} />
+      <div className="marca__lema">
+        <span className="marca__linha" />
+        <span>Aqui a amizade sempre vale mais</span>
+        <span className="marca__linha marca__linha--dir" />
+      </div>
+    </div>
+  );
+}
 
 const SEEN_KEY = 'bar-do-dindo:notificacoes-vistas';
 
@@ -60,6 +79,8 @@ function useNotifications() {
 }
 
 export function TopBar() {
+  const { me } = useStore();
+  const { pathname } = useLocation();
   const [drawer, setDrawer] = useState(false);
   const [notif, setNotif] = useState(false);
   const notifications = useNotifications();
@@ -90,29 +111,32 @@ export function TopBar() {
   return (
     <>
       <header className="topbar">
-        <button className="icon-btn" onClick={() => setDrawer(true)} aria-label="Abrir menu">
-          <Menu size={26} />
+        <button className="icon-btn topbar__menu" onClick={() => setDrawer(true)} aria-label="Abrir menu">
+          <Menu size={22} />
         </button>
-        <Logo />
-        <button className="icon-btn" onClick={openNotif} aria-label="Notificações">
-          <Bell size={26} />
+        <span className="topbar__title">{TITULOS[pathname] ?? 'Bar do Dindo'}</span>
+        <button className="topbar-btn" onClick={openNotif} aria-label="Notificações">
+          <Bell size={18} />
           {unread && <span className="dot" />}
         </button>
+        <Link to="/perfil" className="topbar__avatar" aria-label="Meu perfil">
+          {me?.cliente.foto ? <img src={me.cliente.foto} alt="" /> : iniciais(me?.cliente.nome ?? '')}
+        </Link>
       </header>
 
       {drawer && (
         <div className="overlay" onClick={() => setDrawer(false)}>
           <nav className="drawer" onClick={(e) => e.stopPropagation()}>
-            <div className="drawer__head">
-              <Logo small />
-              <button className="icon-btn" onClick={() => setDrawer(false)} aria-label="Fechar menu"><X /></button>
+            <button className="icon-btn drawer__close" onClick={() => setDrawer(false)} aria-label="Fechar menu"><X size={20} /></button>
+            <Marca size={110} />
+            <div className="drawer__nav">
+              {DRAWER.map(({ to, label, icon: Icon }) => (
+                <NavLink key={to} to={to} end onClick={() => setDrawer(false)} className="drawer__link">
+                  <Icon size={18} /> <span>{label}</span>
+                </NavLink>
+              ))}
             </div>
-            {DRAWER.map(({ to, label, icon: Icon }) => (
-              <NavLink key={to} to={to} end onClick={() => setDrawer(false)} className="drawer__link">
-                <Icon size={20} /> {label}
-              </NavLink>
-            ))}
-            <p className="drawer__foot">Aqui a amizade sempre vale mais.</p>
+            {me && <p className="drawer__foot">{me.cliente.nome.split(' ')[0]} · Afilhado #{String(me.cliente.numero).padStart(3, '0')}</p>}
           </nav>
         </div>
       )}
@@ -155,15 +179,12 @@ export function BottomNav() {
   );
 }
 
+/** Cabeçalho da página no estilo do CRM: título em destaque e uma linha de explicação. */
 export function PageHeader({ title, subtitle }: { title: string; subtitle?: string }) {
-  const nav = useNavigate();
   return (
     <div className="page-header">
-      <button className="icon-btn" onClick={() => nav(-1)} aria-label="Voltar"><ChevronLeft size={26} /></button>
-      <div>
-        <h1>{title}</h1>
-        {subtitle && <p className="muted">{subtitle}</p>}
-      </div>
+      <h1>{title}</h1>
+      {subtitle && <p className="muted">{subtitle}</p>}
     </div>
   );
 }
