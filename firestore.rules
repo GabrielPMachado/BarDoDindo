@@ -47,7 +47,7 @@ service cloud.firestore {
         'receitas': 'fin', 'despesas': 'fin',
         'reservas': 'atd', 'consumos': 'atd', 'resgates': 'atd',
         'criacao': 'mkt', 'midias': 'mkt', 'recompensas': 'mkt',
-        'produtos': 'vnd',
+        'produtos': 'vnd', 'guarnicoes': 'vnd',
         'trabalhista': 'jur', 'consultoria': 'jur',
         'qualidade': 'fis', 'naoconformidades': 'fis'
       };

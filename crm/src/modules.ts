@@ -92,6 +92,7 @@ export const AREAS: Area[] = [
     items: [
       { path: '/vendas/produtos', label: 'Produtos e cardápio' },
       { path: '/vendas/fichas', label: 'Fichas técnicas' },
+      { path: '/vendas/guarnicoes', label: 'Guarnições e itens fixos' },
       { path: '/vendas/clientes', label: 'Clientes (afilhados)' },
     ],
   },
@@ -213,7 +214,7 @@ export function findModule(caminho: string) {
 export const COLLECTION_PAGE: Record<string, string> = {
   metas: '/diretoria/metas',
   reservas: '/atendimento/reservas', consumos: '/atendimento/consumo', resgates: '/atendimento/vouchers',
-  produtos: '/vendas/produtos', recompensas: '/marketing/recompensas', criacao: '/marketing/criacao', midias: '/marketing/midias',
+  produtos: '/vendas/produtos', guarnicoes: '/vendas/guarnicoes', recompensas: '/marketing/recompensas', criacao: '/marketing/criacao', midias: '/marketing/midias',
   colaboradores: '/rh/colaboradores', ferias: '/rh/ferias',
   projetos: '/estrutura/projetos', estoque: '/estrutura/estoque', materiais: '/estrutura/materiais',
   terceirizados: '/adm/terceirizados', fornecedores: '/adm/fornecedores', contratos: '/adm/contratos', precos: '/adm/precos',

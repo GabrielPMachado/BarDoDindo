@@ -514,6 +514,22 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       ];
     },
   },
+  guarnicoes: {
+    id: 'guarnicoes', area: 'vnd', title: 'Guarnições e itens fixos', singular: 'item fixo',
+    description: 'Gelo, rodelas de fruta, canudos e outros itens que não se pesam: cada um tem um valor fixo por drink, somado nas fichas técnicas em que for marcado.',
+    filterKey: 'status', sortKey: 'nome',
+    fields: [
+      { key: 'nome', label: 'Item', type: 'text', required: true, wide: true, placeholder: 'Ex.: Gelo, Rodela de laranja, Canudo' },
+      { key: 'custo', label: 'Valor por drink / porção', type: 'money', required: true, min: 0.01, max: 1_000 },
+      { key: 'padrao', label: 'Já vem marcado nas fichas novas', type: 'select', options: ['Não', 'Sim'], default: 'Não' },
+      { key: 'status', label: 'Situação', type: 'select', options: ['Ativo', 'Inativo'], default: 'Ativo' },
+      { key: 'observacoes', label: 'Como chegou no valor', type: 'textarea', formOnly: true, wide: true, placeholder: 'Ex.: saco de gelo de 5 kg a R$ 15,00 serve uns 50 copos → R$ 0,30 por drink' },
+    ],
+    kpis: (rows) => [
+      { label: 'Itens ativos', value: num(count(rows, 'status', ['Ativo'])) },
+      { label: 'Marcados por padrão', value: num(rows.filter((r) => r.status !== 'Inativo' && r.padrao === 'Sim').length), tone: 'info' },
+    ],
+  },
   recompensas: {
     id: 'recompensas', comFoto: true, feminino: true, area: 'mkt', title: 'Recompensas', singular: 'recompensa',
     description: 'Catálogo de recompensas do programa de fidelidade. As ativas aparecem no aplicativo.',
@@ -644,7 +660,8 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
 };
 
 /** Fichas técnicas (Vendas): os mesmos produtos, vistos pela receita. Um registro novo aqui cria o produto do cardápio. */
-const cmvDe = (r: Row) => (fichaDe(r.ficha).itens.length ? calcularFicha(fichaDe(r.ficha), n(r.preco)) : null);
+const temFicha = (r: Row) => { const f = fichaDe(r.ficha); return f.itens.length > 0 || f.fixos.length > 0; };
+const cmvDe = (r: Row) => (temFicha(r) ? calcularFicha(fichaDe(r.ficha), n(r.preco)) : null);
 const acimaDoAlvo = (r: Row) => { const c = cmvDe(r)?.cmv; return c != null && c > fichaDe(r.ficha).cmvAlvo / 100; };
 COLLECTIONS.fichas = {
   ...COLLECTIONS.produtos,
@@ -664,7 +681,7 @@ COLLECTIONS.fichas = {
     const cmvs = rows.map((r) => cmvDe(r)?.cmv).filter((c): c is number => c != null);
     const acima = rows.filter(acimaDoAlvo).length;
     return [
-      { label: 'Produtos com ficha', value: `${num(rows.filter((r) => fichaDe(r.ficha).itens.length).length)} de ${num(rows.length)}` },
+      { label: 'Produtos com ficha', value: `${num(rows.filter(temFicha).length)} de ${num(rows.length)}` },
       { label: 'CMV médio', value: cmvs.length ? pct(cmvs.reduce((t, c) => t + c, 0) / cmvs.length) : '—' },
       { label: 'Acima do CMV desejado', value: num(acima), tone: acima ? 'bad' : 'good' },
     ];

@@ -298,7 +298,7 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
   const [anexosNovos, setAnexosNovos] = useState<AnexoNovo[]>([]);
   // com a ficha técnica preenchida, o custo do produto é o custo por porção calculado nela
   const mudarFicha = useCallback((ficha: Ficha) => setData((d) => ({
-    ...d, ficha, ...(ficha.itens.length ? { custo: calcularFicha(ficha, Number(d.preco) || 0).custoPorcao } : {}),
+    ...d, ficha, ...(ficha.itens.length || ficha.fixos.length ? { custo: calcularFicha(ficha, Number(d.preco) || 0).custoPorcao } : {}),
   })), []);
 
   const submit = async (e: React.FormEvent) => {
@@ -355,6 +355,7 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
   const fichaCampo = def.fichaTecnica && (
     <FichaTecnica
       ficha={fichaDe(data.ficha)} preco={Number(data.preco) || 0} nome={String(data.nome ?? '')} disabled={!canEdit}
+      preMarcar={!row && def.fichaPrimeiro}
       onChange={mudarFicha}
       onUsarPreco={(preco) => setData((d) => ({ ...d, preco }))}
     />

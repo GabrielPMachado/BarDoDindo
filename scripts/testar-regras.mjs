@@ -156,6 +156,8 @@ if (senhaMarketing) {
   await permitido('ver o Estoque (insumos da ficha técnica)', () => getDocs(collection(db, 'estoque')));
   await negado('alterar o Estoque (só leitura para Vendas)', () => addDoc(collection(db, 'estoque'), { item: 'x', quantidade: 1 }));
   await permitido('ver a Tabela de preços dos fornecedores (ficha técnica)', () => getDocs(collection(db, 'precos')));
+  await permitido('ver guarnições e itens fixos (Vendas)', () => getDocs(collection(db, 'guarnicoes')));
+  await negado('cadastrar item fixo (só "ver")', () => addDoc(collection(db, 'guarnicoes'), { nome: 'Gelo', custo: 0.3 }));
   await negado('cadastrar preço de fornecedor (só Administrativo)', () => addDoc(collection(db, 'precos'), { insumo: 'x', preco: 1 }));
   await negado('listar despesas', () => getDocs(collection(db, 'despesas')));
   await signOut(auth);
@@ -246,6 +248,7 @@ if (senhaAdministrativo) {
   await negado('listar os PDFs anexados', () => getDocs(collection(db, 'anexos')));
   await negado('ver o Estoque (sem Vendas nem Estrutura)', () => getDocs(collection(db, 'estoque')));
   await negado('ver a Tabela de preços (sem Vendas nem Administrativo)', () => getDocs(collection(db, 'precos')));
+  await negado('ver guarnições e itens fixos (sem Vendas)', () => getDocs(collection(db, 'guarnicoes')));
   await negado('anexar PDF a um contrato (Administrativo)', async () => {
     const ref = doc(collection(db, 'anexos'));
     const lote = writeBatch(db);
