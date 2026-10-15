@@ -8,6 +8,7 @@ import { AREAS_VISIVEIS as AREAS, CAMINHOS_ANTIGOS, findModule, type AreaKey } f
 import { COLLECTIONS } from './collections';
 import { Brand, Layout } from './components/Layout';
 import { CollectionPage } from './components/CollectionPage';
+import { CalculadoraGuarnicoes } from './components/CalculadoraGuarnicoes';
 import { EmptyState, Toasts } from './components/ui';
 import { ConfirmHost } from './components/pickers';
 import Login from './pages/Login';
@@ -33,7 +34,6 @@ const GENERIC: Record<string, string> = {
   '/adm/fornecedores': 'fornecedores',
   '/adm/precos': 'precos',
   '/vendas/fichas': 'fichas',
-  '/vendas/guarnicoes': 'guarnicoes',
   '/adm/contratos': 'contratos',
   '/marketing/criacao': 'criacao',
   '/marketing/midias': 'midias',
@@ -54,6 +54,7 @@ const CUSTOM: Record<string, () => ReactNode> = {
   '/financeiro/despesas': () => <Despesas />,
   '/financeiro/resultado': () => <Resultado />,
   '/vendas/clientes': () => <Clientes />,
+  '/vendas/guarnicoes': () => <CollectionPage def={COLLECTIONS.guarnicoes} before={(rows) => <CalculadoraGuarnicoes rows={rows} />} />,
   '/atendimento/reservas': () => <Reservas />,
   '/atendimento/consumo': () => <Consumo />,
   '/atendimento/vouchers': () => <Resgates />,

@@ -858,6 +858,23 @@ button.anexos__nome:hover { text-decoration: underline; }
 .ficha__fixo.is-on { border-color: var(--brand); background: #c4572a1f; }
 .ficha__fixo-check { width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--border-strong); display: grid; place-items: center; color: #fff; }
 .ficha__fixo.is-on .ficha__fixo-check { background: var(--brand); border-color: var(--brand); }
+/* calculadora de guarnições pelo Estoque */
+.calc-guar { margin-bottom: 16px; padding: 0; overflow: hidden; }
+.calc-guar__cab { width: 100%; display: flex; align-items: center; gap: 10px; padding: 14px 16px; text-align: left; flex-wrap: wrap; }
+.calc-guar__cab > span:nth-child(2) { flex: 1; min-width: 200px; }
+.calc-guar__corpo { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 10px; }
+.calc-guar__linhas { display: flex; flex-direction: column; gap: 8px; }
+.calc-guar__linha { display: grid; grid-template-columns: minmax(140px, 1.2fr) minmax(180px, 1.6fr) 170px minmax(120px, 1fr) 110px; gap: 8px; align-items: center; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.cg-consumo { display: grid; grid-template-columns: 1fr 64px; gap: 6px; }
+.cg-valor { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cg-acao { display: flex; justify-content: flex-end; }
+.cg-dica { grid-column: 1 / -1; margin-top: -2px; }
+.calc-guar__rodape { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+@media (max-width: 760px) {
+  .calc-guar__linha { grid-template-columns: 1fr 1fr; }
+  .cg-nome, .cg-insumo, .cg-acao { grid-column: 1 / -1; }
+  .cg-acao { justify-content: flex-start; }
+}
 /* comparação de fornecedores (abaixo de cada insumo) */
 .ficha__comparar { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
 .ficha__opcao { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); text-align: left; min-width: 150px; cursor: pointer; }
