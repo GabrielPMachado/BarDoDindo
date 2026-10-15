@@ -1064,3 +1064,51 @@ button.anexos__nome:hover { text-decoration: underline; }
 .ad__btn--militar { margin-top: 6px; color: #e8dcb5; background: linear-gradient(180deg, #5c6a26, #3b4218); border: 2px solid #2b3010; box-shadow: 0 6px 0 #22270c; animation: ad-in .5s ease 1.3s both; }
 .ad__btn--militar:active { transform: translateY(4px); box-shadow: 0 2px 0 #22270c; }
 @media (prefers-reduced-motion: reduce) { .ad, .ad * { animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
+
+/* ---------- quantidade por local ---------- */
+.locais { gap: 8px; }
+.locais > label { display: inline-flex; align-items: center; gap: 5px; }
+.locais__linhas { display: flex; flex-direction: column; gap: 6px; }
+.locais__linha { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(120px, 1fr) 32px; gap: 8px; align-items: center; }
+.locais__rodape { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.locais__total { color: var(--muted); font-size: 13px; }
+.locais__total b { color: var(--text); }
+
+/* ---------- entrada de notas ---------- */
+.compra { gap: 10px; }
+.compra > label { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text); font-size: 13px; }
+.compra__ia { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; padding: 14px; border-radius: 12px;
+  border: 1px solid var(--border-strong); background: radial-gradient(120% 140% at 100% 0%, #c4572a26, transparent 60%), var(--surface-2); }
+.compra__ia strong { display: inline-flex; align-items: center; gap: 6px; }
+.compra__ia strong svg { color: var(--brand-light); }
+.compra__ia p { margin-top: 4px; max-width: 460px; }
+.compra__ia label.btn { cursor: pointer; font-size: 14px; font-weight: 600; color: var(--on-brand); }
+.compra__ia label.btn.is-disabled { opacity: .7; pointer-events: none; }
+.compra__lista { display: flex; flex-direction: column; gap: 8px; }
+.compra__item { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+.compra__topo { display: flex; align-items: center; gap: 10px; }
+.compra__num { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: var(--surface-3); color: var(--brand-light); flex-shrink: 0; }
+.compra__destino { flex: 1; max-width: 300px; display: inline-grid; grid-template-columns: 1fr 1fr; padding: 3px; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+.compra__destino button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; height: 30px; border-radius: 6px; font-size: 12.5px; color: var(--muted); }
+.compra__destino button.is-active { background: var(--surface-3); color: var(--brand-light); box-shadow: inset 0 0 0 1px var(--border-strong); }
+.compra__topo .icon-btn { margin-left: auto; }
+.compra__nome { display: flex; flex-direction: column; gap: 4px; }
+.compra__novo { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.compra__valores { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; align-items: end; }
+.compra__sub { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; padding-bottom: 8px; min-width: 90px; }
+.compra__rodape { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.compra__total { font-size: 14px; color: var(--muted); }
+.compra__total b { color: var(--text); font-size: 16px; }
+.compra__lido { display: grid; grid-template-columns: auto 1fr auto auto; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.compra__lido-nome { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 760px) {
+  .compra__valores { grid-template-columns: 1fr 1fr; }
+  .compra__sub { grid-column: 1 / -1; flex-direction: row; justify-content: space-between; padding: 0; }
+  .compra__lido { grid-template-columns: 1fr auto; }
+  .compra__lido .badge { grid-column: 1 / -1; justify-self: start; }
+}
+
+/* chave da IA (Parâmetros) */
+.ia-chave { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+.ia-chave__passos { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
+.ia-chave__link { display: inline-flex; align-items: center; gap: 5px; align-self: flex-start; }

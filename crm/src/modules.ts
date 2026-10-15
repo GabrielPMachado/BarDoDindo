@@ -121,6 +121,7 @@ export const AREAS: Area[] = [
       { path: '/estrutura/projetos', label: 'Projetos' },
       { path: '/estrutura/estoque', label: 'Estoque' },
       { path: '/estrutura/materiais', label: 'Materiais' },
+      { path: '/estrutura/notas', label: 'Entrada de notas' },
     ],
   },
   {
@@ -216,7 +217,7 @@ export const COLLECTION_PAGE: Record<string, string> = {
   reservas: '/atendimento/reservas', consumos: '/atendimento/consumo', resgates: '/atendimento/vouchers',
   produtos: '/vendas/produtos', guarnicoes: '/vendas/guarnicoes', recompensas: '/marketing/recompensas', criacao: '/marketing/criacao', midias: '/marketing/midias',
   colaboradores: '/rh/colaboradores', ferias: '/rh/ferias',
-  projetos: '/estrutura/projetos', estoque: '/estrutura/estoque', materiais: '/estrutura/materiais',
+  projetos: '/estrutura/projetos', estoque: '/estrutura/estoque', materiais: '/estrutura/materiais', compras: '/estrutura/notas',
   terceirizados: '/adm/terceirizados', fornecedores: '/adm/fornecedores', contratos: '/adm/contratos', precos: '/adm/precos',
   receitas: '/financeiro/receitas', despesas: '/financeiro/despesas',
   trabalhista: '/juridico/trabalhista', consultoria: '/juridico/consultoria',
