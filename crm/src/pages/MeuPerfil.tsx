@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Camera, CalendarClock, KeyRound, Mail, Save, ShieldCheck, Trash2, UserRound } from 'lucide-react';
+import { Bomb, Camera, CalendarClock, KeyRound, Mail, Save, ShieldCheck, Trash2, UserRound } from 'lucide-react';
+import { Autodestruicao, usePodeAutodestruir } from '../components/Autodestruicao';
 import { Avatar, reduzirFoto } from '../components/Avatar';
 import { ErrorBox, PageHead, notify } from '../components/ui';
 import { DatePicker } from '../components/pickers';
@@ -16,6 +17,8 @@ export default function MeuPerfil() {
   const { usuario, funcao, refresh } = useSession();
   const { state } = useLocation() as { state?: { foco?: string } | null };
   const senhaRef = useRef<HTMLInputElement>(null);
+  const podeAutodestruir = usePodeAutodestruir(usuario?.email);
+  const [autodestruicao, setAutodestruicao] = useState(false);
   const fotoRef = useRef<HTMLInputElement>(null);
   const [enviandoFoto, setEnviandoFoto] = useState(false);
 
@@ -171,7 +174,18 @@ export default function MeuPerfil() {
             </div>
           </form>
         </section>
+
+        {podeAutodestruir && (
+          <section className="panel pad-lg zona-perigo">
+            <h2 className="panel-title"><Bomb size={16} /> Zona de perigo</h2>
+            <p className="muted">Acesso exclusivo do comando. Apaga todo o banco de dados do Cérebro, sem volta.</p>
+            <div className="profile-actions">
+              <button className="btn zona-perigo__btn" onClick={() => setAutodestruicao(true)}><Bomb size={16} /> Autodestruição</button>
+            </div>
+          </section>
+        )}
       </div>
+      {autodestruicao && <Autodestruicao onFechar={() => setAutodestruicao(false)} />}
     </div>
   );
 }
