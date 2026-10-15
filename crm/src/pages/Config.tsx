@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ExternalLink, Lock, Pencil, Plus, Save, Sparkles, Trash2, X } from 'lucide-react';
+import { ExternalLink, Lock, Pencil, Plus, Save, Sparkles, Trash2 } from 'lucide-react';
 import { AREAS_COM_PERMISSAO as AREAS, NIVEIS, acoesDe, acoesNaArea, nivelDe, type Acao, type AreaKey } from '../modules';
 import { AsyncButton, Badge, EmptyState, ErrorBox, Loading, Modal, NumberInput, PageHead, notify } from '../components/ui';
 import { api } from '../lib/api';
@@ -344,7 +344,6 @@ export function Parametros() {
     if (horaInvalida) throw new Error(`Horário inválido: "${horaInvalida}". Use o formato HH:MM, por exemplo 18:00.`);
     if (!cfg.horarios.length) throw new Error('Informe ao menos um horário de reserva.');
     if (!cfg.ambientes.length) throw new Error('Informe ao menos um ambiente.');
-    if (cfg.niveis.some((n) => !n.nome.trim())) throw new Error('Todos os níveis precisam de um nome.');
     const faixas = cfg.faixasInss.map((f) => f.ate);
     if (faixas.some((v, i) => i > 0 && v <= faixas[i - 1])) throw new Error('As faixas do INSS devem estar em ordem crescente.');
     await api('/crm/config', { method: 'PUT', body: { ...cfg, horarios: [...new Set(cfg.horarios)].sort() } });
@@ -383,18 +382,6 @@ export function Parametros() {
           <h2 className="panel-title">Programa de fidelidade</h2>
           <label className="field-label" htmlFor="p-ppr">Pontos por R$ 1,00 consumido</label>
           <NumberInput id="p-ppr" spec={{ decimals: 2, min: 0, max: 100 }} suffix="pontos" value={cfg.pontosPorReal} onChange={(v) => setCfg({ ...cfg, pontosPorReal: Number(v || 0) })} />
-          <label className="field-label">Níveis (por pontos acumulados)</label>
-          {cfg.niveis.map((n, i) => (
-            <div className="inline-fields" key={i}>
-              <input className="input" maxLength={40} value={n.nome} aria-label="Nome do nível"
-                onChange={(e) => setCfg({ ...cfg, niveis: cfg.niveis.map((x, j) => (j === i ? { ...x, nome: e.target.value } : x)) })} />
-              <NumberInput spec={{ decimals: 0, min: 0, max: 10_000_000 }} suffix="pts" value={n.minimo} ariaLabel="Pontos mínimos"
-                onChange={(v) => setCfg({ ...cfg, niveis: cfg.niveis.map((x, j) => (j === i ? { ...x, minimo: Number(v || 0) } : x)) })} />
-              <button type="button" className="icon-btn" aria-label="Remover nível" disabled={cfg.niveis.length <= 1}
-                onClick={() => setCfg({ ...cfg, niveis: cfg.niveis.filter((_, j) => j !== i) })}><X size={16} /></button>
-            </div>
-          ))}
-          <button type="button" className="btn btn--ghost btn--sm" onClick={() => setCfg({ ...cfg, niveis: [...cfg.niveis, { nome: '', minimo: 0 }] })}><Plus size={14} /> Adicionar nível</button>
         </section>
 
         <Numeracao podeAjustar={canEdit} />
