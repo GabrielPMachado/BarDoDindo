@@ -38,16 +38,11 @@ const TITULOS: Record<string, string> = {
 };
 const iniciais = (nome: string) => nome.trim().split(/\s+/).filter(Boolean).map((p) => p[0]).slice(0, 2).join('').toUpperCase() || '?';
 
-/** Marca do Bar do Dindo com o lema entre as linhas (como a marca do CRM, sem o "Cérebro"). */
+/** Marca do Bar do Dindo (como a marca do CRM, sem o "Cérebro"). */
 export function Marca({ size = 120 }: { size?: number }) {
   return (
     <div className="marca">
       <Logo asLink={false} size={size} />
-      <div className="marca__lema">
-        <span className="marca__linha" />
-        <span>Aqui a amizade sempre vale mais</span>
-        <span className="marca__linha marca__linha--dir" />
-      </div>
     </div>
   );
 }

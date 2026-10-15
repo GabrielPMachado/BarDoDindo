@@ -97,9 +97,6 @@ export default function Home() {
         <div className="profile__info">
           <h1 className="profile__name">{me.cliente.nome}</h1>
           <p className="profile__member">{me.nivel.atual.nome} #{memberNumber(me.cliente.numero)}</p>
-          <p className="profile__motto">
-            Aqui a amizade<br />sempre vale mais
-          </p>
         </div>
         <Link to="/recompensas" className="points-chip" aria-label={`${me.pontos} pontos — ver recompensas`}>
           <span className="points-chip__star"><Star size={20} fill="currentColor" /></span>
