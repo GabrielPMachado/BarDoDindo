@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bomb, ShieldAlert, Siren, Skull, X } from 'lucide-react';
+import { Bomb, ShieldAlert, Siren, Skull, Volume2, VolumeX, X } from 'lucide-react';
 import logoUrl from '../../../shared/assets/logo.webp';
 
 /**
@@ -36,10 +36,16 @@ export function usePodeAutodestruir(email?: string | null) {
 
 /* ---------- sons (gerados na hora, sem arquivos) ---------- */
 let audio: AudioContext | null = null;
+let mudo = false;
+function contexto() {
+  audio ??= new AudioContext();
+  if (audio.state === 'suspended') void audio.resume();
+  return audio;
+}
 function som(tipo: 'bip' | 'erro' | 'ok' | 'boom' | 'alarme') {
+  if (mudo) return;
   try {
-    audio ??= new AudioContext();
-    const a = audio, t = a.currentTime;
+    const a = contexto(), t = a.currentTime;
     const g = a.createGain();
     g.connect(a.destination);
     if (tipo === 'boom') {
@@ -65,6 +71,43 @@ function som(tipo: 'bip' | 'erro' | 'ok' | 'boom' | 'alarme') {
     o.start(t); o.stop(t + dur);
   } catch { /* sem som: segue em silêncio */ }
 }
+/**
+ * Alarmão: sirene de bombardeio que sobe e desce sem parar (duas ondas desafinadas + modulação lenta).
+ * `acelerar` deixa o uivo mais rápido nos últimos segundos; `parar` desliga com um corte curto.
+ */
+function iniciarSirene() {
+  try {
+    const a = contexto();
+    const saida = a.createGain();
+    saida.gain.setValueAtTime(0, a.currentTime);
+    saida.gain.linearRampToValueAtTime(mudo ? 0 : 0.22, a.currentTime + 0.4);
+    const filtro = a.createBiquadFilter();
+    filtro.type = 'lowpass'; filtro.frequency.value = 2600;
+    filtro.connect(saida); saida.connect(a.destination);
+    const lfo = a.createOscillator(), profundidade = a.createGain();
+    lfo.type = 'sine'; lfo.frequency.value = 0.75; profundidade.gain.value = 380;
+    lfo.connect(profundidade);
+    const ondas = (['sawtooth', 'square'] as OscillatorType[]).map((tipo, i) => {
+      const o = a.createOscillator();
+      o.type = tipo; o.frequency.value = 680 + i * 4;
+      profundidade.connect(o.frequency);
+      const g = a.createGain(); g.gain.value = i ? 0.35 : 1;
+      o.connect(g); g.connect(filtro);
+      return o;
+    });
+    [lfo, ...ondas].forEach((o) => o.start());
+    return {
+      acelerar: () => lfo.frequency.setTargetAtTime(2.6, a.currentTime, 0.3),
+      volume: (ligado: boolean) => saida.gain.setTargetAtTime(ligado ? 0.22 : 0, a.currentTime, 0.05),
+      parar: () => {
+        saida.gain.setTargetAtTime(0, a.currentTime, 0.04);
+        setTimeout(() => [lfo, ...ondas].forEach((o) => { try { o.stop(); } catch { /* já parou */ } }), 400);
+      },
+    };
+  } catch {
+    return null;
+  }
+}
 const vibrar = (p: number | number[]) => { try { navigator.vibrate?.(p); } catch { /* ignora */ } };
 
 const ALVOS = [
@@ -86,6 +129,17 @@ export function Autodestruicao({ onFechar }: { onFechar: () => void }) {
   const [linhas, setLinhas] = useState(0);
   const [progresso, setProgresso] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const sirene = useRef<ReturnType<typeof iniciarSirene>>(null);
+  const [comSom, setComSom] = useState(!mudo);
+  const alternarSom = () => { mudo = comSom; setComSom(!comSom); sirene.current?.volume(!mudo); };
+
+  // o alarmão toca da contagem até a explosão
+  useEffect(() => {
+    if ((etapa === 'contagem' || etapa === 'apagando') && !sirene.current) sirene.current = iniciarSirene();
+    if (etapa === 'explosao' || etapa === 'falhou') { sirene.current?.parar(); sirene.current = null; }
+  }, [etapa]);
+  useEffect(() => { if (etapa === 'contagem' && n <= 3) sirene.current?.acelerar(); }, [etapa, n]);
+  useEffect(() => () => { sirene.current?.parar(); sirene.current = null; }, []);
 
   // Esc fecha só antes de o código ser aceito (depois disso, "não tem volta")
   useEffect(() => {
@@ -161,6 +215,11 @@ export function Autodestruicao({ onFechar }: { onFechar: () => void }) {
       {etapa !== 'falhou' && etapa !== 'explosao' && <><div className="ad__faixa ad__faixa--topo" /><div className="ad__faixa ad__faixa--base" /></>}
       {(etapa === 'aviso' || etapa === 'codigo') && (
         <button className="ad__fechar" onClick={onFechar} aria-label="Abortar e fechar"><X size={22} /></button>
+      )}
+      {etapa !== 'falhou' && (
+        <button className="ad__som" onClick={alternarSom} aria-label={comSom ? 'Desligar o som' : 'Ligar o som'} title={comSom ? 'Desligar o som' : 'Ligar o som'}>
+          {comSom ? <Volume2 size={20} /> : <VolumeX size={20} />}
+        </button>
       )}
 
       {etapa === 'aviso' && (
