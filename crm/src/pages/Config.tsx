@@ -473,7 +473,7 @@ function ChaveIA() {
         </div>
         <div className="form-field">
           <label htmlFor="ia-modelo">Modelo (opcional)</label>
-          <input id="ia-modelo" className="input" placeholder="gemini-2.5-flash" value={modelo} onChange={(e) => setModelo(e.target.value)} />
+          <input id="ia-modelo" className="input" placeholder="automático (deixe em branco)" value={modelo} onChange={(e) => setModelo(e.target.value)} />
         </div>
       </div>
       <div className="profile-actions">
