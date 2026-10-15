@@ -1156,3 +1156,4 @@ button.anexos__nome:hover { text-decoration: underline; }
 .gerar-foto label.btn--primary { color: var(--on-brand); }
 .gerar-foto label.btn--sm { font-size: 12.5px; }
 .gerar-foto label.btn:not(.btn--sm) { font-size: 14px; }
+.gerar-foto__extras { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }

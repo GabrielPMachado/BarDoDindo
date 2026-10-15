@@ -17,11 +17,13 @@ async function copiar(texto: string) {
   }
 }
 
-function baixarModelo() {
+function baixar(url: string, nome: string) {
   const a = document.createElement('a');
-  a.href = FOTO_MODELO_URL; a.download = 'foto-modelo-bar-do-dindo.jpg';
+  a.href = url; a.download = nome;
   document.body.appendChild(a); a.click(); a.remove();
 }
+const baixarModelo = () => baixar(FOTO_MODELO_URL, 'foto-modelo-bar-do-dindo.jpg');
+const nomeArquivo = (nome: string) => nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'drink';
 
 /**
  * "Foto no padrão do Dindo", de graça pelo app do Gemini: o Cérebro copia o pedido pronto do drink e
@@ -35,12 +37,20 @@ export function GerarFotoIA({ data, onUsar }: { data: Record<string, unknown>; o
   const nome = String(data.nome ?? '').trim();
   const prompt = () => promptDaFoto({ nome, resumo: String(data.resumo ?? ''), ingredientes: String(data.ingredientes ?? '') });
 
-  const abrirGemini = async () => {
+  /**
+   * Um toque faz tudo: copia o pedido, baixa a foto modelo (e a foto atual do drink, como referência) e abre o Gemini.
+   * A cópia começa antes de abrir a aba: depois que o Gemini abre, a página perde o foco e o navegador não deixa copiar.
+   */
+  const criarNoGemini = () => {
     if (!nome) { notify('Informe o nome do produto antes.', 'error'); return; }
-    // abre a aba já no clique (senão o navegador bloqueia) e copia o pedido
+    const copiou = copiar(prompt());
+    baixarModelo();
+    if (fotoAtual) baixar(fotoAtual, `referencia-${nomeArquivo(nome)}.jpg`);
     window.open(GEMINI_URL, '_blank', 'noopener');
-    const ok = await copiar(prompt());
-    notify(ok ? 'Pedido copiado! No Gemini: anexe a foto modelo, cole o pedido e envie.' : 'Não deu para copiar sozinho: use "Copiar pedido".', ok ? 'ok' : 'error');
+    setAberto(true);
+    void copiou.then((ok) => notify(ok
+      ? 'Pedido copiado e fotos baixadas! No Gemini: anexe a foto modelo, cole o pedido e envie.'
+      : 'Fotos baixadas. Não deu para copiar o pedido sozinho: toque em "Copiar pedido".', ok ? 'ok' : 'error'));
   };
 
   const receber = async (arquivo?: File) => {
@@ -55,9 +65,9 @@ export function GerarFotoIA({ data, onUsar }: { data: Record<string, unknown>; o
         <div className="gerar-foto__chamada">
           <div>
             <strong><Sparkles size={15} /> Foto no padrão do Dindo</strong>
-            <p className="muted small">Crie de graça no Gemini a foto deste drink na mesa do bar, com a placa do Dindo ao fundo, igual às outras fotos do cardápio.</p>
+            <p className="muted small">Um toque copia o pedido deste drink, baixa a foto modelo e abre o Gemini (grátis). Depois é só enviar a foto pronta aqui.</p>
           </div>
-          <button type="button" className="btn btn--primary" onClick={() => setAberto(true)}><Sparkles size={16} /> Criar foto</button>
+          <button type="button" className="btn btn--primary" onClick={criarNoGemini}><Sparkles size={16} /> Criar no Gemini</button>
         </div>
       </div>
     );
@@ -70,25 +80,22 @@ export function GerarFotoIA({ data, onUsar }: { data: Record<string, unknown>; o
           <strong className="gerar-foto__titulo"><Sparkles size={15} /> Foto no padrão do Dindo · grátis pelo Gemini</strong>
           <ol className="gerar-foto__passos">
             <li>
-              <span><b>Baixe a foto modelo</b> (só precisa na primeira vez).</span>
-              <button type="button" className="btn btn--ghost btn--sm" onClick={baixarModelo}><Download size={14} /> Foto modelo</button>
+              <span>No Gemini, <b>anexe a foto modelo</b> que foi baixada{fotoAtual ? ' (e, se quiser, a foto atual do drink como referência)' : ''}, <b>cole o pedido</b> e envie.</span>
             </li>
             <li>
-              <span><b>Abra o Gemini</b>: o pedido deste drink já vai copiado.</span>
-              <button type="button" className="btn btn--primary btn--sm" onClick={() => void abrirGemini()}><ExternalLink size={14} /> Abrir o Gemini</button>
-            </li>
-            <li>
-              <span>No Gemini, <b>anexe a foto modelo</b>, <b>cole o pedido</b> e envie. Salve a imagem que ele criar.</span>
-              <button type="button" className="btn btn--ghost btn--sm" onClick={async () => notify(await copiar(prompt()) ? 'Pedido copiado.' : 'Não foi possível copiar.')}><Copy size={14} /> Copiar pedido</button>
-            </li>
-            <li>
-              <span><b>Envie a foto pronta</b> aqui para comparar com a atual.</span>
+              <span>Salve a imagem que o Gemini criar e <b>envie aqui</b> para comparar com a atual.</span>
               <label className="btn btn--primary btn--sm">
                 <Upload size={14} /> Enviar foto
                 <input type="file" accept="image/*" hidden onChange={(e) => { void receber(e.target.files?.[0]); e.target.value = ''; }} />
               </label>
             </li>
           </ol>
+          <div className="gerar-foto__extras">
+            <span className="muted small">Algo não funcionou?</span>
+            <button type="button" className="btn btn--ghost btn--sm" onClick={async () => notify(await copiar(prompt()) ? 'Pedido copiado.' : 'Não foi possível copiar.')}><Copy size={14} /> Copiar pedido</button>
+            <button type="button" className="btn btn--ghost btn--sm" onClick={baixarModelo}><Download size={14} /> Baixar foto modelo</button>
+            <a className="btn btn--ghost btn--sm" href={GEMINI_URL} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} /> Abrir o Gemini</a>
+          </div>
           {erro && <p className="error">{erro}</p>}
           <div className="gerar-foto__botoes"><button type="button" className="btn btn--ghost btn--sm" onClick={() => setAberto(false)}>Fechar</button></div>
         </>
