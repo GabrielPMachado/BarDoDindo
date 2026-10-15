@@ -961,6 +961,8 @@ button.anexos__nome:hover { text-decoration: underline; }
 @keyframes ad-faixa { to { background-position: 51px 0; } }
 .ad__fechar { position: fixed; top: 32px; right: 16px; z-index: 3; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: #f6e9e6aa; border: 1px solid #ffffff22; background: #0008; }
 .ad__fechar:hover { color: #fff; }
+.ad__som { position: fixed; top: 32px; left: 16px; z-index: 3; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: #f6e9e6aa; border: 1px solid #ffffff22; background: #0008; }
+.ad__som:hover { color: #fff; }
 .ad__caixa { position: relative; z-index: 1; width: min(560px, 100%); display: flex; flex-direction: column; align-items: center; text-align: center; gap: 14px;
   padding: 30px 24px; border: 1px solid #ff2a2a55; border-radius: 6px; background: linear-gradient(180deg, #1a0606e6, #0d0303e6);
   box-shadow: 0 0 0 4px #ff2a2a14, 0 30px 80px #000c, inset 0 0 40px #ff2a2a14; }
