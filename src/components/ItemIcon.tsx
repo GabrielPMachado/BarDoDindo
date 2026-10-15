@@ -23,3 +23,9 @@ export function ItemIcon({ categoria, size = 'md' }: { categoria: string; size?:
     </div>
   );
 }
+
+/** Foto do produto (quando cadastrada no Cérebro) ou o ícone da categoria. */
+export function ItemFoto({ foto, categoria, size = 'md', alt = '' }: { foto?: string; categoria: string; size?: 'md' | 'lg' | 'xl'; alt?: string }) {
+  if (!foto) return <ItemIcon categoria={categoria} size={size} />;
+  return <img className={`thumb thumb--${size} thumb--foto`} src={foto} alt={alt} loading="lazy" />;
+}

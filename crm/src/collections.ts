@@ -526,6 +526,13 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'destaque', label: 'Destaque', type: 'select', options: ['Não', 'Sim'], default: 'Não' },
       { key: 'status', label: 'Status', type: 'select', options: ['Ativo', 'Sazonal', 'Inativo'], default: 'Ativo' },
       { key: 'descricao', label: 'Descrição no cardápio', type: 'textarea', formOnly: true, wide: true },
+      // perfil da bebida, mostrado no app ao tocar no item (0 = não mostrar)
+      { key: 'teor', label: 'Teor alcoólico', type: 'percent', decimals: 1, max: 100, formOnly: true, placeholder: 'Ex.: 11 (deixe vazio se não tiver álcool)' },
+      { key: 'docura', label: 'Doçura (0 a 5)', type: 'number', min: 0, max: 5, formOnly: true },
+      { key: 'amargor', label: 'Amargor (0 a 5)', type: 'number', min: 0, max: 5, formOnly: true },
+      { key: 'acidez', label: 'Acidez (0 a 5)', type: 'number', min: 0, max: 5, formOnly: true },
+      { key: 'intensidade', label: 'Intensidade (0 a 5)', type: 'number', min: 0, max: 5, formOnly: true },
+      { key: 'notas', label: 'Notas de sabor (separadas por vírgula)', type: 'text', formOnly: true, wide: true, placeholder: 'Ex.: Cítrico, Refrescante, Levemente amargo' },
     ],
     computed: [
       {
