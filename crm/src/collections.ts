@@ -244,7 +244,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'conteudoUnidade', label: 'Medida do conteúdo', type: 'select', options: ['ml', 'L', 'g', 'kg'], default: 'ml', formOnly: true },
       { key: 'quantidade', label: 'Quantidade', type: 'number', required: true, decimals: 3, max: 1_000_000 },
       { key: 'minimo', label: 'Estoque mínimo', type: 'number', decimals: 3, max: 1_000_000 },
-      { key: 'custo', label: 'Custo unitário', type: 'money', max: 100_000, formOnly: true },
+      { key: 'custo', label: 'Custo unitário', type: 'money', max: 100_000 },
       { key: 'fornecedor', label: 'Fornecedor', type: 'ref', ref: 'fornecedores', refKey: 'fornecedorId', livre: true, formOnly: true },
       { key: 'validade', label: 'Validade', type: 'date' },
     ],
