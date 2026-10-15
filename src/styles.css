@@ -18,7 +18,7 @@
   --radius-sm: 8px;
   --serif: 'Roboto Slab', Georgia, 'Times New Roman', serif;
   --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --nav-h: 68px;
+  --nav-h: 64px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   color-scheme: dark;
@@ -56,7 +56,7 @@ p { margin: 0; }
   body { background: #070605; }
   .app { box-shadow: 0 0 0 1px var(--border), 0 30px 80px #000; }
 }
-main { padding: 0 16px calc(var(--nav-h) + var(--safe-bottom) + 24px); }
+main { padding: 0 16px calc(var(--nav-h) + var(--safe-bottom) + 40px); }
 .page { display: flex; flex-direction: column; gap: 14px; animation: fade .25s ease; }
 @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
@@ -379,22 +379,26 @@ select.input { appearance: none;
 
 /* ---------- Navegação inferior ---------- */
 .bottomnav {
-  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
-  width: 100%; max-width: 480px; z-index: 30;
-  display: grid; grid-template-columns: repeat(5, 1fr);
-  height: calc(var(--nav-h) + var(--safe-bottom));
-  padding-bottom: var(--safe-bottom);
-  background: #0a0909f2; backdrop-filter: blur(12px);
-  border-top: 1px solid var(--border);
+  /* barra flutuante, no estilo dos apps do iPhone: pílula translúcida afastada das bordas */
+  position: fixed; left: 50%; transform: translateX(-50%); z-index: 30;
+  bottom: calc(var(--safe-bottom) + 12px);
+  width: calc(100% - 24px); max-width: 456px; height: var(--nav-h);
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; padding: 6px;
+  border-radius: 999px;
+  background: #1b1716b8; -webkit-backdrop-filter: blur(22px) saturate(170%); backdrop-filter: blur(22px) saturate(170%);
+  border: 1px solid #ffffff14;
+  box-shadow: 0 12px 32px #000000a6, 0 2px 6px #00000066, inset 0 1px 0 #ffffff0f;
 }
 .bottomnav__item {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
-  color: var(--muted); font-size: 12px;
+  position: relative; border-radius: 999px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  color: var(--muted); font-size: 10.5px; font-weight: 500;
+  transition: background .2s, color .2s;
 }
-.bottomnav__item { position: relative; }
-.bottomnav__item.active { color: var(--brand-light); font-weight: 600; }
-.bottomnav__item.active::before { content: ''; position: absolute; top: -1px; left: 26%; right: 26%; height: 2px; border-radius: 0 0 2px 2px; background: var(--brand); }
+.bottomnav__item svg { width: 22px; height: 22px; }
+.bottomnav__item.active { color: var(--brand-light); font-weight: 600; background: #c4572a2e; box-shadow: inset 0 0 0 1px #c4572a40; }
 .bottomnav__item.active svg { fill: currentColor; fill-opacity: .9; }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .bottomnav { background: #1b1716f5; } }
 
 /* ---------- Sobreposições ---------- */
 .overlay {
@@ -448,7 +452,7 @@ select.input { appearance: none;
 .marca .logo__img { box-shadow: 0 10px 30px #000c; }
 
 .toast {
-  position: fixed; left: 50%; bottom: calc(var(--nav-h) + var(--safe-bottom) + 16px); transform: translateX(-50%);
+  position: fixed; left: 50%; bottom: calc(var(--nav-h) + var(--safe-bottom) + 28px); transform: translateX(-50%);
   z-index: 60; display: flex; align-items: center; gap: 8px;
   padding: 12px 18px; border-radius: 999px;
   background: var(--surface-2); border: 1px solid var(--border-strong); color: var(--text);
