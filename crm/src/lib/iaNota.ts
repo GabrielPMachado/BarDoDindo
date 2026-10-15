@@ -103,8 +103,10 @@ export async function lerNotaComIA(arquivo: File): Promise<NotaLida> {
 }
 
 /* ---------- correspondência com os cadastros ---------- */
-const normalizar = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]+/g, ' ');
-const palavras = (s: string) => normalizar(s).split(/\s+/).filter((p) => p.length > 1 && !/^\d+$/.test(p) && !['de', 'da', 'do', 'com', 'un', 'ml', 'lt', 'cx', 'pct'].includes(p));
+const normalizar = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]+/g, ' ')
+  // "lt350", "750ml": separa número e medida
+  .replace(/(\d)([a-z])/g, '$1 $2').replace(/([a-z])(\d)/g, '$1 $2');
+const palavras = (s: string) => normalizar(s).split(/\s+/).filter((p) => p.length > 1 && !/^\d+$/.test(p) && !['de', 'da', 'do', 'com', 'un', 'und', 'ml', 'lt', 'kg', 'gr', 'cx', 'pct', 'pc', 'lata', 'refrig', 'refri', 'ref', 'fruta', 'fresco', 'fresca', 'natural'].includes(p));
 
 /** Nota de 0 a 1 para quão parecidos são dois nomes (palavras em comum). */
 export function semelhanca(a: string, b: string) {
