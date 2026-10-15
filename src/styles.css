@@ -675,3 +675,10 @@ button.menu-row:active { background: var(--surface-2); }
 .produto__ingredientes li:last-child { border-bottom: 0; }
 .produto__ingredientes li::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--brand); flex-shrink: 0; }
 .produto__historia { margin: 0; color: var(--muted); line-height: 1.65; font-size: 14.5px; }
+
+/* detalhes do produto flutuando, com respiro dos lados e embaixo (como a barra de navegação) */
+.overlay:has(> .produto) { padding: 0 12px calc(12px + var(--safe-bottom)); }
+.sheet.produto { width: 100%; max-width: 456px; max-height: calc(100dvh - 48px - var(--safe-top)); padding-bottom: 20px;
+  border-radius: 26px; border: 1px solid var(--border-strong); box-shadow: 0 18px 48px #000c; }
+.produto__capa { margin: 10px 10px 0; border-radius: 18px; }
+.produto__fechar { top: 20px; right: 20px; }
