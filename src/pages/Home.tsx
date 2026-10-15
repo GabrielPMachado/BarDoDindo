@@ -5,10 +5,10 @@ import { ConsumoSheet, Empty, HistoryRow, ReservationCard, SectionHeader } from 
 import { memberNumber, upcoming, useMe, useStore, type Consumption } from '../store';
 
 const ACTIONS = [
-  { to: '/reservas', label: 'Fazer reserva', icon: CalendarDays, primary: true },
-  { to: '/historico', label: 'Meu histórico', icon: ReceiptText },
+  { to: '/reservas', label: 'Reservar', icon: CalendarDays, primary: true },
+  { to: '/historico', label: 'Histórico', icon: ReceiptText },
   { to: '/cardapio', label: 'Cardápio', icon: Utensils },
-  { to: '/recompensas', label: 'Minhas recompensas', icon: Gift },
+  { to: '/recompensas', label: 'Prêmios', icon: Gift },
 ];
 
 export function Avatar({ editable = false, size = 'lg' }: { editable?: boolean; size?: 'lg' | 'md' }) {
@@ -119,7 +119,7 @@ export default function Home() {
       <section className="actions">
         {ACTIONS.map(({ to, label, icon: Icon, primary }) => (
           <Link key={to} to={to} className={`action ${primary ? 'action--primary' : ''}`}>
-            <Icon size={34} strokeWidth={1.6} />
+            <Icon size={24} strokeWidth={1.8} />
             <span>{label}</span>
           </Link>
         ))}
