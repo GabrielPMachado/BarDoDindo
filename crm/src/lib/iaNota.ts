@@ -77,41 +77,52 @@ export async function chaveDaIA() {
 }
 
 /**
- * Pede ao Gemini uma resposta no formato `esquema` e devolve o texto (JSON).
- * Tenta os modelos da lista em ordem quando um está aposentado, sobrecarregado, sem cota ou lento.
+ * Chamada ao Gemini com troca automática de modelo: passa para o próximo da lista quando um está
+ * aposentado (404), sobrecarregado (5xx), sem cota (429) ou demora mais que `esperaMs`.
+ * Devolve a resposta (JSON) do primeiro modelo que respondeu.
  */
-export async function gerarComGemini(chave: string, modelo: string, parts: unknown[], esquema: unknown, acao: string, temperatura = 0): Promise<string> {
-  const corpoPedido = JSON.stringify({
-    contents: [{ parts }],
-    generationConfig: { temperature: temperatura, responseMimeType: 'application/json', responseSchema: esquema },
-  });
-  let corpo: { candidates?: { content?: { parts?: { text?: string }[] } }[] } = {};
+export async function chamarGemini(chave: string, modelos: string[], corpo: unknown, acao: string, esperaMs = ESPERA_MS, sinal?: AbortSignal) {
+  const corpoPedido = JSON.stringify(corpo);
   let ultimoErro = '';
-  for (const m of [...new Set([modelo, ...MODELOS].filter(Boolean))]) {
+  let semCotaGratis = false;
+  for (const m of [...new Set(modelos.filter(Boolean))]) {
+    if (sinal?.aborted) throw new Error('Cancelado.');
     const parar = new AbortController();
-    const relogio = setTimeout(() => parar.abort(), ESPERA_MS);
+    const relogio = setTimeout(() => parar.abort(), esperaMs);
+    const cancelar = () => parar.abort();
+    sinal?.addEventListener('abort', cancelar);
     const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(chave)}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: corpoPedido, signal: parar.signal,
     }).catch(() => {
+      if (sinal?.aborted) throw new Error('Cancelado.');
       if (parar.signal.aborted) return null;
       throw new Error('Sem conexão com a IA. Verifique a internet e tente de novo.');
-    }).finally(() => clearTimeout(relogio));
+    }).finally(() => { clearTimeout(relogio); sinal?.removeEventListener('abort', cancelar); });
     if (!resp) { ultimoErro = 'A IA do Google está demorando demais agora. Tente de novo em alguns minutos.'; continue; }
     const json = await resp.json().catch(() => ({}));
-    if (resp.ok) { corpo = json; ultimoErro = ''; break; }
+    if (resp.ok) return json;
     const msg = String(json?.error?.message ?? '');
     if (resp.status === 400 && /API key/i.test(msg)) throw new Error('A chave da IA é inválida. Confira em Configurações → Parâmetros.');
     if (resp.status === 403) throw new Error('A chave da IA não permite este endereço. Confira as restrições da chave no Google AI Studio.');
-    // modelo aposentado (404), sobrecarregado (503/500) ou sem cota (429): tenta o próximo
+    // cota zero no plano gratuito (ex.: geração de imagem): só funciona com faturamento ativo
+    if (resp.status === 429 && /limit:\s*0\b|free_tier|billing/i.test(msg)) semCotaGratis = true;
     ultimoErro = resp.status === 429 ? 'A cota gratuita da IA acabou por agora. Tente de novo em alguns minutos.'
       : resp.status >= 500 ? 'A IA do Google está sobrecarregada agora. Tente de novo em alguns minutos.'
       : `A IA não conseguiu ${acao}${msg ? `: ${msg}` : '.'}`;
     if (![404, 429, 500, 503].includes(resp.status)) break;
   }
-  if (ultimoErro) throw new Error(ultimoErro);
-  return corpo?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? '').join('') ?? '';
+  if (semCotaGratis) throw new Error('SEM_FATURAMENTO');
+  throw new Error(ultimoErro || `A IA não conseguiu ${acao}.`);
 }
 
+/** Pede ao Gemini uma resposta de texto no formato `esquema` (JSON) e devolve o texto. */
+export async function gerarComGemini(chave: string, modelo: string, parts: unknown[], esquema: unknown, acao: string, temperatura = 0): Promise<string> {
+  const corpo: { candidates?: { content?: { parts?: { text?: string }[] } }[] } = await chamarGemini(chave, [modelo, ...MODELOS], {
+    contents: [{ parts }],
+    generationConfig: { temperature: temperatura, responseMimeType: 'application/json', responseSchema: esquema },
+  }, acao).catch((e: Error) => { throw e.message === 'SEM_FATURAMENTO' ? new Error('A cota gratuita da IA acabou por agora. Tente de novo em alguns minutos.') : e; });
+  return corpo?.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
+}
 export async function lerNotaComIA(arquivo: File): Promise<NotaLida> {
   const { chave, modelo } = await chaveDaIA();
   const pdf = arquivo.type === 'application/pdf';
