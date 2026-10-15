@@ -150,7 +150,7 @@ main { padding: 0 16px calc(var(--nav-h) + var(--safe-bottom) + 24px); }
 }
 .points-chip:hover { border-color: var(--border-strong); }
 .points-chip, .stat, .points-hero { position: relative; overflow: hidden; }
-.points-chip::before, .stat::before, .points-hero::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--brand); }
+.points-chip, .points-hero { border-color: var(--border-strong); }
 .points-chip > span:nth-child(2) { flex: 1; display: flex; flex-direction: column; }
 .points-chip strong { font-size: 26px; color: var(--text); font-weight: 700; line-height: 1; }
 .points-chip small { font-size: 12px; letter-spacing: .1em; color: var(--muted); margin-top: 4px; }
@@ -344,10 +344,6 @@ select.input { appearance: none;
 .points-hero__top { display: flex; align-items: center; gap: 14px; }
 .points-hero__top strong { display: block; font-size: 34px; line-height: 1; }
 .points-hero__top small { color: var(--muted); }
-.level { margin-top: 16px; }
-.level__row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
-.bar { height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
-.bar__fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--brand-dark), var(--brand-light)); transition: width .4s; }
 
 .rewards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .reward { display: flex; flex-direction: column; gap: 6px; padding: 14px; }
@@ -531,3 +527,5 @@ button.hist-row { width: 100%; text-align: left; }
 /* Entrar / Quero ser afilhado */
 .auth__title { justify-content: center; }
 .auth__card > p.muted { text-align: center; }
+.points-hero__regra { margin: 12px 0 0; text-align: center; }
+.points-hero__top small { font-size: 12px; letter-spacing: .16em; text-transform: uppercase; }

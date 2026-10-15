@@ -6,15 +6,14 @@ import { useMe, useStore, type Recompensa, type Redemption } from '../store';
 
 export default function Recompensas() {
   const me = useMe();
-  const { recompensas, resgatar } = useStore();
+  const { recompensas, resgatar, config } = useStore();
   const [pick, setPick] = useState<Recompensa | null>(null);
   const [voucher, setVoucher] = useState<Redemption | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const clearToast = useCallback(() => setToast(null), []);
 
-  const { atual, proximo } = me.nivel;
-  const progress = proximo ? Math.min(100, ((me.acumulados - atual.minimo) / (proximo.minimo - atual.minimo)) * 100) : 100;
+  const pontosPorReal = config?.pontosPorReal ?? 1;
 
   const doRedeem = async () => {
     if (!pick) return;
@@ -46,17 +45,9 @@ export default function Recompensas() {
             <small>pontos disponíveis</small>
           </div>
         </div>
-        <div className="level">
-          <div className="level__row">
-            <span>Nível <b className="gold">{atual.nome}</b></span>
-            {proximo && (
-              <span className="muted small">
-                {(proximo.minimo - me.acumulados).toLocaleString('pt-BR')} pts para {proximo.nome}
-              </span>
-            )}
-          </div>
-          <div className="bar"><div className="bar__fill" style={{ width: `${progress}%` }} /></div>
-        </div>
+        <p className="muted small points-hero__regra">
+          Cada R$ 1 consumido vale {pontosPorReal === 1 ? '1 ponto' : `${pontosPorReal.toLocaleString('pt-BR')} pontos`}
+        </p>
       </section>
 
       {active.length > 0 && (

@@ -71,7 +71,7 @@ export function Clientes() {
             <table className="table table--cards">
               <thead>
                 <tr>
-                  <th>Afilhado</th><th>Contato</th><th>Nível</th>
+                  <th>Afilhado</th><th>Contato</th>
                   <th className="num">Pontos</th><th className="num">Visitas</th><th className="num">Consumo total</th><th>Última visita</th><th>Cliente desde</th>{podeExcluir && <th aria-label="Ações" />}
                 </tr>
               </thead>
@@ -80,7 +80,6 @@ export function Clientes() {
                   <tr key={c.id}>
                     <td data-label="Afilhado" className="text"><strong>{c.nome}</strong><div className="muted small">{numero(c.numero)}{c.origem === 'Pré-cadastro' && <> · <span className="gold">Pré-cadastro</span></>}</div></td>
                     <td data-label="Contato" className="text"><div className="small">{c.email}</div><div className="muted small nowrap">{c.telefone ? maskPhone(c.telefone) : '—'}</div></td>
-                    <td data-label="Nível" className="nowrap"><Badge tone="info">{c.nivel}</Badge></td>
                     <td data-label="Pontos" className="num">{num(c.pontos)}</td>
                     <td data-label="Visitas" className="num">{num(c.visitas)}</td>
                     <td data-label="Consumo total" className="num">{brl(c.totalGasto)}</td>
@@ -197,7 +196,7 @@ export function Consumo() {
               <div className="selected-client">
                 <div>
                   <strong>{cliente.nome}</strong> <span className="muted">{numero(cliente.numero)}</span>
-                  <div className="muted small">{cliente.email} · {num(cliente.pontos)} pontos · nível {cliente.nivel}</div>
+                  <div className="muted small">{cliente.email} · {num(cliente.pontos)} pontos</div>
                 </div>
                 <button className="btn btn--ghost btn--sm" onClick={() => setClienteId(null)}>Trocar</button>
               </div>

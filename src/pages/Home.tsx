@@ -96,7 +96,7 @@ export default function Home() {
         <Avatar editable />
         <div className="profile__info">
           <h1 className="profile__name">{me.cliente.nome}</h1>
-          <p className="profile__member">{me.nivel.atual.nome} #{memberNumber(me.cliente.numero)}</p>
+          <p className="profile__member">Afilhado #{memberNumber(me.cliente.numero)}</p>
         </div>
         <Link to="/recompensas" className="points-chip" aria-label={`${me.pontos} pontos — ver recompensas`}>
           <span className="points-chip__star"><Star size={20} fill="currentColor" /></span>

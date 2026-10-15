@@ -38,7 +38,7 @@ export default function Perfil() {
       <div className="profile-card">
         <Avatar editable />
         <h2>{me.cliente.nome}</h2>
-        <p className="profile__member">{me.nivel.atual.nome} #{memberNumber(me.cliente.numero)}</p>
+        <p className="profile__member">Afilhado #{memberNumber(me.cliente.numero)}</p>
         <div className="stats">
           <div className="stat"><small>Pontos</small><strong className="gold">{me.pontos.toLocaleString('pt-BR')}</strong></div>
           <div className="stat"><small>Visitas</small><strong>{me.visitas}</strong></div>
