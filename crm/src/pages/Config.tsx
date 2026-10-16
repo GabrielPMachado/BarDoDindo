@@ -1,21 +1,29 @@
-import { Fragment, useEffect, useState } from 'react';
-import { ExternalLink, Lock, Pencil, Plus, Save, Sparkles, Trash2 } from 'lucide-react';
-import { AREAS_COM_PERMISSAO as AREAS, CARGOS_SUGERIDOS, DEPARTAMENTOS, NIVEIS, acoesDe, acoesNaArea, nivelDe, type Acao, type AreaKey } from '../modules';
+import { useEffect, useState } from 'react';
+import { ChevronDown, ExternalLink, Lock, Pencil, Plus, Save, Sparkles, Trash2 } from 'lucide-react';
+import { CARGOS_SUGERIDOS, GRUPOS_DE_PERMISSAO, MODULOS, NIVEIS, acoesDe, acoesNaArea, nivelDe, type Acao, type Modulo } from '../modules';
 import { AsyncButton, Badge, EmptyState, ErrorBox, Loading, Modal, NumberInput, PageHead, notify } from '../components/ui';
 import { api } from '../lib/api';
 import { SelectPicker } from '../components/pickers';
 import { reload, useCollection, useResource, type Row } from '../lib/data';
 import { useSession, type Config, type Funcao, type Usuario } from '../lib/session';
 
-/** "Tudo", "Só ver" ou a lista das permissões marcadas. */
-const resumoAcoes = (acoes: Acao[]) => NIVEIS.find((n) => n.key === nivelDe(acoes))?.label ?? 'Personalizado';
+const acoesDaFuncao = (f: Funcao, k: string) => (f.sistema ? acoesDe('edit') : acoesNaArea(f.permissoes as Record<string, unknown>, k));
+/** Resumo de um grupo (Diretoria ou departamento): o nível, se for o mesmo em todas as telas; senão, quantas telas a função acessa. */
+function resumoGrupo(acoesDe: (k: string) => Acao[], modulos: Modulo[]) {
+  const niveis = modulos.map((m) => nivelDe(acoesDe(m.key)) ?? 'editar');
+  const com = niveis.filter((n) => n !== 'none').length;
+  if (!com) return { texto: '—', classe: 'none' };
+  if (niveis.every((n) => n === niveis[0])) return { texto: NIVEIS.find((n) => n.key === niveis[0])!.label, classe: niveis[0] };
+  return { texto: `${com} de ${modulos.length} telas`, classe: 'misto' };
+}
+const nomeGrupo = (label: string) => label.replace(/^Departamento /, '');
 
 /* ---------------- Usuários ---------------- */
 export function Usuarios() {
   const { pode, usuario: eu } = useSession();
-  const canCreate = pode('cfg', 'criar');
-  const canEdit = pode('cfg', 'editar');
-  const canDelete = pode('cfg', 'excluir');
+  const canCreate = pode('usuarios', 'criar');
+  const canEdit = pode('usuarios', 'editar');
+  const canDelete = pode('usuarios', 'excluir');
   const users = useResource<Usuario[]>('/crm/usuarios');
   const funcoes = useCollection<Funcao & Row>('funcoes').rows;
   const [editing, setEditing] = useState<Usuario | 'new' | null>(null);
@@ -148,11 +156,9 @@ function UsuarioForm({ user, funcoes, isSelf, canDelete, onClose }: {
           <div className="form-field form-field--wide">
             <label>Acessos desta função</label>
             <div className="access-chips">
-              {AREAS.map((a) => {
-                const acoes = funcao.sistema ? acoesDe('edit') : acoesNaArea(funcao.permissoes as Record<string, unknown>, a.key);
-                return acoes.includes('ver')
-                  ? <Badge key={a.key} tone={acoes.length > 1 ? 'good' : 'info'}>{a.label} · {resumoAcoes(acoes)}</Badge>
-                  : null;
+              {GRUPOS_DE_PERMISSAO.map((g) => {
+                const r = resumoGrupo((k) => acoesDaFuncao(funcao, k), g.modulos);
+                return r.classe === 'none' ? null : <Badge key={g.label} tone={r.classe === 'ver' ? 'info' : 'good'}>{nomeGrupo(g.label)} · {r.texto}</Badge>;
               })}
             </div>
           </div>
@@ -164,18 +170,11 @@ function UsuarioForm({ user, funcoes, isSelf, canDelete, onClose }: {
 }
 
 /* ---------------- Funções e permissões ---------------- */
-/** Título do grupo antes da primeira área de cada departamento (na tela de permissões). */
-function cabecalhoDe(area: AreaKey) {
-  if (area === 'dir') return 'Diretoria';
-  const d = DEPARTAMENTOS.find((x) => x.setores[0]?.area.key === area);
-  return d ? `Departamento ${d.label}` : null;
-}
-
 export function Funcoes() {
   const { pode, refresh } = useSession();
-  const canCreate = pode('cfg', 'criar');
-  const canEdit = pode('cfg', 'editar');
-  const canDelete = pode('cfg', 'excluir');
+  const canCreate = pode('funcoes', 'criar');
+  const canEdit = pode('funcoes', 'editar');
+  const canDelete = pode('funcoes', 'excluir');
   const col = useCollection<Funcao & Row>('funcoes');
   const [editing, setEditing] = useState<Funcao | 'new' | null>(null);
 
@@ -208,7 +207,7 @@ export function Funcoes() {
               <thead>
                 <tr>
                   <th>Função</th>
-                  {AREAS.map((a) => <th key={a.key} className="center" title={a.label}><a.icon size={16} /><span>{a.label}</span></th>)}
+                  {GRUPOS_DE_PERMISSAO.map((g) => <th key={g.label} className="center"><span>{nomeGrupo(g.label)}</span></th>)}
                   <th className="actions-col" />
                 </tr>
               </thead>
@@ -216,13 +215,11 @@ export function Funcoes() {
                 {col.rows.map((f) => (
                   <tr key={f.id}>
                     <td className="matrix__role"><strong>{f.nome}</strong>{f.sistema && <Lock size={12} className="muted inline-icon" />}<div className="muted small">{f.descricao}</div></td>
-                    {AREAS.map((a) => {
-                      const acoes = f.sistema ? acoesDe('edit') : acoesNaArea(f.permissoes as Record<string, unknown>, a.key);
+                    {GRUPOS_DE_PERMISSAO.map((g) => {
+                      const r = resumoGrupo((k) => acoesDaFuncao(f, k), g.modulos);
                       return (
-                        <td key={a.key} className="center">
-                          {acoes.includes('ver') ? (
-                            <span className={`access access--${nivelDe(acoes) ?? 'editar'}`} title={NIVEIS.find((n) => n.key === nivelDe(acoes))?.dica}>{resumoAcoes(acoes)}</span>
-                          ) : <span className="access access--none" title="Sem acesso">—</span>}
+                        <td key={g.label} className="center">
+                          <span className={`access access--${r.classe}`} title={r.classe === 'misto' ? 'Acesso diferente em cada tela: toque no lápis para ver' : undefined}>{r.texto}</span>
                         </td>
                       );
                     })}
@@ -264,10 +261,12 @@ function FuncaoForm({ funcao, onClose, onSave, onDelete }: {
 }) {
   const [nome, setNome] = useState(funcao?.nome ?? '');
   const [descricao, setDescricao] = useState(funcao?.descricao ?? '');
-  const [perm, setPerm] = useState<Partial<Record<AreaKey, Acao[]>>>(
-    () => Object.fromEntries(AREAS.map((a) => [a.key, acoesNaArea(funcao?.permissoes as Record<string, unknown> | undefined, a.key)])),
+  // uma permissão por tela (módulo); funções antigas, gravadas por área, abrem já convertidas
+  const [perm, setPerm] = useState<Record<string, Acao[]>>(
+    () => Object.fromEntries(MODULOS.map((m) => [m.key, acoesNaArea(funcao?.permissoes as Record<string, unknown> | undefined, m.key)])),
   );
-  const definir = (area: AreaKey, acoes: Acao[]) => setPerm({ ...perm, [area]: acoes });
+  const definir = (keys: string[], acoes: Acao[]) => setPerm((p) => ({ ...p, ...Object.fromEntries(keys.map((k) => [k, [...acoes]])) }));
+  const [abertos, setAbertos] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -308,29 +307,52 @@ function FuncaoForm({ funcao, onClose, onSave, onDelete }: {
           <input id="r-desc" className="input" value={descricao} onChange={(e) => setDescricao(e.target.value)} />
         </div>
         <div className="form-field form-field--wide">
-          <label>Permissões por área</label>
-          <p className="muted small">Ver: abrir e consultar · Editar: ver, cadastrar e alterar · Total: editar e também excluir (inclui estornos).</p>
+          <label>Permissões por tela</label>
+          <p className="muted small">Ver: abrir e consultar · Editar: ver, cadastrar e alterar · Total: editar e também excluir (inclui estornos). Use “Todo o grupo” para marcar o departamento inteiro de uma vez.</p>
           <div className="perm-list">
-            {AREAS.map((a) => (
-              <Fragment key={a.key}>
-              {cabecalhoDe(a.key) && <div className="perm-grupo">{cabecalhoDe(a.key)}</div>}
-              <div className="perm">
-                <a.icon size={18} className="gold" />
-                <div className="perm__text"><strong>{a.label}</strong><span className="muted small">{a.description}</span></div>
-                <div className="segmented" role="radiogroup" aria-label={`Acesso em ${a.label}`}>
-                  {NIVEIS.map((n) => {
-                    const ativo = nivelDe(perm[a.key] ?? []) === n.key;
-                    return (
-                      <button type="button" key={n.key} role="radio" aria-checked={ativo} title={n.dica}
-                        className={ativo ? 'is-active' : ''} onClick={() => definir(a.key, [...n.acoes])}>
-                        {n.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              </Fragment>
-            ))}
+            {GRUPOS_DE_PERMISSAO.map((g) => {
+              const keys = g.modulos.map((m) => m.key);
+              const r = resumoGrupo((k) => perm[k] ?? [], g.modulos);
+              const aberto = !!abertos[g.label];
+              return (
+                <section key={g.label} className={`perm-grupo ${aberto ? 'is-open' : ''}`}>
+                  <div className="perm-grupo__topo">
+                    <button type="button" className="perm-grupo__titulo" onClick={() => setAbertos((x) => ({ ...x, [g.label]: !aberto }))} aria-expanded={aberto}>
+                      <ChevronDown size={15} className={aberto ? '' : 'is-closed'} />
+                      <span>{nomeGrupo(g.label)}</span>
+                      <span className={`access access--${r.classe}`}>{r.texto}</span>
+                    </button>
+                    <div className="segmented segmented--sm" role="radiogroup" aria-label={`Todo o grupo ${nomeGrupo(g.label)}`} title="Todo o grupo">
+                      {NIVEIS.map((n) => (
+                        <button type="button" key={n.key} role="radio" aria-checked={r.classe === n.key} className={r.classe === n.key ? 'is-active' : ''}
+                          title={`${n.dica} (todas as telas do grupo)`} onClick={() => definir(keys, n.acoes)}>
+                          {n.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {aberto && g.modulos.map((m) => (
+                    <div key={m.key} className="perm">
+                      <div className="perm__text">
+                        <strong>{m.label}</strong>
+                        <span className="muted small">{[m.setor !== m.label ? m.setor : '', m.paginas.length > 1 ? m.paginas.join(', ') : ''].filter(Boolean).join(' · ')}</span>
+                      </div>
+                      <div className="segmented" role="radiogroup" aria-label={`Acesso em ${m.label}`}>
+                        {NIVEIS.map((n) => {
+                          const ativo = nivelDe(perm[m.key] ?? []) === n.key;
+                          return (
+                            <button type="button" key={n.key} role="radio" aria-checked={ativo} title={n.dica}
+                              className={ativo ? 'is-active' : ''} onClick={() => definir([m.key], n.acoes)}>
+                              {n.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </section>
+              );
+            })}
           </div>
         </div>
         {error && <p className="error form-field--wide">{error}</p>}
@@ -353,7 +375,7 @@ function normalizarHora(h: string) {
 
 export function Parametros() {
   const { pode } = useSession();
-  const canEdit = pode('cfg', 'editar');
+  const canEdit = pode('parametros', 'editar');
   const res = useResource<Config>('/crm/config');
   const [cfg, setCfg] = useState<Config | null>(null);
   useEffect(() => {

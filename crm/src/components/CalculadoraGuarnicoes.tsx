@@ -92,7 +92,7 @@ export function CalculadoraGuarnicoes({ rows }: { rows: Row[] }) {
   };
 
   const pendentes = linhas.filter((l) => { const c = calcular(l, lista); return 'valor' in c && (!l.existente || Math.abs(Number(l.existente.custo) - (c.valor ?? 0)) >= 0.005); });
-  const podeSalvar = (l: Linha) => (l.existente ? pode('vnd', 'editar') : pode('vnd', 'criar'));
+  const podeSalvar = (l: Linha) => (l.existente ? pode('guarnicoes', 'editar') : pode('guarnicoes', 'criar'));
 
   return (
     <div className="panel calc-guar">

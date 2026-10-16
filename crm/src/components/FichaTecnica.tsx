@@ -314,7 +314,7 @@ function LinhaFicha({ item: it, opcoes, disabled, onChange, onUnidade, onInsumo,
           "{it.insumo}" está no Estoque em {it.unidadeBase}. Para medir em ml ou g, informe em Estrutura → Estoque o conteúdo de cada {it.unidadeBase} (ex.: 1 garrafa = 750 ml) ou cadastre o preço do fornecedor em ml na Tabela de preços.
         </p>
       )}
-      {!vinculado && it.insumo.trim() && !disabled && pode('dp', 'criar') && !cadastrando && (
+      {!vinculado && it.insumo.trim() && !disabled && pode('estoque', 'criar') && !cadastrando && (
         <div className="ficha__comparar">
           <button type="button" className="btn btn--ghost btn--sm" onClick={() => setCadastrando(true)}>
             <PackagePlus size={14} /> Cadastrar "{it.insumo.trim()}" no Estoque

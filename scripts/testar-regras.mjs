@@ -8,7 +8,7 @@ import {
   addDoc, collection, connectFirestoreEmulator, deleteDoc, doc, getDoc, getDocs, getFirestore, increment, query, setDoc, updateDoc, where, writeBatch,
 } from 'firebase/firestore';
 
-const [senhaCliente, senhaAtendente, senhaMarketing, senhaAdministrativo] = process.argv.slice(2);
+const [senhaCliente, senhaAtendente, senhaMarketing, senhaAdministrativo, senhaModular] = process.argv.slice(2);
 const app = initializeApp({ apiKey: 'teste', projectId: 'demo-bardodindo' });
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -163,6 +163,21 @@ if (senhaMarketing) {
   await negado('cadastrar item fixo (só "ver")', () => addDoc(collection(db, 'guarnicoes'), { nome: 'Gelo', custo: 0.3 }));
   await negado('cadastrar preço de fornecedor (só Administrativo)', () => addDoc(collection(db, 'precos'), { insumo: 'x', preco: 1 }));
   await negado('listar despesas', () => getDocs(collection(db, 'despesas')));
+  await signOut(auth);
+}
+
+if (senhaModular) {
+  console.log('— equipe: função por tela (formato novo) —');
+  await signInWithEmailAndPassword(auth, 'modular@teste.local', senhaModular);
+  await permitido('ver reservas (módulo com "ver")', () => getDocs(collection(db, 'reservas')));
+  await negado('ver consumos (módulo sem permissões, mesmo com Atendimento total)', () => getDocs(collection(db, 'consumos')));
+  await negado('excluir reserva (o módulo não tem "excluir")', () => deleteDoc(doc(db, 'reservas', 'qualquer')));
+  await permitido('ver o calendário (módulo não marcado: vale a área Atendimento)', () => getDocs(collection(db, 'eventos')));
+  await permitido('Entrada de notas lê o Estoque', () => getDocs(collection(db, 'estoque')));
+  await permitido('Entrada de notas soma a quantidade no Estoque', () => updateDoc(doc(db, 'estoque', 'gin'), { quantidade: 3 }));
+  await permitido('Resultado (DRE) lê as receitas', () => getDocs(collection(db, 'receitas')));
+  await negado('Resultado (DRE) não lança receita', () => addDoc(collection(db, 'receitas'), { descricao: 'x', valor: 1, data: '2026-10-01' }));
+  await negado('ver colaboradores', () => getDocs(collection(db, 'colaboradores')));
   await signOut(auth);
 }
 

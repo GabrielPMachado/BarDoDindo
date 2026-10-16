@@ -4,7 +4,7 @@ import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ShieldOff } from 'lucide-react';
 import { SessionProvider, useSession } from './lib/session';
 import { startLiveUpdates, stopLiveUpdates, vigiarNovaVersao } from './lib/data';
-import { AREAS_VISIVEIS as AREAS, CAMINHOS_ANTIGOS, findModule, type AreaKey } from './modules';
+import { AREAS_VISIVEIS as AREAS, CAMINHOS_ANTIGOS, findModule } from './modules';
 import { COLLECTIONS } from './collections';
 import { Brand, Layout } from './components/Layout';
 import { CollectionPage } from './components/CollectionPage';
@@ -105,9 +105,9 @@ const CUSTOM: Record<string, () => ReactNode> = {
   '/config/parametros': () => <Parametros />,
 };
 
-function Guard({ area, children }: { area: AreaKey; children: ReactNode }) {
+function Guard({ perm, children }: { perm: string; children: ReactNode }) {
   const { access } = useSession();
-  if (access(area) === 'none') {
+  if (access(perm) === 'none') {
     return (
       <div className="page">
         <EmptyState title="Acesso não permitido">
@@ -122,8 +122,8 @@ function Guard({ area, children }: { area: AreaKey; children: ReactNode }) {
 function Home() {
   const { access } = useSession();
   // abre a primeira área liberada pela função; quem ainda não tem nenhuma cai no próprio painel (Meu perfil)
-  const first = AREAS.find((a) => !a.pessoal && access(a.key) !== 'none');
-  return <Navigate to={first ? first.items[0].path : '/perfil/painel'} replace />;
+  const first = AREAS.filter((a) => !a.pessoal).flatMap((a) => a.items).find((i) => access(i.perm) !== 'none');
+  return <Navigate to={first ? first.path : '/perfil/painel'} replace />;
 }
 
 /** Tela de passagem logo depois de entrar; some sozinha ou ao clicar. */
@@ -162,9 +162,9 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         {paths.map((p) => {
-          const area = findModule(p)!.area.key;
+          const perm = findModule(p)!.item.perm;
           const element = CUSTOM[p] ? CUSTOM[p]() : GENERIC[p] ? <CollectionPage key={p} def={COLLECTIONS[GENERIC[p]]} /> : null;
-          return <Route key={p} path={p} element={<Guard area={area}>{element}</Guard>} />;
+          return <Route key={p} path={p} element={<Guard perm={perm}>{element}</Guard>} />;
         })}
         {Object.entries(CAMINHOS_ANTIGOS).map(([antigo, novo]) => <Route key={antigo} path={antigo} element={<Navigate to={novo} replace />} />)}
         <Route path="*" element={<Navigate to="/" replace />} />

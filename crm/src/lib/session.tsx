@@ -1,14 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { api, getToken, setToken, setUnauthorizedHandler } from './api';
 import { clearCache } from './data';
-import { acoesDe, acoesNaArea, resumoAcesso, type Acao, type Access, type AreaKey } from '../modules';
+import { acoesDe, acoesNaArea, resumoAcesso, type Acao, type Access } from '../modules';
 
 export interface Funcao {
   id: string;
   nome: string;
   descricao: string;
-  /** Por área: lista de permissões (ou o nível antigo "view"/"edit"). */
-  permissoes: Partial<Record<AreaKey, Acao[] | 'view' | 'edit' | 'none'>>;
+  /** Por módulo (tela ou cadastro) — ou, no formato antigo, por área: lista de permissões (ou o nível "view"/"edit"). */
+  permissoes: Record<string, Acao[] | 'view' | 'edit' | 'none'>;
   sistema?: boolean;
 }
 
@@ -44,9 +44,9 @@ interface Session {
   setupPendente: boolean;
   usuario: Usuario | null;
   funcao: Funcao | null;
-  access: (area: AreaKey) => Access;
+  access: (modulo: string) => Access;
   /** Se a função do usuário tem uma permissão (ver, criar, editar, excluir) na área. */
-  pode: (area: AreaKey, acao: Acao) => boolean;
+  pode: (modulo: string, acao: Acao) => boolean;
   /** Acabou de entrar (login ou primeiro acesso): mostra a tela de boas-vindas até ser dispensada. */
   boasVindas: boolean;
   dispensarBoasVindas: () => void;
@@ -99,8 +99,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [refresh, reset]);
 
   // "Meu perfil" é de todo usuário; a função Administrador (de sistema) tem tudo; as demais áreas dependem da função
-  const acoes = (area: AreaKey): Acao[] => (area === 'eu' || funcao?.sistema ? acoesDe('edit') : acoesNaArea(funcao?.permissoes as Record<string, unknown> | undefined, area));
-  const access = (area: AreaKey): Access => resumoAcesso(acoes(area));
+  const acoes = (modulo: string): Acao[] => (modulo === 'eu' || funcao?.sistema ? acoesDe('edit') : acoesNaArea(funcao?.permissoes as Record<string, unknown> | undefined, modulo));
+  const access = (modulo: string): Access => resumoAcesso(acoes(modulo));
 
   const value: Session = {
     ready,

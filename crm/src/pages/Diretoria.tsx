@@ -9,7 +9,7 @@ import { useCollection, useResource, type Row } from '../lib/data';
 import { brl, dateBR, daysUntil, isoToday, monthLabel, num, pct } from '../lib/format';
 import { currentMonth, despesaValida, lastMonths, monthName, monthOf, sumBy } from '../lib/finance';
 import { alternarAtalho, atalhoId, TAMANHOS, usePainelPrefs, type PainelChave, type PainelPrefs, type Posicao, type Tamanho } from '../lib/preferencias';
-import { AREAS, findModule } from '../modules';
+import { AREAS, MODULOS, findModule } from '../modules';
 import { useSession } from '../lib/session';
 import { useToqueLongo } from '../lib/toque';
 import type { Kpi } from '../collections';
@@ -82,22 +82,23 @@ interface PainelInfo { chave: PainelChave; titulo: string; descricao: string }
 /** Monta os blocos (indicadores, gráficos, listas) com os dados das áreas que o usuário acessa. */
 function PainelDeBlocos(info: PainelInfo) {
   const { access } = useSession();
-  const can = (a: Parameters<typeof access>[0]) => access(a) !== 'none';
+  // módulo: a própria permissão; área (painéis de um setor inteiro): alguma tela da área liberada
+  const can = (k: string) => access(k) !== 'none' || MODULOS.some((m) => m.area === k && access(m.key) !== 'none');
 
   // só os meses que os gráficos mostram (os 6 últimos); contas em aberto vêm sempre
   const inicioSerie = `${lastMonths(6)[0]}-01`;
-  const receitas = useCollection('receitas', can('fin'), inicioSerie).rows;
-  const despesas = useCollection('despesas', can('fin'), inicioSerie).rows.filter(despesaValida);
-  const colaboradores = useCollection('colaboradores', can('rh')).rows;
-  const estoque = useCollection('estoque', can('dp')).rows;
-  const contratos = useCollection('contratos', can('adm')).rows;
-  const ncs = useCollection('naoconformidades', can('fis')).rows;
-  const qualidade = useCollection('qualidade', can('fis')).rows;
-  const processos = useCollection('trabalhista', can('jur')).rows;
+  const receitas = useCollection('receitas', can('receitas') || can('resultado'), inicioSerie).rows;
+  const despesas = useCollection('despesas', can('despesas') || can('resultado'), inicioSerie).rows.filter(despesaValida);
+  const colaboradores = useCollection('colaboradores', can('colaboradores')).rows;
+  const estoque = useCollection('estoque', can('estoque')).rows;
+  const contratos = useCollection('contratos', can('contratos')).rows;
+  const ncs = useCollection('naoconformidades', can('naoconformidades')).rows;
+  const qualidade = useCollection('qualidade', can('qualidade')).rows;
+  const processos = useCollection('trabalhista', can('trabalhista')).rows;
   // reservas de hoje em diante (pendentes, de hoje e próximas)
-  const reservas = useCollection('reservas', can('atd'), isoToday()).rows;
-  const metas = useCollection('metas', can('dir')).rows;
-  const clientes = useResource<ClienteResumo[]>(can('vnd') || can('mkt') || can('atd') ? '/crm/clientes' : null).data ?? [];
+  const reservas = useCollection('reservas', can('reservas'), isoToday()).rows;
+  const metas = useCollection('metas', can('metas')).rows;
+  const clientes = useResource<ClienteResumo[]>(['clientes', 'reservas', 'consumos', 'resgates', 'recompensas'].some((k) => access(k) !== 'none') ? '/crm/clientes' : null).data ?? [];
 
   const mes = currentMonth();
   const recMes = sumBy(receitas.filter((r) => monthOf(r.data) === mes));
@@ -270,18 +271,18 @@ function PainelDeBlocos(info: PainelInfo) {
   /* ---------- blocos extras (catálogo "Adicionar bloco"): só carregam dados quando o usuário os adiciona ---------- */
   const { prefs } = usePainelPrefs(info.chave);
   const tem = (...ids: string[]) => ids.some((id) => prefs.extras.includes(id));
-  const vendas = can('atd') || can('vnd') || can('mkt');
+  const vendas = ['consumos', 'clientes', 'recompensas'].some((k) => access(k) !== 'none');
   const consumos = useCollection('consumos', vendas && tem('x-vendas-hoje', 'x-ticket-mes', 'x-mais-vendidos'), `${currentMonth()}-01`).rows;
   const resgates = useCollection('resgates', vendas && tem('x-vouchers')).rows;
-  const ferias = useCollection('ferias', can('rh') && tem('x-ausentes', 'x-proximas-ferias')).rows;
+  const ferias = useCollection('ferias', can('ferias') && tem('x-ausentes', 'x-proximas-ferias')).rows;
   const resgatesTop = useCollection('resgates', vendas && tem('x-recompensas-top')).rows;
-  const midias = useCollection('midias', can('mkt') && tem('x-midias')).rows;
-  const criacao = useCollection('criacao', can('mkt') && tem('x-criacao')).rows;
-  const projetos = useCollection('projetos', can('dp') && tem('x-projetos')).rows;
-  const materiais = useCollection('materiais', can('dp') && tem('x-materiais')).rows;
-  const terceirizados = useCollection('terceirizados', can('adm') && tem('x-terceirizados', 'x-custo-terceirizados')).rows;
-  const consultorias = useCollection('consultoria', can('jur') && tem('x-consultorias')).rows;
-  const usuarios = useResource<{ id: string; status: string; ultimoAcesso?: string | null }[]>(can('cfg') && tem('x-usuarios') ? '/crm/usuarios' : null).data ?? [];
+  const midias = useCollection('midias', can('midias') && tem('x-midias')).rows;
+  const criacao = useCollection('criacao', can('criacao') && tem('x-criacao')).rows;
+  const projetos = useCollection('projetos', can('projetos') && tem('x-projetos')).rows;
+  const materiais = useCollection('materiais', can('materiais') && tem('x-materiais')).rows;
+  const terceirizados = useCollection('terceirizados', can('terceirizados') && tem('x-terceirizados', 'x-custo-terceirizados')).rows;
+  const consultorias = useCollection('consultoria', can('consultoria') && tem('x-consultorias')).rows;
+  const usuarios = useResource<{ id: string; status: string; ultimoAcesso?: string | null }[]>(can('usuarios') && tem('x-usuarios') ? '/crm/usuarios' : null).data ?? [];
   const { items: atividades } = useAtividades();
 
   const consumosHoje = consumos.filter((c) => diaDe(c.data) === hoje);
@@ -646,7 +647,7 @@ function PainelPersonalizavel({ blocos: proprios, chave, titulo, descricao }: { 
   // blocos extras só entram depois de adicionados pelo catálogo
   const catalogo = proprios.filter((b) => b.extra);
   const blocos = [
-    ...prefs.atalhos.map(blocoAtalho).filter((b): b is Bloco => !!b && access(findModule(b.atalho!)!.area.key) !== 'none'),
+    ...prefs.atalhos.map(blocoAtalho).filter((b): b is Bloco => !!b && access(findModule(b.atalho!)!.item.perm) !== 'none'),
     ...proprios.filter((b) => !b.extra || prefs.extras.includes(b.id)),
   ];
   const [editando, setEditando] = useState(false);

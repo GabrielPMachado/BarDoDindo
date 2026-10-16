@@ -86,7 +86,7 @@ export function Layout({ children }: { children: ReactNode }) {
       };
     };
     const lista = [opcao('meu painel', 'Meu painel', meuPainel)];
-    if (access('dir') !== 'none') lista.push(opcao('painel executivo', 'Painel executivo', executivo));
+    if (access('painel') !== 'none') lista.push(opcao('painel executivo', 'Painel executivo', executivo));
     return lista;
   };
   const [menu, setMenu] = useState(false);
@@ -145,9 +145,11 @@ export function Layout({ children }: { children: ReactNode }) {
   };
 
   const local = current ? localDe(current.item.path) : null;
+  const temAcesso = (st: Setor) => st.items.some((i) => access(i.perm) !== 'none');
   /** Setor com uma página só vira link direto; com mais, abre e fecha. */
   const setorNav = (st: Setor) => {
-    const ro = access(st.area.key) === 'view' && <span className="nav__ro" title="Somente leitura">leitura</span>;
+    const paginas = st.items.filter((i) => access(i.perm) !== 'none');
+    const ro = paginas.every((i) => access(i.perm) === 'view') && <span className="nav__ro" title="Somente leitura">leitura</span>;
     if (st.items.length === 1) {
       const i = st.items[0];
       return (
@@ -170,14 +172,14 @@ export function Layout({ children }: { children: ReactNode }) {
           {ro}
           <ChevronDown size={13} className={`nav__chev ${sOpen ? '' : 'is-closed'}`} />
         </button>
-        {sOpen && items({ ...st.area, items: st.items.map((i) => ({ ...i, group: undefined })) })}
+        {sOpen && items({ ...st.area, items: paginas.map((i) => ({ ...i, group: undefined })) })}
       </div>
     );
   };
 
   const fixados = pins
     .map((p) => findModule(p))
-    .filter((m): m is NonNullable<typeof m> => !!m && access(m.area.key) !== 'none');
+    .filter((m): m is NonNullable<typeof m> => !!m && access(m.item.perm) !== 'none');
 
   return (
     <div className="shell">
@@ -187,15 +189,16 @@ export function Layout({ children }: { children: ReactNode }) {
         {/* na gaveta (celular/tablet), escolher uma página fecha o menu — inclusive a página em que já se está */}
         <nav className="nav" ref={navRef} onClick={(e) => (e.target as HTMLElement).closest('a, .nav__fixado-go') && setGaveta(false)}>
           {(['eu', 'dir'] as AreaKey[]).map((k) => {
-            const area = AREAS.find((x) => x.key === k)!;
-            if (access(k) === 'none') return null;
+            const todas = AREAS.find((x) => x.key === k)!;
+            const area = { ...todas, items: todas.items.filter((i) => access(i.perm) !== 'none') };
+            if (!area.items.length) return null;
             const gOpen = !!open[`g:${k}`];
             return (
               <div key={k} className="nav__block">
                 <button className={`nav__head nav__head--group ${current?.area.key === k ? 'is-current' : ''}`} onClick={() => flip(`g:${k}`)} aria-expanded={gOpen}>
                   <area.icon size={18} strokeWidth={1.7} />
                   <span>{area.label}</span>
-                  {access(k) === 'view' && <span className="nav__ro" title="Somente leitura">leitura</span>}
+                  {area.items.every((i) => access(i.perm) === 'view') && <span className="nav__ro" title="Somente leitura">leitura</span>}
                   <ChevronDown size={14} className={`nav__chev ${gOpen ? '' : 'is-closed'}`} />
                 </button>
                 {gOpen && items(area)}
@@ -224,9 +227,9 @@ export function Layout({ children }: { children: ReactNode }) {
           })}
 
           {/* III - Departamentos → setores → páginas */}
-          {DEPARTAMENTOS.some((d) => d.setores.some((st) => access(st.area.key) !== 'none')) && <div className="nav__secao">Departamentos</div>}
+          {DEPARTAMENTOS.some((d) => d.setores.some(temAcesso)) && <div className="nav__secao">Departamentos</div>}
           {DEPARTAMENTOS.map((d) => {
-            const setores = d.setores.filter((st) => access(st.area.key) !== 'none');
+            const setores = d.setores.filter(temAcesso);
             if (!setores.length) return null;
             const dOpen = !!open[`d:${d.key}`];
             return (

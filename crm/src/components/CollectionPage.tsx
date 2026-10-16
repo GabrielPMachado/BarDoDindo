@@ -312,7 +312,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
           <EmptyState title="Nenhum resultado">Ajuste a busca ou o filtro.</EmptyState>
         ) : (
           <div className="table-wrap">
-            <table className="table table--cards">
+            <table className={`table table--cards ${selecionados.length ? 'table--selecionando' : ''}`}>
               <thead>
                 <tr>
                   <th className="sel-col">
