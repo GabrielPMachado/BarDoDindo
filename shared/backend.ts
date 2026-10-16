@@ -1327,7 +1327,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
         // a unidade trocada na nota corrige o cadastro (ex.: gin cadastrado em "ml" que é comprado por garrafa)
         if (sinal > 0 && col === 'estoque' && it.unidade && it.unidade !== cur.unidade) patch.unidade = it.unidade;
         if (sinal > 0 && col === 'estoque') Object.assign(patch, { custo: it.valorUnitario, ...(compra.fornecedor ? { fornecedor: compra.fornecedor, fornecedorId: compra.fornecedorId ?? null } : {}) });
-        if (sinal > 0 && col === 'materiais') Object.assign(patch, { valor: it.valorUnitario, aquisicao: compra.data || '' });
+        if (sinal > 0 && col === 'materiais') Object.assign(patch, { valor: it.valorUnitario, aquisicao: compra.data || '', ...(compra.fornecedor ? { fornecedor: compra.fornecedor, fornecedorId: compra.fornecedorId ?? null } : {}) });
         lote.update(doc(db, col, cur.id), patch);
         item = { ...cur, ...patch };
       } else {
@@ -1336,7 +1336,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
         it.itemId = ref.id;
         item = col === 'estoque'
           ? { item: it.nome, categoria: it.categoria || 'Outros', unidade: it.unidade || 'un', locais, quantidade, custo: it.valorUnitario, fornecedor: compra.fornecedor ?? '', fornecedorId: compra.fornecedorId ?? null, criadoEm: t, atualizadoEm: t }
-          : { material: it.nome, tipo: it.tipo || 'Utensílio', locais, quantidade, local: principal, estado: 'Novo', valor: it.valorUnitario, aquisicao: compra.data || '', criadoEm: t, atualizadoEm: t };
+          : { material: it.nome, tipo: it.tipo || 'Utensílio', locais, quantidade, local: principal, estado: 'Novo', valor: it.valorUnitario, aquisicao: compra.data || '', fornecedor: compra.fornecedor ?? '', fornecedorId: compra.fornecedorId ?? null, criadoEm: t, atualizadoEm: t };
         lote.set(ref, item);
         item.id = ref.id;
       }

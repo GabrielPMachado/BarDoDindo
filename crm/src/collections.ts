@@ -4,7 +4,7 @@ import { brl, daysUntil, isoToday, num, pct } from './lib/format';
 import { calcularFicha, fichaDe, precoNormalizado } from './lib/ficha';
 import { locaisDe, resumoLocais } from './lib/locais';
 
-export type FieldType = 'text' | 'textarea' | 'number' | 'money' | 'date' | 'select' | 'email' | 'phone' | 'percent' | 'cnpj' | 'time' | 'ref';
+export type FieldType = 'text' | 'textarea' | 'number' | 'money' | 'date' | 'select' | 'email' | 'phone' | 'percent' | 'cnpj' | 'time' | 'ref' | 'url';
 
 /** Listas que podem ser vinculadas (servidas por /api/crm/referencias/:tipo). */
 export type RefSource = 'pessoas' | 'colaboradores' | 'fornecedores' | 'clientes' | 'insumos' | 'copos' | 'utensilios' | 'materiais';
@@ -31,6 +31,8 @@ export interface Field {
   refKey?: string;
   /** Permite digitar um nome que não está na lista. */
   livre?: boolean;
+  /** Campo de link (url): vira um botão na linha da tabela ("comprar" = carrinho, "site" = site do fornecedor). */
+  acao?: 'comprar' | 'site';
   /** Ao escolher um item, copia outros dados dele (campo do registro → campo do item). */
   fill?: Record<string, string>;
 }
@@ -85,6 +87,8 @@ export interface CollectionDef {
   lancarAoCriar?: boolean;
   /** Quantidade guardada por local (Bar, Depósito…), com botão de transferir entre locais. */
   porLocal?: boolean;
+  /** No cadastro do fornecedor, mostra os itens que temos dele (Estoque, Materiais e Tabela de preços). */
+  itensDoFornecedor?: boolean;
   /** Botão "Preencher com IA" (descrição, ingredientes e perfil da bebida) no cadastro do produto. */
   iaProduto?: boolean;
   /** A ficha técnica vem antes dos outros campos no formulário (tela "Fichas técnicas"). */
@@ -248,6 +252,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'minimo', label: 'Estoque mínimo', type: 'number', decimals: 3, max: 1_000_000 },
       { key: 'custo', label: 'Custo unitário', type: 'money', max: 100_000 },
       { key: 'fornecedor', label: 'Fornecedor', type: 'ref', ref: 'fornecedores', refKey: 'fornecedorId', livre: true, formOnly: true },
+      { key: 'link', label: 'Link para compra', type: 'url', formOnly: true, wide: true, acao: 'comprar', placeholder: 'Cole aqui o link do produto na loja' },
       { key: 'validade', label: 'Validade', type: 'date' },
     ],
     computed: [
@@ -282,6 +287,8 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'estado', label: 'Estado', type: 'select', options: ['Novo', 'Bom', 'Regular', 'Manutenção', 'Descartar'], default: 'Bom' },
       { key: 'valor', label: 'Valor unitário', type: 'money', max: 10_000_000 },
       { key: 'aquisicao', label: 'Aquisição', type: 'date' },
+      { key: 'fornecedor', label: 'Fornecedor', type: 'ref', ref: 'fornecedores', refKey: 'fornecedorId', livre: true, formOnly: true },
+      { key: 'link', label: 'Link para compra', type: 'url', formOnly: true, wide: true, acao: 'comprar', placeholder: 'Cole aqui o link do produto na loja' },
       { key: 'observacoes', label: 'Observações', type: 'textarea', formOnly: true, wide: true },
     ],
     computed: [{ label: 'Locais', format: 'text', get: (r) => resumoLocais(locaisDe(r)) || null }],
@@ -331,6 +338,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'preco', label: 'Preço da embalagem', type: 'money', required: true, min: 0.01, max: 100_000 },
       { key: 'data', label: 'Data da cotação', type: 'date' },
       { key: 'status', label: 'Situação', type: 'select', options: ['Ativo', 'Inativo'], default: 'Ativo' },
+      { key: 'link', label: 'Link do produto no fornecedor', type: 'url', formOnly: true, wide: true, acao: 'comprar', placeholder: 'Cole aqui o link do produto na loja' },
       { key: 'observacoes', label: 'Observações', type: 'textarea', formOnly: true, wide: true, placeholder: 'Prazo de entrega, pedido mínimo, condições de pagamento…' },
     ],
     computed: [
@@ -370,7 +378,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     },
   },
   fornecedores: {
-    id: 'fornecedores', anexos: 'Contratos, catálogos e tabelas de preço', area: 'adm', title: 'Fornecedores', singular: 'fornecedor',
+    id: 'fornecedores', itensDoFornecedor: true, anexos: 'Contratos, catálogos e tabelas de preço', area: 'adm', title: 'Fornecedores', singular: 'fornecedor',
     description: 'Cadastro e avaliação de fornecedores.',
     filterKey: 'categoria', sortKey: 'nome',
     fields: [
@@ -380,6 +388,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'contato', label: 'Contato', type: 'text' },
       { key: 'telefone', label: 'Telefone', type: 'phone' },
       { key: 'email', label: 'E-mail', type: 'email', formOnly: true },
+      { key: 'site', label: 'Site / loja online', type: 'url', formOnly: true, wide: true, acao: 'site', placeholder: 'Ex.: www.distribuidora.com.br' },
       { key: 'prazo', label: 'Prazo de pagamento', type: 'select', options: ['À vista', '7 dias', '14 dias', '21 dias', '28 dias', '30 dias', '45 dias'], formOnly: true },
       { key: 'avaliacao', label: 'Avaliação', type: 'select', options: ['Excelente', 'Bom', 'Regular', 'Ruim'] },
       { key: 'status', label: 'Status', type: 'select', options: ['Ativo', 'Em avaliação', 'Inativo'], default: 'Ativo' },

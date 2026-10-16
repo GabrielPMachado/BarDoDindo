@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2, Inbox, X, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ExternalLink, Inbox, X, XCircle } from 'lucide-react';
+import { linkSeguro } from '../lib/links';
 import { numberSpec, type Field, type Kpi, type Tone } from '../collections';
 import { applyNumberMask, formatNumber, maskCnpj, maskPhone, type NumberSpec } from '../lib/masks';
 import { confirmar, DatePicker, SelectPicker, TimePicker, type ConfirmOptions } from './pickers';
@@ -101,6 +102,20 @@ export function FieldInput({ field, value, onChange, disabled }: {
       return <input {...common} type="email" maxLength={160} value={v} onChange={(e) => onChange(e.target.value)} />;
     case 'phone':
       return <input {...common} type="tel" inputMode="tel" maxLength={15} placeholder="(00) 00000-0000" value={maskPhone(v)} onChange={(e) => onChange(maskPhone(e.target.value))} />;
+    case 'url': {
+      const link = linkSeguro(v);
+      return (
+        <div className="campo-link">
+          <input {...common} type="url" inputMode="url" maxLength={500} value={v} onChange={(e) => onChange(e.target.value)}
+            onBlur={() => { if (link && link !== v) onChange(link); }} />
+          {link && (
+            <a className="btn btn--ghost btn--sm" href={link} target="_blank" rel="noopener noreferrer" title="Abrir o link numa aba nova">
+              <ExternalLink size={14} /> Abrir
+            </a>
+          )}
+        </div>
+      );
+    }
     case 'cnpj':
       return <input {...common} inputMode="numeric" maxLength={18} placeholder="00.000.000/0000-00" value={maskCnpj(v)} onChange={(e) => onChange(maskCnpj(e.target.value))} />;
     default:
