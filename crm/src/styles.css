@@ -1175,3 +1175,16 @@ button.anexos__nome:hover { text-decoration: underline; }
 .itens-forn__valor { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
 .itens-forn__semlink { white-space: nowrap; }
 .itens-forn li a.btn { white-space: nowrap; }
+
+/* arrastar PDF/foto sobre a linha (ou o campo de anexos) anexa direto */
+.toolbar__dica { display: inline-flex; align-items: center; gap: 5px; }
+@media (hover: none) { .toolbar__dica { display: none; } }
+.table tr.is-soltando > td { background: color-mix(in srgb, var(--brand) 16%, transparent) !important; }
+.table tr.is-soltando > td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
+.table tr.is-anexando { opacity: .55; pointer-events: none; }
+.anexos.is-soltando { outline: 2px dashed var(--brand); outline-offset: 6px; border-radius: 10px; background: color-mix(in srgb, var(--brand) 8%, transparent); }
+.solta-aviso {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 90; pointer-events: none;
+  display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 999px;
+  background: var(--brand); color: #fff; font-size: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.35); white-space: nowrap;
+}

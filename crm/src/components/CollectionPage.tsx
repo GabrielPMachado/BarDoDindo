@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type ReactNode, Fragment } from 'react';
+import { useCallback, useMemo, useState, type DragEvent, type ReactNode, Fragment } from 'react';
 import { ArrowDown, ArrowLeftRight, ArrowUp, Camera, ChevronDown, Download, FileSpreadsheet, FileText, Globe, ImageOff, Paperclip, Pencil, Plus, Receipt, Search, Sheet, ShoppingCart, Trash2 } from 'lucide-react';
 import { numberSpec, STATUS_KEYS, termos, toneOf, type CollectionDef, type Computed, type Field } from '../collections';
 import { maskCnpj, maskPhone } from '../lib/masks';
@@ -12,7 +12,8 @@ import { reduzirFoto } from './Avatar';
 import { ContextMenu, type MenuPos } from './ContextMenu';
 import { colunasDe, exportarCsv, exportarExcel, exportarPdf } from '../lib/exportar';
 import { LancarDespesa } from './LancarDespesa';
-import { AnexosCampo, anexosDe, type AnexoNovo } from './Anexos';
+import { AnexosCampo, anexosDe, arrastandoArquivo, lerArquivo, type AnexoNovo } from './Anexos';
+import { ANEXOS_POR_REGISTRO } from '../../../shared/backend';
 import { FichaTecnica } from './FichaTecnica';
 import { LocaisCampo, TransferirModal } from './Locais';
 import { CelulaRapida, editavelNaTabela } from './EdicaoRapida';
@@ -86,6 +87,33 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   const [transferindo, setTransferindo] = useState<Row | null>(null);
 
   const tableFields = def.fields.filter((f) => !f.formOnly);
+
+  /* arrastar um PDF (ou foto) para cima de uma linha anexa direto naquele registro, sem abrir o cadastro */
+  const soltaAnexo = !!def.anexos && canEdit;
+  const [soltandoEm, setSoltandoEm] = useState<Row | null>(null);
+  const [anexandoEm, setAnexandoEm] = useState<string | null>(null);
+  const nomeDe = (r: Row) => String(r[def.fields[0].key] ?? '').trim() || def.singular;
+  const anexarSoltos = async (r: Row, lista: FileList) => {
+    const arquivos = Array.from(lista);
+    if (!arquivos.length) return;
+    const livres = ANEXOS_POR_REGISTRO - anexosDe(r.anexos).length;
+    if (arquivos.length > livres) { notify(`"${nomeDe(r)}" já tem ${anexosDe(r.anexos).length} de ${ANEXOS_POR_REGISTRO} PDFs.`, 'error'); return; }
+    setAnexandoEm(r.id);
+    try {
+      const lidos = await Promise.all(arquivos.map(lerArquivo));
+      // sem a lista `anexos`, o servidor mantém os PDFs que já estavam e soma os novos
+      await col.update(r.id, { anexosNovos: lidos.map(({ nome, dados }) => ({ nome, dados })) } as Partial<Row>);
+      notify(`${lidos.length === 1 ? `"${lidos[0].nome}" anexado` : `${lidos.length} arquivos anexados`} em ${nomeDe(r)}.`);
+    } catch (e) {
+      notify(e instanceof Error ? e.message : 'Não foi possível anexar.', 'error');
+    } finally {
+      setAnexandoEm(null);
+    }
+  };
+  const arrastoNaLinha = (r: Row) => soltaAnexo ? {
+    onDragOver: (e: DragEvent) => { if (!arrastandoArquivo(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; if (soltandoEm?.id !== r.id) setSoltandoEm(r); },
+    onDrop: (e: DragEvent) => { if (!arrastandoArquivo(e)) return; e.preventDefault(); setSoltandoEm(null); void anexarSoltos(r, e.dataTransfer.files); },
+  } : {};
   const campoLink = def.fields.find((f) => f.type === 'url' && f.acao);
   const filterField = def.fields.find((f) => f.key === def.filterKey);
 
@@ -134,7 +162,12 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
     setSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }));
 
   return (
-    <div className="page">
+    <div
+      className="page"
+      onDragOver={soltaAnexo ? (e) => { if (!arrastandoArquivo(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'none'; if (!(e.target as HTMLElement).closest('tr[data-solta]')) setSoltandoEm(null); } : undefined}
+      onDragLeave={soltaAnexo ? (e) => { if (!e.relatedTarget) setSoltandoEm(null); } : undefined}
+      onDrop={soltaAnexo ? (e) => { if (arrastandoArquivo(e)) { e.preventDefault(); setSoltandoEm(null); } } : undefined}
+    >
       <PageHead
         title={def.title}
         description={def.description}
@@ -179,6 +212,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
               {PERIODOS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
             </select>
           )}
+          {soltaAnexo && all.length > 0 && <span className="muted small toolbar__dica"><Paperclip size={13} /> Arraste um PDF ou foto sobre a linha para anexar</span>}
           <span className="muted toolbar__count">{num(rows.length)} {rows.length === 1 ? 'registro' : 'registros'}</span>
         </div>
 
@@ -214,7 +248,10 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
               </thead>
               <tbody>
                 {visible.map((r) => (
-                  <tr key={r.id} className="is-clickable" onClick={() => setEditing(r)} title={canEdit ? 'Clique para editar' : 'Clique para ver os detalhes'}>
+                  <tr
+                    key={r.id} data-solta={soltaAnexo ? '' : undefined} {...arrastoNaLinha(r)}
+                    className={`is-clickable ${soltandoEm?.id === r.id ? 'is-soltando' : ''} ${anexandoEm === r.id ? 'is-anexando' : ''}`}
+                    onClick={() => setEditing(r)} title={canEdit ? 'Clique para editar' : 'Clique para ver os detalhes'}>
                     {def.comFoto && (
                       <td className="foto-col" data-label="Foto">
                         {typeof r.foto === 'string' && r.foto ? <img className="thumb" src={r.foto} alt="" loading="lazy" /> : <span className="thumb thumb--vazio"><ImageOff size={14} /></span>}
@@ -275,6 +312,10 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
           </div>
         )}
       </div>
+
+      {soltandoEm && (
+        <div className="solta-aviso" role="status"><Paperclip size={16} /> Solte para anexar em <b>{nomeDe(soltandoEm)}</b></div>
+      )}
 
       {transferindo && (
         <TransferirModal
