@@ -3,7 +3,7 @@ import { ChevronDown, ExternalLink, Lock, Pencil, Plus, Save, Sparkles, Trash2 }
 import { CARGOS_SUGERIDOS, GRUPOS_DE_PERMISSAO, MODULOS, NIVEIS, acoesDe, acoesNaArea, nivelDe, type Acao, type Modulo } from '../modules';
 import { AsyncButton, Badge, EmptyState, ErrorBox, Loading, Modal, NumberInput, PageHead, notify } from '../components/ui';
 import { api } from '../lib/api';
-import { SelectPicker } from '../components/pickers';
+import { SelectPicker, confirmar } from '../components/pickers';
 import { reload, useCollection, useResource, type Row } from '../lib/data';
 import { useSession, type Config, type Funcao, type Usuario } from '../lib/session';
 
@@ -178,14 +178,35 @@ export function Funcoes() {
   const col = useCollection<Funcao & Row>('funcoes');
   const [editing, setEditing] = useState<Funcao | 'new' | null>(null);
 
-  /** Cria os cargos prontos que ainda não existem (pelo nome); depois cada um pode ser ajustado. */
+  /**
+   * Cria os cargos prontos que faltam e atualiza os que já existem (pelo nome) para as permissões sugeridas,
+   * uma por tela. Atualizar substitui ajustes feitos à mão nesses cargos, por isso pergunta antes.
+   */
   const adicionarSugeridos = async () => {
-    const existentes = new Set(col.rows.map((f) => String(f.nome).trim().toLowerCase()));
-    const faltam = CARGOS_SUGERIDOS.filter((c) => !existentes.has(c.nome.toLowerCase()));
-    if (!faltam.length) { notify('Todos os cargos sugeridos já existem.'); return; }
+    const porNome = new Map(col.rows.map((f) => [String(f.nome).trim().toLowerCase(), f]));
+    const faltam = CARGOS_SUGERIDOS.filter((c) => !porNome.has(c.nome.toLowerCase()));
+    const desatualizados = CARGOS_SUGERIDOS.filter((c) => {
+      const f = porNome.get(c.nome.toLowerCase());
+      return f && !f.sistema && MODULOS.some((m) => JSON.stringify(acoesDaFuncao(f, m.key)) !== JSON.stringify(c.permissoes[m.key] ?? []));
+    });
+    if (!faltam.length && !desatualizados.length) { notify('Os cargos sugeridos já existem e estão atualizados.'); return; }
+    let atualizar = false;
+    if (desatualizados.length) {
+      atualizar = await confirmar({
+        title: `Atualizar ${desatualizados.length} ${desatualizados.length === 1 ? 'cargo' : 'cargos'} que já existe${desatualizados.length === 1 ? '' : 'm'}?`,
+        message: `${desatualizados.map((c) => c.nome).join(', ')} passa${desatualizados.length === 1 ? '' : 'm'} a ter as permissões sugeridas, uma por tela. Ajustes feitos à mão nesses cargos são substituídos.${faltam.length ? ` Os ${faltam.length} que faltam são criados de qualquer jeito.` : ''}`,
+        confirmLabel: 'Atualizar',
+      });
+      if (!atualizar && !faltam.length) return;
+    }
     for (const c of faltam) await api('/crm/c/funcoes', { method: 'POST', body: c });
+    if (atualizar) for (const c of desatualizados) await api(`/crm/c/funcoes/${porNome.get(c.nome.toLowerCase())!.id}`, { method: 'PUT', body: { permissoes: c.permissoes, descricao: c.descricao } });
     await col.reload();
-    notify(`${faltam.length} ${faltam.length === 1 ? 'cargo criado' : 'cargos criados'}. Toque no lápis para ajustar as permissões de cada um.`);
+    await refresh();
+    notify([
+      faltam.length ? `${faltam.length} ${faltam.length === 1 ? 'cargo criado' : 'cargos criados'}` : '',
+      atualizar ? `${desatualizados.length} ${desatualizados.length === 1 ? 'atualizado' : 'atualizados'}` : '',
+    ].filter(Boolean).join(' e ') + '. Toque no lápis para ajustar cada um.');
   };
 
   return (
@@ -195,7 +216,7 @@ export function Funcoes() {
         description="Cada função define, área por área, o nível de acesso: sem acesso, ver, editar (ver, cadastrar e alterar) ou total (também excluir)."
         actions={canCreate && (
           <>
-            <AsyncButton className="btn btn--ghost" onClick={adicionarSugeridos}><Sparkles size={16} /> Adicionar cargos sugeridos</AsyncButton>
+            <AsyncButton className="btn btn--ghost" onClick={adicionarSugeridos}><Sparkles size={16} /> Criar / atualizar cargos sugeridos</AsyncButton>
             <button className="btn btn--primary" onClick={() => setEditing('new')}><Plus size={16} /> Nova função</button>
           </>
         )}

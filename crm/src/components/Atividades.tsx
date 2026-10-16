@@ -17,6 +17,13 @@ export interface Atividade {
   usuarioId: string;
   usuarioNome: string;
   criadoEm: string;
+  /** Histórico detalhado (alterações feitas depois dos Logs de alterações). */
+  registroId?: string;
+  antes?: Record<string, unknown>;
+  depois?: Record<string, unknown>;
+  omitidos?: string[];
+  /** Id da atividade que esta desfez. */
+  desfaz?: string;
 }
 
 // o histórico é gravado por módulo (tela/cadastro); os registros de antes da separação, por área
