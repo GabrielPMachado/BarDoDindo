@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCircle2, Send, Users } from 'lucide-react';
-import { COLLECTIONS } from '../collections';
+import { COLLECTIONS, naturezaDe } from '../collections';
 import { CollectionPage } from '../components/CollectionPage';
 import { BarChart, HBarList } from '../components/Charts';
 import { AsyncButton, EmptyState, ErrorBox, KpiRow, Loading, PageHead, notify } from '../components/ui';
@@ -209,10 +209,19 @@ export function Receitas() {
 }
 
 /* ---------------- Despesas ---------------- */
-export function Despesas() {
+/** Lançamento de despesas (todas) ou as despesas variáveis / invariáveis (fixas) da Contabilidade geral. */
+export function Despesas({ natureza }: { natureza?: 'Fixa' | 'Variável' }) {
+  const def = natureza === 'Fixa'
+    ? { ...COLLECTIONS.despesas, title: 'Despesas invariáveis (fixas)', description: 'Despesas que se repetem todo mês: aluguel, folha, encargos, tarifas… (ou marcadas como fixas).' }
+    : natureza === 'Variável'
+      ? { ...COLLECTIONS.despesas, title: 'Despesas variáveis', description: 'Despesas que mudam com o movimento: fornecedores, manutenção, marketing, impostos… (ou marcadas como variáveis).' }
+      : { ...COLLECTIONS.despesas, title: 'Lançamento de despesas' };
   return (
     <CollectionPage
-      def={COLLECTIONS.despesas}
+      key={natureza ?? 'todas'}
+      def={def}
+      filterRows={natureza ? (r) => naturezaDe(r) === natureza : undefined}
+      newDefaults={natureza ? { natureza } : undefined}
       before={(rows) => {
         const validas = rows.filter(despesaValida);
         const aPagar = validas.filter((r) => r.status === 'A pagar');
@@ -230,7 +239,7 @@ export function Despesas() {
                 },
               ]} />
             )}
-            <LancarFolha />
+            {!natureza && <LancarFolha />}
           </>
         );
       }}
@@ -301,6 +310,112 @@ export function Resultado() {
           ) : (
             <p className="muted pad">Sem lançamentos financeiros.</p>
           )}
+        </section>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Ticket médio (Resultado) ---------------- */
+/** Receitas de venda: tudo, menos "Outras receitas" (rendimentos, reembolsos…). */
+const deVenda = (r: Record<string, unknown>) => r.categoria !== 'Outras receitas';
+
+export function TicketMedio() {
+  const [mes, setMes] = useState(currentMonth());
+  const desde = `${[mes, lastMonths(13)[0]].sort()[0]}-01`;
+  const receitas = useCollection('receitas', true, desde).rows.filter(deVenda);
+  const doMes = receitas.filter((r) => monthOf(r.data) === mes);
+  const ticket = (rows: typeof receitas) => (rows.length ? sumBy(rows) / rows.length : 0);
+  const [a, mm] = mes.split('-').map(Number);
+  const anterior = mm === 1 ? `${a - 1}-12` : `${a}-${String(mm - 1).padStart(2, '0')}`;
+  const tAnt = ticket(receitas.filter((r) => monthOf(r.data) === anterior));
+  const tMes = ticket(doMes);
+  const porGrupo = (key: string) => Object.entries(doMes.reduce<Record<string, typeof receitas>>((a, r) => {
+    const k = String(r[key] || 'Não informado');
+    (a[k] ??= []).push(r);
+    return a;
+  }, {})).map(([label, rows]) => ({ label, value: ticket(rows), qtd: rows.length })).sort((a, b) => b.value - a.value);
+  const serie = lastMonths(12).map((m) => ({ label: monthLabel(m), value: ticket(receitas.filter((r) => monthOf(r.data) === m)) }));
+
+  return (
+    <div className="page">
+      <PageHead
+        title="Ticket médio"
+        description="Valor médio de cada venda lançada nas receitas (sem contar “Outras receitas”). Cada consumo do aplicativo conta como uma venda."
+        actions={<MonthPicker value={mes} onChange={setMes} />}
+      />
+      <KpiRow items={[
+        { label: `Ticket médio · ${monthName(mes)}`, value: brl(tMes), hint: tAnt ? `${tMes >= tAnt ? '+' : ''}${pct(tMes / tAnt - 1)} sobre o mês anterior` : undefined, tone: tAnt ? (tMes >= tAnt ? 'good' : 'bad') : undefined },
+        { label: 'Vendas lançadas', value: num(doMes.length) },
+        { label: 'Faturamento de vendas', value: brl(sumBy(doMes)) },
+      ]} />
+      <div className="grid-2">
+        <section className="panel">
+          <div className="panel__head"><h2>Ticket médio mensal</h2><span className="muted small">Últimos 12 meses</span></div>
+          {serie.some((p) => p.value) ? <BarChart data={serie} format={(v) => brl(v)} ariaLabel="Ticket médio dos últimos doze meses" /> : <p className="muted pad">Sem vendas lançadas.</p>}
+        </section>
+        <section className="panel">
+          <div className="panel__head"><h2>Por canal e forma de pagamento · {monthName(mes)}</h2></div>
+          {doMes.length ? (
+            <table className="table">
+              <tbody>
+                {porGrupo('categoria').map((g) => <tr key={`c${g.label}`}><td>{g.label}</td><td className="num muted">{num(g.qtd)} {g.qtd === 1 ? 'venda' : 'vendas'}</td><td className="num"><b>{brl(g.value)}</b></td></tr>)}
+                <tr><td colSpan={3} className="muted small">Forma de pagamento</td></tr>
+                {porGrupo('formaPagamento').map((g) => <tr key={`f${g.label}`}><td>{g.label}</td><td className="num muted">{num(g.qtd)} {g.qtd === 1 ? 'venda' : 'vendas'}</td><td className="num"><b>{brl(g.value)}</b></td></tr>)}
+              </tbody>
+            </table>
+          ) : <p className="muted pad">Nenhuma venda neste mês.</p>}
+        </section>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Renda diária e mensal (Resultado) ---------------- */
+export function Renda() {
+  const [mes, setMes] = useState(currentMonth());
+  const desde = `${[mes, lastMonths(12)[0]].sort()[0]}-01`;
+  const receitas = useCollection('receitas', true, desde).rows;
+  const doMes = receitas.filter((r) => monthOf(r.data) === mes);
+  const [ano, m] = mes.split('-').map(Number);
+  const diasNoMes = new Date(ano, m, 0).getDate();
+  const porDia = Array.from({ length: diasNoMes }, (_, i) => {
+    const dia = `${mes}-${String(i + 1).padStart(2, '0')}`;
+    return { label: String(i + 1), dia, value: sumBy(doMes.filter((r) => String(r.data) === dia)) };
+  });
+  const comMovimento = porDia.filter((d) => d.value > 0);
+  const melhor = comMovimento.reduce<(typeof porDia)[number] | null>((a, d) => (!a || d.value > a.value ? d : a), null);
+  const total = sumBy(doMes);
+  const serie = lastMonths(12).map((x) => ({ label: monthLabel(x), value: sumBy(receitas.filter((r) => monthOf(r.data) === x)) }));
+  const semana = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'].map((label, i) => {
+    const dias = comMovimento.filter((d) => new Date(`${d.dia}T12:00:00`).getDay() === i);
+    return { label, value: dias.length ? dias.reduce((t, d) => t + d.value, 0) / dias.length : 0 };
+  }).filter((d) => d.value > 0);
+
+  return (
+    <div className="page">
+      <PageHead
+        title="Renda diária e mensal"
+        description="Quanto entrou no caixa por dia e por mês (todas as receitas)."
+        actions={<MonthPicker value={mes} onChange={setMes} />}
+      />
+      <KpiRow items={[
+        { label: `Renda · ${monthName(mes)}`, value: brl(total) },
+        { label: 'Média por dia aberto', value: brl(comMovimento.length ? total / comMovimento.length : 0), hint: `${comMovimento.length} ${comMovimento.length === 1 ? 'dia' : 'dias'} com movimento` },
+        { label: 'Melhor dia', value: melhor ? brl(melhor.value) : '—', hint: melhor ? new Date(`${melhor.dia}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' }) : undefined, tone: melhor ? 'good' : undefined },
+      ]} />
+      <section className="panel">
+        <div className="panel__head"><h2>Renda diária · {monthName(mes)}</h2></div>
+        {comMovimento.length ? <BarChart data={porDia} format={(v) => brl(v).replace(',00', '')} ariaLabel="Renda de cada dia do mês" /> : <p className="muted pad">Nenhuma receita neste mês.</p>}
+      </section>
+      <div className="grid-2">
+        <section className="panel">
+          <div className="panel__head"><h2>Renda mensal</h2><span className="muted small">Últimos 12 meses</span></div>
+          {serie.some((p) => p.value) ? <BarChart data={serie} format={(v) => brl(v).replace(',00', '')} ariaLabel="Renda mensal dos últimos doze meses" /> : <p className="muted pad">Sem receitas lançadas.</p>}
+        </section>
+        <section className="panel">
+          <div className="panel__head"><h2>Média por dia da semana · {monthName(mes)}</h2></div>
+          {semana.length ? <HBarList data={semana} format={brl} /> : <p className="muted pad">Sem movimento neste mês.</p>}
         </section>
       </div>
     </div>

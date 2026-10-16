@@ -40,6 +40,12 @@ const COLLECTIONS: Record<string, string> = {
   trabalhista: 'jur', consultoria: 'jur',
   qualidade: 'fis', naoconformidades: 'fis',
   funcoes: 'cfg',
+  // organização por departamentos (Administrativo, Financeiro, Pessoal, Jurídico e TI)
+  eventos: 'atd', publicidade: 'mkt', atestados: 'fis',
+  acoes: 'fin', creditos: 'fin', docfin: 'fin', investimentos: 'fin',
+  prestadores: 'rh', conduta: 'rh',
+  advogados: 'jur', normas: 'jur',
+  chamados: 'ti', equipamentos: 'ti',
 };
 /** Permissões que uma função marca em cada área. */
 type Acao = 'ver' | 'criar' | 'editar' | 'excluir';
@@ -51,7 +57,7 @@ function acoesDe(p: unknown): Acao[] {
   if (p === 'view') return ['ver'];
   return [];
 }
-const AREAS = ['dir', 'atd', 'vnd', 'mkt', 'rh', 'dp', 'adm', 'fin', 'jur', 'fis', 'mon', 'cfg'];
+const AREAS = ['dir', 'atd', 'vnd', 'mkt', 'rh', 'dp', 'adm', 'fin', 'jur', 'fis', 'mon', 'ti', 'cfg'];
 
 /** Como cada registro é citado no painel de atualizações ("cadastrou o produto …"). */
 const REGISTRO: Record<string, string> = {
@@ -64,11 +70,16 @@ const REGISTRO: Record<string, string> = {
   trabalhista: 'o processo trabalhista', consultoria: 'a demanda de consultoria',
   qualidade: 'a inspeção', naoconformidades: 'a não conformidade',
   funcoes: 'a função',
+  eventos: 'o evento', publicidade: 'a campanha', atestados: 'o atestado',
+  acoes: 'a participação', creditos: 'o crédito', docfin: 'o documento', investimentos: 'o investimento',
+  prestadores: 'o contratado', conduta: 'o manual de conduta',
+  advogados: 'o advogado', normas: 'a norma',
+  chamados: 'o chamado', equipamentos: 'o equipamento',
 };
 /** Nome legível de um registro qualquer, para o painel de atualizações. */
 function nomeDe(d: Dados | null | undefined) {
   if (!d) return '';
-  for (const k of ['nome', 'titulo', 'descricao', 'assunto', 'item', 'servico', 'processo', 'colaborador', 'clienteNome', 'recompensa', 'codigo', 'insumo']) {
+  for (const k of ['nome', 'titulo', 'campanha', 'descricao', 'assunto', 'tema', 'item', 'servico', 'processo', 'colaborador', 'clienteNome', 'recompensa', 'instituicao', 'documento', 'codigo', 'insumo']) {
     const v = d[k];
     if (typeof v === 'string' && v.trim()) return v.trim().slice(0, 120);
   }
@@ -203,6 +214,7 @@ function inssEmpregado(salario: number, faixas: { ate: number; aliquota: number 
 export const COM_ANEXOS = [
   'metas', 'colaboradores', 'ferias', 'projetos', 'materiais', 'compras', 'terceirizados', 'fornecedores', 'contratos',
   'receitas', 'despesas', 'criacao', 'trabalhista', 'consultoria', 'qualidade', 'naoconformidades',
+  'publicidade', 'atestados', 'acoes', 'creditos', 'docfin', 'investimentos', 'prestadores', 'conduta', 'advogados', 'normas', 'equipamentos',
 ];
 export const ANEXO_MAX_BYTES = 5 * 1024 * 1024;
 export const ANEXOS_POR_REGISTRO = 10;
