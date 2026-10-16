@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, type DragEvent, type ReactNode, Fragment } from 'react';
-import { ArrowDown, ArrowLeftRight, ArrowUp, Camera, ChevronDown, Download, FileSpreadsheet, FileText, Globe, ImageOff, Paperclip, Pencil, Plus, Receipt, Search, Sheet, ShoppingCart, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowLeftRight, ArrowUp, Camera, ChevronDown, Download, FileSpreadsheet, FileText, Globe, ImageOff, Paperclip, Pencil, Plus, Receipt, Search, Sheet, ShoppingCart, Trash2, X } from 'lucide-react';
 import { numberSpec, STATUS_KEYS, termos, toneOf, type CollectionDef, type Computed, type Field } from '../collections';
 import { maskCnpj, maskPhone } from '../lib/masks';
 import { useCollection, type Row } from '../lib/data';
@@ -7,7 +7,8 @@ import { brl, dateBR, num, pct } from '../lib/format';
 import { useSession } from '../lib/session';
 import { desdeDe, PERIODO_PADRAO, PERIODOS, type PeriodoKey } from '../lib/periodo';
 import { AsyncButton, Badge, checkRange, EmptyState, ErrorBox, FieldInput, KpiRow, Loading, Modal, PageHead, notify } from './ui';
-import { RefPicker } from './pickers';
+import { confirmar, RefPicker } from './pickers';
+import { api } from '../lib/api';
 import { reduzirFoto } from './Avatar';
 import { ContextMenu, type MenuPos } from './ContextMenu';
 import { colunasDe, exportarCsv, exportarExcel, exportarPdf } from '../lib/exportar';
@@ -152,15 +153,48 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   const pages = Math.max(1, Math.ceil(rows.length / PAGE));
   const visible = rows.slice(page * PAGE, page * PAGE + PAGE);
 
+  /* seleção: marca linhas para exportar só elas ou excluir várias de uma vez */
+  const [sel, setSel] = useState<Set<string>>(() => new Set());
+  const selecionados = rows.filter((r) => sel.has(r.id));
+  const marcar = (id: string, on: boolean) => setSel((x) => { const n = new Set(x); if (on) n.add(id); else n.delete(id); return n; });
+  const todosNaPagina = visible.length > 0 && visible.every((r) => sel.has(r.id));
+  const algunsNaPagina = visible.some((r) => sel.has(r.id));
+  const marcarPagina = (on: boolean) => setSel((x) => { const n = new Set(x); for (const r of visible) { if (on) n.add(r.id); else n.delete(r.id); } return n; });
+  const [excluindo, setExcluindo] = useState(false);
+  const excluirSelecionados = async () => {
+    const alvo = selecionados;
+    if (!alvo.length) return;
+    const ok = await confirmar({
+      title: `Excluir ${alvo.length} ${alvo.length === 1 ? 'registro' : 'registros'}?`,
+      message: alvo.length <= 5
+        ? alvo.map((r) => String(r[def.fields[0].key] ?? '—')).join(', ') + '. Essa ação não pode ser desfeita.'
+        : 'Essa ação não pode ser desfeita.',
+      confirmLabel: 'Excluir', danger: true,
+    });
+    if (!ok) return;
+    setExcluindo(true);
+    let feitos = 0; let erro = '';
+    for (const r of alvo) {
+      try { await api(`/crm/c/${def.id}/${r.id}`, { method: 'DELETE' }); feitos++; marcar(r.id, false); }
+      catch (e) { erro ||= e instanceof Error ? e.message : 'erro'; }
+    }
+    await col.reload();
+    setExcluindo(false);
+    if (erro) notify(`${feitos} de ${alvo.length} excluídos. ${erro}`, 'error');
+    else notify(`${feitos} ${feitos === 1 ? 'registro excluído' : 'registros excluídos'}`);
+  };
+
   const [menuExportar, setMenuExportar] = useState<MenuPos | null>(null);
   const [exportando, setExportando] = useState(false);
+  // com linhas marcadas, exporta só elas; sem nenhuma, a lista toda (com busca e filtros)
+  const paraExportar = () => (selecionados.length ? selecionados : rows);
   const exportar = async (formato: 'pdf' | 'xlsx') => {
     setExportando(true);
     try {
       const colunas = colunasDe(def);
       const arquivo = `${def.id}-${new Date().toISOString().slice(0, 10)}`;
-      if (formato === 'pdf') await exportarPdf(def.title, colunas, rows, arquivo);
-      else await exportarExcel(def.title, colunas, rows, arquivo);
+      if (formato === 'pdf') await exportarPdf(def.title, colunas, paraExportar(), arquivo);
+      else await exportarExcel(def.title, colunas, paraExportar(), arquivo);
     } catch (e) {
       console.error(e);
       notify('Não foi possível gerar o arquivo.', 'error');
@@ -168,7 +202,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
       setExportando(false);
     }
   };
-  const exportCsv = () => exportarCsv(colunasDe(def), rows, `${def.id}-${new Date().toISOString().slice(0, 10)}`);
+  const exportCsv = () => exportarCsv(colunasDe(def), paraExportar(), `${def.id}-${new Date().toISOString().slice(0, 10)}`);
 
   const toggleSort = (key: string) =>
     setSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }));
@@ -176,9 +210,13 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   return (
     <div
       className="page"
-      onDragOver={soltaAnexo ? (e) => { if (!arrastandoArquivo(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'none'; if (!(e.target as HTMLElement).closest('tr[data-solta]')) setSoltandoEm(null); } : undefined}
+      onDragOver={soltaAnexo ? (e) => {
+        // a linha (ou o campo de anexos) já aceitou o arquivo: não desfazer aqui, que recebe o evento depois dela
+        if (!arrastandoArquivo(e) || e.isDefaultPrevented()) return;
+        e.preventDefault(); e.dataTransfer.dropEffect = 'none'; setSoltandoEm(null);
+      } : undefined}
       onDragLeave={soltaAnexo ? (e) => { if (!e.relatedTarget) setSoltandoEm(null); } : undefined}
-      onDrop={soltaAnexo ? (e) => { if (arrastandoArquivo(e)) { e.preventDefault(); setSoltandoEm(null); } } : undefined}
+      onDrop={soltaAnexo ? (e) => { if (arrastandoArquivo(e) && !e.isDefaultPrevented()) { e.preventDefault(); setSoltandoEm(null); } } : undefined}
     >
       <PageHead
         title={def.title}
@@ -189,7 +227,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
               className="btn btn--ghost" disabled={!rows.length || exportando}
               onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMenuExportar({ x: r.left, y: r.bottom + 6 }); }}
             >
-              <Download size={16} /> {exportando ? 'Gerando…' : 'Exportar'} <ChevronDown size={14} />
+              <Download size={16} /> {exportando ? 'Gerando…' : selecionados.length ? `Exportar ${selecionados.length}` : 'Exportar'} <ChevronDown size={14} />
             </button>
             {canCreate && <button className="btn btn--primary" onClick={() => setEditing('new')}><Plus size={16} /> {termos(def).novo}</button>}
           </>
@@ -240,6 +278,26 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
           <span className="muted toolbar__count">{num(rows.length)} {rows.length === 1 ? 'registro' : 'registros'}</span>
         </div>
 
+        {selecionados.length > 0 && (
+          <div className="selecao-barra" role="region" aria-label="Itens selecionados">
+            <b>{selecionados.length} {selecionados.length === 1 ? 'selecionado' : 'selecionados'}</b>
+            {selecionados.length < rows.length && (
+              <button className="btn btn--ghost btn--sm" onClick={() => setSel(new Set(rows.map((r) => r.id)))}>Selecionar todos ({num(rows.length)})</button>
+            )}
+            <span className="selecao-barra__acoes">
+              <button className="btn btn--ghost btn--sm" disabled={exportando} onClick={() => exportar('pdf')}><FileText size={14} /> PDF</button>
+              <button className="btn btn--ghost btn--sm" disabled={exportando} onClick={() => exportar('xlsx')}><FileSpreadsheet size={14} /> Excel</button>
+              <button className="btn btn--ghost btn--sm" onClick={exportCsv}><Sheet size={14} /> CSV</button>
+              {canDelete && (
+                <button className="btn btn--danger btn--sm" disabled={excluindo} onClick={() => void excluirSelecionados()}>
+                  <Trash2 size={14} /> {excluindo ? 'Excluindo…' : 'Excluir'}
+                </button>
+              )}
+              <button className="icon-btn" onClick={() => setSel(new Set())} aria-label="Limpar seleção" title="Limpar seleção"><X size={16} /></button>
+            </span>
+          </div>
+        )}
+
         {col.error && <ErrorBox>{col.error}</ErrorBox>}
         {col.loading ? (
           <Loading />
@@ -257,6 +315,13 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
             <table className="table table--cards">
               <thead>
                 <tr>
+                  <th className="sel-col">
+                    <input
+                      type="checkbox" className="sel-check" aria-label="Selecionar todos desta página"
+                      checked={todosNaPagina} ref={(el) => { if (el) el.indeterminate = algunsNaPagina && !todosNaPagina; }}
+                      onChange={(e) => marcarPagina(e.target.checked)}
+                    />
+                  </th>
                   {def.comFoto && <th className="foto-col">Foto</th>}
                   {tableFields.map((f) => (
                     <th key={f.key} className={['money', 'number', 'percent'].includes(f.type) ? 'num' : ''}>
@@ -274,8 +339,11 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
                 {visible.map((r) => (
                   <tr
                     key={r.id} data-solta={soltaAnexo ? '' : undefined} {...arrastoNaLinha(r)}
-                    className={`is-clickable ${soltandoEm?.id === r.id ? 'is-soltando' : ''} ${anexandoEm === r.id ? 'is-anexando' : ''}`}
+                    className={`is-clickable ${sel.has(r.id) ? 'is-selecionado' : ''} ${soltandoEm?.id === r.id ? 'is-soltando' : ''} ${anexandoEm === r.id ? 'is-anexando' : ''}`}
                     onClick={() => setEditing(r)} title={canEdit ? 'Clique para editar' : 'Clique para ver os detalhes'}>
+                    <td className="sel-col" onClick={(e) => e.stopPropagation()}>
+                      <input type="checkbox" className="sel-check" checked={sel.has(r.id)} onChange={(e) => marcar(r.id, e.target.checked)} aria-label={`Selecionar ${String(r[def.fields[0].key] ?? '')}`} />
+                    </td>
                     {def.comFoto && (
                       <td className="foto-col" data-label="Foto">
                         {typeof r.foto === 'string' && r.foto ? <img className="thumb" src={r.foto} alt="" loading="lazy" /> : <span className="thumb thumb--vazio"><ImageOff size={14} /></span>}
