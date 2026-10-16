@@ -98,6 +98,13 @@ h1, h2, h3, p { margin: 0; }
 .nav__pin { color: var(--brand); flex-shrink: 0; opacity: .8; }
 .nav__link.active .nav__pin { color: var(--on-brand); }
 .nav__link.active { color: var(--on-brand); background: linear-gradient(135deg, var(--brand-light), var(--brand)); font-weight: 600; }
+/* "Departamentos": título da seção, sem clique */
+.nav__secao { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .14em; color: var(--muted); padding: 14px 10px 4px; margin-top: 4px; border-top: 1px solid var(--border); }
+/* setor com uma página só: link direto, no mesmo nível dos setores */
+a.nav__setor-link { color: var(--text); }
+a.nav__setor-link span:nth-child(2) { flex: 1; }
+a.nav__setor-link.active { color: var(--on-brand); background: linear-gradient(135deg, var(--brand-light), var(--brand)); font-weight: 600; }
+a.nav__setor-link.active svg:first-child { color: var(--on-brand); opacity: 1; }
 
 .topbar {
   position: sticky; top: 0; z-index: 20; height: 60px; padding: 0 32px;
@@ -1216,3 +1223,46 @@ button.anexos__nome:hover { text-decoration: underline; }
   .table--cards tbody tr.is-selecionado { background: color-mix(in srgb, var(--brand) 9%, transparent); }
   .table--cards tbody tr.is-selecionado > td, .table--cards tbody tr.is-selecionado > td.actions-col { background: none; }
 }
+.perm-grupo { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--brand-light); padding: 14px 14px 4px; border-top: 1px solid var(--border); }
+.perm-grupo:first-child { border-top: 0; padding-top: 8px; }
+.perm-grupo + .perm { border-top: 0; }
+
+/* ---------- Calendário (Atendimento) ---------- */
+.calendario { padding: 14px 16px 16px; margin-bottom: 18px; }
+.calendario__topo { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.calendario__topo h2 { margin: 0; font-size: 17px; min-width: 170px; text-align: center; }
+.calendario__legenda { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+.ponto { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+.ponto--ev { background: var(--brand); }
+.ponto--rs { background: var(--info, #4c9be8); margin-left: 8px; }
+.calendario__grade { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.calendario__semana { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); text-align: center; padding: 4px 0; }
+.calendario__dia {
+  min-height: 86px; display: flex; flex-direction: column; align-items: stretch; gap: 3px; padding: 6px; text-align: left;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); min-width: 0;
+}
+.calendario__dia:hover { border-color: var(--border-strong); }
+.calendario__dia.is-fora { opacity: .4; }
+.calendario__dia.is-hoje .calendario__n { background: var(--brand); color: var(--on-brand); }
+.calendario__dia.is-sel { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
+.calendario__n { align-self: flex-start; font-size: 12px; font-weight: 600; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px; display: grid; place-items: center; }
+.calendario__ev { font-size: 11px; padding: 2px 5px; border-radius: 4px; background: color-mix(in srgb, var(--brand) 22%, transparent); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.calendario__mais { font-size: 10.5px; color: var(--muted); }
+.calendario__rs { margin-top: auto; font-size: 11px; color: var(--info, #4c9be8); display: inline-flex; align-items: center; gap: 3px; }
+.calendario__detalhe { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+.calendario__detalhe h3 { margin: 0; font-size: 14px; }
+.calendario__item { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 640px) {
+  .calendario { padding: 12px 10px; }
+  .calendario__dia { min-height: 54px; padding: 4px; }
+  .calendario__ev { font-size: 0; height: 6px; padding: 0; }
+  .calendario__legenda { margin-left: 0; width: 100%; }
+}
+
+/* ---------- Leis de referência (Jurídico) ---------- */
+.leis { margin-bottom: 18px; }
+.leis__grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; padding: 0 16px 16px; }
+.leis__item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); color: var(--text); }
+.leis__item:hover { border-color: var(--brand); color: var(--text); }
+.leis__item span { display: flex; flex-direction: column; gap: 2px; }
+.leis__item svg { color: var(--brand); flex-shrink: 0; }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { AppWindow, ChevronDown, LayoutDashboard, Menu, UserRound, Copy, ExternalLink, KeyRound, LogOut, MousePointerClick, Pin, PinOff, X } from 'lucide-react';
-import { GROUPS, findModule, groupOf, type Area } from '../modules';
+import { AREAS, DEPARTAMENTOS, findModule, localDe, type Area, type AreaKey, type Setor } from '../modules';
 import { useSession } from '../lib/session';
 import { useLastSync } from '../lib/data';
 import { usePins } from '../lib/pins';
@@ -98,15 +98,18 @@ export function Layout({ children }: { children: ReactNode }) {
   useEffect(() => setGaveta(false), [pathname]);
   const toqueLongo = useToqueLongo();
 
-  // grupos começam abertos; departamentos começam fechados, exceto o da página atual
-  const [open, setOpen] = useState<Record<string, boolean>>(() => ({ 'g:eu': true, 'g:dir': true, 'g:dep': true, 'g:cfg': true }));
-  const expand = (areaKey: Area['key']) => setOpen((o) => ({ ...o, [`g:${groupOf(areaKey).key}`]: true, [`a:${areaKey}`]: true }));
+  // Meu perfil e Diretoria começam abertos; departamentos e setores, fechados, exceto os da página atual
+  const [open, setOpen] = useState<Record<string, boolean>>(() => ({ 'g:eu': true, 'g:dir': true }));
+  const expand = (path: string) => {
+    const l = localDe(path);
+    setOpen((o) => (l ? { ...o, [`d:${l.departamento.key}`]: true, [`s:${l.setor.key}`]: true } : { ...o, [`g:${findModule(path)?.area.key}`]: true }));
+  };
   useEffect(() => {
     if (!current) return;
-    expand(current.area.key);
+    expand(current.item.path);
     // leva a página atual para a área visível do menu
     requestAnimationFrame(() => navRef.current?.querySelector('.nav__link.active')?.scrollIntoView({ block: 'nearest' }));
-  }, [current?.area.key, current?.item.path]);
+  }, [current?.item.path]);
   const flip = (k: string) => setOpen((o) => ({ ...o, [k]: !o[k] }));
 
   const openMenu = (path: string) => (e: React.MouseEvent) => {
@@ -116,8 +119,7 @@ export function Layout({ children }: { children: ReactNode }) {
   /** Botão direito no computador; toque longo no celular. */
   const menuProps = (path: string) => ({ onContextMenu: openMenu(path), ...toqueLongo((x, y) => setCtx({ x, y, path })) });
   const goPinned = (path: string) => {
-    const m = findModule(path);
-    if (m) expand(m.area.key);
+    expand(path);
     navigate(path);
   };
 
@@ -142,6 +144,37 @@ export function Layout({ children }: { children: ReactNode }) {
     );
   };
 
+  const local = current ? localDe(current.item.path) : null;
+  /** Setor com uma página só vira link direto; com mais, abre e fecha. */
+  const setorNav = (st: Setor) => {
+    const ro = access(st.area.key) === 'view' && <span className="nav__ro" title="Somente leitura">leitura</span>;
+    if (st.items.length === 1) {
+      const i = st.items[0];
+      return (
+        <div key={st.key} className="nav__area">
+          <NavLink to={i.path} end className="nav__head nav__head--dept nav__setor-link" {...menuProps(i.path)}>
+            <st.icon size={16} strokeWidth={1.7} />
+            <span>{st.label}</span>
+            {ro}
+            {isPinned(i.path) && <Pin size={12} className="nav__pin" aria-label="Fixado" />}
+          </NavLink>
+        </div>
+      );
+    }
+    const sOpen = !!open[`s:${st.key}`];
+    return (
+      <div key={st.key} className="nav__area">
+        <button className={`nav__head nav__head--dept ${local?.setor.key === st.key ? 'is-current' : ''}`} onClick={() => flip(`s:${st.key}`)} aria-expanded={sOpen}>
+          <st.icon size={16} strokeWidth={1.7} />
+          <span>{st.label}</span>
+          {ro}
+          <ChevronDown size={13} className={`nav__chev ${sOpen ? '' : 'is-closed'}`} />
+        </button>
+        {sOpen && items({ ...st.area, items: st.items.map((i) => ({ ...i, group: undefined })) })}
+      </div>
+    );
+  };
+
   const fixados = pins
     .map((p) => findModule(p))
     .filter((m): m is NonNullable<typeof m> => !!m && access(m.area.key) !== 'none');
@@ -153,60 +186,57 @@ export function Layout({ children }: { children: ReactNode }) {
         <Brand />
         {/* na gaveta (celular/tablet), escolher uma página fecha o menu — inclusive a página em que já se está */}
         <nav className="nav" ref={navRef} onClick={(e) => (e.target as HTMLElement).closest('a, .nav__fixado-go') && setGaveta(false)}>
-          {GROUPS.map((g) => {
-            const areas = g.areas.filter((a) => access(a.key) !== 'none');
-            if (!areas.length) return null;
-            const gOpen = !!open[`g:${g.key}`];
-            const isCurrent = current && groupOf(current.area.key).key === g.key;
+          {(['eu', 'dir'] as AreaKey[]).map((k) => {
+            const area = AREAS.find((x) => x.key === k)!;
+            if (access(k) === 'none') return null;
+            const gOpen = !!open[`g:${k}`];
             return (
-              <div key={g.key} className="nav__block">
-                <button className={`nav__head nav__head--group ${isCurrent ? 'is-current' : ''}`} onClick={() => flip(`g:${g.key}`)} aria-expanded={gOpen}>
-                  <g.icon size={18} strokeWidth={1.7} />
-                  <span>{g.label}</span>
-                  {g.single && access(g.single) === 'view' && <span className="nav__ro" title="Somente leitura">leitura</span>}
+              <div key={k} className="nav__block">
+                <button className={`nav__head nav__head--group ${current?.area.key === k ? 'is-current' : ''}`} onClick={() => flip(`g:${k}`)} aria-expanded={gOpen}>
+                  <area.icon size={18} strokeWidth={1.7} />
+                  <span>{area.label}</span>
+                  {access(k) === 'view' && <span className="nav__ro" title="Somente leitura">leitura</span>}
                   <ChevronDown size={14} className={`nav__chev ${gOpen ? '' : 'is-closed'}`} />
                 </button>
-                {gOpen && g.key === 'eu' && (
-                  <>
-                    {items(areas[0])}
-                    {/* páginas fixadas (botão direito ou toque longo sobre uma página → Fixar) */}
-                    <div className="nav__items nav__fixados">
-                      <div className="nav__group"><Pin size={11} /> Fixados</div>
-                      {fixados.length ? fixados.map((m) => (
-                        <div key={m.item.path} className={`nav__fixado ${current?.item.path === m.item.path ? 'is-current' : ''}`} title={`${m.area.label} · ${m.item.label}`}>
-                          <button className="nav__fixado-go" onClick={() => goPinned(m.item.path)} {...menuProps(m.item.path)}>
-                            <m.area.icon size={14} strokeWidth={1.8} />
-                            <span>{m.item.label}</span>
-                          </button>
-                          <button className="nav__fixado-x" onClick={() => unpin(m.item.path)} aria-label={`Desafixar ${m.item.label}`} title="Desafixar"><X size={12} /></button>
-                        </div>
-                      )) : (
-                        <p className="nav__fixados-dica">
-                          <span className="pins__hint-desktop">Clique com o botão direito em uma página do menu e escolha “Fixar”.</span>
-                          <span className="pins__hint-touch">Segure o dedo sobre uma página do menu e escolha “Fixar”.</span>
-                        </p>
-                      )}
-                    </div>
-                  </>
-                )}
-                {gOpen && g.key !== 'eu' && (g.single ? items(areas[0]) : (
-                  <div className="nav__depts">
-                    {areas.map((a) => {
-                      const aOpen = !!open[`a:${a.key}`];
-                      return (
-                        <div key={a.key} className="nav__area">
-                          <button className={`nav__head nav__head--dept ${current?.area.key === a.key ? 'is-current' : ''}`} onClick={() => flip(`a:${a.key}`)} aria-expanded={aOpen}>
-                            <a.icon size={16} strokeWidth={1.7} />
-                            <span>{a.label}</span>
-                            {access(a.key) === 'view' && <span className="nav__ro" title="Somente leitura">leitura</span>}
-                            <ChevronDown size={13} className={`nav__chev ${aOpen ? '' : 'is-closed'}`} />
-                          </button>
-                          {aOpen && items(a)}
-                        </div>
-                      );
-                    })}
+                {gOpen && items(area)}
+                {gOpen && k === 'eu' && (
+                  /* páginas fixadas (botão direito ou toque longo sobre uma página → Fixar) */
+                  <div className="nav__items nav__fixados">
+                    <div className="nav__group"><Pin size={11} /> Fixados</div>
+                    {fixados.length ? fixados.map((m) => (
+                      <div key={m.item.path} className={`nav__fixado ${current?.item.path === m.item.path ? 'is-current' : ''}`} title={`${m.area.label} · ${m.item.label}`}>
+                        <button className="nav__fixado-go" onClick={() => goPinned(m.item.path)} {...menuProps(m.item.path)}>
+                          <m.area.icon size={14} strokeWidth={1.8} />
+                          <span>{m.item.label}</span>
+                        </button>
+                        <button className="nav__fixado-x" onClick={() => unpin(m.item.path)} aria-label={`Desafixar ${m.item.label}`} title="Desafixar"><X size={12} /></button>
+                      </div>
+                    )) : (
+                      <p className="nav__fixados-dica">
+                        <span className="pins__hint-desktop">Clique com o botão direito em uma página do menu e escolha “Fixar”.</span>
+                        <span className="pins__hint-touch">Segure o dedo sobre uma página do menu e escolha “Fixar”.</span>
+                      </p>
+                    )}
                   </div>
-                ))}
+                )}
+              </div>
+            );
+          })}
+
+          {/* III - Departamentos → setores → páginas */}
+          {DEPARTAMENTOS.some((d) => d.setores.some((st) => access(st.area.key) !== 'none')) && <div className="nav__secao">Departamentos</div>}
+          {DEPARTAMENTOS.map((d) => {
+            const setores = d.setores.filter((st) => access(st.area.key) !== 'none');
+            if (!setores.length) return null;
+            const dOpen = !!open[`d:${d.key}`];
+            return (
+              <div key={d.key} className="nav__block">
+                <button className={`nav__head nav__head--group ${local?.departamento.key === d.key ? 'is-current' : ''}`} onClick={() => flip(`d:${d.key}`)} aria-expanded={dOpen}>
+                  <d.icon size={18} strokeWidth={1.7} />
+                  <span>{d.label}</span>
+                  <ChevronDown size={14} className={`nav__chev ${dOpen ? '' : 'is-closed'}`} />
+                </button>
+                {dOpen && <div className="nav__depts">{setores.map(setorNav)}</div>}
               </div>
             );
           })}
@@ -222,13 +252,17 @@ export function Layout({ children }: { children: ReactNode }) {
               <>
                 <span className="crumbs__root">Cérebro</span>
                 <span className="crumbs__sep">/</span>
-                <span className="crumbs__mid">{groupOf(current.area.key).label}</span>
-                {!groupOf(current.area.key).single && (
+                {local ? (
                   <>
-                    <span className="crumbs__sep">/</span>
-                    <span className="crumbs__mid">{current.area.label}</span>
+                    <span className="crumbs__mid">{local.departamento.label}</span>
+                    {local.setor.items.length > 1 && (
+                      <>
+                        <span className="crumbs__sep">/</span>
+                        <span className="crumbs__mid">{local.setor.label}</span>
+                      </>
+                    )}
                   </>
-                )}
+                ) : <span className="crumbs__mid">{current.area.label}</span>}
                 <span className="crumbs__sep">/</span>
                 <strong className="crumbs__page">{current.item.label}</strong>
               </>

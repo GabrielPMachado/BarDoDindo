@@ -13,7 +13,10 @@ import { EmptyState, Toasts } from './components/ui';
 import { ConfirmHost } from './components/pickers';
 import Login from './pages/Login';
 import Diretoria, { MeuPainel } from './pages/Diretoria';
-import { Despesas, Folha, Receitas, Resultado } from './pages/Financeiro';
+import { Despesas, Folha, Receitas, Renda, Resultado, TicketMedio } from './pages/Financeiro';
+import Calendario from './pages/Calendario';
+import Logs from './pages/Logs';
+import { Advogados, Leis, Normas } from './pages/Juridico';
 import Monitoramento from './pages/Monitoramento';
 import { Clientes, Consumo, Reservas, Resgates } from './pages/Vendas';
 import { Funcoes, Parametros, Usuarios } from './pages/Config';
@@ -26,7 +29,14 @@ vigiarNovaVersao();
 const GENERIC: Record<string, string> = {
   '/diretoria/metas': 'metas',
   '/rh/colaboradores': 'colaboradores',
-  '/rh/ferias': 'ferias',
+  '/rh/conduta': 'conduta',
+  '/marketing/publicidade': 'publicidade',
+  '/fiscalizacao/atestados': 'atestados',
+  '/financeiro/acoes': 'acoes',
+  '/financeiro/credito': 'creditos',
+  '/financeiro/investimentos': 'investimentos',
+  '/ti/chamados': 'chamados',
+  '/ti/equipamentos': 'equipamentos',
   '/estrutura/projetos': 'projetos',
   '/estrutura/estoque': 'estoque',
   '/estrutura/materiais': 'materiais',
@@ -46,7 +56,37 @@ const GENERIC: Record<string, string> = {
   '/fiscalizacao/nao-conformidades': 'naoconformidades',
 };
 
+/** A mesma lista vista por partes (ex.: só as férias, só os prestadores pessoa física). */
+function Parte({ col, titulo, descricao, campo, valores, fora }: { col: string; titulo: string; descricao?: string; campo: string; valores: string[]; fora?: boolean }) {
+  const def = { ...COLLECTIONS[col], title: titulo, description: descricao ?? COLLECTIONS[col].description };
+  return (
+    <CollectionPage
+      key={titulo} def={def}
+      filterRows={(r) => valores.includes(String(r[campo] ?? '')) !== !!fora}
+      newDefaults={fora ? undefined : { [campo]: valores[0] }}
+    />
+  );
+}
+
 const CUSTOM: Record<string, () => ReactNode> = {
+  '/atendimento/calendario': () => <Calendario />,
+  '/financeiro/despesas/variaveis': () => <Despesas natureza="Variável" />,
+  '/financeiro/despesas/fixas': () => <Despesas natureza="Fixa" />,
+  '/financeiro/ticket-medio': () => <TicketMedio />,
+  '/financeiro/renda': () => <Renda />,
+  '/financeiro/documentos': () => <Parte col="docfin" titulo="Contratos onerosos e títulos" campo="tipo" valores={['Relatório']} fora />,
+  '/financeiro/relatorios': () => <Parte col="docfin" titulo="Relatórios" descricao="Relatórios financeiros, balancetes e prestações de contas (PDF)." campo="tipo" valores={['Relatório']} />,
+  '/rh/prestadores/pf': () => <Parte col="prestadores" titulo="Pessoas físicas contratadas" descricao="Freelas, músicos, seguranças e outros profissionais autônomos que prestam serviço à casa." campo="tipo" valores={['Pessoa física']} />,
+  '/rh/prestadores/pj': () => <Parte col="prestadores" titulo="Pessoas jurídicas contratadas" descricao="Empresas contratadas para serviços de pessoal: contabilidade, segurança, limpeza, eventos…" campo="tipo" valores={['Pessoa jurídica']} />,
+  '/rh/ferias': () => <Parte col="ferias" titulo="Férias" descricao="Programação de férias da equipe." campo="tipo" valores={['Férias']} />,
+  '/rh/afastamentos': () => <Parte col="ferias" titulo="Atestados, faltas e afastamentos" descricao="Atestados médicos, faltas, licenças e afastamentos." campo="tipo" valores={['Férias']} fora />,
+  '/juridico/advogados/consultoria': () => <Advogados atuacao="Consultoria jurídica" />,
+  '/juridico/advogados/trabalhista': () => <Advogados atuacao="Trabalhista e Tributário" />,
+  '/juridico/advogados/empresarial': () => <Advogados atuacao="Empresarial" />,
+  '/juridico/normas/trabalhista': () => <Normas tipo="trabalhista" />,
+  '/juridico/normas/empresarial': () => <Normas tipo="empresarial" />,
+  '/juridico/leis': () => <Leis />,
+  '/ti/logs': () => <Logs />,
   '/perfil': () => <MeuPerfil />,
   '/perfil/painel': () => <MeuPainel />,
   '/diretoria': () => <Diretoria />,

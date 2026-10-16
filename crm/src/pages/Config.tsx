@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { ExternalLink, Lock, Pencil, Plus, Save, Sparkles, Trash2 } from 'lucide-react';
-import { AREAS_COM_PERMISSAO as AREAS, NIVEIS, acoesDe, acoesNaArea, nivelDe, type Acao, type AreaKey } from '../modules';
+import { AREAS_COM_PERMISSAO as AREAS, CARGOS_SUGERIDOS, DEPARTAMENTOS, NIVEIS, acoesDe, acoesNaArea, nivelDe, type Acao, type AreaKey } from '../modules';
 import { AsyncButton, Badge, EmptyState, ErrorBox, Loading, Modal, NumberInput, PageHead, notify } from '../components/ui';
 import { api } from '../lib/api';
 import { SelectPicker } from '../components/pickers';
@@ -164,6 +164,13 @@ function UsuarioForm({ user, funcoes, isSelf, canDelete, onClose }: {
 }
 
 /* ---------------- Funções e permissões ---------------- */
+/** Título do grupo antes da primeira área de cada departamento (na tela de permissões). */
+function cabecalhoDe(area: AreaKey) {
+  if (area === 'dir') return 'Diretoria';
+  const d = DEPARTAMENTOS.find((x) => x.setores[0]?.area.key === area);
+  return d ? `Departamento ${d.label}` : null;
+}
+
 export function Funcoes() {
   const { pode, refresh } = useSession();
   const canCreate = pode('cfg', 'criar');
@@ -172,12 +179,27 @@ export function Funcoes() {
   const col = useCollection<Funcao & Row>('funcoes');
   const [editing, setEditing] = useState<Funcao | 'new' | null>(null);
 
+  /** Cria os cargos prontos que ainda não existem (pelo nome); depois cada um pode ser ajustado. */
+  const adicionarSugeridos = async () => {
+    const existentes = new Set(col.rows.map((f) => String(f.nome).trim().toLowerCase()));
+    const faltam = CARGOS_SUGERIDOS.filter((c) => !existentes.has(c.nome.toLowerCase()));
+    if (!faltam.length) { notify('Todos os cargos sugeridos já existem.'); return; }
+    for (const c of faltam) await api('/crm/c/funcoes', { method: 'POST', body: c });
+    await col.reload();
+    notify(`${faltam.length} ${faltam.length === 1 ? 'cargo criado' : 'cargos criados'}. Toque no lápis para ajustar as permissões de cada um.`);
+  };
+
   return (
     <div className="page">
       <PageHead
         title="Funções e permissões"
         description="Cada função define, área por área, o nível de acesso: sem acesso, ver, editar (ver, cadastrar e alterar) ou total (também excluir)."
-        actions={canCreate && <button className="btn btn--primary" onClick={() => setEditing('new')}><Plus size={16} /> Nova função</button>}
+        actions={canCreate && (
+          <>
+            <AsyncButton className="btn btn--ghost" onClick={adicionarSugeridos}><Sparkles size={16} /> Adicionar cargos sugeridos</AsyncButton>
+            <button className="btn btn--primary" onClick={() => setEditing('new')}><Plus size={16} /> Nova função</button>
+          </>
+        )}
       />
       <div className="panel">
         {col.loading ? <Loading /> : (
@@ -290,7 +312,9 @@ function FuncaoForm({ funcao, onClose, onSave, onDelete }: {
           <p className="muted small">Ver: abrir e consultar · Editar: ver, cadastrar e alterar · Total: editar e também excluir (inclui estornos).</p>
           <div className="perm-list">
             {AREAS.map((a) => (
-              <div key={a.key} className="perm">
+              <Fragment key={a.key}>
+              {cabecalhoDe(a.key) && <div className="perm-grupo">{cabecalhoDe(a.key)}</div>}
+              <div className="perm">
                 <a.icon size={18} className="gold" />
                 <div className="perm__text"><strong>{a.label}</strong><span className="muted small">{a.description}</span></div>
                 <div className="segmented" role="radiogroup" aria-label={`Acesso em ${a.label}`}>
@@ -305,6 +329,7 @@ function FuncaoForm({ funcao, onClose, onSave, onDelete }: {
                   })}
                 </div>
               </div>
+              </Fragment>
             ))}
           </div>
         </div>

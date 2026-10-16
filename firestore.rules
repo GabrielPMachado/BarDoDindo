@@ -49,7 +49,12 @@ service cloud.firestore {
         'criacao': 'mkt', 'midias': 'mkt', 'recompensas': 'mkt',
         'produtos': 'vnd', 'guarnicoes': 'vnd',
         'trabalhista': 'jur', 'consultoria': 'jur',
-        'qualidade': 'fis', 'naoconformidades': 'fis'
+        'qualidade': 'fis', 'naoconformidades': 'fis',
+        'eventos': 'atd', 'publicidade': 'mkt', 'atestados': 'fis',
+        'acoes': 'fin', 'creditos': 'fin', 'docfin': 'fin', 'investimentos': 'fin',
+        'prestadores': 'rh', 'conduta': 'rh',
+        'advogados': 'jur', 'normas': 'jur',
+        'chamados': 'ti', 'equipamentos': 'ti'
       };
     }
     match /{col}/{id} {
@@ -226,7 +231,8 @@ service cloud.firestore {
     // Vale a permissão da área do cadastro de origem: quem vê o cadastro abre o PDF; quem cria ou edita anexa.
     function colecoesComAnexo() {
       return ['metas', 'colaboradores', 'ferias', 'projetos', 'materiais', 'compras', 'terceirizados', 'fornecedores', 'contratos',
-        'receitas', 'despesas', 'criacao', 'trabalhista', 'consultoria', 'qualidade', 'naoconformidades'];
+        'receitas', 'despesas', 'criacao', 'trabalhista', 'consultoria', 'qualidade', 'naoconformidades',
+        'publicidade', 'atestados', 'acoes', 'creditos', 'docfin', 'investimentos', 'prestadores', 'conduta', 'advogados', 'normas', 'equipamentos'];
     }
     function anexaEm(col) { return col in colecoesComAnexo() && (pode(areas()[col], 'criar') || pode(areas()[col], 'editar')); }
     // apaga quem edita ou exclui na área, ou quem enviou o arquivo (desfaz um envio quando o registro não chega a ser gravado)

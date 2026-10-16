@@ -7,7 +7,7 @@ import { useSession } from '../lib/session';
 import { initials } from '../lib/format';
 import { Modal } from './ui';
 
-interface Atividade {
+export interface Atividade {
   id: string;
   area: AreaKey;
   acao: string;
@@ -19,8 +19,8 @@ interface Atividade {
   criadoEm: string;
 }
 
-const areaLabel = (k: string) => AREAS.find((a) => a.key === k)?.label ?? k;
-const pageOf = (a: Atividade) => (a.colecao && COLLECTION_PAGE[a.colecao]) || AREAS.find((x) => x.key === a.area)?.items[0]?.path;
+export const areaLabel = (k: string) => AREAS.find((a) => a.key === k)?.label ?? k;
+export const pageOf = (a: Atividade) => (a.colecao && COLLECTION_PAGE[a.colecao]) || AREAS.find((x) => x.key === a.area)?.items[0]?.path;
 const hora = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
 function diaLabel(iso: string) {

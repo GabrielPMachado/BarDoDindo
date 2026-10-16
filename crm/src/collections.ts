@@ -113,11 +113,15 @@ const juntar = (...partes: unknown[]) => partes.map(s).filter(Boolean).join(' ·
 /** Categoria de despesa sugerida para cada tipo de contrato. */
 const CATEGORIA_DO_CONTRATO: Record<string, string> = { Locação: 'Aluguel', 'Prestação de serviço': 'Terceirizados', Fornecimento: 'Fornecedores' };
 
+/** Despesas invariáveis (fixas): as que se repetem todo mês no mesmo valor. Sem a natureza marcada, vale a categoria. */
+const CATEGORIAS_FIXAS = ['Folha de pagamento', 'Encargos', 'Aluguel', 'Tarifas bancárias'];
+export const naturezaDe = (r: Row) => (r.natureza === 'Fixa' || r.natureza === 'Variável' ? s(r.natureza) : CATEGORIAS_FIXAS.includes(s(r.categoria)) ? 'Fixa' : 'Variável');
+
 /** Tons de status reconhecidos em todos os módulos. */
 const TONES: Record<string, Tone> = {
   Ativo: 'good', Ativa: 'good', Concluído: 'good', Concluída: 'good', Pago: 'good', Aprovado: 'good', Conforme: 'good',
   Vigente: 'good', Publicado: 'good', Confirmada: 'good', Resolvida: 'good', 'Encerrado (favorável)': 'good', Utilizado: 'good',
-  Bom: 'good', Novo: 'good', Disponível: 'info',
+  Bom: 'good', Novo: 'good', Disponível: 'info', Confirmado: 'good', Realizado: 'good', Quitado: 'good', 'Vence em 30 dias': 'warn', 'Sem validade': 'neutral',
   Pendente: 'warn', 'Em andamento': 'warn', 'Em análise': 'warn', Agendado: 'warn', 'Em produção': 'warn', 'Em aprovação': 'warn',
   'A pagar': 'warn', 'Em renovação': 'warn', 'Conforme com ressalvas': 'warn', 'Em tratamento': 'warn', Férias: 'info',
   Afastado: 'warn', Planejado: 'info', Briefing: 'info', Rascunho: 'neutral', Pausado: 'neutral', Regular: 'warn',
@@ -185,7 +189,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     filterKey: 'tipo', sortKey: 'inicio',
     fields: [
       { key: 'colaborador', label: 'Colaborador', type: 'ref', ref: 'colaboradores', refKey: 'colaboradorId', required: true },
-      { key: 'tipo', label: 'Tipo', type: 'select', options: ['Férias', 'Atestado médico', 'Licença maternidade', 'Licença paternidade', 'Afastamento INSS', 'Outro'], required: true },
+      { key: 'tipo', label: 'Tipo', type: 'select', options: ['Férias', 'Atestado médico', 'Falta', 'Falta justificada', 'Licença maternidade', 'Licença paternidade', 'Afastamento INSS', 'Outro'], required: true },
       { key: 'inicio', label: 'Início', type: 'date', required: true },
       { key: 'fim', label: 'Término', type: 'date', required: true },
       { key: 'status', label: 'Status', type: 'select', options: ['Agendado', 'Em andamento', 'Concluído', 'Cancelado'], default: 'Agendado' },
@@ -462,6 +466,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     fields: [
       { key: 'descricao', label: 'Descrição', type: 'text', required: true, wide: true },
       { key: 'categoria', label: 'Categoria', type: 'select', options: ['Fornecedores', 'Folha de pagamento', 'Encargos', 'Aluguel', 'Energia e água', 'Impostos', 'Terceirizados', 'Marketing', 'Manutenção', 'Tarifas bancárias', 'Outras despesas'], required: true },
+      { key: 'natureza', label: 'Natureza (fixa ou variável)', type: 'select', options: ['Variável', 'Fixa'], formOnly: true },
       { key: 'data', label: 'Competência', type: 'date', required: true },
       { key: 'vencimento', label: 'Vencimento', type: 'date' },
       { key: 'valor', label: 'Valor', type: 'money', required: true, min: 0.01, max: 1_000_000 },
@@ -469,6 +474,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'observacoes', label: 'Observações', type: 'textarea', formOnly: true, wide: true },
     ],
     computed: [
+      { label: 'Natureza', format: 'text', get: (r) => naturezaDe(r) },
       {
         label: 'Situação', format: 'badge',
         get: (r) => (r.status === 'A pagar' && daysUntil(r.vencimento) < 0 ? 'Vencido' : s(r.status)),
@@ -624,7 +630,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
 
   /* ---------------- Jurídico ---------------- */
   trabalhista: {
-    id: 'trabalhista', anexos: 'Peças do processo e documentos', area: 'jur', title: 'Trabalhista', singular: 'processo',
+    id: 'trabalhista', anexos: 'Peças do processo e documentos', area: 'jur', title: 'Processos trabalhistas', singular: 'processo',
     description: 'Reclamações trabalhistas, audiências e valores envolvidos.',
     filterKey: 'status', sortKey: 'audiencia', sortDir: 'asc',
     fields: [
@@ -648,7 +654,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     },
   },
   consultoria: {
-    id: 'consultoria', anexos: 'Pareceres e relatórios', feminino: true, area: 'jur', title: 'Consultoria empresarial', singular: 'demanda',
+    id: 'consultoria', anexos: 'Pareceres e relatórios', feminino: true, area: 'jur', title: 'Demandas de consultoria', singular: 'demanda',
     description: 'Pareceres, revisões contratuais, licenças e questões societárias.',
     filterKey: 'tipo', sortKey: 'prazo', sortDir: 'asc',
     fields: [
@@ -712,6 +718,265 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
         { label: 'Prazo vencido', value: num(abertas.filter((r) => daysUntil(r.prazo) < 0).length), tone: 'bad' },
       ];
     },
+  },
+
+  /* ---------------- Atendimento: eventos do calendário ---------------- */
+  eventos: {
+    id: 'eventos', area: 'atd', title: 'Calendário', singular: 'evento',
+    description: 'Shows, festas, jogos e eventos fechados. O calendário junta os eventos com as reservas.',
+    filterKey: 'tipo', sortKey: 'data', sortDir: 'asc',
+    fields: [
+      { key: 'titulo', label: 'Evento', type: 'text', required: true, wide: true, placeholder: 'Ex.: Samba de sexta' },
+      { key: 'tipo', label: 'Tipo', type: 'select', options: ['Show', 'Festa', 'Jogo / transmissão', 'Evento fechado', 'Degustação', 'Feriado', 'Outro'], required: true },
+      { key: 'data', label: 'Data', type: 'date', required: true },
+      { key: 'horario', label: 'Horário', type: 'time' },
+      { key: 'responsavel', label: 'Responsável', type: 'ref', ref: 'pessoas', refKey: 'responsavelId', livre: true, formOnly: true },
+      { key: 'publico', label: 'Público esperado', type: 'number', max: 10_000 },
+      { key: 'status', label: 'Status', type: 'select', options: ['Planejado', 'Confirmado', 'Realizado', 'Cancelado'], default: 'Planejado' },
+      { key: 'descricao', label: 'Detalhes', type: 'textarea', formOnly: true, wide: true },
+    ],
+  },
+
+  /* ---------------- Marketing: publicidade e propaganda ---------------- */
+  publicidade: {
+    id: 'publicidade', anexos: 'Peças, orçamentos e relatórios', feminino: true, area: 'mkt', title: 'Publicidade e propaganda', singular: 'campanha',
+    description: 'Campanhas pagas e ações de divulgação: canal, período, investimento e resultado.',
+    filterKey: 'status', filtros: ['canal'], sortKey: 'inicio', sortDir: 'desc',
+    despesa: (r) => ({ descricao: juntar('Publicidade', r.campanha, r.canal), categoria: 'Marketing', valor: n(r.investimento) }),
+    fields: [
+      { key: 'campanha', label: 'Campanha', type: 'text', required: true, wide: true },
+      { key: 'canal', label: 'Canal', type: 'select', options: ['Instagram / Facebook Ads', 'Google Ads', 'TikTok', 'Influenciador', 'Panfletos e cartazes', 'Rádio', 'Parceria', 'Outro'], required: true },
+      { key: 'inicio', label: 'Início', type: 'date', required: true },
+      { key: 'fim', label: 'Término', type: 'date' },
+      { key: 'investimento', label: 'Investimento', type: 'money', max: 1_000_000 },
+      { key: 'alcance', label: 'Alcance / impressões', type: 'number', max: 100_000_000 },
+      { key: 'status', label: 'Status', type: 'select', options: ['Planejado', 'Em andamento', 'Concluída', 'Cancelada'], default: 'Planejado' },
+      { key: 'resultado', label: 'Resultado', type: 'textarea', formOnly: true, wide: true, placeholder: 'Novos afilhados, reservas, vendas no período…' },
+    ],
+    kpis: (rows) => [
+      { label: 'Em andamento', value: num(count(rows, 'status', ['Em andamento'])) },
+      { label: 'Investido no ano', value: brl(sum(rows.filter((r) => s(r.inicio).slice(0, 4) === isoToday().slice(0, 4) && r.status !== 'Cancelada'), 'investimento')) },
+    ],
+  },
+
+  /* ---------------- Fiscalização: atestados emitidos ---------------- */
+  atestados: {
+    id: 'atestados', anexos: 'Documento emitido (PDF)', area: 'fis', title: 'Atestados emitidos', singular: 'atestado',
+    description: 'Alvarás, licenças, AVCB, laudos e certificados da casa, com a validade de cada um.',
+    filterKey: 'documento', sortKey: 'validade', sortDir: 'asc',
+    fields: [
+      { key: 'documento', label: 'Documento', type: 'select', options: ['Alvará de funcionamento', 'Licença sanitária', 'AVCB / Bombeiros', 'Licença ambiental', 'Certificado de dedetização', 'Limpeza da caixa d’água', 'Laudo elétrico', 'Laudo de gás', 'Outro'], required: true },
+      { key: 'orgao', label: 'Órgão / empresa emissora', type: 'text', required: true },
+      { key: 'numero', label: 'Número', type: 'text' },
+      { key: 'emissao', label: 'Emissão', type: 'date' },
+      { key: 'validade', label: 'Validade', type: 'date' },
+      { key: 'observacoes', label: 'Observações', type: 'textarea', formOnly: true, wide: true },
+    ],
+    computed: [
+      {
+        label: 'Situação', format: 'badge',
+        get: (r) => (!r.validade ? 'Sem validade' : daysUntil(r.validade) < 0 ? 'Vencido' : daysUntil(r.validade) <= 30 ? 'Vence em 30 dias' : 'Vigente'),
+        tone: (r) => (!r.validade ? 'neutral' : daysUntil(r.validade) < 0 ? 'bad' : daysUntil(r.validade) <= 30 ? 'warn' : 'good'),
+      },
+    ],
+    kpis: (rows) => [
+      { label: 'Vigentes', value: num(rows.filter((r) => r.validade && daysUntil(r.validade) >= 0).length), tone: 'good' },
+      { label: 'Vencem em 30 dias', value: num(rows.filter((r) => r.validade && daysUntil(r.validade) >= 0 && daysUntil(r.validade) <= 30).length), tone: 'warn' },
+      { label: 'Vencidos', value: num(rows.filter((r) => r.validade && daysUntil(r.validade) < 0).length), tone: 'bad' },
+    ],
+  },
+
+  /* ---------------- Financeiro: investidores, documentos e investimentos ---------------- */
+  acoes: {
+    id: 'acoes', anexos: 'Contrato social, acordos e comprovantes', feminino: true, area: 'fin', title: 'Ações da empresa', singular: 'participação',
+    description: 'Sócios e investidores: quantidade de ações ou cotas, participação e valor aportado.',
+    filterKey: 'tipo', sortKey: 'participacao', sortDir: 'desc',
+    fields: [
+      { key: 'nome', label: 'Sócio / investidor', type: 'text', required: true, wide: true },
+      { key: 'tipo', label: 'Tipo', type: 'select', options: ['Sócio administrador', 'Sócio', 'Investidor', 'Investidor-anjo'], required: true },
+      { key: 'documento', label: 'CPF / CNPJ', type: 'text', formOnly: true },
+      { key: 'quantidade', label: 'Ações / cotas', type: 'number', max: 100_000_000 },
+      { key: 'participacao', label: 'Participação', type: 'percent', decimals: 2 },
+      { key: 'aporte', label: 'Valor aportado', type: 'money', max: 99_999_999.99 },
+      { key: 'entrada', label: 'Data de entrada', type: 'date' },
+      { key: 'status', label: 'Situação', type: 'select', options: ['Ativo', 'Inativo'], default: 'Ativo' },
+      { key: 'observacoes', label: 'Observações', type: 'textarea', formOnly: true, wide: true },
+    ],
+    kpis: (rows) => {
+      const ativos = rows.filter((r) => r.status !== 'Inativo');
+      const total = sum(ativos, 'participacao');
+      return [
+        { label: 'Sócios e investidores', value: num(ativos.length) },
+        { label: 'Capital aportado', value: brl(sum(ativos, 'aporte')) },
+        { label: 'Participação distribuída', value: `${num(total, 2)}%`, tone: Math.abs(total - 100) < 0.01 || !ativos.length ? 'good' : 'warn', hint: Math.abs(total - 100) < 0.01 || !ativos.length ? undefined : 'a soma deveria dar 100%' },
+      ];
+    },
+  },
+  creditos: {
+    id: 'creditos', anexos: 'Contrato e extratos', area: 'fin', title: 'Crédito CNPJ', singular: 'crédito',
+    description: 'Empréstimos, financiamentos e limites no CNPJ: taxa, parcelas e saldo devedor.',
+    filterKey: 'status', sortKey: 'proximaParcela', sortDir: 'asc',
+    despesa: (r) => ({ descricao: juntar('Parcela', r.modalidade, r.instituicao), categoria: 'Tarifas bancárias', valor: n(r.parcela) }),
+    fields: [
+      { key: 'instituicao', label: 'Instituição', type: 'text', required: true, placeholder: 'Ex.: Banrisul, Sicredi, Pronampe' },
+      { key: 'modalidade', label: 'Modalidade', type: 'select', options: ['Capital de giro', 'Financiamento de equipamentos', 'Pronampe', 'Cheque especial / limite', 'Cartão de crédito PJ', 'Antecipação de recebíveis', 'Outro'], required: true },
+      { key: 'valor', label: 'Valor contratado', type: 'money', required: true, max: 99_999_999.99 },
+      { key: 'taxa', label: 'Taxa ao mês', type: 'percent', decimals: 2 },
+      { key: 'parcelas', label: 'Parcelas', type: 'number', max: 600 },
+      { key: 'parcela', label: 'Valor da parcela', type: 'money', max: 9_999_999.99 },
+      { key: 'saldo', label: 'Saldo devedor', type: 'money', max: 99_999_999.99 },
+      { key: 'proximaParcela', label: 'Próxima parcela', type: 'date' },
+      { key: 'status', label: 'Status', type: 'select', options: ['Em análise', 'Ativo', 'Quitado', 'Recusado'], default: 'Ativo' },
+      { key: 'observacoes', label: 'Observações', type: 'textarea', formOnly: true, wide: true },
+    ],
+    kpis: (rows) => {
+      const ativos = rows.filter((r) => r.status === 'Ativo');
+      return [
+        { label: 'Saldo devedor', value: brl(sum(ativos, 'saldo')), tone: sum(ativos, 'saldo') ? 'warn' : 'good' },
+        { label: 'Parcelas por mês', value: brl(sum(ativos, 'parcela')) },
+        { label: 'Contratos ativos', value: num(ativos.length) },
+      ];
+    },
+  },
+  docfin: {
+    id: 'docfin', anexos: 'Documento (PDF)', area: 'fin', title: 'Contratos onerosos e títulos', singular: 'documento',
+    description: 'Contratos onerosos, títulos concedidos (notas promissórias, duplicatas, cheques) e relatórios financeiros.',
+    filterKey: 'tipo', sortKey: 'data', sortDir: 'desc',
+    fields: [
+      { key: 'titulo', label: 'Documento', type: 'text', required: true, wide: true },
+      { key: 'tipo', label: 'Tipo', type: 'select', options: ['Contrato oneroso', 'Título concedido', 'Nota promissória', 'Duplicata', 'Relatório'], required: true },
+      { key: 'parte', label: 'Parte envolvida', type: 'text' },
+      { key: 'data', label: 'Data', type: 'date', required: true },
+      { key: 'vencimento', label: 'Vencimento', type: 'date' },
+      { key: 'valor', label: 'Valor', type: 'money', max: 99_999_999.99 },
+      { key: 'status', label: 'Status', type: 'select', options: ['Vigente', 'Pago', 'Encerrado', 'Cancelado'], default: 'Vigente' },
+      { key: 'observacoes', label: 'Observações', type: 'textarea', formOnly: true, wide: true },
+    ],
+  },
+  investimentos: {
+    id: 'investimentos', anexos: 'Notas, orçamentos e comprovantes', area: 'fin', title: 'Lançamento de investimentos', singular: 'investimento',
+    description: 'Dinheiro aplicado na casa (equipamentos, reformas, estoque inicial…) e de onde ele veio.',
+    filterKey: 'categoria', sortKey: 'data', sortDir: 'desc',
+    fields: [
+      { key: 'descricao', label: 'Descrição', type: 'text', required: true, wide: true },
+      { key: 'categoria', label: 'Categoria', type: 'select', options: ['Equipamentos', 'Reforma e obras', 'Mobiliário', 'Estoque inicial', 'Tecnologia', 'Marketing', 'Outros'], required: true },
+      { key: 'origem', label: 'Origem do dinheiro', type: 'select', options: ['Caixa próprio', 'Aporte de sócio', 'Crédito CNPJ', 'Outro'], required: true },
+      { key: 'data', label: 'Data', type: 'date', required: true },
+      { key: 'valor', label: 'Valor', type: 'money', required: true, min: 0.01, max: 99_999_999.99 },
+      { key: 'status', label: 'Status', type: 'select', options: ['Planejado', 'Pago', 'Cancelado'], default: 'Pago' },
+      { key: 'observacoes', label: 'Observações', type: 'textarea', formOnly: true, wide: true },
+    ],
+    kpis: (rows) => {
+      const pagos = rows.filter((r) => r.status === 'Pago');
+      return [
+        { label: 'Investido no ano', value: brl(sum(pagos.filter((r) => s(r.data).slice(0, 4) === isoToday().slice(0, 4)), 'valor')) },
+        { label: 'Investido no total', value: brl(sum(pagos, 'valor')) },
+        { label: 'Planejado', value: brl(sum(rows.filter((r) => r.status === 'Planejado'), 'valor')), tone: 'info' },
+      ];
+    },
+  },
+
+  /* ---------------- Pessoal: prestadores (PF e PJ) e regras de conduta ---------------- */
+  prestadores: {
+    id: 'prestadores', anexos: 'Contrato, documentos e notas', area: 'rh', title: 'Fornecedores de mão de obra', singular: 'contratado',
+    description: 'Pessoas físicas e jurídicas contratadas para prestar serviço à casa (freelas, músicos, segurança, contabilidade…).',
+    filterKey: 'status', sortKey: 'nome',
+    despesa: (r) => ({ descricao: juntar(r.servico, r.nome), categoria: 'Terceirizados', valor: n(r.valor) }),
+    fields: [
+      { key: 'nome', label: 'Nome / razão social', type: 'text', required: true, wide: true },
+      { key: 'tipo', label: 'Pessoa', type: 'select', options: ['Pessoa física', 'Pessoa jurídica'], required: true, default: 'Pessoa física' },
+      { key: 'documento', label: 'CPF / CNPJ', type: 'text' },
+      { key: 'servico', label: 'Serviço', type: 'text', required: true, placeholder: 'Ex.: Músico, segurança, contador' },
+      { key: 'telefone', label: 'Telefone', type: 'phone' },
+      { key: 'email', label: 'E-mail', type: 'email', formOnly: true },
+      { key: 'pagamento', label: 'Forma de pagamento', type: 'select', options: ['Por serviço / diária', 'Por hora', 'Mensal'], formOnly: true },
+      { key: 'valor', label: 'Valor combinado', type: 'money', max: 1_000_000 },
+      { key: 'status', label: 'Situação', type: 'select', options: ['Ativo', 'Inativo'], default: 'Ativo' },
+      { key: 'observacoes', label: 'Observações', type: 'textarea', formOnly: true, wide: true },
+    ],
+  },
+  conduta: {
+    id: 'conduta', anexos: 'Manual de Conduta (PDF)', feminino: true, area: 'rh', title: 'Regras de conduta', singular: 'versão do manual',
+    description: 'Manual de Conduta do Bar do Dindo: a versão em vigor fica disponível em PDF para toda a equipe com acesso ao Pessoal.',
+    filterKey: 'status', sortKey: 'vigencia', sortDir: 'desc',
+    fields: [
+      { key: 'titulo', label: 'Título', type: 'text', required: true, wide: true, default: 'Manual de Conduta do Bar do Dindo' },
+      { key: 'versao', label: 'Versão', type: 'text', placeholder: 'Ex.: 2026.1' },
+      { key: 'vigencia', label: 'Em vigor desde', type: 'date' },
+      { key: 'status', label: 'Status', type: 'select', options: ['Vigente', 'Rascunho', 'Encerrado'], default: 'Vigente' },
+      { key: 'resumo', label: 'Principais regras / o que mudou', type: 'textarea', formOnly: true, wide: true },
+    ],
+  },
+
+  /* ---------------- Jurídico: advogados e normas ---------------- */
+  advogados: {
+    id: 'advogados', anexos: 'Procuração, contrato de honorários e documentos', area: 'jur', title: 'Advogados', singular: 'advogado',
+    description: 'Advogados e escritórios que atendem a casa, por área de atuação.',
+    filterKey: 'status', sortKey: 'nome',
+    fields: [
+      { key: 'nome', label: 'Nome', type: 'text', required: true, wide: true },
+      { key: 'atuacao', label: 'Área de atuação', type: 'select', options: ['Consultoria jurídica', 'Trabalhista e Tributário', 'Empresarial'], required: true },
+      { key: 'oab', label: 'OAB', type: 'text', placeholder: 'Ex.: RS 123.456' },
+      { key: 'escritorio', label: 'Escritório', type: 'text' },
+      { key: 'telefone', label: 'Telefone', type: 'phone' },
+      { key: 'email', label: 'E-mail', type: 'email', formOnly: true },
+      { key: 'honorarios', label: 'Honorários (mensal)', type: 'money', max: 1_000_000, formOnly: true },
+      { key: 'status', label: 'Situação', type: 'select', options: ['Ativo', 'Inativo'], default: 'Ativo' },
+      { key: 'observacoes', label: 'Observações', type: 'textarea', formOnly: true, wide: true },
+    ],
+  },
+  normas: {
+    id: 'normas', anexos: 'Texto da norma ou resumo (PDF)', feminino: true, area: 'jur', title: 'Leis e normas', singular: 'norma',
+    description: 'Biblioteca de leis, normas e orientações que valem para a casa, com o link do texto oficial.',
+    filterKey: 'ambito', sortKey: 'titulo',
+    fields: [
+      { key: 'titulo', label: 'Norma', type: 'text', required: true, wide: true, placeholder: 'Ex.: CLT, art. 59 – horas extras' },
+      { key: 'ambito', label: 'Âmbito', type: 'select', options: ['Trabalhista (CLT)', 'Tributário', 'Empresarial', 'Constitucional', 'Civil', 'Registro de empresas', 'Sanitário', 'Consumidor', 'Outro'], required: true },
+      { key: 'link', label: 'Texto oficial', type: 'url', acao: 'site', formOnly: true, wide: true, placeholder: 'Link do Planalto ou do órgão oficial' },
+      { key: 'resumo', label: 'O que diz / como se aplica à casa', type: 'textarea', formOnly: true, wide: true },
+    ],
+  },
+
+  /* ---------------- TI: chamados e equipamentos ---------------- */
+  chamados: {
+    id: 'chamados', area: 'ti', title: 'Chamados de suporte', singular: 'chamado',
+    description: 'Problemas de sistema, internet, equipamentos e impressoras, até a solução.',
+    filterKey: 'status', sortKey: 'abertura', sortDir: 'desc',
+    fields: [
+      { key: 'titulo', label: 'Problema', type: 'text', required: true, wide: true },
+      { key: 'categoria', label: 'Categoria', type: 'select', options: ['Cérebro / sistema', 'Aplicativo do afilhado', 'Internet / Wi-Fi', 'Computador / celular', 'Impressora / maquininha', 'Câmeras', 'Outro'], required: true },
+      { key: 'prioridade', label: 'Prioridade', type: 'select', options: ['Baixa', 'Média', 'Alta', 'Crítica'], default: 'Média' },
+      { key: 'solicitante', label: 'Aberto por', type: 'ref', ref: 'pessoas', refKey: 'solicitanteId', livre: true },
+      { key: 'abertura', label: 'Aberto em', type: 'date', required: true },
+      { key: 'status', label: 'Status', type: 'select', options: ['Aberta', 'Em andamento', 'Resolvida'], default: 'Aberta' },
+      { key: 'descricao', label: 'Detalhes e solução', type: 'textarea', formOnly: true, wide: true },
+    ],
+    kpis: (rows) => [
+      { label: 'Em aberto', value: num(count(rows, 'status', ['Aberta', 'Em andamento'])), tone: count(rows, 'status', ['Aberta', 'Em andamento']) ? 'warn' : 'good' },
+      { label: 'Altos ou críticos', value: num(rows.filter((r) => r.status !== 'Resolvida' && ['Alta', 'Crítica'].includes(s(r.prioridade))).length), tone: 'bad' },
+    ],
+  },
+  equipamentos: {
+    id: 'equipamentos', anexos: 'Notas fiscais, garantias e licenças', area: 'ti', title: 'Equipamentos e licenças', singular: 'equipamento',
+    description: 'Computadores, celulares, maquininhas, rede, câmeras e as assinaturas de software, com garantia e renovação.',
+    filterKey: 'tipo', sortKey: 'vencimento', sortDir: 'asc',
+    fields: [
+      { key: 'item', label: 'Item', type: 'text', required: true, wide: true, placeholder: 'Ex.: Notebook do caixa, Wi-Fi do salão, Canva Pro' },
+      { key: 'tipo', label: 'Tipo', type: 'select', options: ['Computador', 'Celular / tablet', 'Maquininha', 'Impressora', 'Rede / internet', 'Câmera', 'Software / licença', 'Outro'], required: true },
+      { key: 'local', label: 'Local / responsável', type: 'text' },
+      { key: 'identificacao', label: 'Marca, modelo ou série', type: 'text', formOnly: true },
+      { key: 'custo', label: 'Custo (ou mensalidade)', type: 'money', max: 1_000_000 },
+      { key: 'vencimento', label: 'Garantia / renovação até', type: 'date' },
+      { key: 'status', label: 'Situação', type: 'select', options: ['Ativo', 'Manutenção', 'Inativo'], default: 'Ativo' },
+      { key: 'observacoes', label: 'Observações', type: 'textarea', formOnly: true, wide: true },
+    ],
+    computed: [
+      {
+        label: 'Renovação', format: 'badge',
+        get: (r) => (!r.vencimento ? null : daysUntil(r.vencimento) < 0 ? 'Vencido' : daysUntil(r.vencimento) <= 30 ? 'Em renovação' : 'Vigente'),
+        tone: (r) => (daysUntil(r.vencimento) < 0 ? 'bad' : daysUntil(r.vencimento) <= 30 ? 'warn' : 'good'),
+      },
+    ],
   },
 };
 
