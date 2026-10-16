@@ -34,7 +34,7 @@ export function Folha() {
   const { pode } = useSession();
   const [mes, setMes] = useState(currentMonth());
   const { data: folha, loading, error } = useResource<Folha>(`/crm/folha?mes=${mes}`);
-  const podeLancar = pode('fin', 'criar');
+  const podeLancar = pode('despesas', 'criar');
 
   return (
     <div className="page">
@@ -123,7 +123,7 @@ function LancarFolha() {
   const path = `/crm/folha?mes=${mes}`;
   const { data: folha, loading, error } = useResource<Folha>(path);
   // lançar a folha cria as despesas do mês
-  const podeLancar = pode('fin', 'criar');
+  const podeLancar = pode('despesas', 'criar');
 
   return (
     <section className="panel pad-lg folha-box">

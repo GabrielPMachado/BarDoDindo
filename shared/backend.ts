@@ -27,26 +27,36 @@ const fail = (status: number, message: string): never => {
 };
 const codigo = (e: unknown) => String((e as { code?: string } | null)?.code ?? '');
 
-/** Coleções do CRM e a área (permissão) que cada uma exige. */
-const COLLECTIONS: Record<string, string> = {
-  metas: 'dir',
-  colaboradores: 'rh', ferias: 'rh',
+/**
+ * Permissões por módulo (uma por tela ou cadastro). Cada módulo pertence a uma área antiga (departamento/setor):
+ * funções gravadas antes da separação, sem o módulo, continuam valendo pela área (e Vendas, por Marketing).
+ * Igual a `pai()` em firestore.rules.
+ */
+export const PAI_DO_MODULO: Record<string, string> = {
+  painel: 'dir', metas: 'dir',
+  reservas: 'atd', consumos: 'atd', resgates: 'atd', eventos: 'atd',
+  produtos: 'vnd', guarnicoes: 'vnd', clientes: 'vnd',
+  recompensas: 'mkt', criacao: 'mkt', midias: 'mkt', publicidade: 'mkt',
   projetos: 'dp', estoque: 'dp', materiais: 'dp', compras: 'dp',
-  terceirizados: 'adm', fornecedores: 'adm', contratos: 'adm', precos: 'adm',
-  receitas: 'fin', despesas: 'fin',
-  reservas: 'atd', consumos: 'atd', resgates: 'atd',
-  criacao: 'mkt', midias: 'mkt', recompensas: 'mkt',
-  produtos: 'vnd', guarnicoes: 'vnd',
-  trabalhista: 'jur', consultoria: 'jur',
-  qualidade: 'fis', naoconformidades: 'fis',
-  funcoes: 'cfg',
-  // organização por departamentos (Administrativo, Financeiro, Pessoal, Jurídico e TI)
-  eventos: 'atd', publicidade: 'mkt', atestados: 'fis',
-  acoes: 'fin', creditos: 'fin', docfin: 'fin', investimentos: 'fin',
-  prestadores: 'rh', conduta: 'rh',
-  advogados: 'jur', normas: 'jur',
-  chamados: 'ti', equipamentos: 'ti',
+  terceirizados: 'adm', fornecedores: 'adm', precos: 'adm', contratos: 'adm',
+  qualidade: 'fis', atestados: 'fis', naoconformidades: 'fis',
+  receitas: 'fin', despesas: 'fin', resultado: 'fin', acoes: 'fin', creditos: 'fin', docfin: 'fin', investimentos: 'fin',
+  colaboradores: 'rh', prestadores: 'rh', folha: 'rh', ferias: 'rh', conduta: 'rh',
+  consultoria: 'jur', trabalhista: 'jur', advogados: 'jur', normas: 'jur',
+  logs: 'ti', chamados: 'ti', equipamentos: 'ti',
+  usuarios: 'cfg', funcoes: 'cfg', parametros: 'cfg',
 };
+/** Áreas antigas que herdaram permissões de outra (Vendas foi separada de Marketing). */
+const LEGADO: Record<string, string> = { vnd: 'mkt' };
+export const MODULOS = Object.keys(PAI_DO_MODULO).concat('mon');
+/** Coleções do CRM e o módulo (permissão) que cada uma exige: o próprio cadastro. */
+const COLLECTIONS: Record<string, string> = Object.fromEntries(
+  ['metas', 'colaboradores', 'ferias', 'projetos', 'estoque', 'materiais', 'compras', 'terceirizados', 'fornecedores', 'contratos', 'precos',
+    'receitas', 'despesas', 'reservas', 'consumos', 'resgates', 'criacao', 'midias', 'recompensas', 'produtos', 'guarnicoes',
+    'trabalhista', 'consultoria', 'qualidade', 'naoconformidades', 'funcoes',
+    'eventos', 'publicidade', 'atestados', 'acoes', 'creditos', 'docfin', 'investimentos', 'prestadores', 'conduta', 'advogados', 'normas', 'chamados', 'equipamentos',
+  ].map((c) => [c, c]),
+);
 /** Permissões que uma função marca em cada área. */
 type Acao = 'ver' | 'criar' | 'editar' | 'excluir';
 const ACOES: Acao[] = ['ver', 'criar', 'editar', 'excluir'];
@@ -58,6 +68,11 @@ function acoesDe(p: unknown): Acao[] {
   return [];
 }
 const AREAS = ['dir', 'atd', 'vnd', 'mkt', 'rh', 'dp', 'adm', 'fin', 'jur', 'fis', 'mon', 'ti', 'cfg'];
+/** Permissões de um módulo: as do próprio módulo; sem elas, as da área a que ele pertence (formato antigo). */
+export function permissaoDe(perm: Record<string, unknown>, k: string): unknown {
+  for (const chave of [k, PAI_DO_MODULO[k], LEGADO[PAI_DO_MODULO[k] ?? ''], LEGADO[k]]) if (chave && chave in perm) return perm[chave];
+  return undefined;
+}
 
 /** Como cada registro é citado no painel de atualizações ("cadastrou o produto …"). */
 const REGISTRO: Record<string, string> = {
@@ -387,7 +402,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     // permissões da função, área por área; a função Administrador (de sistema) tem todas, inclusive em áreas novas
     // Vendas foi separada de Marketing: sem permissões próprias para Vendas, valem as de Marketing
     const perm = (funcao?.permissoes ?? {}) as Dados;
-    const acoes = (area: string): string[] => (funcao?.sistema ? [...ACOES] : acoesDe(area === 'vnd' && !('vnd' in perm) ? perm.mkt : perm[area]));
+    const acoes = (area: string): string[] => (funcao?.sistema ? [...ACOES] : acoesDe(permissaoDe(perm, area)));
     return {
       usuario, funcao, acoes,
       access: (area: string): string => (!acoes(area).includes('ver') ? 'none' : acoes(area).length > 1 ? 'edit' : 'view'),
@@ -714,7 +729,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   /* CRM: painel de atualizações (as últimas alterações das áreas que a pessoa acessa) */
   rota('GET', '/crm/atividades', async () => {
     const ctx = await requireUsuario();
-    const areas = AREAS.filter((a) => ctx.access(a) !== 'none');
+    // histórico por módulo (e, nos registros de antes da separação, por área)
+    const areas = [...new Set([...AREAS, ...MODULOS])].filter((a) => ctx.access(a) !== 'none');
     const listas = await Promise.all(areas.map((a) =>
       lista(`atividades@${a}`, query(collection(db, 'atividades', a, 'itens'), orderBy('criadoEm', 'desc'), limit(80)))));
     return ordenar(listas.flat()).slice(0, 200);
@@ -724,13 +740,13 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   rota('GET', '/crm/config', async () => { await requireUsuario(); return getConfig(); });
   rota('PUT', '/crm/config', async ({ b }) => {
     const ctx = await requireUsuario();
-    requireAccess(ctx, 'cfg', 'editar');
+    requireAccess(ctx, 'parametros', 'editar');
     if (b.pontosPorReal !== undefined && !(Number(b.pontosPorReal) >= 0)) fail(400, 'Pontos por real inválido.');
     if (b.horarios && !b.horarios.every((h: string) => /^\d{2}:\d{2}$/.test(h))) fail(400, 'Horários devem estar no formato HH:MM.');
     const patch = Object.fromEntries(Object.entries(b).filter(([k]) => k in DEFAULT_CONFIG));
     const lote = writeBatch(db);
     lote.set(doc(db, 'config/geral'), patch, { merge: true });
-    registrar(lote, ctx, 'cfg', 'alterou os parâmetros do aplicativo');
+    registrar(lote, ctx, 'parametros', 'alterou os parâmetros do aplicativo');
     await lote.commit();
     return { ...(await getConfig()), ...patch };
   });
@@ -738,12 +754,12 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   /* CRM: usuários */
   const activeAdmins = (usuarios: Dados[]) => usuarios.filter((u) => u.funcaoId === 'admin' && u.status === 'Ativo').length;
   rota('GET', '/crm/usuarios', async () => {
-    requireAccess(await requireUsuario(), 'cfg', 'ver');
+    requireAccess(await requireUsuario(), 'usuarios', 'ver');
     return (await colecao('usuarios')).map(publicUsuario).sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
   });
   rota('POST', '/crm/usuarios', async ({ b }) => {
     const ctx = await requireUsuario();
-    requireAccess(ctx, 'cfg', 'criar');
+    requireAccess(ctx, 'usuarios', 'criar');
     const nome = str(b.nome, 120), email = str(b.email, 160).toLowerCase(), senha = String(b.senha ?? '');
     const funcaoId = str(b.funcaoId, 40);
     if (nome.length < 3) fail(400, 'Informe o nome completo.');
@@ -756,13 +772,13 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const usuario = { nome, email, funcaoId, status: b.status === 'Inativo' ? 'Inativo' : 'Ativo', ultimoAcesso: null, criadoEm: now() };
     const lote = writeBatch(db);
     lote.set(doc(db, 'usuarios', uid), usuario);
-    registrar(lote, ctx, 'cfg', 'cadastrou o usuário', { colecao: 'usuarios', alvo: nome, detalhe: `Função: ${funcao.nome}` });
+    registrar(lote, ctx, 'usuarios', 'cadastrou o usuário', { colecao: 'usuarios', alvo: nome, detalhe: `Função: ${funcao.nome}` });
     await lote.commit();
     return publicUsuario({ ...usuario, id: uid });
   });
   rota('PUT', '/crm/usuarios/:id', async ({ p, b }) => {
     const ctx = await requireUsuario();
-    requireAccess(ctx, 'cfg', 'editar');
+    requireAccess(ctx, 'usuarios', 'editar');
     const usuarios = await colecao('usuarios');
     const u = usuarios.find((x) => x.id === p.id);
     if (!u) return fail(404, 'Usuário não encontrado.');
@@ -784,12 +800,12 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       status !== u.status ? `Status: ${status}` : '',
       nome !== u.nome ? `Nome: ${nome}` : '',
     ].filter(Boolean).join(' · ');
-    registrar(lote, ctx, 'cfg', 'alterou o usuário', { colecao: 'usuarios', alvo: u.nome, detalhe: mudancas });
+    registrar(lote, ctx, 'usuarios', 'alterou o usuário', { colecao: 'usuarios', alvo: u.nome, detalhe: mudancas });
     await lote.commit();
     return publicUsuario({ ...u, nome, funcaoId, status });
   });
   rota('POST', '/crm/usuarios/:id/redefinir-senha', async ({ p }) => {
-    requireAccess(await requireUsuario(), 'cfg', 'editar');
+    requireAccess(await requireUsuario(), 'usuarios', 'editar');
     const u = (await colecao('usuarios')).find((x) => x.id === p.id);
     if (!u) return fail(404, 'Usuário não encontrado.');
     await sendPasswordResetEmail(auth, u.email);
@@ -797,7 +813,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   });
   rota('DELETE', '/crm/usuarios/:id', async ({ p }) => {
     const ctx = await requireUsuario();
-    requireAccess(ctx, 'cfg', 'excluir');
+    requireAccess(ctx, 'usuarios', 'excluir');
     if (ctx.usuario.id === p.id) fail(400, 'Você não pode excluir o próprio usuário.');
     const usuarios = await colecao('usuarios');
     const u = usuarios.find((x) => x.id === p.id);
@@ -806,7 +822,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     // sem o cadastro em `usuarios` a conta não passa mais pelas regras nem pelo login do CRM
     const lote = writeBatch(db);
     lote.delete(doc(db, 'usuarios', p.id));
-    registrar(lote, ctx, 'cfg', 'excluiu o usuário', { colecao: 'usuarios', alvo: u.nome });
+    registrar(lote, ctx, 'usuarios', 'excluiu o usuário', { colecao: 'usuarios', alvo: u.nome });
     await lote.commit();
     return { ok: true };
   });
@@ -814,7 +830,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   /* CRM: clientes do aplicativo */
   rota('GET', '/crm/clientes', async () => {
     const ctx = await requireUsuario();
-    requireAnyAccess(ctx, ['vnd', 'mkt', 'atd'], 'ver');
+    requireAnyAccess(ctx, ['clientes', 'reservas', 'consumos', 'resgates', 'recompensas'], 'ver');
     // os totais de cada afilhado ficam no saldo (atualizados a cada consumo), sem carregar todos os consumos
     const [clientes, saldos, cfg] = await Promise.all([colecao('clientes'), colecao('saldos'), getConfig()]);
     const saldoDe = new Map(saldos.map((s) => [s.id, s]));
@@ -829,7 +845,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
         saldoDe.set(c.id, { acumulados: r.acumulados, usados: r.acumulados - r.pontos, ...saldoDe.get(c.id), ...totais });
         lote.set(doc(db, 'saldos', c.id), totais, { merge: true });
       }
-      if (ctx.acoes('atd').some((a) => a !== 'ver')) await lote.commit().catch(() => undefined);
+      if (ctx.acoes('consumos').some((a) => a !== 'ver')) await lote.commit().catch(() => undefined);
     }
     return clientes
       .map((c) => {
@@ -860,8 +876,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   /* CRM: excluir um afilhado (a pedido dele, como manda a LGPD): cadastro, saldo, consumos com as receitas, vouchers e reservas */
   rota('DELETE', '/crm/clientes/:numero', async ({ p }) => {
     const ctx = await requireUsuario();
-    requireAccess(ctx, 'vnd', 'excluir');
-    requireAccess(ctx, 'atd', 'excluir');
+    requireAccess(ctx, 'clientes', 'excluir');
+    requireAccess(ctx, 'consumos', 'excluir');
     const c = (await colecao('clientes')).find((x) => x.numero === Number(p.numero));
     if (!c) return fail(404, 'Afilhado não encontrado.');
     const [consumos, resgates, reservas] = await Promise.all([doCliente('consumos', c.id), doCliente('resgates', c.id), doCliente('reservas', c.id)]);
@@ -870,7 +886,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       ...consumos.flatMap((x) => [doc(db, 'consumos', x.id), ...(x.receitaId ? [doc(db, 'receitas', x.receitaId)] : [])]),
       ...resgates.map((x) => doc(db, 'resgates', x.id)), ...reservas.map((x) => doc(db, 'reservas', x.id)),
     ];
-    await apagarEmLotes(refs, (lote) => registrar(lote, ctx, 'vnd', 'excluiu o afilhado', {
+    await apagarEmLotes(refs, (lote) => registrar(lote, ctx, 'clientes', 'excluiu o afilhado', {
       colecao: 'clientes', alvo: `${c.nome} (#${pad3(c.numero)})`,
       detalhe: `${consumos.length} consumo(s), ${resgates.length} voucher(s) e ${reservas.length} reserva(s) apagados`,
     }));
@@ -880,11 +896,11 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   /* CRM: numeração dos afilhados — o próximo número volta a seguir o maior número em uso (ex.: depois de excluir afilhados de teste) */
   rota('POST', '/crm/clientes/numeracao', async () => {
     const ctx = await requireUsuario();
-    requireAccess(ctx, 'cfg', 'editar');
+    requireAccess(ctx, 'parametros', 'editar');
     const maior = Math.max(0, ...(await colecao('clientes')).map((c) => Number(c.numero) || 0));
     const lote = writeBatch(db);
     lote.set(doc(db, 'meta', 'contadores'), { clientes: maior });
-    registrar(lote, ctx, 'cfg', 'ajustou a numeração dos afilhados', { alvo: `próximo número: #${pad3(maior + 1)}` });
+    registrar(lote, ctx, 'parametros', 'ajustou a numeração dos afilhados', { alvo: `próximo número: #${pad3(maior + 1)}` });
     await lote.commit();
     return { proximo: maior + 1 };
   });
@@ -899,7 +915,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const cols = [...Object.keys(COLLECTIONS).filter((c) => c !== 'funcoes'), 'clientes', 'saldos', 'cardapio', 'ref_colaboradores', 'ref_fornecedores', 'config', 'segredos'];
     const refs: DocumentReference[] = [];
     for (const c of cols) refs.push(...(await todos(c)));
-    for (const a of AREAS) refs.push(...(await todos('atividades', a, 'itens')));
+    for (const a of new Set([...AREAS, ...MODULOS])) refs.push(...(await todos('atividades', a, 'itens')));
     // PDFs anexados: as partes antes do registro de cada arquivo (as regras consultam o registro ao apagar uma parte)
     const anexos = await todos('anexos');
     for (const a of anexos) refs.push(...(await todos('anexos', a.id, 'partes')));
@@ -947,7 +963,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       case 'insumos':
         // ficha técnica dos produtos (Vendas): itens do Estoque com unidade e custo, sem quantidades nem validade
         // (o Administrativo também escolhe o insumo ao cadastrar um preço de fornecedor)
-        requireAnyAccess(ctx, ['vnd', 'dp', 'adm'], 'ver');
+        requireAnyAccess(ctx, ['produtos', 'guarnicoes', 'estoque', 'compras', 'precos'], 'ver');
         return (await colecao('estoque'))
           .map((e) => {
             const un = e.unidade || 'un', custo = Number(e.custo) || 0;
@@ -963,7 +979,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
           });
       case 'materiais':
         // entrada de notas: materiais (patrimônio) já cadastrados
-        requireAnyAccess(ctx, ['dp'], 'ver');
+        requireAnyAccess(ctx, ['materiais', 'compras'], 'ver');
         return (await colecao('materiais'))
           .filter((m) => m.material)
           .map((m) => ({ id: m.id, nome: String(m.material), tipo: m.tipo ?? '', valor: Number(m.valor) || 0, detalhe: [m.tipo, m.local].filter(Boolean).join(' · ') }));
@@ -971,7 +987,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       case 'utensilios': {
         // ficha técnica (preparo): copos e utensílios ligados aos cadastros de Estoque e de Materiais
         // (com quanto tem de cada), mais sugestões comuns de bar para o que ainda não foi cadastrado
-        requireAnyAccess(ctx, ['vnd', 'dp'], 'ver');
+        requireAnyAccess(ctx, ['produtos', 'estoque', 'materiais'], 'ver');
         const copos = p.tipo === 'copos';
         const parece = copos ? PARECE_COPO : PARECE_UTENSILIO;
         const qtd = (v: unknown, un: unknown) => `${(Number(v) || 0).toLocaleString('pt-BR')} ${un || 'un'}`;
@@ -995,7 +1011,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       }
       case 'precos':
         // ficha técnica: preço de cada fornecedor para cada insumo (Tabela de preços do Administrativo)
-        requireAnyAccess(ctx, ['vnd', 'dp', 'adm'], 'ver');
+        requireAnyAccess(ctx, ['produtos', 'compras', 'precos'], 'ver');
         return (await colecao('precos'))
           .filter((x) => x.status !== 'Inativo' && x.insumoId && Number(x.preco) > 0 && Number(x.conteudo) > 0)
           .map((x) => ({
@@ -1003,7 +1019,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
             embalagem: x.embalagem ?? '', conteudo: Number(x.conteudo), unidade: x.unidade || 'un', preco: Number(x.preco), data: x.data ?? '',
           }));
       case 'clientes':
-        requireAnyAccess(ctx, ['atd', 'vnd', 'mkt'], 'ver');
+        requireAnyAccess(ctx, ['clientes', 'reservas', 'consumos', 'resgates', 'recompensas'], 'ver');
         return (await colecao('clientes'))
           .map((c) => ({ id: c.numero, nome: c.nome, detalhe: `#${String(c.numero).padStart(3, '0')}${c.telefone ? ' · ' + c.telefone : ''}`, telefone: c.telefone }));
       default:
@@ -1013,7 +1029,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
 
   /* CRM: produtos disponíveis para venda (o atendimento lança consumo sem acesso ao cadastro de produtos) */
   rota('GET', '/crm/produtos-venda', async () => {
-    requireAnyAccess(await requireUsuario(), ['atd', 'vnd'], 'ver');
+    requireAnyAccess(await requireUsuario(), ['consumos', 'produtos'], 'ver');
     return (await colecao('produtos'))
       .filter((p) => p.status !== 'Inativo')
       .map((p) => ({ id: p.id, nome: p.nome, categoria: p.categoria, preco: Number(p.preco) || 0, foto: p.foto || undefined }))
@@ -1051,15 +1067,15 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   }
   rota('GET', '/crm/folha', async ({ q }) => {
     const ctx = await requireUsuario();
-    requireAnyAccess(ctx, ['rh', 'fin'], 'ver');
+    requireAnyAccess(ctx, ['folha', 'despesas'], 'ver');
     const folha = await calcularFolha(q.get('mes') ?? '');
     // o Financeiro vê os totais; o detalhe por colaborador (salários individuais) é do RH
-    if (ctx.access('rh') === 'none') folha.linhas = [];
+    if (ctx.access('folha') === 'none') folha.linhas = [];
     return folha;
   });
   rota('POST', '/crm/folha/lancar', async ({ b }) => {
     const ctx = await requireUsuario();
-    requireAccess(ctx, 'fin', 'criar');
+    requireAccess(ctx, 'despesas', 'criar');
     const folha = await calcularFolha(str(b.mes, 7));
     if (folha.lancada) fail(409, 'A folha desta competência já foi lançada.');
     if (!folha.colaboradores) fail(400, 'Não há colaboradores com salário cadastrado no RH.');
@@ -1073,7 +1089,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     if (folha.totais.inss > 0) criadas.push({ ...base, categoria: 'Encargos', descricao: `INSS retido dos empregados · ${nomeMes}`, vencimento: iso(new Date(y, m, 20)), valor: folha.totais.inss });
     const lote = writeBatch(db);
     for (const d of criadas) lote.set(doc(collection(db, 'despesas')), d);
-    registrar(lote, ctx, 'fin', 'lançou a folha de pagamento', {
+    registrar(lote, ctx, 'despesas', 'lançou a folha de pagamento', {
       colecao: 'despesas', alvo: nomeMes, detalhe: `${folha.colaboradores} colaborador(es) · líquido ${brl(folha.totais.liquido)} · custo total ${brl(folha.totais.custo)}`,
     });
     await lote.commit();
@@ -1117,7 +1133,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   /* CRM: lançamento de consumo (credita pontos e gera receita) */
   rota('POST', '/crm/consumos', async ({ b }) => {
     const ctx = await requireUsuario();
-    requireAccess(ctx, 'atd', 'criar');
+    requireAccess(ctx, 'consumos', 'criar');
     const cliente = (await colecao('clientes')).find((c) => c.numero === Number(b.clienteId));
     if (!cliente) return fail(400, 'Selecione um cliente.');
     const produtos = await colecao('produtos');
@@ -1148,7 +1164,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     lote.set(doc(db, 'saldos', cliente.id), {
       acumulados: increment(pontos), gasto: increment(valor), lancamentos: increment(1), dias: arrayUnion(data.slice(0, 10)),
     }, { merge: true });
-    registrar(lote, ctx, 'atd', 'lançou consumo para', {
+    registrar(lote, ctx, 'consumos', 'lançou consumo para', {
       colecao: 'consumos', alvo: `${cliente.nome} (#${String(cliente.numero).padStart(3, '0')})`, detalhe: `${brl(valor)} · ${pontos} pontos · ${forma}`,
     });
     await lote.commit();
@@ -1270,12 +1286,12 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   });
   rota('PUT', '/crm/ia/chave', async ({ b }) => {
     const ctx = await requireUsuario();
-    requireAccess(ctx, 'cfg', 'editar');
+    requireAccess(ctx, 'parametros', 'editar');
     const chave = str(b.chave, 300).replace(/\s+/g, ''), modelo = str(b.modelo, 80);
     if (chave && !/^[A-Za-z0-9._-]{20,300}$/.test(chave)) fail(400, 'Chave inválida. Copie a chave inteira do Google AI Studio.');
     const lote = writeBatch(db);
     lote.set(doc(db, 'segredos', 'ia'), { chave, modelo, atualizadoEm: now(), atualizadoPor: ctx.usuario.id });
-    registrar(lote, ctx, 'cfg', chave ? 'configurou a IA de leitura de notas' : 'removeu a chave da IA de leitura de notas');
+    registrar(lote, ctx, 'parametros', chave ? 'configurou a IA de leitura de notas' : 'removeu a chave da IA de leitura de notas');
     await lote.commit();
     return { ok: true };
   });
@@ -1325,7 +1341,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   async function aplicarCompra(lote: WriteBatch, ctx: Ctx, compra: Dados, sinal: 1 | -1) {
     const t = now();
     const itens = compra.itens as ItemCompra[];
-    const precos = sinal > 0 && compra.fornecedorId && ctx.acoes('adm').some((a) => a === 'criar' || a === 'editar') ? await colecao('precos') : [];
+    const precos = sinal > 0 && compra.fornecedorId && ctx.acoes('precos').some((a) => a === 'criar' || a === 'editar') ? await colecao('precos') : [];
     for (const it of itens) {
       const col = it.destino;
       const cur = it.itemId ? await registro(col, it.itemId) : null;
@@ -1333,7 +1349,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       const { locais, quantidade, principal } = locaisSomados(cur, it.local, sinal * it.quantidade);
       let item: Dados;
       if (cur) {
-        requireAccess(ctx, 'dp', 'editar');
+        requireAnyAccess(ctx, ['compras', 'estoque', 'materiais'], 'editar');
         const patch: Dados = { locais, quantidade, atualizadoEm: t };
         if (col === 'materiais') patch.local = principal;
         // a unidade trocada na nota corrige o cadastro (ex.: gin cadastrado em "ml" que é comprado por garrafa)
@@ -1353,7 +1369,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
         item.id = ref.id;
       }
       // Tabela de preços: o preço desta compra passa a ser o preço do fornecedor para o item
-      if (sinal > 0 && col === 'estoque' && compra.fornecedorId && (precos.length || ctx.acoes('adm').length)) {
+      if (sinal > 0 && col === 'estoque' && compra.fornecedorId && (precos.length || ctx.acoes('precos').length)) {
         const un = String(item.unidade || 'un'), conteudo = Number(item.conteudo) || 0, cu = String(item.conteudoUnidade ?? '');
         const comConteudo = conteudo > 0 && MEDIDAS.includes(cu) && !MEDIDAS.includes(un);
         const dadosPreco = {
@@ -1372,12 +1388,15 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   rota('GET', '/crm/c/:col', async ({ p, q }) => {
     const ctx = await requireUsuario();
     // consumos e resgates também alimentam o resumo de clientes, visto por Vendas e Marketing
-    if (['consumos', 'resgates'].includes(p.col)) requireAnyAccess(ctx, ['atd', 'vnd', 'mkt'], 'ver');
+    if (['consumos', 'resgates'].includes(p.col)) requireAnyAccess(ctx, [p.col, 'clientes', 'recompensas'], 'ver');
+    // o Resultado (DRE, ticket médio e renda) lê receitas e despesas; o Calendário, as reservas
+    else if (['receitas', 'despesas'].includes(p.col)) requireAnyAccess(ctx, [p.col, 'resultado'], 'ver');
+    else if (p.col === 'reservas') requireAnyAccess(ctx, ['reservas', 'eventos'], 'ver');
     else requireAccess(ctx, collectionArea(p.col), 'ver');
     // ?desde=AAAA-MM-DD carrega só o período (receitas, despesas, consumos e reservas)
     const linhas = await colecaoDesde(p.col, q.get('desde'));
     // ao abrir os produtos, quem edita Vendas acerta o cardápio público com o que mudou (fotos, perfil da bebida…)
-    if (p.col === 'produtos' && ctx.acoes('vnd').includes('editar')) await sincronizarCardapio(linhas).catch(() => undefined);
+    if (p.col === 'produtos' && ctx.acoes('produtos').includes('editar')) await sincronizarCardapio(linhas).catch(() => undefined);
     return linhas;
   });
   /** JSON com as chaves em ordem, para comparar dois objetos. */
@@ -1467,7 +1486,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
         lote.set(doc(db, 'saldos', cur.clienteUid), { usados: increment((depois ? -1 : 1) * (Number(cur.custo) || 0)) }, { merge: true });
       }
       if (status !== cur.status) {
-        registrar(lote, ctx, 'atd', 'alterou o voucher', { colecao: 'resgates', alvo: `${cur.codigo ?? ''} · ${cur.recompensa ?? ''}`, detalhe: `Status: ${cur.status} → ${status}` });
+        registrar(lote, ctx, 'resgates', 'alterou o voucher', { colecao: 'resgates', alvo: `${cur.codigo ?? ''} · ${cur.recompensa ?? ''}`, detalhe: `Status: ${cur.status} → ${status}` });
       }
       await lote.commit();
       return { ...cur, status };

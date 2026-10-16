@@ -1,4 +1,3 @@
-import type { AreaKey } from './modules';
 import type { Row } from './lib/data';
 import { brl, daysUntil, isoToday, num, pct } from './lib/format';
 import { calcularFicha, fichaDe, precoNormalizado } from './lib/ficha';
@@ -62,7 +61,8 @@ export interface Kpi {
 
 export interface CollectionDef {
   id: string;
-  area: AreaKey;
+  /** Permissão (módulo) do cadastro: o próprio cadastro. */
+  area: string;
   title: string;
   description: string;
   singular: string;
@@ -137,7 +137,7 @@ export const STATUS_KEYS = ['status', 'resultado', 'estado', 'gravidade', 'prior
 export const COLLECTIONS: Record<string, CollectionDef> = {
   /* ---------------- Diretoria ---------------- */
   metas: {
-    id: 'metas', anexos: 'Atas e documentos', feminino: true, area: 'dir', title: 'Metas e decisões', singular: 'meta ou decisão',
+    id: 'metas', anexos: 'Atas e documentos', feminino: true, area: 'metas', title: 'Metas e decisões', singular: 'meta ou decisão',
     description: 'Objetivos da casa e decisões registradas pela diretoria.',
     filterKey: 'status', sortKey: 'prazo', sortDir: 'asc',
     fields: [
@@ -159,7 +159,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
 
   /* ---------------- RH ---------------- */
   colaboradores: {
-    id: 'colaboradores', anexos: 'Currículo e documentos', comFoto: true, area: 'rh', title: 'Colaboradores', singular: 'colaborador',
+    id: 'colaboradores', anexos: 'Currículo e documentos', comFoto: true, area: 'colaboradores', title: 'Colaboradores', singular: 'colaborador',
     description: 'Cadastro da equipe, cargos e vínculos.',
     filterKey: 'setor', sortKey: 'nome',
     fields: [
@@ -184,7 +184,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     },
   },
   ferias: {
-    id: 'ferias', anexos: 'Atestados e documentos', area: 'rh', title: 'Férias e afastamentos', singular: 'registro',
+    id: 'ferias', anexos: 'Atestados e documentos', area: 'ferias', title: 'Férias e afastamentos', singular: 'registro',
     description: 'Programação de férias, atestados e licenças.',
     filterKey: 'tipo', sortKey: 'inicio',
     fields: [
@@ -211,7 +211,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
 
   /* ---------------- DP Estrutura ---------------- */
   projetos: {
-    id: 'projetos', anexos: 'Propostas e documentos', area: 'dp', title: 'Projetos', singular: 'projeto',
+    id: 'projetos', anexos: 'Propostas e documentos', area: 'projetos', title: 'Projetos', singular: 'projeto',
     // o "Realizado" do projeto é acumulado: o valor de cada lançamento é digitado, para não contar o mesmo gasto duas vezes
     despesa: (r) => ({ descricao: juntar('Projeto', r.nome), categoria: 'Outras despesas', valor: 0 }),
     description: 'Obras, reformas, melhorias e implantações.',
@@ -244,7 +244,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     },
   },
   estoque: {
-    id: 'estoque', comFoto: true, porLocal: true, area: 'dp', title: 'Estoque', singular: 'item de estoque',
+    id: 'estoque', comFoto: true, porLocal: true, area: 'estoque', title: 'Estoque', singular: 'item de estoque',
     description: 'Insumos com controle de quantidade mínima e validade.',
     filterKey: 'categoria', sortKey: 'item',
     fields: [
@@ -282,7 +282,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     },
   },
   materiais: {
-    id: 'materiais', anexos: 'Fichas técnicas e manuais', comFoto: true, porLocal: true, area: 'dp', title: 'Materiais', singular: 'material',
+    id: 'materiais', anexos: 'Fichas técnicas e manuais', comFoto: true, porLocal: true, area: 'materiais', title: 'Materiais', singular: 'material',
     description: 'Patrimônio: equipamentos, utensílios, mobiliário e uniformes.',
     filterKey: 'tipo', sortKey: 'material',
     fields: [
@@ -306,7 +306,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   },
 
   compras: {
-    id: 'compras', comFoto: true, anexos: 'Nota fiscal (PDF ou XML em PDF)', compra: true, lancarAoCriar: true, feminino: true, area: 'dp',
+    id: 'compras', comFoto: true, anexos: 'Nota fiscal (PDF ou XML em PDF)', compra: true, lancarAoCriar: true, feminino: true, area: 'compras',
     title: 'Entrada de notas', singular: 'nota de compra',
     description: 'Lance a nota fiscal de compra (ou leia a foto com a IA): cada item soma no Estoque ou nos Materiais, no local escolhido, e atualiza o custo e a Tabela de preços do fornecedor.',
     sortKey: 'data', sortDir: 'desc',
@@ -332,7 +332,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
 
   /* ---------------- Administrativo ---------------- */
   precos: {
-    id: 'precos', area: 'adm', title: 'Tabela de preços', singular: 'preço de fornecedor',
+    id: 'precos', area: 'precos', title: 'Tabela de preços', singular: 'preço de fornecedor',
     description: 'Quanto cada fornecedor cobra por insumo. A ficha técnica dos produtos compara os preços e mostra o mais barato.',
     filterKey: 'status', filtros: ['insumo', 'fornecedor'], sortKey: 'insumo',
     fields: [
@@ -361,7 +361,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     },
   },
   terceirizados: {
-    id: 'terceirizados', anexos: 'Contrato, orçamentos e notas fiscais', area: 'adm', title: 'Serviços terceirizados', singular: 'serviço',
+    id: 'terceirizados', anexos: 'Contrato, orçamentos e notas fiscais', area: 'terceirizados', title: 'Serviços terceirizados', singular: 'serviço',
     despesa: (r) => ({ descricao: juntar(r.servico, r.empresa), categoria: 'Terceirizados', valor: n(r.valor) }),
     description: 'Prestadores recorrentes: segurança, limpeza, manutenção, música e outros.',
     filterKey: 'categoria', sortKey: 'proximo', sortDir: 'asc',
@@ -384,7 +384,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     },
   },
   fornecedores: {
-    id: 'fornecedores', itensDoFornecedor: true, anexos: 'Contratos, catálogos e tabelas de preço', area: 'adm', title: 'Fornecedores', singular: 'fornecedor',
+    id: 'fornecedores', itensDoFornecedor: true, anexos: 'Contratos, catálogos e tabelas de preço', area: 'fornecedores', title: 'Fornecedores', singular: 'fornecedor',
     description: 'Cadastro e avaliação de fornecedores.',
     filterKey: 'categoria', sortKey: 'nome',
     fields: [
@@ -405,7 +405,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     ],
   },
   contratos: {
-    id: 'contratos', anexos: 'Contrato assinado e aditivos', area: 'adm', title: 'Contratos', singular: 'contrato',
+    id: 'contratos', anexos: 'Contrato assinado e aditivos', area: 'contratos', title: 'Contratos', singular: 'contrato',
     despesa: (r) => ({ descricao: juntar(r.titulo, r.parte), categoria: CATEGORIA_DO_CONTRATO[s(r.tipo)] ?? 'Outras despesas', valor: n(r.valor) }),
     description: 'Contratos vigentes, vencimentos e renovações.',
     filterKey: 'status', sortKey: 'vencimento', sortDir: 'asc',
@@ -448,7 +448,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
 
   /* ---------------- Financeiro ---------------- */
   receitas: {
-    id: 'receitas', anexos: 'Notas fiscais e comprovantes', feminino: true, area: 'fin', title: 'Receitas', singular: 'receita',
+    id: 'receitas', anexos: 'Notas fiscais e comprovantes', feminino: true, area: 'receitas', title: 'Receitas', singular: 'receita',
     description: 'Entradas do caixa. Consumos lançados para clientes do aplicativo entram aqui automaticamente.',
     filterKey: 'categoria', sortKey: 'data', sortDir: 'desc',
     fields: [
@@ -460,7 +460,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     ],
   },
   despesas: {
-    id: 'despesas', anexos: 'Notas fiscais, boletos e comprovantes', feminino: true, area: 'fin', title: 'Despesas', singular: 'despesa',
+    id: 'despesas', anexos: 'Notas fiscais, boletos e comprovantes', feminino: true, area: 'despesas', title: 'Despesas', singular: 'despesa',
     description: 'Contas a pagar e lançamentos de despesa, inclusive a folha de pagamento.',
     filterKey: 'status', sortKey: 'vencimento', sortDir: 'asc',
     fields: [
@@ -485,7 +485,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
 
   /* ---------------- Marketing e Vendas (produtos são de Vendas) ---------------- */
   criacao: {
-    id: 'criacao', anexos: 'Artes e briefings', comFoto: true, feminino: true, area: 'mkt', title: 'Criação', singular: 'peça',
+    id: 'criacao', anexos: 'Artes e briefings', comFoto: true, feminino: true, area: 'criacao', title: 'Criação', singular: 'peça',
     description: 'Fluxo de produção de peças: do briefing à publicação.',
     filterKey: 'status', sortKey: 'entrega', sortDir: 'asc',
     fields: [
@@ -504,7 +504,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     ],
   },
   midias: {
-    id: 'midias', comFoto: true, feminino: true, area: 'mkt', title: 'Gestão de mídias', singular: 'publicação',
+    id: 'midias', comFoto: true, feminino: true, area: 'midias', title: 'Gestão de mídias', singular: 'publicação',
     despesa: (r) => ({ descricao: juntar('Mídia', r.conteudo, r.canal), categoria: 'Marketing', valor: n(r.investimento) }),
     description: 'Calendário de publicações e resultados por canal.',
     filterKey: 'canal', sortKey: 'data', sortDir: 'desc',
@@ -533,7 +533,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     },
   },
   produtos: {
-    id: 'produtos', comFoto: true, fichaTecnica: true, iaProduto: true, area: 'vnd', title: 'Produtos e cardápio', singular: 'produto',
+    id: 'produtos', comFoto: true, fichaTecnica: true, iaProduto: true, area: 'produtos', title: 'Produtos e cardápio', singular: 'produto',
     description: 'Produtos marcados como "No cardápio" e ativos aparecem no aplicativo dos clientes.',
     filterKey: 'categoria', sortKey: 'nome',
     fields: [
@@ -577,7 +577,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     },
   },
   guarnicoes: {
-    id: 'guarnicoes', area: 'vnd', title: 'Guarnições e itens fixos', singular: 'item fixo',
+    id: 'guarnicoes', area: 'guarnicoes', title: 'Guarnições e itens fixos', singular: 'item fixo',
     description: 'Gelo, rodelas de fruta, canudos e outros itens que não se pesam: cada um tem um valor fixo por drink, somado nas fichas técnicas em que for marcado.',
     filterKey: 'status', sortKey: 'nome',
     fields: [
@@ -593,7 +593,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     ],
   },
   recompensas: {
-    id: 'recompensas', comFoto: true, feminino: true, area: 'mkt', title: 'Recompensas', singular: 'recompensa',
+    id: 'recompensas', comFoto: true, feminino: true, area: 'recompensas', title: 'Recompensas', singular: 'recompensa',
     description: 'Catálogo de recompensas do programa de fidelidade. As ativas aparecem no aplicativo.',
     filterKey: 'status', sortKey: 'custo', sortDir: 'asc',
     fields: [
@@ -604,7 +604,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     ],
   },
   reservas: {
-    id: 'reservas', feminino: true, area: 'atd', title: 'Reservas', singular: 'reserva',
+    id: 'reservas', feminino: true, area: 'reservas', title: 'Reservas', singular: 'reserva',
     description: 'Solicitações feitas pelo aplicativo e reservas registradas pela equipe.',
     filterKey: 'status', sortKey: 'data', sortDir: 'asc',
     fields: [
@@ -630,7 +630,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
 
   /* ---------------- Jurídico ---------------- */
   trabalhista: {
-    id: 'trabalhista', anexos: 'Peças do processo e documentos', area: 'jur', title: 'Processos trabalhistas', singular: 'processo',
+    id: 'trabalhista', anexos: 'Peças do processo e documentos', area: 'trabalhista', title: 'Processos trabalhistas', singular: 'processo',
     description: 'Reclamações trabalhistas, audiências e valores envolvidos.',
     filterKey: 'status', sortKey: 'audiencia', sortDir: 'asc',
     fields: [
@@ -654,7 +654,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     },
   },
   consultoria: {
-    id: 'consultoria', anexos: 'Pareceres e relatórios', feminino: true, area: 'jur', title: 'Demandas de consultoria', singular: 'demanda',
+    id: 'consultoria', anexos: 'Pareceres e relatórios', feminino: true, area: 'consultoria', title: 'Demandas de consultoria', singular: 'demanda',
     description: 'Pareceres, revisões contratuais, licenças e questões societárias.',
     filterKey: 'tipo', sortKey: 'prazo', sortDir: 'asc',
     fields: [
@@ -675,7 +675,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
 
   /* ---------------- Fiscalização ---------------- */
   qualidade: {
-    id: 'qualidade', anexos: 'Laudos e checklists', feminino: true, area: 'fis', title: 'Controle de qualidade', singular: 'inspeção',
+    id: 'qualidade', anexos: 'Laudos e checklists', feminino: true, area: 'qualidade', title: 'Controle de qualidade', singular: 'inspeção',
     description: 'Inspeções periódicas por área com nota e resultado.',
     filterKey: 'area', sortKey: 'data', sortDir: 'desc',
     fields: [
@@ -697,7 +697,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     },
   },
   naoconformidades: {
-    id: 'naoconformidades', anexos: 'Relatórios e evidências', feminino: true, area: 'fis', title: 'Não conformidades', singular: 'não conformidade',
+    id: 'naoconformidades', anexos: 'Relatórios e evidências', feminino: true, area: 'naoconformidades', title: 'Não conformidades', singular: 'não conformidade',
     description: 'Problemas identificados e o plano de ação corretiva.',
     filterKey: 'status', sortKey: 'prazo', sortDir: 'asc',
     fields: [
@@ -722,7 +722,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
 
   /* ---------------- Atendimento: eventos do calendário ---------------- */
   eventos: {
-    id: 'eventos', area: 'atd', title: 'Calendário', singular: 'evento',
+    id: 'eventos', area: 'eventos', title: 'Calendário', singular: 'evento',
     description: 'Shows, festas, jogos e eventos fechados. O calendário junta os eventos com as reservas.',
     filterKey: 'tipo', sortKey: 'data', sortDir: 'asc',
     fields: [
@@ -739,7 +739,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
 
   /* ---------------- Marketing: publicidade e propaganda ---------------- */
   publicidade: {
-    id: 'publicidade', anexos: 'Peças, orçamentos e relatórios', feminino: true, area: 'mkt', title: 'Publicidade e propaganda', singular: 'campanha',
+    id: 'publicidade', anexos: 'Peças, orçamentos e relatórios', feminino: true, area: 'publicidade', title: 'Publicidade e propaganda', singular: 'campanha',
     description: 'Campanhas pagas e ações de divulgação: canal, período, investimento e resultado.',
     filterKey: 'status', filtros: ['canal'], sortKey: 'inicio', sortDir: 'desc',
     despesa: (r) => ({ descricao: juntar('Publicidade', r.campanha, r.canal), categoria: 'Marketing', valor: n(r.investimento) }),
@@ -761,7 +761,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
 
   /* ---------------- Fiscalização: atestados emitidos ---------------- */
   atestados: {
-    id: 'atestados', anexos: 'Documento emitido (PDF)', area: 'fis', title: 'Atestados emitidos', singular: 'atestado',
+    id: 'atestados', anexos: 'Documento emitido (PDF)', area: 'atestados', title: 'Atestados emitidos', singular: 'atestado',
     description: 'Alvarás, licenças, AVCB, laudos e certificados da casa, com a validade de cada um.',
     filterKey: 'documento', sortKey: 'validade', sortDir: 'asc',
     fields: [
@@ -788,7 +788,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
 
   /* ---------------- Financeiro: investidores, documentos e investimentos ---------------- */
   acoes: {
-    id: 'acoes', anexos: 'Contrato social, acordos e comprovantes', feminino: true, area: 'fin', title: 'Ações da empresa', singular: 'participação',
+    id: 'acoes', anexos: 'Contrato social, acordos e comprovantes', feminino: true, area: 'acoes', title: 'Ações da empresa', singular: 'participação',
     description: 'Sócios e investidores: quantidade de ações ou cotas, participação e valor aportado.',
     filterKey: 'tipo', sortKey: 'participacao', sortDir: 'desc',
     fields: [
@@ -813,7 +813,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     },
   },
   creditos: {
-    id: 'creditos', anexos: 'Contrato e extratos', area: 'fin', title: 'Crédito CNPJ', singular: 'crédito',
+    id: 'creditos', anexos: 'Contrato e extratos', area: 'creditos', title: 'Crédito CNPJ', singular: 'crédito',
     description: 'Empréstimos, financiamentos e limites no CNPJ: taxa, parcelas e saldo devedor.',
     filterKey: 'status', sortKey: 'proximaParcela', sortDir: 'asc',
     despesa: (r) => ({ descricao: juntar('Parcela', r.modalidade, r.instituicao), categoria: 'Tarifas bancárias', valor: n(r.parcela) }),
@@ -839,7 +839,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     },
   },
   docfin: {
-    id: 'docfin', anexos: 'Documento (PDF)', area: 'fin', title: 'Contratos onerosos e títulos', singular: 'documento',
+    id: 'docfin', anexos: 'Documento (PDF)', area: 'docfin', title: 'Contratos onerosos e títulos', singular: 'documento',
     description: 'Contratos onerosos, títulos concedidos (notas promissórias, duplicatas, cheques) e relatórios financeiros.',
     filterKey: 'tipo', sortKey: 'data', sortDir: 'desc',
     fields: [
@@ -854,7 +854,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     ],
   },
   investimentos: {
-    id: 'investimentos', anexos: 'Notas, orçamentos e comprovantes', area: 'fin', title: 'Lançamento de investimentos', singular: 'investimento',
+    id: 'investimentos', anexos: 'Notas, orçamentos e comprovantes', area: 'investimentos', title: 'Lançamento de investimentos', singular: 'investimento',
     description: 'Dinheiro aplicado na casa (equipamentos, reformas, estoque inicial…) e de onde ele veio.',
     filterKey: 'categoria', sortKey: 'data', sortDir: 'desc',
     fields: [
@@ -878,7 +878,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
 
   /* ---------------- Pessoal: prestadores (PF e PJ) e regras de conduta ---------------- */
   prestadores: {
-    id: 'prestadores', anexos: 'Contrato, documentos e notas', area: 'rh', title: 'Fornecedores de mão de obra', singular: 'contratado',
+    id: 'prestadores', anexos: 'Contrato, documentos e notas', area: 'prestadores', title: 'Fornecedores de mão de obra', singular: 'contratado',
     description: 'Pessoas físicas e jurídicas contratadas para prestar serviço à casa (freelas, músicos, segurança, contabilidade…).',
     filterKey: 'status', sortKey: 'nome',
     despesa: (r) => ({ descricao: juntar(r.servico, r.nome), categoria: 'Terceirizados', valor: n(r.valor) }),
@@ -896,7 +896,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     ],
   },
   conduta: {
-    id: 'conduta', anexos: 'Manual de Conduta (PDF)', feminino: true, area: 'rh', title: 'Regras de conduta', singular: 'versão do manual',
+    id: 'conduta', anexos: 'Manual de Conduta (PDF)', feminino: true, area: 'conduta', title: 'Regras de conduta', singular: 'versão do manual',
     description: 'Manual de Conduta do Bar do Dindo: a versão em vigor fica disponível em PDF para toda a equipe com acesso ao Pessoal.',
     filterKey: 'status', sortKey: 'vigencia', sortDir: 'desc',
     fields: [
@@ -910,7 +910,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
 
   /* ---------------- Jurídico: advogados e normas ---------------- */
   advogados: {
-    id: 'advogados', anexos: 'Procuração, contrato de honorários e documentos', area: 'jur', title: 'Advogados', singular: 'advogado',
+    id: 'advogados', anexos: 'Procuração, contrato de honorários e documentos', area: 'advogados', title: 'Advogados', singular: 'advogado',
     description: 'Advogados e escritórios que atendem a casa, por área de atuação.',
     filterKey: 'status', sortKey: 'nome',
     fields: [
@@ -926,7 +926,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     ],
   },
   normas: {
-    id: 'normas', anexos: 'Texto da norma ou resumo (PDF)', feminino: true, area: 'jur', title: 'Leis e normas', singular: 'norma',
+    id: 'normas', anexos: 'Texto da norma ou resumo (PDF)', feminino: true, area: 'normas', title: 'Leis e normas', singular: 'norma',
     description: 'Biblioteca de leis, normas e orientações que valem para a casa, com o link do texto oficial.',
     filterKey: 'ambito', sortKey: 'titulo',
     fields: [
@@ -939,7 +939,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
 
   /* ---------------- TI: chamados e equipamentos ---------------- */
   chamados: {
-    id: 'chamados', area: 'ti', title: 'Chamados de suporte', singular: 'chamado',
+    id: 'chamados', area: 'chamados', title: 'Chamados de suporte', singular: 'chamado',
     description: 'Problemas de sistema, internet, equipamentos e impressoras, até a solução.',
     filterKey: 'status', sortKey: 'abertura', sortDir: 'desc',
     fields: [
@@ -957,7 +957,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     ],
   },
   equipamentos: {
-    id: 'equipamentos', anexos: 'Notas fiscais, garantias e licenças', area: 'ti', title: 'Equipamentos e licenças', singular: 'equipamento',
+    id: 'equipamentos', anexos: 'Notas fiscais, garantias e licenças', area: 'equipamentos', title: 'Equipamentos e licenças', singular: 'equipamento',
     description: 'Computadores, celulares, maquininhas, rede, câmeras e as assinaturas de software, com garantia e renovação.',
     filterKey: 'tipo', sortKey: 'vencimento', sortDir: 'asc',
     fields: [

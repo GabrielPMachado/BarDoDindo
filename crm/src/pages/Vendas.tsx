@@ -34,7 +34,7 @@ export function Clientes() {
   const { data, loading, error } = useResource<Cliente[]>('/crm/clientes');
   const { pode } = useSession();
   // excluir apaga também consumos, vouchers e reservas do afilhado, por isso exige as duas permissões
-  const podeExcluir = pode('vnd', 'excluir') && pode('atd', 'excluir');
+  const podeExcluir = pode('clientes', 'excluir') && pode('consumos', 'excluir');
   const excluir = async (c: Cliente) => {
     await api(`/crm/clientes/${c.numero}`, { method: 'DELETE' });
     await reload('/crm/clientes');
@@ -131,8 +131,8 @@ export function Reservas() {
 export function Consumo() {
   const { pode } = useSession();
   // lançar consumo é "Criar"; apagar um lançamento (estorna pontos e receita) é "Excluir"
-  const canEdit = pode('atd', 'criar');
-  const canDelete = pode('atd', 'excluir');
+  const canEdit = pode('consumos', 'criar');
+  const canDelete = pode('consumos', 'excluir');
   const clientes = useResource<Cliente[]>('/crm/clientes');
   const produtos = useResource<{ id: string; nome: string; categoria: string; preco: number; foto?: string }[]>('/crm/produtos-venda').data ?? [];
   // a lista mostra os lançamentos recentes: basta o último mês
@@ -314,7 +314,7 @@ export function Consumo() {
 export function Resgates() {
   const { pode } = useSession();
   // dar baixa num voucher altera o resgate
-  const canEdit = pode('atd', 'editar');
+  const canEdit = pode('resgates', 'editar');
   const col = useCollection('resgates');
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('Disponível');

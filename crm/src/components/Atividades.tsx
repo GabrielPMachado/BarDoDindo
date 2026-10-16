@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowUpRight, BellRing, History } from 'lucide-react';
-import { AREAS, COLLECTION_PAGE, type AreaKey } from '../modules';
+import { AREAS, COLLECTION_PAGE, MODULOS } from '../modules';
 import { useResource } from '../lib/data';
 import { useSession } from '../lib/session';
 import { initials } from '../lib/format';
@@ -9,7 +9,7 @@ import { Modal } from './ui';
 
 export interface Atividade {
   id: string;
-  area: AreaKey;
+  area: string;
   acao: string;
   colecao?: string;
   alvo?: string;
@@ -19,8 +19,10 @@ export interface Atividade {
   criadoEm: string;
 }
 
-export const areaLabel = (k: string) => AREAS.find((a) => a.key === k)?.label ?? k;
-export const pageOf = (a: Atividade) => (a.colecao && COLLECTION_PAGE[a.colecao]) || AREAS.find((x) => x.key === a.area)?.items[0]?.path;
+// o histórico é gravado por módulo (tela/cadastro); os registros de antes da separação, por área
+export const areaLabel = (k: string) => MODULOS.find((m) => m.key === k)?.label ?? AREAS.find((a) => a.key === k)?.label ?? k;
+export const pageOf = (a: Atividade) => (a.colecao && COLLECTION_PAGE[a.colecao])
+  || AREAS.flatMap((x) => x.items).find((i) => i.perm === a.area)?.path || AREAS.find((x) => x.key === a.area)?.items[0]?.path;
 const hora = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
 function diaLabel(iso: string) {
