@@ -85,7 +85,14 @@ service cloud.firestore {
     match /atividades/{area}/itens/{id} {
       allow read: if podeVer(area);
       allow create: if podeAlterar(area)
-        && request.resource.data.keys().hasOnly(['area', 'acao', 'colecao', 'alvo', 'detalhe', 'usuarioId', 'usuarioNome', 'criadoEm'])
+        && request.resource.data.keys().hasOnly(['area', 'acao', 'colecao', 'alvo', 'detalhe', 'usuarioId', 'usuarioNome', 'criadoEm',
+          'registroId', 'antes', 'depois', 'omitidos', 'desfaz'])
+        // histórico detalhado (Logs de alterações): o registro e os valores de antes e de depois
+        && request.resource.data.get('registroId', '') is string && request.resource.data.get('registroId', '').size() <= 128
+        && request.resource.data.get('desfaz', '') is string && request.resource.data.get('desfaz', '').size() <= 128
+        && request.resource.data.get('antes', {}) is map && request.resource.data.get('antes', {}).size() <= 100
+        && request.resource.data.get('depois', {}) is map && request.resource.data.get('depois', {}).size() <= 100
+        && request.resource.data.get('omitidos', []) is list && request.resource.data.get('omitidos', []).size() <= 50
         && request.resource.data.area == area
         && request.resource.data.usuarioId == request.auth.uid
         && request.resource.data.usuarioNome == get(caminho('usuarios', request.auth.uid)).data.nome

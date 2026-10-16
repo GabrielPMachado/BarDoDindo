@@ -421,11 +421,47 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   /* ---------- painel de atualizações ----------
    * Cada alteração feita no CRM grava, no mesmo lote, quem fez o quê e quando.
    * Fica em `atividades/{área}/itens`, para que cada pessoa veja só o que é das áreas que ela acessa. */
-  function registrar(lote: WriteBatch, ctx: Ctx, area: string, acao: string, extra: { colecao?: string; alvo?: string; detalhe?: string } = {}) {
+  interface ExtraAtividade {
+    colecao?: string; alvo?: string; detalhe?: string;
+    /** Histórico detalhado (Logs de alterações): o registro, os valores de antes e de depois e o que ficou de fora. */
+    registroId?: string; antes?: Dados; depois?: Dados; omitidos?: string[];
+    /** Esta atividade desfaz outra (id da atividade desfeita). */
+    desfaz?: string;
+  }
+  function registrar(lote: WriteBatch, ctx: Ctx, area: string, acao: string, extra: ExtraAtividade = {}) {
     lote.set(doc(collection(db, 'atividades', area, 'itens')), {
       area, acao: str(acao, 120), colecao: extra.colecao ?? '', alvo: str(extra.alvo, 160), detalhe: str(extra.detalhe, 300),
       usuarioId: ctx.usuario.id, usuarioNome: ctx.usuario.nome, criadoEm: now(),
+      ...(extra.registroId ? { registroId: extra.registroId } : {}),
+      ...(extra.antes ? { antes: extra.antes } : {}),
+      ...(extra.depois ? { depois: extra.depois } : {}),
+      ...(extra.omitidos?.length ? { omitidos: extra.omitidos.slice(0, 50) } : {}),
+      ...(extra.desfaz ? { desfaz: extra.desfaz } : {}),
     });
+  }
+
+  /* ---------- histórico detalhado ---------- */
+  // campos que não entram no histórico: controle interno, ou grandes demais (foto, PDFs) — esses não voltam ao desfazer
+  const SEM_HISTORICO = ['atualizadoEm', 'id'];
+  const NAO_VOLTAM = ['foto', 'anexos', 'anexosNovos'];
+  /** Valores de um registro para o histórico: tira o que é grande demais e anota o que ficou de fora. */
+  function paraHistorico(d: Dados, chaves?: string[]) {
+    const valores: Dados = {}, omitidos: string[] = [];
+    for (const k of chaves ?? Object.keys(d)) {
+      if (SEM_HISTORICO.includes(k)) continue;
+      const v = d[k] === undefined ? null : d[k];
+      if (NAO_VOLTAM.includes(k) || JSON.stringify(v).length > 6000) { omitidos.push(k); continue; }
+      valores[k] = v;
+      if (Object.keys(valores).length >= 90) break;
+    }
+    return { valores, omitidos };
+  }
+  const igual = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  /** O que mudou numa alteração: os campos do patch com valor diferente do atual. */
+  function diferencas(cur: Dados, patch: Dados) {
+    const chaves = Object.keys(patch).filter((k) => !SEM_HISTORICO.includes(k) && !igual(cur[k], patch[k]));
+    const a = paraHistorico(cur, chaves), d = paraHistorico(patch, chaves);
+    return { antes: a.valores, depois: d.valores, omitidos: [...new Set([...a.omitidos, ...d.omitidos])] };
   }
 
   /* ---------- rotas ---------- */
@@ -1440,8 +1476,10 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     if (p.col === 'compras') await aplicarCompra(lote, ctx, dados, 1);
     lote.set(ref, dados);
     espelhar(lote, p.col, ref.id, dados);
+    const criado = paraHistorico(dados);
     registrar(lote, ctx, collectionArea(p.col), `cadastrou ${REGISTRO[p.col] ?? 'o registro'}`, {
       colecao: p.col, alvo: nomeDe(dados), detalhe: [valorDe(dados), resumoAnexos(enviados.length, 0)].filter(Boolean).join(' · '),
+      registroId: ref.id, depois: criado.valores, omitidos: criado.omitidos,
     });
     try {
       await lote.commit();
@@ -1501,6 +1539,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     registrar(lote, ctx, collectionArea(p.col), `alterou ${REGISTRO[p.col] ?? 'o registro'}`, {
       colecao: p.col, alvo: nomeDe({ ...cur, ...patch }),
       detalhe: [novoStatus, valorDe({ ...cur, ...patch }), resumoAnexos(enviados.length, removidos.length)].filter(Boolean).join(' · '),
+      registroId: p.id, ...diferencas(cur, patch),
     });
     try {
       await lote.commit();
@@ -1510,8 +1549,9 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     }
     return { ...cur, ...patch };
   });
-  rota('DELETE', '/crm/c/:col/:id', async ({ p }) => {
-    const ctx = await requireUsuario();
+  /** Exclui um registro com os efeitos do módulo (estornos, espelhos, PDFs); `desfaz` = atividade que esta exclusão desfaz. */
+  async function excluirRegistro(ctx: Ctx, col: string, id: string, desfaz?: string) {
+    const p = { col, id };
     requireAccess(ctx, collectionArea(p.col), 'excluir');
     const cur = await registro(p.col, p.id);
     if (!cur) return fail(404, 'Registro não encontrado.');
@@ -1547,10 +1587,74 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     lote.delete(doc(db, p.col, p.id));
     apagarAnexos(lote, anexosDe(cur));
     espelhar(lote, p.col, p.id, null);
-    registrar(lote, ctx, collectionArea(p.col), `excluiu ${REGISTRO[p.col] ?? 'o registro'}`, { colecao: p.col, alvo: nomeDe(cur), detalhe: valorDe(cur) });
+    const excluido = paraHistorico(cur);
+    registrar(lote, ctx, collectionArea(p.col), desfaz ? `desfez o cadastro d${(REGISTRO[p.col] ?? 'o registro').slice(0, 1) === 'a' ? 'a' : 'o'} ${(REGISTRO[p.col] ?? 'o registro').slice(2)}` : `excluiu ${REGISTRO[p.col] ?? 'o registro'}`, {
+      colecao: p.col, alvo: nomeDe(cur), detalhe: valorDe(cur), registroId: p.id, antes: excluido.valores, omitidos: excluido.omitidos, desfaz,
+    });
     await lote.commit();
     return { ok: true };
+  }
+  rota('DELETE', '/crm/c/:col/:id', async ({ p }) => excluirRegistro(await requireUsuario(), p.col, p.id));
+
+  /* Logs de alterações: desfazer uma alteração, apagar o que foi cadastrado ou restaurar o que foi excluído.
+   * Vale a permissão do cadastro (editar, excluir ou criar); módulos com efeitos próprios (estoque, pontos) ficam de fora. */
+  const SEM_DESFAZER = ['consumos', 'resgates', 'compras'];
+  rota('POST', '/crm/atividades/:area/:id/desfazer', async ({ p, b }) => {
+    const ctx = await requireUsuario();
+    const at = await documento(`atividades/${p.area}/itens/${p.id}`);
+    if (!at) return fail(404, 'Atividade não encontrada.');
+    const col = String(at.colecao ?? ''), id = String(at.registroId ?? '');
+    if (!COLLECTIONS[col] || !id) return fail(400, 'Esta atividade foi registrada antes do histórico detalhado e não pode ser desfeita.');
+    if (SEM_DESFAZER.includes(col)) return fail(400, 'Este cadastro tem efeitos próprios (estoque, pontos ou receitas): corrija pelo próprio módulo.');
+    const acao = String(at.acao ?? '');
+    const omitidos = new Set<string>(Array.isArray(at.omitidos) ? at.omitidos : []);
+    const voltar = (d: unknown) => Object.fromEntries(Object.entries((d ?? {}) as Dados).filter(([k]) => !omitidos.has(k) && !NAO_VOLTAM.includes(k)));
+    const nome = REGISTRO[col] ?? 'o registro';
+    const cur = await registro(col, id);
+    if (acao.startsWith('cadastrou')) {
+      if (!cur) return fail(400, 'Esse registro já foi excluído.');
+      return excluirRegistro(ctx, col, id, p.id);
+    }
+    if (acao.startsWith('excluiu')) {
+      requireAccess(ctx, collectionArea(col), 'criar');
+      if (cur) return fail(400, 'Esse registro já existe de novo (talvez já tenha sido restaurado).');
+      const dados: Dados = { ...voltar(at.antes), atualizadoEm: now() };
+      if (col === 'funcoes') dados.sistema = false;
+      const lote = writeBatch(db);
+      lote.set(doc(db, col, id), dados);
+      espelhar(lote, col, id, dados);
+      registrar(lote, ctx, collectionArea(col), `restaurou ${nome}`, {
+        colecao: col, alvo: nomeDe(dados), detalhe: omitidos.size ? 'sem a foto e os PDFs, que não voltam' : valorDe(dados),
+        registroId: id, depois: paraHistorico(dados).valores, desfaz: p.id,
+      });
+      await lote.commit();
+      return { ok: true };
+    }
+    if (acao.startsWith('alterou') || acao.startsWith('desfez a alteração')) {
+      requireAccess(ctx, collectionArea(col), 'editar');
+      if (!cur) return fail(400, 'Esse registro foi excluído depois: restaure-o primeiro.');
+      if (col === 'funcoes' && cur.sistema) fail(400, 'A função Administrador não pode ser alterada.');
+      if (col === 'receitas' && cur.consumoId) fail(400, 'Receitas geradas por consumo são alteradas pelo lançamento de consumo.');
+      const volta = voltar(at.antes);
+      if (!Object.keys(volta).length) return fail(400, 'Não há o que desfazer: só mudaram a foto ou os PDFs, que não ficam no histórico.');
+      // mudou de novo depois? avisa antes de sobrescrever
+      const mudouDepois = Object.keys(volta).filter((k) => !igual(cur[k], (at.depois as Dados | undefined)?.[k]));
+      if (mudouDepois.length && b?.forcar !== true) return fail(409, `Esse registro foi alterado de novo depois (${mudouDepois.length} ${mudouDepois.length === 1 ? 'campo' : 'campos'}). Desfazer vai sobrescrever essas mudanças.`);
+      const patch: Dados = { ...volta, atualizadoEm: now() };
+      await vincularCliente(col, patch);
+      const lote = writeBatch(db);
+      lote.update(doc(db, col, id), patch);
+      espelhar(lote, col, id, { ...cur, ...patch });
+      registrar(lote, ctx, collectionArea(col), `desfez a alteração em ${nome}`, {
+        colecao: col, alvo: nomeDe({ ...cur, ...patch }), registroId: id, ...diferencas(cur, patch), desfaz: p.id,
+      });
+      await lote.commit();
+      return { ok: true };
+    }
+    return fail(400, 'Esta atividade não pode ser desfeita.');
   });
+
+
 
   /* ---------- entrada única ---------- */
   async function request<T>(path: string, options: { method?: string; body?: unknown } = {}): Promise<T> {
