@@ -111,7 +111,7 @@ function Guard({ perm, children }: { perm: string; children: ReactNode }) {
     return (
       <div className="page">
         <EmptyState title="Acesso não permitido">
-          <ShieldOff size={16} className="inline-icon" /> Sua função não tem acesso a esta área. Fale com o administrador do sistema.
+          <ShieldOff size={16} className="inline-icon" /> Sua função não tem acesso a esta área. Fale com a Presidência.
         </EmptyState>
       </div>
     );

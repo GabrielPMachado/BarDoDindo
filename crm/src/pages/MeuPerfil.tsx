@@ -99,7 +99,7 @@ export default function MeuPerfil() {
 
   return (
     <div className="page">
-      <PageHead title="Meus dados" description="Suas informações no sistema. E-mail de acesso, função e status são definidos pelo administrador." />
+      <PageHead title="Meus dados" description="Suas informações no sistema. E-mail de acesso, função e status são definidos pela Presidência." />
 
       <section className="panel profile-card">
         <div className="profile-card__photo">

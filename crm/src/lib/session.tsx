@@ -98,7 +98,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     refresh();
   }, [refresh, reset]);
 
-  // "Meu perfil" é de todo usuário; a função Administrador (de sistema) tem tudo; as demais áreas dependem da função
+  // "Meu perfil" é de todo usuário; a Presidência (função de sistema) tem tudo; as demais áreas dependem da função
   const acoes = (modulo: string): Acao[] => (modulo === 'eu' || funcao?.sistema ? acoesDe('edit') : acoesNaArea(funcao?.permissoes as Record<string, unknown> | undefined, modulo));
   const access = (modulo: string): Access => resumoAcesso(acoes(modulo));
 
@@ -109,7 +109,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     funcao,
     serverError,
     refresh,
-    // a função Administrador (de sistema) tem acesso total, inclusive a áreas criadas depois
+    // a Presidência (função de sistema) tem acesso total, inclusive a áreas criadas depois
     access,
     pode: (area, acao) => acoes(area).includes(acao),
     boasVindas,

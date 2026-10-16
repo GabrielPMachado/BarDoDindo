@@ -74,6 +74,10 @@ export function permissaoDe(perm: Record<string, unknown>, k: string): unknown {
   return undefined;
 }
 
+/** Nome da função de sistema (acesso total). Antes se chamava "Administrador": o nome gravado é trocado ao exibir. */
+export const PRESIDENCIA = 'Presidência';
+const comNomeDaFuncao = (f: Dados) => (f.sistema ? { ...f, nome: PRESIDENCIA } : f);
+
 /** Como cada registro é citado no painel de atualizações ("cadastrou o produto …"). */
 const REGISTRO: Record<string, string> = {
   metas: 'a meta', colaboradores: 'o colaborador', ferias: 'o registro de férias/afastamento',
@@ -398,8 +402,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const usuario = await documento(`usuarios/${u.uid}`);
     if (!usuario || usuario.status !== 'Ativo') return fail(401, 'Sessão expirada. Entre novamente.');
     const funcao = await documento(`funcoes/${usuario.funcaoId}`);
-    // a função Administrador (de sistema) sempre tem acesso total, inclusive a áreas novas
-    // permissões da função, área por área; a função Administrador (de sistema) tem todas, inclusive em áreas novas
+    // a Presidência (função de sistema) sempre tem acesso total, inclusive a áreas novas
+    // permissões da função, área por área; a Presidência (função de sistema) tem todas, inclusive em áreas novas
     // Vendas foi separada de Marketing: sem permissões próprias para Vendas, valem as de Marketing
     const perm = (funcao?.permissoes ?? {}) as Dados;
     const acoes = (area: string): string[] => (funcao?.sistema ? [...ACOES] : acoesDe(permissaoDe(perm, area)));
@@ -646,7 +650,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const t = now();
     const lote = writeBatch(db);
     lote.set(doc(db, 'funcoes/admin'), {
-      nome: 'Administrador', descricao: 'Acesso total ao sistema, inclusive configurações.', permissoes: Object.fromEntries(AREAS.map((a) => [a, [...ACOES]])), sistema: true, criadoEm: t, atualizadoEm: t,
+      nome: PRESIDENCIA, descricao: 'Acesso total ao sistema, inclusive configurações.', permissoes: Object.fromEntries(AREAS.map((a) => [a, [...ACOES]])), sistema: true, criadoEm: t, atualizadoEm: t,
     });
     lote.set(doc(db, 'usuarios', cred.user.uid), { nome, email, funcaoId: 'admin', status: 'Ativo', ultimoAcesso: t, criadoEm: t });
     lote.set(doc(db, 'meta/setup'), { feitoEm: t });
@@ -667,7 +671,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     }
     if (u.status !== 'Ativo') {
       await sair();
-      fail(403, 'Usuário inativo. Procure o administrador.');
+      fail(403, 'Usuário inativo. Procure a Presidência.');
     }
     const lote = writeBatch(db);
     lote.update(doc(db, 'usuarios', user.uid), { ultimoAcesso: now() });
@@ -677,9 +681,9 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   rota('POST', '/crm/logout', async () => { await sair(); return { ok: true }; });
   rota('GET', '/crm/me', async () => {
     const ctx = await requireUsuario();
-    return { usuario: publicUsuario(ctx.usuario), funcao: ctx.funcao };
+    return { usuario: publicUsuario(ctx.usuario), funcao: ctx.funcao && comNomeDaFuncao(ctx.funcao) };
   });
-  /* Meu perfil: cada usuário edita as próprias informações (e-mail, função e status continuam com o administrador) */
+  /* Meu perfil: cada usuário edita as próprias informações (e-mail, função e status continuam com a Presidência) */
   rota('PUT', '/crm/me', async ({ b }) => {
     const ctx = await requireUsuario();
     const nome = str(b.nome, 120);
@@ -808,7 +812,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const usuario = { nome, email, funcaoId, status: b.status === 'Inativo' ? 'Inativo' : 'Ativo', ultimoAcesso: null, criadoEm: now() };
     const lote = writeBatch(db);
     lote.set(doc(db, 'usuarios', uid), usuario);
-    registrar(lote, ctx, 'usuarios', 'cadastrou o usuário', { colecao: 'usuarios', alvo: nome, detalhe: `Função: ${funcao.nome}` });
+    registrar(lote, ctx, 'usuarios', 'cadastrou o usuário', { colecao: 'usuarios', alvo: nome, detalhe: `Função: ${comNomeDaFuncao(funcao).nome}` });
     await lote.commit();
     return publicUsuario({ ...usuario, id: uid });
   });
@@ -828,11 +832,11 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const funcoes = await colecao('funcoes');
     if (!funcoes.some((f) => f.id === funcaoId)) fail(400, 'Selecione uma função.');
     const deixaDeSerAdmin = u.funcaoId === 'admin' && u.status === 'Ativo' && (funcaoId !== 'admin' || status !== 'Ativo');
-    if (deixaDeSerAdmin && activeAdmins(usuarios) <= 1) fail(400, 'É preciso manter pelo menos um administrador ativo.');
+    if (deixaDeSerAdmin && activeAdmins(usuarios) <= 1) fail(400, 'É preciso manter pelo menos um usuário ativo na Presidência.');
     const lote = writeBatch(db);
     lote.update(doc(db, 'usuarios', p.id), { nome, funcaoId, status });
     const mudancas = [
-      funcaoId !== u.funcaoId ? `Função: ${funcoes.find((f) => f.id === funcaoId)?.nome ?? funcaoId}` : '',
+      funcaoId !== u.funcaoId ? `Função: ${((f) => (f ? comNomeDaFuncao(f).nome : funcaoId))(funcoes.find((f) => f.id === funcaoId))}` : '',
       status !== u.status ? `Status: ${status}` : '',
       nome !== u.nome ? `Nome: ${nome}` : '',
     ].filter(Boolean).join(' · ');
@@ -854,7 +858,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const usuarios = await colecao('usuarios');
     const u = usuarios.find((x) => x.id === p.id);
     if (!u) return fail(404, 'Usuário não encontrado.');
-    if (u.funcaoId === 'admin' && u.status === 'Ativo' && activeAdmins(usuarios) <= 1) fail(400, 'É preciso manter pelo menos um administrador ativo.');
+    if (u.funcaoId === 'admin' && u.status === 'Ativo' && activeAdmins(usuarios) <= 1) fail(400, 'É preciso manter pelo menos um usuário ativo na Presidência.');
     // sem o cadastro em `usuarios` a conta não passa mais pelas regras nem pelo login do CRM
     const lote = writeBatch(db);
     lote.delete(doc(db, 'usuarios', p.id));
@@ -941,11 +945,11 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     return { proximo: maior + 1 };
   });
 
-  /* CRM: zerar o sistema (só a função Administrador). Apaga TODOS os dados, inclusive usuários, funções e parâmetros:
+  /* CRM: zerar o sistema (só a Presidência). Apaga TODOS os dados, inclusive usuários, funções e parâmetros:
    * o sistema volta ao "primeiro acesso". As contas de login (Firebase Auth) continuam existindo. */
   rota('POST', '/crm/admin/zerar', async ({ b }) => {
     const ctx = await requireUsuario();
-    if (!ctx.funcao?.sistema) fail(403, 'Só a função Administrador pode zerar o sistema.');
+    if (!ctx.funcao?.sistema) fail(403, 'Só a Presidência pode zerar o sistema.');
     if (b.confirmacao !== 'ZERAR TUDO') fail(400, 'Para zerar, confirme com "ZERAR TUDO".');
     const todos = async (...caminho: string[]) => (await getDocs(collection(db, caminho.join('/')))).docs.map((d) => d.ref);
     const cols = [...Object.keys(COLLECTIONS).filter((c) => c !== 'funcoes'), 'clientes', 'saldos', 'cardapio', 'ref_colaboradores', 'ref_fornecedores', 'config', 'segredos'];
@@ -958,12 +962,12 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     refs.push(...anexos);
     refs.push(doc(db, 'meta', 'contadores'));
     const usuarios = await todos('usuarios');
-    // preferências de cada usuário (só a própria pessoa lê; o Administrador apaga pela lista de usuários)
+    // preferências de cada usuário (só a própria pessoa lê; a Presidência apaga pela lista de usuários)
     refs.push(...usuarios.map((r) => doc(db, 'preferencias', r.id)));
     refs.push(...usuarios.filter((r) => r.id !== ctx.usuario.id));
     refs.push(...(await todos('funcoes')).filter((r) => r.id !== ctx.funcao?.id && r.id !== ctx.usuario.funcaoId));
     let n = await apagarEmLotes(refs);
-    // por último, num lote só: o próprio usuário, a função Administrador e o registro do primeiro acesso
+    // por último, num lote só: o próprio usuário, a função Presidência e o registro do primeiro acesso
     const fim = writeBatch(db);
     fim.delete(doc(db, 'usuarios', ctx.usuario.id));
     fim.delete(doc(db, 'funcoes', ctx.usuario.funcaoId));
@@ -1433,7 +1437,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const linhas = await colecaoDesde(p.col, q.get('desde'));
     // ao abrir os produtos, quem edita Vendas acerta o cardápio público com o que mudou (fotos, perfil da bebida…)
     if (p.col === 'produtos' && ctx.acoes('produtos').includes('editar')) await sincronizarCardapio(linhas).catch(() => undefined);
-    return linhas;
+    return p.col === 'funcoes' ? linhas.map(comNomeDaFuncao) : linhas;
   });
   /** JSON com as chaves em ordem, para comparar dois objetos. */
   const canon = (v: unknown): string => Array.isArray(v) ? `[${v.map(canon).join(',')}]`
@@ -1503,7 +1507,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const removidos = atuais.filter((a) => !mantidos.includes(a));
     conferirAnexos(p.col, mantidos.length + novos.length, novos);
     if (p.col === 'funcoes') {
-      if (cur.sistema) fail(400, 'A função Administrador não pode ser alterada.');
+      if (cur.sistema) fail(400, 'A função Presidência não pode ser alterada.');
       patch.sistema = false;
     }
     if (p.col === 'consumos') fail(400, 'Consumos não podem ser editados. Exclua e lance novamente.');
@@ -1556,7 +1560,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const cur = await registro(p.col, p.id);
     if (!cur) return fail(404, 'Registro não encontrado.');
     if (p.col === 'funcoes') {
-      if (cur.sistema) fail(400, 'A função Administrador não pode ser excluída.');
+      if (cur.sistema) fail(400, 'A função Presidência não pode ser excluída.');
       if ((await colecao('usuarios')).some((u) => u.funcaoId === p.id)) fail(400, 'Há usuários com esta função. Altere-os antes de excluir.');
     }
     if (p.col === 'receitas' && cur.consumoId) fail(400, 'Esta receita veio de um consumo. Exclua o consumo para estorná-la.');
@@ -1633,7 +1637,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     if (acao.startsWith('alterou') || acao.startsWith('desfez a alteração')) {
       requireAccess(ctx, collectionArea(col), 'editar');
       if (!cur) return fail(400, 'Esse registro foi excluído depois: restaure-o primeiro.');
-      if (col === 'funcoes' && cur.sistema) fail(400, 'A função Administrador não pode ser alterada.');
+      if (col === 'funcoes' && cur.sistema) fail(400, 'A função Presidência não pode ser alterada.');
       if (col === 'receitas' && cur.consumoId) fail(400, 'Receitas geradas por consumo são alteradas pelo lançamento de consumo.');
       const volta = voltar(at.antes);
       if (!Object.keys(volta).length) return fail(400, 'Não há o que desfazer: só mudaram a foto ou os PDFs, que não ficam no histórico.');
