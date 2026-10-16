@@ -36,7 +36,7 @@ export default function Login() {
         {setupPendente ? (
           <>
             <h1><ShieldCheck size={22} /> Primeiro acesso</h1>
-            <p className="muted">Crie o usuário administrador. Ele poderá cadastrar os demais usuários e definir as funções de cada um.</p>
+            <p className="muted">Crie o acesso da Presidência. Ela poderá cadastrar os demais usuários e definir as funções de cada um.</p>
             <label htmlFor="nome">Nome completo</label>
             <input id="nome" className="input" autoComplete="name" required value={form.nome} onChange={set('nome')} />
           </>
@@ -56,7 +56,7 @@ export default function Login() {
         )}
         {(error || serverError) && <ErrorBox>{error ?? serverError}</ErrorBox>}
         <button className="btn btn--primary btn--lg" disabled={busy}>
-          {setupPendente ? <><ShieldCheck size={18} /> Criar administrador</> : <><LogIn size={18} /> Login</>}
+          {setupPendente ? <><ShieldCheck size={18} /> Criar acesso da Presidência</> : <><LogIn size={18} /> Login</>}
         </button>
       </form>
     </div>
