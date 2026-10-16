@@ -35,17 +35,31 @@ const codigo = (e: unknown) => String((e as { code?: string } | null)?.code ?? '
 export const PAI_DO_MODULO: Record<string, string> = {
   painel: 'dir', metas: 'dir',
   reservas: 'atd', consumos: 'atd', resgates: 'atd', eventos: 'atd',
-  produtos: 'vnd', guarnicoes: 'vnd', clientes: 'vnd',
+  produtos: 'vnd', fichas: 'vnd', guarnicoes: 'vnd', clientes: 'vnd',
   recompensas: 'mkt', criacao: 'mkt', midias: 'mkt', publicidade: 'mkt',
   projetos: 'dp', estoque: 'dp', materiais: 'dp', compras: 'dp',
   terceirizados: 'adm', fornecedores: 'adm', precos: 'adm', contratos: 'adm',
   qualidade: 'fis', atestados: 'fis', naoconformidades: 'fis',
-  receitas: 'fin', despesas: 'fin', resultado: 'fin', acoes: 'fin', creditos: 'fin', docfin: 'fin', investimentos: 'fin',
-  colaboradores: 'rh', prestadores: 'rh', folha: 'rh', ferias: 'rh', conduta: 'rh',
-  consultoria: 'jur', trabalhista: 'jur', advogados: 'jur', normas: 'jur',
+  receitas: 'fin', despesas: 'fin', despesas_variaveis: 'fin', despesas_fixas: 'fin', resultado: 'fin', ticket: 'fin', renda: 'fin',
+  acoes: 'fin', creditos: 'fin', docfin: 'fin', relatorios: 'fin', investimentos: 'fin',
+  colaboradores: 'rh', prestadores: 'rh', prestadores_pj: 'rh', folha: 'rh', ferias: 'rh', afastamentos: 'rh', conduta: 'rh',
+  consultoria: 'jur', trabalhista: 'jur', advogados: 'jur', advogados_trabalhista: 'jur', advogados_empresarial: 'jur',
+  normas: 'jur', normas_trabalhista: 'jur', normas_empresarial: 'jur',
   logs: 'ti', chamados: 'ti', equipamentos: 'ti',
   usuarios: 'cfg', funcoes: 'cfg', parametros: 'cfg',
 };
+/**
+ * Telas que mostram uma parte de um cadastro (ex.: só as despesas fixas) têm permissão própria; funções gravadas antes
+ * dessa separação não têm a tela: vale a do cadastro (módulo base). Igual a `base()` em firestore.rules.
+ */
+export const BASE_DA_PAGINA: Record<string, string> = {
+  fichas: 'produtos', despesas_variaveis: 'despesas', despesas_fixas: 'despesas', ticket: 'resultado', renda: 'resultado',
+  relatorios: 'docfin', prestadores_pj: 'prestadores', afastamentos: 'ferias',
+  advogados_trabalhista: 'advogados', advogados_empresarial: 'advogados', normas_trabalhista: 'normas', normas_empresarial: 'normas',
+};
+/** Telas de cada cadastro: quem tem alguma delas usa o cadastro (o banco libera o cadastro inteiro; cada tela mostra a sua parte). */
+export const PAGINAS_DA_COLECAO: Record<string, string[]> = Object.entries(BASE_DA_PAGINA)
+  .reduce<Record<string, string[]>>((m, [pg, base]) => ((m[base] ??= [base]).push(pg), m), {});
 /** Áreas antigas que herdaram permissões de outra (Vendas foi separada de Marketing). */
 const LEGADO: Record<string, string> = { vnd: 'mkt' };
 export const MODULOS = Object.keys(PAI_DO_MODULO).concat('mon');
@@ -70,7 +84,8 @@ function acoesDe(p: unknown): Acao[] {
 const AREAS = ['dir', 'atd', 'vnd', 'mkt', 'rh', 'dp', 'adm', 'fin', 'jur', 'fis', 'mon', 'ti', 'cfg'];
 /** Permissões de um módulo: as do próprio módulo; sem elas, as da área a que ele pertence (formato antigo). */
 export function permissaoDe(perm: Record<string, unknown>, k: string): unknown {
-  for (const chave of [k, PAI_DO_MODULO[k], LEGADO[PAI_DO_MODULO[k] ?? ''], LEGADO[k]]) if (chave && chave in perm) return perm[chave];
+  const base = BASE_DA_PAGINA[k] ?? k;
+  for (const chave of [k, base, PAI_DO_MODULO[base], LEGADO[PAI_DO_MODULO[base] ?? ''], LEGADO[k]]) if (chave && chave in perm) return perm[chave];
   return undefined;
 }
 
@@ -415,6 +430,10 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   type Ctx = Awaited<ReturnType<typeof requireUsuario>>;
   function requireAccess(ctx: Ctx, area: string, acao: Acao) {
     if (!ctx.acoes(area).includes(acao)) fail(403, semPermissao);
+  }
+  /** Acesso a um cadastro: vale qualquer tela dele (ex.: despesas fixas, variáveis ou lançamento). */
+  function requireColecao(ctx: Ctx, col: string, acao: Acao) {
+    requireAnyAccess(ctx, PAGINAS_DA_COLECAO[collectionArea(col)] ?? [collectionArea(col)], acao);
   }
   /** Exige acesso em pelo menos uma das áreas informadas. */
   function requireAnyAccess(ctx: Ctx, areas: string[], acao: Acao) {
@@ -1341,7 +1360,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const ctx = await requireUsuario();
     const meta = (await getDoc(doc(db, 'anexos', p.id))).data();
     if (!meta) return fail(404, 'Arquivo não encontrado.');
-    requireAccess(ctx, collectionArea(meta.colecao), 'ver');
+    requireColecao(ctx, meta.colecao, 'ver');
     const partes = await Promise.all(Array.from({ length: Number(meta.partes) || 1 }, (_, i) => getDoc(doc(db, 'anexos', p.id, 'partes', String(i)))));
     if (partes.some((s) => !s.exists())) fail(404, 'Arquivo incompleto. Envie o PDF novamente.');
     return { nome: meta.nome, tamanho: meta.tamanho, dados: partes.map((s) => String(s.data()?.dados ?? '')).join('') };
@@ -1430,9 +1449,9 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     // consumos e resgates também alimentam o resumo de clientes, visto por Vendas e Marketing
     if (['consumos', 'resgates'].includes(p.col)) requireAnyAccess(ctx, [p.col, 'clientes', 'recompensas'], 'ver');
     // o Resultado (DRE, ticket médio e renda) lê receitas e despesas; o Calendário, as reservas
-    else if (['receitas', 'despesas'].includes(p.col)) requireAnyAccess(ctx, [p.col, 'resultado'], 'ver');
+    else if (['receitas', 'despesas'].includes(p.col)) requireAnyAccess(ctx, [...(PAGINAS_DA_COLECAO[p.col] ?? [p.col]), 'resultado', 'ticket', 'renda'], 'ver');
     else if (p.col === 'reservas') requireAnyAccess(ctx, ['reservas', 'eventos'], 'ver');
-    else requireAccess(ctx, collectionArea(p.col), 'ver');
+    else requireColecao(ctx, p.col, 'ver');
     // ?desde=AAAA-MM-DD carrega só o período (receitas, despesas, consumos e reservas)
     const linhas = await colecaoDesde(p.col, q.get('desde'));
     // ao abrir os produtos, quem edita Vendas acerta o cardápio público com o que mudou (fotos, perfil da bebida…)
@@ -1460,7 +1479,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   }
   rota('POST', '/crm/c/:col', async ({ p, b }) => {
     const ctx = await requireUsuario();
-    requireAccess(ctx, collectionArea(p.col), 'criar');
+    requireColecao(ctx, p.col, 'criar');
     if (['consumos', 'resgates'].includes(p.col)) fail(400, 'Use o fluxo próprio deste módulo.');
     const t = now();
     const { resto, novos } = separarAnexos(b);
@@ -1495,7 +1514,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   });
   rota('PUT', '/crm/c/:col/:id', async ({ p, b }) => {
     const ctx = await requireUsuario();
-    requireAccess(ctx, collectionArea(p.col), 'editar');
+    requireColecao(ctx, p.col, 'editar');
     const { resto, manter, novos } = separarAnexos(b);
     validarRegistro(resto);
     const cur = await registro(p.col, p.id);
@@ -1556,7 +1575,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   /** Exclui um registro com os efeitos do módulo (estornos, espelhos, PDFs); `desfaz` = atividade que esta exclusão desfaz. */
   async function excluirRegistro(ctx: Ctx, col: string, id: string, desfaz?: string) {
     const p = { col, id };
-    requireAccess(ctx, collectionArea(p.col), 'excluir');
+    requireColecao(ctx, p.col, 'excluir');
     const cur = await registro(p.col, p.id);
     if (!cur) return fail(404, 'Registro não encontrado.');
     if (p.col === 'funcoes') {
@@ -1620,7 +1639,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       return excluirRegistro(ctx, col, id, p.id);
     }
     if (acao.startsWith('excluiu')) {
-      requireAccess(ctx, collectionArea(col), 'criar');
+      requireColecao(ctx, col, 'criar');
       if (cur) return fail(400, 'Esse registro já existe de novo (talvez já tenha sido restaurado).');
       const dados: Dados = { ...voltar(at.antes), atualizadoEm: now() };
       if (col === 'funcoes') dados.sistema = false;
@@ -1635,7 +1654,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       return { ok: true };
     }
     if (acao.startsWith('alterou') || acao.startsWith('desfez a alteração')) {
-      requireAccess(ctx, collectionArea(col), 'editar');
+      requireColecao(ctx, col, 'editar');
       if (!cur) return fail(400, 'Esse registro foi excluído depois: restaure-o primeiro.');
       if (col === 'funcoes' && cur.sistema) fail(400, 'A função Presidência não pode ser alterada.');
       if (col === 'receitas' && cur.consumoId) fail(400, 'Receitas geradas por consumo são alteradas pelo lançamento de consumo.');

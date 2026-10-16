@@ -178,6 +178,9 @@ if (senhaModular) {
   await permitido('Resultado (DRE) lê as receitas', () => getDocs(collection(db, 'receitas')));
   await negado('Resultado (DRE) não lança receita', () => addDoc(collection(db, 'receitas'), { descricao: 'x', valor: 1, data: '2026-10-01' }));
   await negado('ver colaboradores', () => getDocs(collection(db, 'colaboradores')));
+  await permitido('Ticket médio (tela não marcada: vale a do Resultado) lê as receitas', () => getDocs(collection(db, 'receitas')));
+  await permitido('Despesas fixas (só a tela) lê as despesas', () => getDocs(collection(db, 'despesas')));
+  await negado('Despesas fixas (só ver) não lança despesa', () => addDoc(collection(db, 'despesas'), { descricao: 'x', categoria: 'Aluguel', valor: 1, data: '2026-10-01', status: 'A pagar' }));
   await signOut(auth);
 }
 

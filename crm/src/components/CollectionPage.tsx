@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useState, type DragEvent, type ReactNode, Fragment } from 'react';
 import { ArrowDown, ArrowLeftRight, ArrowUp, Camera, ChevronDown, Download, FileSpreadsheet, FileText, Globe, ImageOff, Paperclip, Pencil, Plus, Receipt, Search, Sheet, ShoppingCart, Trash2, X } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
+import { findModule } from '../modules';
 import { numberSpec, STATUS_KEYS, termos, toneOf, type CollectionDef, type Computed, type Field } from '../collections';
 import { maskCnpj, maskPhone } from '../lib/masks';
 import { useCollection, type Row } from '../lib/data';
@@ -70,9 +72,12 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   filterRows?: (r: Row) => boolean;
 }) {
   const { pode } = useSession();
-  const canCreate = pode(def.area, 'criar');
-  const canEdit = pode(def.area, 'editar');
-  const canDelete = pode(def.area, 'excluir');
+  // cada tela tem a própria permissão (ex.: só as despesas fixas); fora do menu, vale a do cadastro
+  const { pathname } = useLocation();
+  const perm = findModule(pathname)?.item.perm ?? def.area;
+  const canCreate = pode(perm, 'criar');
+  const canEdit = pode(perm, 'editar');
+  const canDelete = pode(perm, 'excluir');
   // receitas, despesas, consumos e reservas carregam só um período (escolhido na barra da tabela)
   const padraoPeriodo = PERIODO_PADRAO[def.id];
   const [periodo, setPeriodo] = useState<PeriodoKey>(padraoPeriodo ?? 'tudo');

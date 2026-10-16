@@ -101,7 +101,7 @@ export const AREAS: Area[] = [
     description: 'Produtos e cardápio do aplicativo, fichas técnicas e os clientes (afilhados).',
     items: [
       { path: '/vendas/produtos', perm: 'produtos', label: 'Produtos e cardápio' },
-      { path: '/vendas/fichas', perm: 'produtos', label: 'Fichas técnicas' },
+      { path: '/vendas/fichas', perm: 'fichas', label: 'Fichas técnicas' },
       { path: '/vendas/guarnicoes', perm: 'guarnicoes', label: 'Guarnições e itens fixos' },
       { path: '/vendas/clientes', perm: 'clientes', label: 'Clientes (afilhados)' },
     ],
@@ -151,15 +151,15 @@ export const AREAS: Area[] = [
     description: 'Contabilidade, resultado (DRE), investidores, documentos e lançamentos.',
     items: [
       { path: '/financeiro/receitas', perm: 'receitas', label: 'Receitas', group: 'Contabilidade geral', icon: Calculator },
-      { path: '/financeiro/despesas/variaveis', perm: 'despesas', label: 'Despesas variáveis', group: 'Contabilidade geral' },
-      { path: '/financeiro/despesas/fixas', perm: 'despesas', label: 'Despesas invariáveis (fixas)', group: 'Contabilidade geral' },
+      { path: '/financeiro/despesas/variaveis', perm: 'despesas_variaveis', label: 'Despesas variáveis', group: 'Contabilidade geral' },
+      { path: '/financeiro/despesas/fixas', perm: 'despesas_fixas', label: 'Despesas invariáveis (fixas)', group: 'Contabilidade geral' },
       { path: '/financeiro/resultado', perm: 'resultado', label: 'Resultado orçamentário', group: 'Resultado (DRE)', icon: BarChart3 },
-      { path: '/financeiro/ticket-medio', perm: 'resultado', label: 'Ticket médio', group: 'Resultado (DRE)' },
-      { path: '/financeiro/renda', perm: 'resultado', label: 'Renda diária e mensal', group: 'Resultado (DRE)' },
+      { path: '/financeiro/ticket-medio', perm: 'ticket', label: 'Ticket médio', group: 'Resultado (DRE)' },
+      { path: '/financeiro/renda', perm: 'renda', label: 'Renda diária e mensal', group: 'Resultado (DRE)' },
       { path: '/financeiro/acoes', perm: 'acoes', label: 'Ações da empresa', group: 'Investidores', icon: HandCoins },
       { path: '/financeiro/credito', perm: 'creditos', label: 'Crédito CNPJ', group: 'Investidores' },
       { path: '/financeiro/documentos', perm: 'docfin', label: 'Contratos onerosos e títulos', group: 'Documentos', icon: FileStack },
-      { path: '/financeiro/relatorios', perm: 'docfin', label: 'Relatórios', group: 'Documentos' },
+      { path: '/financeiro/relatorios', perm: 'relatorios', label: 'Relatórios', group: 'Documentos' },
       { path: '/financeiro/despesas', perm: 'despesas', label: 'Lançamento de despesas', group: 'Lançamentos', icon: Receipt },
       { path: '/financeiro/investimentos', perm: 'investimentos', label: 'Lançamento de investimentos', group: 'Lançamentos' },
     ],
@@ -171,10 +171,10 @@ export const AREAS: Area[] = [
     items: [
       { path: '/rh/colaboradores', perm: 'colaboradores', label: 'Colaboradores', group: 'Colaboradores', icon: Users },
       { path: '/rh/prestadores/pf', perm: 'prestadores', label: 'Pessoas físicas contratadas', group: 'Fornecedores', icon: UserCog },
-      { path: '/rh/prestadores/pj', perm: 'prestadores', label: 'Pessoas jurídicas contratadas', group: 'Fornecedores' },
+      { path: '/rh/prestadores/pj', perm: 'prestadores_pj', label: 'Pessoas jurídicas contratadas', group: 'Fornecedores' },
       { path: '/rh/folha', perm: 'folha', label: 'Folha de pagamento', group: 'Folha de pagamento', icon: Wallet },
       { path: '/rh/ferias', perm: 'ferias', label: 'Férias', group: 'Férias e afastamentos', icon: Plane },
-      { path: '/rh/afastamentos', perm: 'ferias', label: 'Atestados, faltas e afastamentos', group: 'Férias e afastamentos' },
+      { path: '/rh/afastamentos', perm: 'afastamentos', label: 'Atestados, faltas e afastamentos', group: 'Férias e afastamentos' },
       { path: '/rh/conduta', perm: 'conduta', label: 'Regras de conduta', group: 'Regras de conduta', icon: ScrollText },
     ],
   },
@@ -186,10 +186,10 @@ export const AREAS: Area[] = [
       { path: '/juridico/consultoria', perm: 'consultoria', label: 'Demandas de consultoria', group: 'Consultoria jurídica', icon: Gavel },
       { path: '/juridico/advogados/consultoria', perm: 'advogados', label: 'Advogados', group: 'Consultoria jurídica' },
       { path: '/juridico/trabalhista', perm: 'trabalhista', label: 'Processos', group: 'Trabalhista e Tributário', icon: FolderOpen },
-      { path: '/juridico/normas/trabalhista', perm: 'normas', label: 'Normas da CLT e tributárias', group: 'Trabalhista e Tributário' },
-      { path: '/juridico/advogados/trabalhista', perm: 'advogados', label: 'Advogados', group: 'Trabalhista e Tributário' },
-      { path: '/juridico/normas/empresarial', perm: 'normas', label: 'Normas da área empresarial', group: 'Área empresarial', icon: Building },
-      { path: '/juridico/advogados/empresarial', perm: 'advogados', label: 'Advogados', group: 'Área empresarial' },
+      { path: '/juridico/normas/trabalhista', perm: 'normas_trabalhista', label: 'Normas da CLT e tributárias', group: 'Trabalhista e Tributário' },
+      { path: '/juridico/advogados/trabalhista', perm: 'advogados_trabalhista', label: 'Advogados', group: 'Trabalhista e Tributário' },
+      { path: '/juridico/normas/empresarial', perm: 'normas_empresarial', label: 'Normas da área empresarial', group: 'Área empresarial', icon: Building },
+      { path: '/juridico/advogados/empresarial', perm: 'advogados_empresarial', label: 'Advogados', group: 'Área empresarial' },
       { path: '/juridico/leis', perm: 'normas', label: 'Leis e normas', group: 'Leis e normas', icon: Library },
     ],
   },
@@ -266,12 +266,11 @@ export const AREAS_COM_PERMISSAO = AREAS.filter((a) => !a.pessoal && !a.oculta);
 
 /* ---------- módulos (uma permissão por tela ou cadastro) ---------- */
 export interface Modulo { key: string; label: string; area: AreaKey; setor: string; paginas: string[] }
-/** Nome do módulo quando várias páginas dividem o mesmo cadastro. */
+/** Nome da tela no editor de permissões, quando o do menu sozinho não diz tudo. */
 const NOME_DO_MODULO: Record<string, string> = {
-  painel: 'Painel executivo', produtos: 'Produtos, cardápio e fichas técnicas', despesas: 'Despesas (variáveis, fixas e lançamentos)',
-  resultado: 'Resultado (DRE, ticket médio e renda)', docfin: 'Documentos (contratos, títulos e relatórios)',
-  prestadores: 'Pessoas físicas e jurídicas contratadas', ferias: 'Férias, atestados, faltas e afastamentos',
-  advogados: 'Advogados (todas as áreas)', normas: 'Normas e leis', consultoria: 'Demandas de consultoria', trabalhista: 'Processos trabalhistas',
+  painel: 'Painel executivo', despesas: 'Lançamento de despesas', advogados: 'Advogados · Consultoria jurídica',
+  advogados_trabalhista: 'Advogados · Trabalhista e Tributário', advogados_empresarial: 'Advogados · Área empresarial',
+  normas: 'Leis e normas (biblioteca completa)',
 };
 /** Todos os módulos, na ordem do menu (cada um uma vez), com o setor onde aparece primeiro. */
 export const MODULOS: Modulo[] = (() => {
@@ -346,18 +345,22 @@ const cargo = (nome: string, descricao: string, niveis: Partial<Record<AreaKey, 
 const OPERACAO: AreaKey[] = ['atd', 'vnd', 'mkt', 'dp', 'adm', 'fis'];
 const TUDO: AreaKey[] = [...OPERACAO, 'dir', 'fin', 'rh', 'jur', 'mon', 'ti'];
 const todasEm = (areas: AreaKey[], n: NivelCargo) => Object.fromEntries(areas.map((a) => [a, n])) as Partial<Record<AreaKey, NivelCargo>>;
-export const CARGOS_SUGERIDOS: CargoSugerido[] = [
+/** Quanto poder uma lista de permissões dá: soma das ações liberadas em todas as telas (usado para ordenar os cargos). */
+export const poderDe = (acoesDe: (k: string) => Acao[]) => MODULOS.reduce((t, m) => t + acoesDe(m.key).length, 0);
+const CARGOS: CargoSugerido[] = [
   cargo('Sócio / Diretoria', 'Vê toda a casa e decide na Diretoria; não mexe em usuários.', { ...todasEm(TUDO, 'ver'), dir: 'total', cfg: 'ver' }),
   cargo('Gerente geral', 'Comanda a operação inteira: edita tudo e exclui no Administrativo.', { ...todasEm(OPERACAO, 'total'), dir: 'editar', fin: 'editar', rh: 'editar', jur: 'ver', mon: 'ver', ti: 'editar', cfg: 'ver' }),
   cargo('Gerente de salão', 'Atendimento, vendas e qualidade do salão.', { atd: 'total', vnd: 'editar', mkt: 'ver', dp: 'ver', fis: 'editar', mon: 'ver' }),
   cargo('Atendente / Garçom', 'Reservas, consumos e vouchers; consulta o cardápio.', { atd: 'editar', vnd: 'ver' }, { clientes: 'none', guarnicoes: 'none' }),
-  cargo('Caixa', 'Lança consumos e vouchers e acompanha as receitas.', { atd: 'editar' }, { produtos: 'ver', clientes: 'ver', receitas: 'ver', resultado: 'ver' }),
+  cargo('Caixa', 'Lança consumos e vouchers e acompanha as receitas.', { atd: 'editar' }, { produtos: 'ver', clientes: 'ver', receitas: 'ver', ticket: 'ver', renda: 'ver' }),
   cargo('Bartender', 'Fichas técnicas e cardápio, com o estoque do bar.', { vnd: 'editar' }, { clientes: 'none', estoque: 'editar', compras: 'ver', eventos: 'ver', reservas: 'ver' }),
   cargo('Compras e estoque', 'Estoque, materiais, notas, fornecedores e preços.', { dp: 'total', adm: 'total', vnd: 'ver', fin: 'ver' }),
   cargo('Marketing', 'Recompensas, criação, mídias e publicidade; edita o cardápio.', { mkt: 'total', vnd: 'editar', atd: 'ver' }),
   cargo('Financeiro', 'Contabilidade, DRE, investidores e lançamentos.', { fin: 'total', adm: 'ver', dir: 'ver' }, { folha: 'ver', compras: 'ver' }),
-  cargo('Recursos Humanos', 'Colaboradores, prestadores, folha, férias e conduta.', { rh: 'total' }, { trabalhista: 'ver', advogados: 'ver', normas: 'ver' }),
+  cargo('Recursos Humanos', 'Colaboradores, prestadores, folha, férias e conduta.', { rh: 'total' }, { trabalhista: 'ver', advogados_trabalhista: 'ver', normas_trabalhista: 'ver' }),
   cargo('Jurídico', 'Consultoria, processos, advogados e normas.', { jur: 'total', rh: 'ver', adm: 'ver', fin: 'ver', fis: 'ver' }),
   cargo('Fiscal / Qualidade', 'Inspeções, atestados emitidos e não conformidades.', { fis: 'total', dp: 'ver', adm: 'ver', atd: 'ver' }),
   cargo('TI / Suporte', 'Monitoramento, logs, chamados, equipamentos e usuários.', { ti: 'total', mon: 'total', cfg: 'editar' }, { funcoes: 'ver' }),
 ];
+/** Os cargos prontos, do que tem mais poderes para o que tem menos. */
+export const CARGOS_SUGERIDOS: CargoSugerido[] = [...CARGOS].sort((a, b) => poderDe((k) => b.permissoes[k] ?? []) - poderDe((k) => a.permissoes[k] ?? []));
