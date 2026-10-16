@@ -1355,3 +1355,8 @@ button.anexos__nome:hover { text-decoration: underline; }
 .log-detalhe__tabela td { vertical-align: top; }
 .log-detalhe__antes { color: #e5484d; text-decoration: line-through; text-decoration-color: #e5484d80; }
 .log-detalhe__depois { color: var(--good); font-weight: 600; }
+/* ordem das funções (setas) */
+.matrix__ordem { display: flex; align-items: center; gap: 8px; }
+.ordem-btns { display: inline-flex; flex-direction: column; gap: 0; flex-shrink: 0; }
+.ordem-btns .icon-btn { width: 24px; height: 18px; border-radius: 5px; }
+.ordem-btns .icon-btn:disabled { opacity: .25; cursor: default; }
