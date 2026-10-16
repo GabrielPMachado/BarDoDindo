@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ChevronDown, ExternalLink, Lock, Pencil, Plus, Save, Sparkles, Trash2 } from 'lucide-react';
-import { CARGOS_SUGERIDOS, GRUPOS_DE_PERMISSAO, MODULOS, NIVEIS, acoesDe, acoesNaArea, nivelDe, type Acao, type Modulo } from '../modules';
+import { CARGOS_SUGERIDOS, GRUPOS_DE_PERMISSAO, MODULOS, NIVEIS, poderDe, acoesDe, acoesNaArea, nivelDe, type Acao, type Modulo } from '../modules';
 import { AsyncButton, Badge, EmptyState, ErrorBox, Loading, Modal, NumberInput, PageHead, notify } from '../components/ui';
 import { api } from '../lib/api';
 import { SelectPicker, confirmar } from '../components/pickers';
@@ -17,6 +17,9 @@ function resumoGrupo(acoesDe: (k: string) => Acao[], modulos: Modulo[]) {
   return { texto: `${com} de ${modulos.length} telas`, classe: 'misto' };
 }
 const nomeGrupo = (label: string) => label.replace(/^Departamento /, '');
+/** Funções da que tem mais poderes para a que tem menos (a Presidência, de sistema, sempre primeiro). */
+const porPoder = <T extends Funcao>(lista: T[]) => [...lista].sort((a, b) =>
+  (b.sistema ? Infinity : poderDe((k) => acoesDaFuncao(b, k))) - (a.sistema ? Infinity : poderDe((k) => acoesDaFuncao(a, k))) || a.nome.localeCompare(b.nome, 'pt-BR'));
 
 /* ---------------- Usuários ---------------- */
 export function Usuarios() {
@@ -146,7 +149,7 @@ function UsuarioForm({ user, funcoes, isSelf, canDelete, onClose }: {
         )}
         <div className="form-field">
           <label htmlFor="u-funcao">Função *</label>
-          <SelectPicker id="u-funcao" options={funcoes.map((f) => ({ value: f.id, label: f.nome }))} value={form.funcaoId} onChange={(v) => setForm({ ...form, funcaoId: v })} />
+          <SelectPicker id="u-funcao" options={porPoder(funcoes).map((f) => ({ value: f.id, label: f.nome }))} value={form.funcaoId} onChange={(v) => setForm({ ...form, funcaoId: v })} />
         </div>
         <div className="form-field">
           <label htmlFor="u-status">Status</label>
@@ -233,7 +236,7 @@ export function Funcoes() {
                 </tr>
               </thead>
               <tbody>
-                {col.rows.map((f) => (
+                {porPoder(col.rows).map((f) => (
                   <tr key={f.id}>
                     <td className="matrix__role"><strong>{f.nome}</strong>{f.sistema && <Lock size={12} className="muted inline-icon" />}<div className="muted small">{f.descricao}</div></td>
                     {GRUPOS_DE_PERMISSAO.map((g) => {

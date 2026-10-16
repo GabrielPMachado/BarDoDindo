@@ -22,26 +22,43 @@ service cloud.firestore {
     // Igual a PAI_DO_MODULO em shared/backend.ts.
     function pai(k) {
       return k.matches('reservas|consumos|resgates|eventos') ? 'atd'
-        : k.matches('produtos|guarnicoes|clientes') ? 'vnd'
+        : k.matches('produtos|fichas|guarnicoes|clientes') ? 'vnd'
         : k.matches('recompensas|criacao|midias|publicidade') ? 'mkt'
         : k.matches('projetos|estoque|materiais|compras') ? 'dp'
         : k.matches('terceirizados|fornecedores|precos|contratos') ? 'adm'
         : k.matches('qualidade|atestados|naoconformidades') ? 'fis'
-        : k.matches('receitas|despesas|resultado|acoes|creditos|docfin|investimentos') ? 'fin'
-        : k.matches('colaboradores|prestadores|folha|ferias|conduta') ? 'rh'
-        : k.matches('consultoria|trabalhista|advogados|normas') ? 'jur'
+        : k.matches('receitas|despesas.*|resultado|ticket|renda|acoes|creditos|docfin|relatorios|investimentos') ? 'fin'
+        : k.matches('colaboradores|prestadores.*|folha|ferias|afastamentos|conduta') ? 'rh'
+        : k.matches('consultoria|trabalhista|advogados.*|normas.*') ? 'jur'
         : k.matches('logs|chamados|equipamentos') ? 'ti'
         : k.matches('usuarios|funcoes|parametros') ? 'cfg'
         : k.matches('painel|metas') ? 'dir' : '-';
     }
     function legado(area) { return { 'vnd': 'mkt' }.get(area, '-'); }
-    // a função é lida uma vez só e guardada em variáveis: cada pedido tem um limite de expressões avaliadas,
-    // e os lotes do CRM (registro + espelhos + histórico) passam por esta checagem várias vezes
+    // telas que mostram parte de um cadastro (ex.: só as despesas fixas): sem a tela, vale a do cadastro. Igual a BASE_DA_PAGINA.
+    function base(k) {
+      return k.matches('despesas_.*') ? 'despesas' : k.matches('advogados_.*') ? 'advogados' : k.matches('normas_.*') ? 'normas'
+        : k == 'fichas' ? 'produtos' : k.matches('ticket|renda') ? 'resultado' : k == 'relatorios' ? 'docfin'
+        : k == 'prestadores_pj' ? 'prestadores' : k == 'afastamentos' ? 'ferias' : k;
+    }
+    // telas-parte de cada cadastro, além do próprio (Igual a PAGINAS_DA_COLECAO): quem tem alguma delas usa o cadastro
+    function paginasExtras(col) {
+      return !col.matches('produtos|despesas|docfin|prestadores|ferias|advogados|normas') ? [] : {
+        'produtos': ['fichas'], 'despesas': ['despesas_variaveis', 'despesas_fixas'], 'docfin': ['relatorios'],
+        'prestadores': ['prestadores_pj'], 'ferias': ['afastamentos'],
+        'advogados': ['advogados_trabalhista', 'advogados_empresarial'], 'normas': ['normas_trabalhista', 'normas_empresarial']
+      }[col];
+    }
     // a área (pai) só é calculada quando a função não tem o próprio módulo (formato antigo)
     function herdada(permissoes, a, k) {
       return a in permissoes ? permissoes[a] : permissoes.get(legado(a), permissoes.get(legado(k), 'none'));
     }
-    function acoesEm(permissoes, k) { return k in permissoes ? permissoes[k] : herdada(permissoes, pai(k), k); }
+    // só as telas-parte (com "_" ou de nome próprio) passam pelo base(): as demais já são o próprio cadastro
+    function acoesEm(permissoes, k) {
+      return k in permissoes ? permissoes[k]
+        : acoesBase(permissoes, k.matches('.*_.*|fichas|ticket|renda|relatorios|afastamentos') ? base(k) : k);
+    }
+    function acoesBase(permissoes, b) { return b in permissoes ? permissoes[b] : herdada(permissoes, pai(b), b); }
     function temAcao(p, acao) { return (p is list && acao in p) || (p is string && (p == 'edit' || (p == 'view' && acao == 'ver'))); }
     function podeNaFuncao(f, area, acao) {
       return f.get('sistema', false) == true || temAcao(acoesEm(f.get('permissoes', {}), area), acao);
@@ -57,6 +74,16 @@ service cloud.firestore {
         || (mods.size() > 4 && temAcao(acoesEm(ps, mods[4]), acao));
     }
     function podeEmAlgum(mods, acao) { return daEquipe() && emAlgum(funcao(), mods, acao); }
+    // um cadastro: o próprio (com a herança completa) ou uma tela-parte gravada na função — sem a tela gravada, ela vale
+    // o mesmo que o cadastro, que já foi conferido
+    function colecaoNaFuncao(f, col, acao) {
+      let ps = f.get('permissoes', {});
+      let extras = paginasExtras(col);
+      return f.get('sistema', false) == true || temAcao(acoesEm(ps, col), acao)
+        || (extras.size() > 0 && extras[0] in ps && temAcao(ps[extras[0]], acao))
+        || (extras.size() > 1 && extras[1] in ps && temAcao(ps[extras[1]], acao));
+    }
+    function podeColecao(col, acao) { return daEquipe() && colecaoNaFuncao(funcao(), col, acao); }
     function pode(area, acao) { return daEquipe() && podeNaFuncao(funcao(), area, acao); }
     function podeVer(area) { return pode(area, 'ver'); }
     // cópias espelhadas, histórico e saldos acompanham qualquer alteração na área
@@ -74,10 +101,10 @@ service cloud.firestore {
         'acoes', 'creditos', 'docfin', 'investimentos', 'prestadores', 'conduta', 'advogados', 'normas', 'chamados', 'equipamentos'];
     }
     match /{col}/{id} {
-      allow read: if col in colecoesCrm() && podeVer(col);
-      allow create: if col in colecoesCrm() && pode(col, 'criar');
-      allow update: if col in colecoesCrm() && pode(col, 'editar');
-      allow delete: if col in colecoesCrm() && pode(col, 'excluir');
+      allow read: if col in colecoesCrm() && podeColecao(col, 'ver');
+      allow create: if col in colecoesCrm() && podeColecao(col, 'criar');
+      allow update: if col in colecoesCrm() && podeColecao(col, 'editar');
+      allow delete: if col in colecoesCrm() && podeColecao(col, 'excluir');
     }
 
     /* ---------- painel de atualizações ---------- */
@@ -178,7 +205,7 @@ service cloud.firestore {
     // cardápio público (sem custo nem margem dos produtos)
     match /cardapio/{id} {
       allow read: if true;
-      allow write: if podeAlterar('produtos');
+      allow write: if podeEmAlgum(['produtos', 'fichas'], 'criar') || podeEmAlgum(['produtos', 'fichas'], 'editar') || podeEmAlgum(['produtos', 'fichas'], 'excluir');
     }
     // nomes para vincular registros, visíveis a toda a equipe (sem salários nem contatos)
     match /ref_colaboradores/{id} {
@@ -198,18 +225,18 @@ service cloud.firestore {
     // a ficha técnica (produtos e guarnições) usa os insumos e custos do Estoque; a Tabela de preços escolhe o insumo;
     // a Entrada de notas soma (ou estorna) as quantidades e atualiza o custo dos itens
     match /estoque/{id} {
-      allow read: if podeEmAlgum(['produtos', 'guarnicoes', 'precos', 'compras'], 'ver');
+      allow read: if podeEmAlgum(['produtos', 'fichas', 'guarnicoes', 'precos', 'compras'], 'ver');
       allow create, update: if podeEmAlgum(['compras'], 'criar') || pode('compras', 'excluir');
     }
     // o preparo da ficha técnica escolhe copos e utensílios do cadastro de Materiais; a Entrada de notas soma os materiais
     match /materiais/{id} {
-      allow read: if podeEmAlgum(['produtos', 'compras'], 'ver');
+      allow read: if podeEmAlgum(['produtos', 'fichas', 'compras'], 'ver');
       allow create, update: if podeEmAlgum(['compras'], 'criar') || pode('compras', 'excluir');
     }
     // a ficha técnica compara os preços de cada fornecedor; a Entrada de notas atualiza o preço do fornecedor;
     // o cadastro do fornecedor mostra o que compramos dele
     match /precos/{id} {
-      allow read: if podeEmAlgum(['produtos', 'compras', 'fornecedores'], 'ver');
+      allow read: if podeEmAlgum(['produtos', 'fichas', 'compras', 'fornecedores'], 'ver');
     }
     // o lançamento de consumo usa os preços do cadastro de produtos
     match /produtos/{id} {
@@ -217,7 +244,7 @@ service cloud.firestore {
     }
     // o lançamento de consumo gera e estorna a própria receita; o Resultado (DRE) lê receitas e despesas
     match /receitas/{id} {
-      allow read: if podeVer('resultado');
+      allow read: if podeEmAlgum(['resultado', 'ticket', 'renda'], 'ver');
       allow create: if pode('consumos', 'criar') && request.resource.data.consumoId is string;
       allow delete: if pode('consumos', 'excluir') && resource.data.get('consumoId', null) != null;
     }
@@ -250,7 +277,7 @@ service cloud.firestore {
         && getAfter(caminho(col, d.origemId)).data.lancamentos[d.data[0:7]].despesaId == id;
     }
     match /despesas/{id} {
-      allow read: if podeVer('resultado');
+      allow read: if podeEmAlgum(['resultado', 'ticket', 'renda'], 'ver');
       allow create: if despesaDeOrigem(id);
     }
 
@@ -262,13 +289,13 @@ service cloud.firestore {
         'receitas', 'despesas', 'criacao', 'trabalhista', 'consultoria', 'qualidade', 'naoconformidades',
         'publicidade', 'atestados', 'acoes', 'creditos', 'docfin', 'investimentos', 'prestadores', 'conduta', 'advogados', 'normas', 'equipamentos'];
     }
-    function anexaEm(col) { return col in colecoesComAnexo() && (pode(col, 'criar') || pode(col, 'editar')); }
+    function anexaEm(col) { return col in colecoesComAnexo() && (podeColecao(col, 'criar') || podeColecao(col, 'editar')); }
     // apaga quem edita ou exclui na área, ou quem enviou o arquivo (desfaz um envio quando o registro não chega a ser gravado)
     function apagaAnexo(a) {
-      return pode(a.colecao, 'editar') || pode(a.colecao, 'excluir') || (a.criadoPor == request.auth.uid && anexaEm(a.colecao));
+      return podeColecao(a.colecao, 'editar') || podeColecao(a.colecao, 'excluir') || (a.criadoPor == request.auth.uid && anexaEm(a.colecao));
     }
     match /anexos/{id} {
-      allow read: if resource.data.colecao in colecoesComAnexo() && podeVer(resource.data.colecao);
+      allow read: if resource.data.colecao in colecoesComAnexo() && podeColecao(resource.data.colecao, 'ver');
       allow create: if request.resource.data.keys().hasOnly(['colecao', 'registroId', 'nome', 'tamanho', 'partes', 'criadoPor', 'criadoEm'])
         && request.resource.data.criadoPor == request.auth.uid
         && textoAte(request.resource.data.nome, 160) && request.resource.data.nome.size() > 0
@@ -280,7 +307,7 @@ service cloud.firestore {
       allow delete: if apagaAnexo(resource.data);
 
       match /partes/{n} {
-        allow read: if podeVer(get(caminho('anexos', id)).data.colecao);
+        allow read: if podeColecao(get(caminho('anexos', id)).data.colecao, 'ver');
         // só junto com o registro do arquivo (mesmo lote) e dentro do número de partes declarado
         allow create: if !exists(caminho('anexos', id)) && existsAfter(caminho('anexos', id))
           && request.resource.data.keys().hasOnly(['dados'])
