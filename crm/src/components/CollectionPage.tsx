@@ -80,6 +80,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
 
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('');
+  const [filtros, setFiltros] = useState<Record<string, string>>({});
   const [sort, setSort] = useState<{ key: string; dir: 'asc' | 'desc' }>({ key: def.sortKey ?? def.fields[0].key, dir: def.sortDir ?? 'asc' });
   const [page, setPage] = useState(0);
   const [editing, setEditing] = useState<Row | 'new' | null>(null);
@@ -116,12 +117,23 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   } : {};
   const campoLink = def.fields.find((f) => f.type === 'url' && f.acao);
   const filterField = def.fields.find((f) => f.key === def.filterKey);
+  // filtros extras: as opções são os valores que aparecem nos registros (sem diferenciar maiúsculas)
+  const chaveFiltro = (v: unknown) => String(v ?? '').trim().toLocaleLowerCase('pt-BR');
+  const filtrosExtras = useMemo(() => (def.filtros ?? []).flatMap((key) => {
+    const f = def.fields.find((x) => x.key === key);
+    if (!f) return [];
+    const valores = new Map<string, string>();
+    for (const r of all) { const v = String(r[key] ?? '').trim(); if (v && !valores.has(chaveFiltro(v))) valores.set(chaveFiltro(v), v); }
+    const opcoes = [...valores].sort((a, b) => a[1].localeCompare(b[1], 'pt-BR', { numeric: true }));
+    return opcoes.length > 1 || filtros[key] ? [{ key, label: f.label.replace(/\s*\(.*\)$/, ''), opcoes }] : [];
+  }), [def, all, filtros]);
 
   const rows = useMemo(() => {
     const term = q.trim().toLowerCase();
     const list = all.filter(
       (r) =>
         (!filter || r[def.filterKey!] === filter) &&
+        Object.entries(filtros).every(([k, v]) => !v || chaveFiltro(r[k]) === v) &&
         (!term || def.fields.some((f) => String(r[f.key] ?? '').toLowerCase().includes(term))),
     );
     const field = def.fields.find((f) => f.key === sort.key);
@@ -135,7 +147,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
       const c = numeric ? Number(av) - Number(bv) : String(av).localeCompare(String(bv), 'pt-BR', { numeric: true });
       return sort.dir === 'asc' ? c : -c;
     });
-  }, [all, q, filter, sort, def]);
+  }, [all, q, filter, filtros, sort, def]);
 
   const pages = Math.max(1, Math.ceil(rows.length / PAGE));
   const visible = rows.slice(page * PAGE, page * PAGE + PAGE);
@@ -206,6 +218,18 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
               <option value="">{filterField.label}: todos</option>
               {filterField.options.map((o) => <option key={o} value={o}>{o}</option>)}
             </select>
+          )}
+          {filtrosExtras.map((fx) => (
+            <select
+              key={fx.key} className={`input input--sm ${filtros[fx.key] ? 'is-filtrando' : ''}`} value={filtros[fx.key] ?? ''}
+              onChange={(e) => { setFiltros((x) => ({ ...x, [fx.key]: e.target.value })); setPage(0); }} aria-label={`Filtrar por ${fx.label}`}
+            >
+              <option value="">{fx.label}: todos</option>
+              {fx.opcoes.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+          ))}
+          {Object.values(filtros).some(Boolean) && (
+            <button className="btn btn--ghost btn--sm" onClick={() => { setFiltros({}); setPage(0); }}>Limpar filtros</button>
           )}
           {padraoPeriodo && (
             <select className="input input--sm" value={periodo} onChange={(e) => { setPeriodo(e.target.value as PeriodoKey); setPage(0); }} aria-label="Período">

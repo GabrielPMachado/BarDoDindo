@@ -73,6 +73,8 @@ export interface CollectionDef {
   kpis?: (rows: Row[]) => Kpi[];
   /** Campo select usado como filtro rápido acima da tabela. */
   filterKey?: string;
+  /** Filtros extras acima da tabela, com os valores que existem nos registros (ex.: por insumo, por fornecedor). */
+  filtros?: string[];
   sortKey?: string;
   sortDir?: 'asc' | 'desc';
   /** Cada registro pode ter uma foto (miniatura na tabela, campo no formulário e imagem nas exportações). */
@@ -328,7 +330,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   precos: {
     id: 'precos', area: 'adm', title: 'Tabela de preços', singular: 'preço de fornecedor',
     description: 'Quanto cada fornecedor cobra por insumo. A ficha técnica dos produtos compara os preços e mostra o mais barato.',
-    filterKey: 'status', sortKey: 'insumo',
+    filterKey: 'status', filtros: ['insumo', 'fornecedor'], sortKey: 'insumo',
     fields: [
       { key: 'insumo', label: 'Insumo (do Estoque)', type: 'ref', ref: 'insumos', refKey: 'insumoId', required: true, wide: true },
       { key: 'fornecedor', label: 'Fornecedor', type: 'ref', ref: 'fornecedores', refKey: 'fornecedorId', required: true },
