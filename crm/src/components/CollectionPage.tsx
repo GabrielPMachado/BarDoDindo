@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, type ReactNode, Fragment } from 'react';
-import { ArrowDown, ArrowLeftRight, ArrowUp, Camera, ChevronDown, Download, FileSpreadsheet, FileText, ImageOff, Paperclip, Pencil, Plus, Receipt, Search, Sheet, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowLeftRight, ArrowUp, Camera, ChevronDown, Download, FileSpreadsheet, FileText, Globe, ImageOff, Paperclip, Pencil, Plus, Receipt, Search, Sheet, ShoppingCart, Trash2 } from 'lucide-react';
 import { numberSpec, STATUS_KEYS, termos, toneOf, type CollectionDef, type Computed, type Field } from '../collections';
 import { maskCnpj, maskPhone } from '../lib/masks';
 import { useCollection, type Row } from '../lib/data';
@@ -16,6 +16,8 @@ import { AnexosCampo, anexosDe, type AnexoNovo } from './Anexos';
 import { FichaTecnica } from './FichaTecnica';
 import { LocaisCampo, TransferirModal } from './Locais';
 import { CelulaRapida, editavelNaTabela } from './EdicaoRapida';
+import { ItensDoFornecedor } from './ItensDoFornecedor';
+import { linkSeguro } from '../lib/links';
 import { PreencherProdutoIA } from './PreencherProdutoIA';
 import { GerarFotoIA } from './GerarFotoIA';
 import { CompraItens, itemVazio, totalItens, type ItemCompra } from './CompraItens';
@@ -84,6 +86,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   const [transferindo, setTransferindo] = useState<Row | null>(null);
 
   const tableFields = def.fields.filter((f) => !f.formOnly);
+  const campoLink = def.fields.find((f) => f.type === 'url' && f.acao);
   const filterField = def.fields.find((f) => f.key === def.filterKey);
 
   const rows = useMemo(() => {
@@ -235,6 +238,13 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
                           </button>
                         )}
                         {rowActions?.(r, canEdit)}
+                        {campoLink && linkSeguro(r[campoLink.key]) && (
+                          <a className="icon-btn" href={linkSeguro(r[campoLink.key])!} target="_blank" rel="noopener noreferrer"
+                            aria-label={campoLink.acao === 'site' ? 'Abrir o site do fornecedor' : 'Comprar (abre o link da loja)'}
+                            title={campoLink.acao === 'site' ? 'Abrir o site' : 'Comprar'}>
+                            {campoLink.acao === 'site' ? <Globe size={16} /> : <ShoppingCart size={16} />}
+                          </a>
+                        )}
                         {def.porLocal && canEdit && (
                           <button className="icon-btn" onClick={() => setTransferindo(r)} aria-label="Transferir entre locais" title="Transferir entre locais">
                             <ArrowLeftRight size={16} />
@@ -464,6 +474,7 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
             onChange={(salvos, novos) => { setData((d) => ({ ...d, anexos: salvos })); setAnexosNovos(novos); }}
           />
         )}
+        {def.itensDoFornecedor && row && <ItensDoFornecedor fornecedorId={row.id} nome={String(row.nome ?? '')} />}
         {row?.criadoEm && (
           <p className="muted small form-field--wide">
             Criado em {new Date(String(row.criadoEm)).toLocaleString('pt-BR')}

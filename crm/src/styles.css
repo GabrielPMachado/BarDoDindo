@@ -1157,3 +1157,21 @@ button.anexos__nome:hover { text-decoration: underline; }
 .gerar-foto label.btn--sm { font-size: 12.5px; }
 .gerar-foto label.btn:not(.btn--sm) { font-size: 14px; }
 .gerar-foto__extras { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+/* ---------- Links de compra e itens do fornecedor ---------- */
+.campo-link { display: flex; gap: 8px; align-items: center; }
+.campo-link .input { flex: 1; min-width: 0; }
+.itens-forn { gap: 10px; }
+.itens-forn__grupo { border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); overflow: hidden; }
+.itens-forn__topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.itens-forn__topo strong { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; }
+.itens-forn__topo strong svg { color: var(--brand-light); }
+.itens-forn__topo a { display: inline-flex; align-items: center; gap: 2px; color: var(--brand-light); }
+.itens-forn ul { list-style: none; margin: 0; padding: 0; }
+.itens-forn li { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.itens-forn li:last-child { border-bottom: 0; }
+.itens-forn__nome { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.itens-forn__nome b { font-weight: 600; font-size: 14px; }
+.itens-forn__valor { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.itens-forn__semlink { white-space: nowrap; }
+.itens-forn li a.btn { white-space: nowrap; }
