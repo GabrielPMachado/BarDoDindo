@@ -876,7 +876,7 @@ button.anexos__nome:hover { text-decoration: underline; }
 .preparo__acoes { display: flex; }
 .preparo__acoes .icon-btn { width: 28px; height: 28px; }
 .preparo__add { align-self: flex-start; margin-top: 6px; }
-@media (max-width: 760px) {
+@media (max-width: 640px) {
   .preparo__grade { grid-template-columns: 1fr; }
   .preparo__passo { grid-template-columns: 26px 1fr; }
   .preparo__acoes { grid-column: 2; justify-content: flex-end; }
@@ -893,7 +893,7 @@ button.anexos__nome:hover { text-decoration: underline; }
 .cg-acao { display: flex; justify-content: flex-end; }
 .cg-dica { grid-column: 1 / -1; margin-top: -2px; }
 .calc-guar__rodape { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-@media (max-width: 760px) {
+@media (max-width: 640px) {
   .calc-guar__linha { grid-template-columns: 1fr 1fr; }
   .cg-nome, .cg-insumo, .cg-acao { grid-column: 1 / -1; }
   .cg-acao { justify-content: flex-start; }
@@ -920,7 +920,7 @@ button.anexos__nome:hover { text-decoration: underline; }
 .ficha__item { align-items: start; }
 .fi-base, .fi-custo, .fi-del { min-height: 38px; display: flex; align-items: center; }
 .fi-custo { justify-content: flex-end; }
-@media (max-width: 760px) {
+@media (max-width: 640px) {
   .ficha { padding: 12px; }
   .ficha__cab { display: none; }
   /* cada insumo vira um cartão: nome em cima; quantidade, unidade e custo embaixo */
@@ -1101,7 +1101,7 @@ button.anexos__nome:hover { text-decoration: underline; }
 .compra__total b { color: var(--text); font-size: 16px; }
 .compra__lido { display: grid; grid-template-columns: auto 1fr auto auto; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
 .compra__lido-nome { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@media (max-width: 760px) {
+@media (max-width: 640px) {
   .compra__valores { grid-template-columns: 1fr 1fr; }
   .compra__sub { grid-column: 1 / -1; flex-direction: row; justify-content: space-between; padding: 0; }
   .compra__lido { grid-template-columns: 1fr auto; }
@@ -1190,3 +1190,29 @@ button.anexos__nome:hover { text-decoration: underline; }
 }
 .toolbar select.is-filtrando { border-color: var(--brand); color: var(--text); }
 .toolbar__count { white-space: nowrap; }
+
+/* seleção de linhas: caixinha no canto de cima à esquerda de cada item */
+.sel-col { width: 1%; padding-right: 2px !important; }
+.sel-check { width: 18px; height: 18px; margin: 0; display: block; accent-color: var(--brand); cursor: pointer; }
+.table tbody tr.is-selecionado > td { background: color-mix(in srgb, var(--brand) 9%, transparent); }
+.table tbody tr.is-selecionado > td.actions-col { background: color-mix(in srgb, var(--brand) 9%, var(--surface)); }
+.selecao-barra {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 16px;
+  border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--brand) 10%, var(--surface));
+}
+.selecao-barra b { font-size: 14px; }
+.selecao-barra__acoes { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+@media (max-width: 640px) {
+  .table--cards tr { position: relative; }
+  .table--cards td.sel-col { position: absolute; top: 12px; left: 14px; width: auto; padding: 0 !important; }
+  .table--cards td.sel-col::before { content: none; }
+  .table--cards td.sel-col + td { padding-left: 30px !important; }
+  .table--cards td.sel-col + td.foto-col { padding-left: 32px !important; }
+  .table--cards td.sel-col + td:not(.foto-col) { font-weight: 600; }
+  .sel-check { width: 20px; height: 20px; }
+  .selecao-barra { position: relative; padding-right: 52px; }
+  .selecao-barra__acoes { margin-left: 0; width: 100%; }
+  .selecao-barra__acoes .icon-btn { position: absolute; top: 8px; right: 10px; }
+  .table--cards tbody tr.is-selecionado { background: color-mix(in srgb, var(--brand) 9%, transparent); }
+  .table--cards tbody tr.is-selecionado > td, .table--cards tbody tr.is-selecionado > td.actions-col { background: none; }
+}
