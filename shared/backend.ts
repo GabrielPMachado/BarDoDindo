@@ -835,6 +835,20 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     await lote.commit();
     return publicUsuario({ ...usuario, id: uid });
   });
+  /* CRM: ordem das funções (definida pela Presidência ou por quem edita funções); a função de sistema fica sempre no topo */
+  rota('PUT', '/crm/funcoes/ordem', async ({ b }) => {
+    const ctx = await requireUsuario();
+    requireAccess(ctx, 'funcoes', 'editar');
+    const funcoes = await colecao('funcoes');
+    const ids: string[] = Array.isArray(b?.ids) ? b.ids.map(String) : [];
+    const lista = ids.map((id) => funcoes.find((f) => f.id === id)).filter((f): f is Dados => !!f && !f.sistema);
+    if (!lista.length) return fail(400, 'Informe a ordem das funções.');
+    const lote = writeBatch(db);
+    lista.forEach((f, i) => { if (f.ordem !== i + 1) lote.update(doc(db, 'funcoes', f.id), { ordem: i + 1 }); });
+    registrar(lote, ctx, 'funcoes', 'reordenou as funções', { colecao: 'funcoes', detalhe: lista.map((f) => f.nome).join(' > ') });
+    await lote.commit();
+    return { ok: true };
+  });
   rota('PUT', '/crm/usuarios/:id', async ({ p, b }) => {
     const ctx = await requireUsuario();
     requireAccess(ctx, 'usuarios', 'editar');

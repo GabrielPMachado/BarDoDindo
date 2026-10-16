@@ -10,6 +10,8 @@ export interface Funcao {
   /** Por módulo (tela ou cadastro) — ou, no formato antigo, por área: lista de permissões (ou o nível "view"/"edit"). */
   permissoes: Record<string, Acao[] | 'view' | 'edit' | 'none'>;
   sistema?: boolean;
+  /** Posição na lista de funções (definida em Funções e permissões); sem ela, a função vai depois, pela quantidade de poderes. */
+  ordem?: number;
 }
 
 export interface Usuario {

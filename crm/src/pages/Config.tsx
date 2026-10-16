@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronDown, ExternalLink, Lock, Pencil, Plus, Save, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowDownWideNarrow, ChevronDown, ChevronUp, ExternalLink, Lock, Pencil, Plus, Save, Sparkles, Trash2 } from 'lucide-react';
 import { CARGOS_SUGERIDOS, GRUPOS_DE_PERMISSAO, MODULOS, NIVEIS, poderDe, acoesDe, acoesNaArea, nivelDe, type Acao, type Modulo } from '../modules';
 import { AsyncButton, Badge, EmptyState, ErrorBox, Loading, Modal, NumberInput, PageHead, notify } from '../components/ui';
 import { api } from '../lib/api';
@@ -14,12 +14,21 @@ function resumoGrupo(acoesDe: (k: string) => Acao[], modulos: Modulo[]) {
   const com = niveis.filter((n) => n !== 'none').length;
   if (!com) return { texto: '—', classe: 'none' };
   if (niveis.every((n) => n === niveis[0])) return { texto: NIVEIS.find((n) => n.key === niveis[0])!.label, classe: niveis[0] };
-  return { texto: `${com} de ${modulos.length} telas`, classe: 'misto' };
+  return { texto: com === modulos.length ? 'Personalizado' : `${com} de ${modulos.length} telas`, classe: 'misto' };
 }
 const nomeGrupo = (label: string) => label.replace(/^Departamento /, '');
 /** Funções da que tem mais poderes para a que tem menos (a Presidência, de sistema, sempre primeiro). */
 const porPoder = <T extends Funcao>(lista: T[]) => [...lista].sort((a, b) =>
   (b.sistema ? Infinity : poderDe((k) => acoesDaFuncao(b, k))) - (a.sistema ? Infinity : poderDe((k) => acoesDaFuncao(a, k))) || a.nome.localeCompare(b.nome, 'pt-BR'));
+/** Na ordem escolhida em Funções e permissões; as que ainda não têm posição vêm depois, pela quantidade de poderes. */
+const emOrdem = <T extends Funcao>(lista: T[]) => {
+  const temOrdem = (f: T) => typeof f.ordem === 'number' && !f.sistema;
+  return [
+    ...lista.filter((f) => f.sistema),
+    ...lista.filter(temOrdem).sort((a, b) => a.ordem! - b.ordem!),
+    ...porPoder(lista.filter((f) => !f.sistema && !temOrdem(f))),
+  ];
+};
 
 /* ---------------- Usuários ---------------- */
 export function Usuarios() {
@@ -149,7 +158,7 @@ function UsuarioForm({ user, funcoes, isSelf, canDelete, onClose }: {
         )}
         <div className="form-field">
           <label htmlFor="u-funcao">Função *</label>
-          <SelectPicker id="u-funcao" options={porPoder(funcoes).map((f) => ({ value: f.id, label: f.nome }))} value={form.funcaoId} onChange={(v) => setForm({ ...form, funcaoId: v })} />
+          <SelectPicker id="u-funcao" options={emOrdem(funcoes).map((f) => ({ value: f.id, label: f.nome }))} value={form.funcaoId} onChange={(v) => setForm({ ...form, funcaoId: v })} />
         </div>
         <div className="form-field">
           <label htmlFor="u-status">Status</label>
@@ -180,6 +189,20 @@ export function Funcoes() {
   const canDelete = pode('funcoes', 'excluir');
   const col = useCollection<Funcao & Row>('funcoes');
   const [editing, setEditing] = useState<Funcao | 'new' | null>(null);
+
+  // a ordem da lista é a escolhida aqui (setas); "Ordenar por poderes" volta à ordem automática
+  const lista = emOrdem(col.rows);
+  const [movendo, setMovendo] = useState(false);
+  const salvarOrdem = async (nova: Funcao[]) => {
+    await api('/crm/funcoes/ordem', { method: 'PUT', body: { ids: nova.filter((f) => !f.sistema).map((f) => f.id) } });
+    await col.reload();
+  };
+  const mover = async (i: number, d: -1 | 1) => {
+    const nova = [...lista];
+    [nova[i], nova[i + d]] = [nova[i + d], nova[i]];
+    setMovendo(true);
+    try { await salvarOrdem(nova); } catch (e) { notify(e instanceof Error ? e.message : 'Não foi possível mudar a ordem.', 'error'); } finally { setMovendo(false); }
+  };
 
   /**
    * Cria os cargos prontos que faltam e atualiza os que já existem (pelo nome) para as permissões sugeridas,
@@ -216,9 +239,10 @@ export function Funcoes() {
     <div className="page">
       <PageHead
         title="Funções e permissões"
-        description="Cada função define, área por área, o nível de acesso: sem acesso, ver, editar (ver, cadastrar e alterar) ou total (também excluir)."
+        description="Cada função define, tela por tela, o nível de acesso: sem acesso, ver, editar (ver, cadastrar e alterar) ou total (também excluir). Use as setas para pôr as funções na ordem que preferir."
         actions={canCreate && (
           <>
+            {canEdit && lista.length > 2 && <AsyncButton className="btn btn--ghost" onClick={() => salvarOrdem(porPoder(lista)).then(() => notify('Funções ordenadas pela quantidade de poderes.'))}><ArrowDownWideNarrow size={16} /> Ordenar por poderes</AsyncButton>}
             <AsyncButton className="btn btn--ghost" onClick={adicionarSugeridos}><Sparkles size={16} /> Criar / atualizar cargos sugeridos</AsyncButton>
             <button className="btn btn--primary" onClick={() => setEditing('new')}><Plus size={16} /> Nova função</button>
           </>
@@ -236,9 +260,19 @@ export function Funcoes() {
                 </tr>
               </thead>
               <tbody>
-                {porPoder(col.rows).map((f) => (
+                {lista.map((f, i) => (
                   <tr key={f.id}>
-                    <td className="matrix__role"><strong>{f.nome}</strong>{f.sistema && <Lock size={12} className="muted inline-icon" />}<div className="muted small">{f.descricao}</div></td>
+                    <td className="matrix__role">
+                      <div className="matrix__ordem">
+                        {canEdit && !f.sistema && (
+                          <span className="ordem-btns">
+                            <button className="icon-btn" disabled={movendo || i <= 1} onClick={() => void mover(i, -1)} aria-label={`Subir ${f.nome}`} title="Subir"><ChevronUp size={15} /></button>
+                            <button className="icon-btn" disabled={movendo || i >= lista.length - 1} onClick={() => void mover(i, 1)} aria-label={`Descer ${f.nome}`} title="Descer"><ChevronDown size={15} /></button>
+                          </span>
+                        )}
+                        <span><strong>{f.nome}</strong>{f.sistema && <Lock size={12} className="muted inline-icon" />}<div className="muted small">{f.descricao}</div></span>
+                      </div>
+                    </td>
                     {GRUPOS_DE_PERMISSAO.map((g) => {
                       const r = resumoGrupo((k) => acoesDaFuncao(f, k), g.modulos);
                       return (
