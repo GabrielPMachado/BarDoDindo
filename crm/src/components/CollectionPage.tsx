@@ -576,7 +576,7 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
         {def.comFoto && (
           <FotoCampo valor={typeof data.foto === 'string' ? data.foto : ''} disabled={!canEdit} onChange={(foto) => setData((d) => ({ ...d, foto }))} />
         )}
-        {def.iaProduto && canEdit && <GerarFotoIA data={data} onUsar={(foto) => setData((d) => ({ ...d, foto }))} />}
+        {(def.iaProduto || def.fotoPadrao) && canEdit && <GerarFotoIA data={data} padrao={def.fotoPadrao ?? 'produto'} onUsar={(foto) => setData((d) => ({ ...d, foto }))} />}
         {def.fichaPrimeiro && fichaCampo}
         {def.fields.map((f) => (def.porLocal && f.key === 'local') || (def.compra && f.key === 'valor') ? null : def.porLocal && f.key === 'quantidade' ? (
           <LocaisCampo

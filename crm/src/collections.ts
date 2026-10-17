@@ -91,6 +91,8 @@ export interface CollectionDef {
   porLocal?: boolean;
   /** No cadastro do fornecedor, mostra os itens que temos dele (Estoque, Materiais e Tabela de preços). */
   itensDoFornecedor?: boolean;
+  /** Botão "Foto no padrão do Dindo" (Gemini) para itens do Estoque, com o depósito como cenário. */
+  fotoPadrao?: 'estoque';
   /** Botão "Preencher com IA" (descrição, ingredientes e perfil da bebida) no cadastro do produto. */
   iaProduto?: boolean;
   /** A ficha técnica vem antes dos outros campos no formulário (tela "Fichas técnicas"). */
@@ -244,7 +246,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     },
   },
   estoque: {
-    id: 'estoque', comFoto: true, porLocal: true, area: 'estoque', title: 'Estoque', singular: 'item de estoque',
+    id: 'estoque', comFoto: true, porLocal: true, fotoPadrao: 'estoque', area: 'estoque', title: 'Estoque', singular: 'item de estoque',
     description: 'Insumos com controle de quantidade mínima e validade.',
     filterKey: 'categoria', sortKey: 'item',
     fields: [

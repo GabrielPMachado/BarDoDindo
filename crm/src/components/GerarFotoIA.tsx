@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Check, Copy, Download, ExternalLink, ImageOff, Sparkles, Upload } from 'lucide-react';
-import { FOTO_MODELO_URL, GEMINI_URL, promptDaFoto } from '../lib/iaFoto';
+import { GEMINI_URL, MODELOS, promptDaFoto, promptDaFotoEstoque, type PadraoFoto } from '../lib/iaFoto';
 import { reduzirFoto } from './Avatar';
 import { notify } from './ui';
 
@@ -22,27 +22,31 @@ function baixar(url: string, nome: string) {
   a.href = url; a.download = nome;
   document.body.appendChild(a); a.click(); a.remove();
 }
-const baixarModelo = () => baixar(FOTO_MODELO_URL, 'foto-modelo-bar-do-dindo.jpg');
-const nomeArquivo = (nome: string) => nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'drink';
+const nomeArquivo = (nome: string) => nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'foto';
 
 /**
- * "Foto no padrão do Dindo", de graça pelo app do Gemini: o Cérebro copia o pedido pronto do drink e
+ * "Foto no padrão do Dindo", de graça pelo app do Gemini: o Cérebro copia o pedido pronto do drink (ou do item do Estoque) e
  * entrega a foto modelo; depois de gerar, a pessoa envia a foto e compara a atual com a nova antes de usar.
  */
-export function GerarFotoIA({ data, onUsar }: { data: Record<string, unknown>; onUsar: (foto: string) => void }) {
+export function GerarFotoIA({ data, onUsar, padrao = 'produto' }: { data: Record<string, unknown>; onUsar: (foto: string) => void; padrao?: PadraoFoto }) {
   const [aberto, setAberto] = useState(false);
   const [nova, setNova] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const fotoAtual = typeof data.foto === 'string' ? data.foto : '';
-  const nome = String(data.nome ?? '').trim();
-  const prompt = () => promptDaFoto({ nome, resumo: String(data.resumo ?? ''), ingredientes: String(data.ingredientes ?? '') });
+  const modelo = MODELOS[padrao];
+  const oQue = modelo.oQue;
+  const baixarModelo = () => baixar(modelo.url, modelo.arquivo);
+  const nome = String((padrao === 'estoque' ? data.item : data.nome) ?? '').trim();
+  const prompt = () => padrao === 'estoque'
+    ? promptDaFotoEstoque({ item: nome, categoria: String(data.categoria ?? ''), unidade: String(data.unidade ?? ''), conteudo: data.conteudo, conteudoUnidade: String(data.conteudoUnidade ?? '') })
+    : promptDaFoto({ nome, resumo: String(data.resumo ?? ''), ingredientes: String(data.ingredientes ?? '') });
 
   /**
-   * Um toque faz tudo: copia o pedido, baixa a foto modelo (e a foto atual do drink, como referência) e abre o Gemini.
+   * Um toque faz tudo: copia o pedido, baixa a foto modelo (e a foto atual, como referência) e abre o Gemini.
    * A cópia começa antes de abrir a aba: depois que o Gemini abre, a página perde o foco e o navegador não deixa copiar.
    */
   const criarNoGemini = () => {
-    if (!nome) { notify('Informe o nome do produto antes.', 'error'); return; }
+    if (!nome) { notify(padrao === 'estoque' ? 'Informe o nome do item antes.' : 'Informe o nome do produto antes.', 'error'); return; }
     const copiou = copiar(prompt());
     baixarModelo();
     if (fotoAtual) baixar(fotoAtual, `referencia-${nomeArquivo(nome)}.jpg`);
@@ -65,7 +69,7 @@ export function GerarFotoIA({ data, onUsar }: { data: Record<string, unknown>; o
         <div className="gerar-foto__chamada">
           <div>
             <strong><Sparkles size={15} /> Foto no padrão do Dindo</strong>
-            <p className="muted small">Um toque copia o pedido deste drink, baixa a foto modelo e abre o Gemini (grátis). Depois é só enviar a foto pronta aqui.</p>
+            <p className="muted small">Um toque copia o pedido deste {oQue}, baixa a foto modelo{padrao === 'estoque' ? ' (o depósito com a lousa do Dindo)' : ''} e abre o Gemini (grátis). Depois é só enviar a foto pronta aqui.</p>
           </div>
           <button type="button" className="btn btn--primary" onClick={criarNoGemini}><Sparkles size={16} /> Criar no Gemini</button>
         </div>
@@ -80,7 +84,7 @@ export function GerarFotoIA({ data, onUsar }: { data: Record<string, unknown>; o
           <strong className="gerar-foto__titulo"><Sparkles size={15} /> Foto no padrão do Dindo · grátis pelo Gemini</strong>
           <ol className="gerar-foto__passos">
             <li>
-              <span>No Gemini, <b>anexe a foto modelo</b> que foi baixada{fotoAtual ? ' (e, se quiser, a foto atual do drink como referência)' : ''}, <b>cole o pedido</b> e envie.</span>
+              <span>No Gemini, <b>anexe a foto modelo</b> que foi baixada{fotoAtual ? ` (e, se quiser, a foto atual do ${oQue} como referência)` : ''}, <b>cole o pedido</b> e envie.</span>
             </li>
             <li>
               <span>Salve a imagem que o Gemini criar e <b>envie aqui</b> para comparar com a atual.</span>
