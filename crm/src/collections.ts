@@ -141,7 +141,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   metas: {
     id: 'metas', anexos: 'Atas e documentos', feminino: true, area: 'metas', title: 'Metas e decisões', singular: 'meta ou decisão',
     description: 'Objetivos da casa e decisões registradas pela diretoria.',
-    filterKey: 'status', sortKey: 'prazo', sortDir: 'asc',
+    filterKey: 'status', filtros: ['tipo', 'area', 'responsavel'], sortKey: 'prazo', sortDir: 'asc',
     fields: [
       { key: 'titulo', label: 'Título', type: 'text', required: true, wide: true },
       { key: 'tipo', label: 'Tipo', type: 'select', options: ['Meta', 'Decisão'], required: true },
@@ -163,7 +163,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   colaboradores: {
     id: 'colaboradores', anexos: 'Currículo e documentos', comFoto: true, area: 'colaboradores', title: 'Colaboradores', singular: 'colaborador',
     description: 'Cadastro da equipe, cargos e vínculos.',
-    filterKey: 'setor', sortKey: 'nome',
+    filterKey: 'setor', filtros: ['contrato', 'status', 'cargo'], sortKey: 'nome',
     fields: [
       { key: 'nome', label: 'Nome completo', type: 'text', required: true, wide: true },
       { key: 'cargo', label: 'Cargo', type: 'text', required: true, placeholder: 'Ex.: Bartender' },
@@ -188,7 +188,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   ferias: {
     id: 'ferias', anexos: 'Atestados e documentos', area: 'ferias', title: 'Férias e afastamentos', singular: 'registro',
     description: 'Programação de férias, atestados e licenças.',
-    filterKey: 'tipo', sortKey: 'inicio',
+    filterKey: 'tipo', filtros: ['colaborador', 'status'], sortKey: 'inicio',
     fields: [
       { key: 'colaborador', label: 'Colaborador', type: 'ref', ref: 'colaboradores', refKey: 'colaboradorId', required: true },
       { key: 'tipo', label: 'Tipo', type: 'select', options: ['Férias', 'Atestado médico', 'Falta', 'Falta justificada', 'Licença maternidade', 'Licença paternidade', 'Afastamento INSS', 'Outro'], required: true },
@@ -217,7 +217,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     // o "Realizado" do projeto é acumulado: o valor de cada lançamento é digitado, para não contar o mesmo gasto duas vezes
     despesa: (r) => ({ descricao: juntar('Projeto', r.nome), categoria: 'Outras despesas', valor: 0 }),
     description: 'Obras, reformas, melhorias e implantações.',
-    filterKey: 'status', sortKey: 'prazo', sortDir: 'asc',
+    filterKey: 'status', filtros: ['prioridade', 'responsavel'], sortKey: 'prazo', sortDir: 'asc',
     fields: [
       { key: 'nome', label: 'Projeto', type: 'text', required: true, wide: true },
       { key: 'responsavel', label: 'Responsável', type: 'ref', ref: 'pessoas', refKey: 'responsavelId', livre: true, formOnly: true },
@@ -248,7 +248,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   estoque: {
     id: 'estoque', comFoto: true, porLocal: true, fotoPadrao: 'estoque', area: 'estoque', title: 'Estoque', singular: 'item de estoque',
     description: 'Insumos com controle de quantidade mínima e validade.',
-    filterKey: 'categoria', sortKey: 'item',
+    filterKey: 'categoria', filtros: ['fornecedor', 'unidade'], sortKey: 'item',
     fields: [
       { key: 'item', label: 'Item', type: 'text', required: true, wide: true },
       { key: 'categoria', label: 'Categoria', type: 'select', options: ['Bebidas', 'Alimentos', 'Descartáveis', 'Limpeza', 'Outros'], required: true },
@@ -286,7 +286,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   materiais: {
     id: 'materiais', anexos: 'Fichas técnicas e manuais', comFoto: true, porLocal: true, area: 'materiais', title: 'Materiais', singular: 'material',
     description: 'Patrimônio: equipamentos, utensílios, mobiliário e uniformes.',
-    filterKey: 'tipo', sortKey: 'material',
+    filterKey: 'tipo', filtros: ['local', 'estado', 'fornecedor'], sortKey: 'material',
     fields: [
       { key: 'material', label: 'Material', type: 'text', required: true, wide: true },
       { key: 'tipo', label: 'Tipo', type: 'select', options: ['Equipamento', 'Utensílio', 'Mobiliário', 'Uniforme', 'Eletrônico', 'Outro'], required: true },
@@ -313,6 +313,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     description: 'Lance a nota fiscal de compra (ou leia a foto com a IA): cada item soma no Estoque ou nos Materiais, no local escolhido, e atualiza o custo e a Tabela de preços do fornecedor.',
     sortKey: 'data', sortDir: 'desc',
     despesa: (r) => ({ descricao: juntar('Compra', r.fornecedor, r.numero ? `NF ${s(r.numero)}` : ''), categoria: 'Fornecedores', valor: n(r.valor) }),
+    filtros: ['fornecedor'],
     fields: [
       { key: 'fornecedor', label: 'Fornecedor', type: 'ref', ref: 'fornecedores', refKey: 'fornecedorId', livre: true, required: true, wide: true },
       { key: 'numero', label: 'Nº da nota', type: 'text', placeholder: 'Ex.: 000123' },
@@ -366,7 +367,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     id: 'terceirizados', anexos: 'Contrato, orçamentos e notas fiscais', area: 'terceirizados', title: 'Serviços terceirizados', singular: 'serviço',
     despesa: (r) => ({ descricao: juntar(r.servico, r.empresa), categoria: 'Terceirizados', valor: n(r.valor) }),
     description: 'Prestadores recorrentes: segurança, limpeza, manutenção, música e outros.',
-    filterKey: 'categoria', sortKey: 'proximo', sortDir: 'asc',
+    filterKey: 'categoria', filtros: ['empresa', 'periodicidade', 'status'], sortKey: 'proximo', sortDir: 'asc',
     fields: [
       { key: 'servico', label: 'Serviço', type: 'text', required: true },
       { key: 'empresa', label: 'Empresa / prestador', type: 'ref', ref: 'fornecedores', refKey: 'fornecedorId', livre: true, required: true },
@@ -388,7 +389,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   fornecedores: {
     id: 'fornecedores', itensDoFornecedor: true, anexos: 'Contratos, catálogos e tabelas de preço', area: 'fornecedores', title: 'Fornecedores', singular: 'fornecedor',
     description: 'Cadastro e avaliação de fornecedores.',
-    filterKey: 'categoria', sortKey: 'nome',
+    filterKey: 'categoria', filtros: ['status', 'avaliacao', 'prazo'], sortKey: 'nome',
     fields: [
       { key: 'nome', label: 'Razão social / nome', type: 'text', required: true, wide: true },
       { key: 'cnpj', label: 'CNPJ', type: 'cnpj', placeholder: '00.000.000/0000-00' },
@@ -410,7 +411,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     id: 'contratos', anexos: 'Contrato assinado e aditivos', area: 'contratos', title: 'Contratos', singular: 'contrato',
     despesa: (r) => ({ descricao: juntar(r.titulo, r.parte), categoria: CATEGORIA_DO_CONTRATO[s(r.tipo)] ?? 'Outras despesas', valor: n(r.valor) }),
     description: 'Contratos vigentes, vencimentos e renovações.',
-    filterKey: 'status', sortKey: 'vencimento', sortDir: 'asc',
+    filterKey: 'status', filtros: ['tipo', 'parte', 'responsavel'], sortKey: 'vencimento', sortDir: 'asc',
     fields: [
       { key: 'titulo', label: 'Objeto do contrato', type: 'text', required: true, wide: true },
       { key: 'parte', label: 'Contratado / contratante', type: 'ref', ref: 'fornecedores', refKey: 'fornecedorId', livre: true, required: true },
@@ -452,7 +453,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   receitas: {
     id: 'receitas', anexos: 'Notas fiscais e comprovantes', feminino: true, area: 'receitas', title: 'Receitas', singular: 'receita',
     description: 'Entradas do caixa. Consumos lançados para clientes do aplicativo entram aqui automaticamente.',
-    filterKey: 'categoria', sortKey: 'data', sortDir: 'desc',
+    filterKey: 'categoria', filtros: ['formaPagamento'], sortKey: 'data', sortDir: 'desc',
     fields: [
       { key: 'data', label: 'Data', type: 'date', required: true },
       { key: 'descricao', label: 'Descrição', type: 'text', required: true, wide: true },
@@ -464,7 +465,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   despesas: {
     id: 'despesas', anexos: 'Notas fiscais, boletos e comprovantes', feminino: true, area: 'despesas', title: 'Despesas', singular: 'despesa',
     description: 'Contas a pagar e lançamentos de despesa, inclusive a folha de pagamento.',
-    filterKey: 'status', sortKey: 'vencimento', sortDir: 'asc',
+    filterKey: 'status', filtros: ['categoria'], sortKey: 'vencimento', sortDir: 'asc',
     fields: [
       { key: 'descricao', label: 'Descrição', type: 'text', required: true, wide: true },
       { key: 'categoria', label: 'Categoria', type: 'select', options: ['Fornecedores', 'Folha de pagamento', 'Encargos', 'Aluguel', 'Energia e água', 'Impostos', 'Terceirizados', 'Marketing', 'Manutenção', 'Tarifas bancárias', 'Outras despesas'], required: true },
@@ -489,7 +490,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   criacao: {
     id: 'criacao', anexos: 'Artes e briefings', comFoto: true, feminino: true, area: 'criacao', title: 'Criação', singular: 'peça',
     description: 'Fluxo de produção de peças: do briefing à publicação.',
-    filterKey: 'status', sortKey: 'entrega', sortDir: 'asc',
+    filterKey: 'status', filtros: ['formato', 'campanha', 'responsavel'], sortKey: 'entrega', sortDir: 'asc',
     fields: [
       { key: 'peca', label: 'Peça', type: 'text', required: true, wide: true },
       { key: 'formato', label: 'Formato', type: 'select', options: ['Post feed', 'Story', 'Reels / vídeo', 'Cardápio', 'Banner', 'Flyer', 'Identidade visual', 'Outro'] },
@@ -509,7 +510,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     id: 'midias', comFoto: true, feminino: true, area: 'midias', title: 'Gestão de mídias', singular: 'publicação',
     despesa: (r) => ({ descricao: juntar('Mídia', r.conteudo, r.canal), categoria: 'Marketing', valor: n(r.investimento) }),
     description: 'Calendário de publicações e resultados por canal.',
-    filterKey: 'canal', sortKey: 'data', sortDir: 'desc',
+    filterKey: 'canal', filtros: ['tipo', 'status'], sortKey: 'data', sortDir: 'desc',
     fields: [
       { key: 'conteudo', label: 'Conteúdo', type: 'text', required: true, wide: true },
       { key: 'canal', label: 'Canal', type: 'select', options: ['Instagram', 'Facebook', 'TikTok', 'Google Perfil da Empresa', 'WhatsApp', 'iFood', 'Site', 'Outro'], required: true },
@@ -537,7 +538,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   produtos: {
     id: 'produtos', comFoto: true, fichaTecnica: true, iaProduto: true, area: 'produtos', title: 'Produtos e cardápio', singular: 'produto',
     description: 'Produtos marcados como "No cardápio" e ativos aparecem no aplicativo dos clientes.',
-    filterKey: 'categoria', sortKey: 'nome',
+    filterKey: 'categoria', filtros: ['status', 'noCardapio', 'destaque'], sortKey: 'nome',
     fields: [
       { key: 'nome', label: 'Produto', type: 'text', required: true, wide: true },
       { key: 'categoria', label: 'Categoria', type: 'select', options: ['Cervejas', 'Chopes', 'Drinks', 'Destilados', 'Vinhos', 'Petiscos', 'Porções', 'Pratos', 'Sobremesas', 'Sem álcool'], required: true },
@@ -581,7 +582,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   guarnicoes: {
     id: 'guarnicoes', area: 'guarnicoes', title: 'Guarnições e itens fixos', singular: 'item fixo',
     description: 'Gelo, rodelas de fruta, canudos e outros itens que não se pesam: cada um tem um valor fixo por drink, somado nas fichas técnicas em que for marcado.',
-    filterKey: 'status', sortKey: 'nome',
+    filterKey: 'status', filtros: ['padrao'], sortKey: 'nome',
     fields: [
       { key: 'nome', label: 'Item', type: 'text', required: true, wide: true, placeholder: 'Ex.: Gelo, Rodela de laranja, Canudo' },
       { key: 'custo', label: 'Valor por drink / porção', type: 'money', required: true, min: 0.01, max: 1_000 },
@@ -608,7 +609,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   reservas: {
     id: 'reservas', feminino: true, area: 'reservas', title: 'Reservas', singular: 'reserva',
     description: 'Solicitações feitas pelo aplicativo e reservas registradas pela equipe.',
-    filterKey: 'status', sortKey: 'data', sortDir: 'asc',
+    filterKey: 'status', filtros: ['ambiente', 'origem'], sortKey: 'data', sortDir: 'asc',
     fields: [
       { key: 'clienteNome', label: 'Cliente', type: 'ref', ref: 'clientes', refKey: 'clienteId', livre: true, required: true, fill: { clienteTelefone: 'telefone' } },
       { key: 'clienteTelefone', label: 'Telefone', type: 'phone' },
@@ -634,7 +635,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   trabalhista: {
     id: 'trabalhista', anexos: 'Peças do processo e documentos', area: 'trabalhista', title: 'Processos trabalhistas', singular: 'processo',
     description: 'Reclamações trabalhistas, audiências e valores envolvidos.',
-    filterKey: 'status', sortKey: 'audiencia', sortDir: 'asc',
+    filterKey: 'status', filtros: ['advogado', 'reclamante'], sortKey: 'audiencia', sortDir: 'asc',
     fields: [
       { key: 'numero', label: 'Número do processo', type: 'text', required: true },
       { key: 'reclamante', label: 'Reclamante', type: 'ref', ref: 'colaboradores', refKey: 'colaboradorId', livre: true, required: true },
@@ -658,7 +659,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   consultoria: {
     id: 'consultoria', anexos: 'Pareceres e relatórios', feminino: true, area: 'consultoria', title: 'Demandas de consultoria', singular: 'demanda',
     description: 'Pareceres, revisões contratuais, licenças e questões societárias.',
-    filterKey: 'tipo', sortKey: 'prazo', sortDir: 'asc',
+    filterKey: 'tipo', filtros: ['status', 'solicitante', 'consultor'], sortKey: 'prazo', sortDir: 'asc',
     fields: [
       { key: 'tema', label: 'Tema', type: 'text', required: true, wide: true },
       { key: 'tipo', label: 'Tipo', type: 'select', options: ['Parecer', 'Revisão contratual', 'Societário', 'Tributário', 'Licenças e alvarás', 'LGPD', 'Consumidor', 'Outro'], required: true },
@@ -679,7 +680,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   qualidade: {
     id: 'qualidade', anexos: 'Laudos e checklists', feminino: true, area: 'qualidade', title: 'Controle de qualidade', singular: 'inspeção',
     description: 'Inspeções periódicas por área com nota e resultado.',
-    filterKey: 'area', sortKey: 'data', sortDir: 'desc',
+    filterKey: 'area', filtros: ['resultado', 'responsavel'], sortKey: 'data', sortDir: 'desc',
     fields: [
       { key: 'data', label: 'Data', type: 'date', required: true },
       { key: 'area', label: 'Área', type: 'select', options: ['Cozinha', 'Bar', 'Salão', 'Banheiros', 'Estoque', 'Área externa'], required: true },
@@ -701,7 +702,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   naoconformidades: {
     id: 'naoconformidades', anexos: 'Relatórios e evidências', feminino: true, area: 'naoconformidades', title: 'Não conformidades', singular: 'não conformidade',
     description: 'Problemas identificados e o plano de ação corretiva.',
-    filterKey: 'status', sortKey: 'prazo', sortDir: 'asc',
+    filterKey: 'status', filtros: ['area', 'gravidade', 'responsavel'], sortKey: 'prazo', sortDir: 'asc',
     fields: [
       { key: 'descricao', label: 'Descrição', type: 'text', required: true, wide: true },
       { key: 'area', label: 'Área', type: 'select', options: ['Cozinha', 'Bar', 'Salão', 'Banheiros', 'Estoque', 'Área externa', 'Atendimento'] },
@@ -726,7 +727,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   eventos: {
     id: 'eventos', area: 'eventos', title: 'Calendário', singular: 'evento',
     description: 'Shows, festas, jogos e eventos fechados. O calendário junta os eventos com as reservas.',
-    filterKey: 'tipo', sortKey: 'data', sortDir: 'asc',
+    filterKey: 'tipo', filtros: ['status', 'responsavel'], sortKey: 'data', sortDir: 'asc',
     fields: [
       { key: 'titulo', label: 'Evento', type: 'text', required: true, wide: true, placeholder: 'Ex.: Samba de sexta' },
       { key: 'tipo', label: 'Tipo', type: 'select', options: ['Show', 'Festa', 'Jogo / transmissão', 'Evento fechado', 'Degustação', 'Feriado', 'Outro'], required: true },
@@ -765,7 +766,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   atestados: {
     id: 'atestados', anexos: 'Documento emitido (PDF)', area: 'atestados', title: 'Atestados emitidos', singular: 'atestado',
     description: 'Alvarás, licenças, AVCB, laudos e certificados da casa, com a validade de cada um.',
-    filterKey: 'documento', sortKey: 'validade', sortDir: 'asc',
+    filterKey: 'documento', filtros: ['orgao'], sortKey: 'validade', sortDir: 'asc',
     fields: [
       { key: 'documento', label: 'Documento', type: 'select', options: ['Alvará de funcionamento', 'Licença sanitária', 'AVCB / Bombeiros', 'Licença ambiental', 'Certificado de dedetização', 'Limpeza da caixa d’água', 'Laudo elétrico', 'Laudo de gás', 'Outro'], required: true },
       { key: 'orgao', label: 'Órgão / empresa emissora', type: 'text', required: true },
@@ -792,7 +793,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   acoes: {
     id: 'acoes', anexos: 'Contrato social, acordos e comprovantes', feminino: true, area: 'acoes', title: 'Ações da empresa', singular: 'participação',
     description: 'Sócios e investidores: quantidade de ações ou cotas, participação e valor aportado.',
-    filterKey: 'tipo', sortKey: 'participacao', sortDir: 'desc',
+    filterKey: 'tipo', filtros: ['status'], sortKey: 'participacao', sortDir: 'desc',
     fields: [
       { key: 'nome', label: 'Sócio / investidor', type: 'text', required: true, wide: true },
       { key: 'tipo', label: 'Tipo', type: 'select', options: ['Sócio administrador', 'Sócio', 'Investidor', 'Investidor-anjo'], required: true },
@@ -817,7 +818,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   creditos: {
     id: 'creditos', anexos: 'Contrato e extratos', area: 'creditos', title: 'Crédito CNPJ', singular: 'crédito',
     description: 'Empréstimos, financiamentos e limites no CNPJ: taxa, parcelas e saldo devedor.',
-    filterKey: 'status', sortKey: 'proximaParcela', sortDir: 'asc',
+    filterKey: 'status', filtros: ['modalidade', 'instituicao'], sortKey: 'proximaParcela', sortDir: 'asc',
     despesa: (r) => ({ descricao: juntar('Parcela', r.modalidade, r.instituicao), categoria: 'Tarifas bancárias', valor: n(r.parcela) }),
     fields: [
       { key: 'instituicao', label: 'Instituição', type: 'text', required: true, placeholder: 'Ex.: Banrisul, Sicredi, Pronampe' },
@@ -843,7 +844,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   docfin: {
     id: 'docfin', anexos: 'Documento (PDF)', area: 'docfin', title: 'Contratos onerosos e títulos', singular: 'documento',
     description: 'Contratos onerosos, títulos concedidos (notas promissórias, duplicatas, cheques) e relatórios financeiros.',
-    filterKey: 'tipo', sortKey: 'data', sortDir: 'desc',
+    filterKey: 'tipo', filtros: ['status', 'parte'], sortKey: 'data', sortDir: 'desc',
     fields: [
       { key: 'titulo', label: 'Documento', type: 'text', required: true, wide: true },
       { key: 'tipo', label: 'Tipo', type: 'select', options: ['Contrato oneroso', 'Título concedido', 'Nota promissória', 'Duplicata', 'Relatório'], required: true },
@@ -858,7 +859,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   investimentos: {
     id: 'investimentos', anexos: 'Notas, orçamentos e comprovantes', area: 'investimentos', title: 'Lançamento de investimentos', singular: 'investimento',
     description: 'Dinheiro aplicado na casa (equipamentos, reformas, estoque inicial…) e de onde ele veio.',
-    filterKey: 'categoria', sortKey: 'data', sortDir: 'desc',
+    filterKey: 'categoria', filtros: ['origem', 'status'], sortKey: 'data', sortDir: 'desc',
     fields: [
       { key: 'descricao', label: 'Descrição', type: 'text', required: true, wide: true },
       { key: 'categoria', label: 'Categoria', type: 'select', options: ['Equipamentos', 'Reforma e obras', 'Mobiliário', 'Estoque inicial', 'Tecnologia', 'Marketing', 'Outros'], required: true },
@@ -882,7 +883,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   prestadores: {
     id: 'prestadores', anexos: 'Contrato, documentos e notas', area: 'prestadores', title: 'Fornecedores de mão de obra', singular: 'contratado',
     description: 'Pessoas físicas e jurídicas contratadas para prestar serviço à casa (freelas, músicos, segurança, contabilidade…).',
-    filterKey: 'status', sortKey: 'nome',
+    filterKey: 'status', filtros: ['servico', 'pagamento'], sortKey: 'nome',
     despesa: (r) => ({ descricao: juntar(r.servico, r.nome), categoria: 'Terceirizados', valor: n(r.valor) }),
     fields: [
       { key: 'nome', label: 'Nome / razão social', type: 'text', required: true, wide: true },
@@ -914,7 +915,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   advogados: {
     id: 'advogados', anexos: 'Procuração, contrato de honorários e documentos', area: 'advogados', title: 'Advogados', singular: 'advogado',
     description: 'Advogados e escritórios que atendem a casa, por área de atuação.',
-    filterKey: 'status', sortKey: 'nome',
+    filterKey: 'status', filtros: ['atuacao', 'escritorio'], sortKey: 'nome',
     fields: [
       { key: 'nome', label: 'Nome', type: 'text', required: true, wide: true },
       { key: 'atuacao', label: 'Área de atuação', type: 'select', options: ['Consultoria jurídica', 'Trabalhista e Tributário', 'Empresarial'], required: true },
@@ -943,7 +944,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   chamados: {
     id: 'chamados', area: 'chamados', title: 'Chamados de suporte', singular: 'chamado',
     description: 'Problemas de sistema, internet, equipamentos e impressoras, até a solução.',
-    filterKey: 'status', sortKey: 'abertura', sortDir: 'desc',
+    filterKey: 'status', filtros: ['categoria', 'prioridade', 'solicitante'], sortKey: 'abertura', sortDir: 'desc',
     fields: [
       { key: 'titulo', label: 'Problema', type: 'text', required: true, wide: true },
       { key: 'categoria', label: 'Categoria', type: 'select', options: ['Cérebro / sistema', 'Aplicativo do afilhado', 'Internet / Wi-Fi', 'Computador / celular', 'Impressora / maquininha', 'Câmeras', 'Outro'], required: true },
@@ -961,7 +962,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   equipamentos: {
     id: 'equipamentos', anexos: 'Notas fiscais, garantias e licenças', area: 'equipamentos', title: 'Equipamentos e licenças', singular: 'equipamento',
     description: 'Computadores, celulares, maquininhas, rede, câmeras e as assinaturas de software, com garantia e renovação.',
-    filterKey: 'tipo', sortKey: 'vencimento', sortDir: 'asc',
+    filterKey: 'tipo', filtros: ['status', 'local'], sortKey: 'vencimento', sortDir: 'asc',
     fields: [
       { key: 'item', label: 'Item', type: 'text', required: true, wide: true, placeholder: 'Ex.: Notebook do caixa, Wi-Fi do salão, Canva Pro' },
       { key: 'tipo', label: 'Tipo', type: 'select', options: ['Computador', 'Celular / tablet', 'Maquininha', 'Impressora', 'Rede / internet', 'Câmera', 'Software / licença', 'Outro'], required: true },
