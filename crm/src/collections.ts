@@ -93,6 +93,8 @@ export interface CollectionDef {
   itensDoFornecedor?: boolean;
   /** Botão "Foto no padrão do Dindo" (Gemini) para itens do Estoque, com o depósito como cenário. */
   fotoPadrao?: 'estoque';
+  /** Foto guardada em tamanho maior (mídias e artes), para ver ampliada. */
+  fotoGrande?: boolean;
   /** Botão "Preencher com IA" (descrição, ingredientes e perfil da bebida) no cadastro do produto. */
   iaProduto?: boolean;
   /** A ficha técnica vem antes dos outros campos no formulário (tela "Fichas técnicas"). */
@@ -488,7 +490,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
 
   /* ---------------- Marketing e Vendas (produtos são de Vendas) ---------------- */
   criacao: {
-    id: 'criacao', anexos: 'Artes e briefings', comFoto: true, feminino: true, area: 'criacao', title: 'Criação', singular: 'peça',
+    id: 'criacao', anexos: 'Artes e briefings', comFoto: true, fotoGrande: true, feminino: true, area: 'criacao', title: 'Criação', singular: 'peça',
     description: 'Fluxo de produção de peças: do briefing à publicação.',
     filterKey: 'status', filtros: ['formato', 'campanha', 'responsavel'], sortKey: 'entrega', sortDir: 'asc',
     fields: [
@@ -507,7 +509,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     ],
   },
   midias: {
-    id: 'midias', comFoto: true, feminino: true, area: 'midias', title: 'Gestão de mídias', singular: 'publicação',
+    id: 'midias', comFoto: true, fotoGrande: true, feminino: true, area: 'midias', title: 'Gestão de mídias', singular: 'publicação',
     despesa: (r) => ({ descricao: juntar('Mídia', r.conteudo, r.canal), categoria: 'Marketing', valor: n(r.investimento) }),
     description: 'Calendário de publicações e resultados por canal.',
     filterKey: 'canal', filtros: ['tipo', 'status'], sortKey: 'data', sortDir: 'desc',

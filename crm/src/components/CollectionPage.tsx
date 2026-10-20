@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, type DragEvent, type ReactNode, Fragment } from 'react';
-import { ArrowDown, ArrowLeftRight, ArrowUp, Camera, ChevronDown, Download, FileSpreadsheet, FileText, Globe, ImageOff, Paperclip, Pencil, Plus, Receipt, Search, Sheet, ShoppingCart, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowLeftRight, ArrowUp, Camera, ChevronDown, Download, FileSpreadsheet, FileText, Globe, ImageOff, Maximize2, Paperclip, Pencil, Plus, Receipt, Search, Sheet, ShoppingCart, Trash2, X } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { findModule } from '../modules';
 import { numberSpec, STATUS_KEYS, termos, toneOf, type CollectionDef, type Computed, type Field } from '../collections';
@@ -24,6 +24,7 @@ import { ItensDoFornecedor } from './ItensDoFornecedor';
 import { linkSeguro } from '../lib/links';
 import { PreencherProdutoIA } from './PreencherProdutoIA';
 import { GerarFotoIA } from './GerarFotoIA';
+import { Ampliar } from './Ampliar';
 import { SeletorVisao, VisaoCalendario, VisaoCartoes, VisaoQuadro, campoDoQuadro, useVisao } from './Visoes';
 import { CompraItens, itemVazio, totalItens, type ItemCompra } from './CompraItens';
 import { camposDosLocais, locaisDe, locaisNoFormulario } from '../lib/locais';
@@ -82,6 +83,9 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   // tabela, cartões com foto, quadro por status ou calendário (lembrado por tela)
   const { visoes, visao, mudar: mudarVisao } = useVisao(def, perm);
   const tituloDe = (r: Row) => String(r[def.fields[0].key] ?? '').trim() || '—';
+  // foto em tela cheia (miniatura da tabela, lupa dos cartões e quadro)
+  const [ampliada, setAmpliada] = useState<{ src: string; titulo: string } | null>(null);
+  const ampliar = (r: Row) => typeof r.foto === 'string' && r.foto && setAmpliada({ src: r.foto, titulo: tituloDe(r) });
   // receitas, despesas, consumos e reservas carregam só um período (escolhido na barra da tabela)
   const padraoPeriodo = PERIODO_PADRAO[def.id];
   const [periodo, setPeriodo] = useState<PeriodoKey>(padraoPeriodo ?? 'tudo');
@@ -332,9 +336,9 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
         ) : rows.length === 0 ? (
           <EmptyState title="Nenhum resultado">Ajuste a busca ou o filtro.</EmptyState>
         ) : visao === 'cartoes' ? (
-          <VisaoCartoes def={def} rows={rows} onAbrir={setEditing} fmt={formatField} titulo={tituloDe} sel={sel} marcar={marcar} />
+          <VisaoCartoes def={def} rows={rows} onAbrir={setEditing} fmt={formatField} titulo={tituloDe} sel={sel} marcar={marcar} onAmpliar={ampliar} />
         ) : visao === 'quadro' ? (
-          <VisaoQuadro def={def} rows={rows} onAbrir={setEditing} fmt={formatField} titulo={tituloDe} podeMover={canEdit} onMover={(r, valor) => void moverNoQuadro(r, valor)} />
+          <VisaoQuadro def={def} rows={rows} onAbrir={setEditing} fmt={formatField} titulo={tituloDe} podeMover={canEdit} onMover={(r, valor) => void moverNoQuadro(r, valor)} onAmpliar={ampliar} />
         ) : visao === 'calendario' ? (
           <VisaoCalendario def={def} rows={rows} onAbrir={setEditing} fmt={formatField} titulo={tituloDe} />
         ) : (
@@ -373,7 +377,9 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
                     </td>
                     {def.comFoto && (
                       <td className="foto-col" data-label="Foto">
-                        {typeof r.foto === 'string' && r.foto ? <img className="thumb" src={r.foto} alt="" loading="lazy" /> : <span className="thumb thumb--vazio"><ImageOff size={14} /></span>}
+                        {typeof r.foto === 'string' && r.foto
+                          ? <button type="button" className="thumb-btn" onClick={(e) => { e.stopPropagation(); ampliar(r); }} aria-label={`Ver a foto de ${tituloDe(r)} maior`} title="Ver maior"><img className="thumb" src={r.foto} alt="" loading="lazy" /></button>
+                          : <span className="thumb thumb--vazio"><ImageOff size={14} /></span>}
                       </td>
                     )}
                     {tableFields.map((f) => canEdit && editavelNaTabela(def, f) ? (
@@ -435,6 +441,8 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
       {soltandoEm && (
         <div className="solta-aviso" role="status"><Paperclip size={16} /> Solte para anexar em <b>{nomeDe(soltandoEm)}</b></div>
       )}
+
+      {ampliada && <Ampliar src={ampliada.src} titulo={ampliada.titulo} onClose={() => setAmpliada(null)} />}
 
       {transferindo && (
         <TransferirModal
@@ -596,7 +604,7 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
     >
       <form id="record-form" className="form-grid" onSubmit={submit}>
         {def.comFoto && (
-          <FotoCampo valor={typeof data.foto === 'string' ? data.foto : ''} disabled={!canEdit} onChange={(foto) => setData((d) => ({ ...d, foto }))} />
+          <FotoCampo valor={typeof data.foto === 'string' ? data.foto : ''} disabled={!canEdit} grande={def.fotoGrande} titulo={String(data[def.fields[0].key] ?? '')} onChange={(foto) => setData((d) => ({ ...d, foto }))} />
         )}
         {(def.iaProduto || def.fotoPadrao) && canEdit && <GerarFotoIA data={data} padrao={def.fotoPadrao ?? 'produto'} onUsar={(foto) => setData((d) => ({ ...d, foto }))} />}
         {def.fichaPrimeiro && fichaCampo}
@@ -648,13 +656,23 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
 }
 
 /** Foto do registro: escolher (a imagem é reduzida antes de salvar), trocar ou remover. */
-function FotoCampo({ valor, disabled, onChange }: { valor: string; disabled: boolean; onChange: (foto: string) => void }) {
+/** Tamanho guardado da foto: mídias e artes ficam maiores (até 1600 px), sempre abaixo do limite do banco. */
+async function fotoNoTamanho(arquivo: File, grande?: boolean) {
+  for (const lado of grande ? [1600, 1280, 1024, 800, 640] : [640]) {
+    const foto = await reduzirFoto(arquivo, lado, false);
+    if (foto.length <= 390_000 || lado === 640) return foto;
+  }
+  return reduzirFoto(arquivo, 640, false);
+}
+
+function FotoCampo({ valor, disabled, grande, titulo, onChange }: { valor: string; disabled: boolean; grande?: boolean; titulo?: string; onChange: (foto: string) => void }) {
   const [erro, setErro] = useState<string | null>(null);
+  const [aberta, setAberta] = useState(false);
   const escolher = async (arquivo?: File) => {
     if (!arquivo) return;
     setErro(null);
     try {
-      onChange(await reduzirFoto(arquivo, 640, false));
+      onChange(await fotoNoTamanho(arquivo, grande));
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Não foi possível ler a imagem.');
     }
@@ -663,19 +681,24 @@ function FotoCampo({ valor, disabled, onChange }: { valor: string; disabled: boo
     <div className="form-field form-field--wide foto-campo">
       <label>Foto</label>
       <div className="foto-campo__linha">
-        <div className="foto-campo__previa">{valor ? <img src={valor} alt="Foto do registro" /> : <ImageOff size={22} />}</div>
+        <div className="foto-campo__previa">
+          {valor ? <button type="button" className="thumb-btn" onClick={() => setAberta(true)} title="Ver maior"><img src={valor} alt="Foto do registro" /></button> : <ImageOff size={22} />}
+        </div>
         {!disabled && (
           <div className="foto-campo__acoes">
             <label className="btn btn--ghost btn--sm">
               <Camera size={14} /> {valor ? 'Trocar foto' : 'Escolher foto'}
               <input type="file" accept="image/*" hidden onChange={(e) => { void escolher(e.target.files?.[0]); e.target.value = ''; }} />
             </label>
+            {valor && <button type="button" className="btn btn--ghost btn--sm" onClick={() => setAberta(true)}><Maximize2 size={14} /> Ver maior</button>}
             {valor && <button type="button" className="btn btn--ghost btn--sm" onClick={() => onChange('')}><Trash2 size={14} /> Remover</button>}
             <span className="muted small">JPG ou PNG. A imagem é reduzida automaticamente.</span>
           </div>
         )}
       </div>
+      {disabled && valor && <button type="button" className="btn btn--ghost btn--sm foto-campo__ver" onClick={() => setAberta(true)}><Maximize2 size={14} /> Ver maior</button>}
       {erro && <p className="error">{erro}</p>}
+      {aberta && valor && <Ampliar src={valor} titulo={titulo} onClose={() => setAberta(false)} />}
     </div>
   );
 }

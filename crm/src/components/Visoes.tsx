@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, Columns3, ImageOff, LayoutGrid, Table2 } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Columns3, ImageOff, LayoutGrid, Maximize2, Table2 } from 'lucide-react';
 import { STATUS_KEYS, toneOf, type CollectionDef, type Field } from '../collections';
 import type { Row } from '../lib/data';
 import { isoToday } from '../lib/format';
@@ -74,7 +74,7 @@ const statusDe = (def: CollectionDef, r: Row) => {
 };
 
 /* ---------- cartões (galeria com foto) ---------- */
-export function VisaoCartoes({ def, rows, onAbrir, fmt, titulo, sel, marcar }: Comum & { sel: Set<string>; marcar: (id: string, on: boolean) => void }) {
+export function VisaoCartoes({ def, rows, onAbrir, fmt, titulo, sel, marcar, onAmpliar }: Comum & { sel: Set<string>; marcar: (id: string, on: boolean) => void; onAmpliar: (r: Row) => void }) {
   const campos = camposDoCartao(def);
   return (
     <div className="cartoes">
@@ -86,6 +86,9 @@ export function VisaoCartoes({ def, rows, onAbrir, fmt, titulo, sel, marcar }: C
               {typeof r.foto === 'string' && r.foto ? <img src={r.foto} alt="" loading="lazy" /> : <span className="cartao__sem"><ImageOff size={22} /></span>}
               <input type="checkbox" className="sel-check cartao__sel" checked={sel.has(r.id)} onClick={(e) => e.stopPropagation()} onChange={(e) => marcar(r.id, e.target.checked)} aria-label={`Selecionar ${titulo(r)}`} />
               {st && <span className="cartao__status"><Badge tone={toneOf(st)}>{st}</Badge></span>}
+              {typeof r.foto === 'string' && r.foto && (
+                <button type="button" className="cartao__ampliar" onClick={(e) => { e.stopPropagation(); onAmpliar(r); }} aria-label={`Ver a foto de ${titulo(r)} maior`} title="Ver maior"><Maximize2 size={15} /></button>
+              )}
             </div>
             <div className="cartao__corpo">
               <b className="cartao__titulo">{titulo(r)}</b>
@@ -101,7 +104,7 @@ export function VisaoCartoes({ def, rows, onAbrir, fmt, titulo, sel, marcar }: C
 }
 
 /* ---------- quadro por status (arrastar o cartão muda o status) ---------- */
-export function VisaoQuadro({ def, rows, onAbrir, fmt, titulo, podeMover, onMover }: Comum & { podeMover: boolean; onMover: (r: Row, valor: string) => void }) {
+export function VisaoQuadro({ def, rows, onAbrir, fmt, titulo, podeMover, onMover, onAmpliar }: Comum & { podeMover: boolean; onMover: (r: Row, valor: string) => void; onAmpliar: (r: Row) => void }) {
   const campo = campoDoQuadro(def)!;
   const colunas = [...(campo.options ?? []), ...(rows.some((r) => !r[campo.key] || !campo.options?.includes(String(r[campo.key]))) ? ['—'] : [])];
   const campos = camposDoCartao(def, [campo.key]).slice(0, 2);
@@ -136,7 +139,7 @@ export function VisaoQuadro({ def, rows, onAbrir, fmt, titulo, podeMover, onMove
                   onClick={() => onAbrir(r)} tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && onAbrir(r)}
                   title={podeMover ? 'Arraste para outra coluna para mudar o ' + campo.label.toLowerCase() : undefined}
                 >
-                  {typeof r.foto === 'string' && r.foto && <img src={r.foto} alt="" loading="lazy" />}
+                  {typeof r.foto === 'string' && r.foto && <img src={r.foto} alt="" loading="lazy" title="Ver maior" onClick={(e) => { e.stopPropagation(); onAmpliar(r); }} />}
                   <b>{titulo(r)}</b>
                   {campos.map((f) => (r[f.key] !== undefined && r[f.key] !== '' && r[f.key] !== null) && (
                     <span key={f.key} className="small"><span className="muted">{f.label}:</span> {fmt(f, r[f.key])}</span>
