@@ -22,7 +22,7 @@ service cloud.firestore {
     // Igual a PAI_DO_MODULO em shared/backend.ts.
     function pai(k) {
       return k.matches('reservas|consumos|resgates|eventos') ? 'atd'
-        : k.matches('produtos|fichas|guarnicoes|clientes') ? 'vnd'
+        : k.matches('produtos|fichas|guarnicoes|clientes|qrcode') ? 'vnd'
         : k.matches('recompensas|criacao|midias|publicidade') ? 'mkt'
         : k.matches('projetos|estoque|materiais|compras') ? 'dp'
         : k.matches('terceirizados|fornecedores|precos|contratos') ? 'adm'
@@ -336,16 +336,39 @@ service cloud.firestore {
     function verAfilhados() {
       return podeEmAlgum(['clientes', 'reservas', 'consumos', 'resgates', 'recompensas'], 'ver');
     }
+    // programa de afilhados: só maiores de 18 anos (pela data de nascimento) e com CPF; um CPF por afilhado
+    function cpfOk(v) { return v is string && v.matches('^[0-9]{11}$'); }
+    function maiorDeIdade(n) {
+      return n is string && n.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$')
+        && timestamp.date(int(n[0:4]) + 18, int(n[5:7]), n[5:7] == '02' && int(n[8:10]) > 28 ? 28 : int(n[8:10])) <= request.time;
+    }
+    function cpfDoAfilhado(uid, cpf) { return existsAfter(caminho('cpfs', cpf)) && getAfter(caminho('cpfs', cpf)).data.uid == uid; }
     match /clientes/{uid} {
       allow read: if logado() && (request.auth.uid == uid || verAfilhados());
       allow create: if logado() && request.auth.uid == uid
         && request.resource.data.email == request.auth.token.email
         && request.resource.data.numero == getAfter(caminho('meta', 'contadores')).data.clientes
+        && cpfOk(request.resource.data.get('cpf', null)) && maiorDeIdade(request.resource.data.get('nascimento', null))
+        && cpfDoAfilhado(uid, request.resource.data.cpf)
         && existsAfter(caminho('saldos', uid));
+      // o próprio afilhado edita nome, telefone, foto e as respostas do questionário opcional;
+      // cadastros de antes do lançamento completam CPF e data de nascimento uma única vez
       allow update: if logado() && request.auth.uid == uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nome', 'telefone', 'foto']);
+        && (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nome', 'telefone', 'foto', 'respostas'])
+          || (!('cpf' in resource.data)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nome', 'telefone', 'foto', 'respostas', 'cpf', 'nascimento'])
+            && cpfOk(request.resource.data.cpf) && maiorDeIdade(request.resource.data.nascimento)
+            && cpfDoAfilhado(uid, request.resource.data.cpf)));
       // excluir o afilhado (a pedido dele, LGPD) ou ao zerar o sistema
       allow delete: if pode('clientes', 'excluir');
+    }
+
+    // um registro por CPF, criado junto com o afilhado que o usa (não dá para criar de novo nem trocar o dono);
+    // ninguém lê (não serve para descobrir se um CPF está cadastrado); a equipe apaga junto com o afilhado
+    match /cpfs/{cpf} {
+      allow create: if logado() && cpfOk(cpf) && request.resource.data.keys().hasOnly(['uid']) && request.resource.data.uid == request.auth.uid
+        && getAfter(caminho('clientes', request.auth.uid)).data.cpf == cpf;
+      allow delete: if pode('clientes', 'excluir') || zerando();
     }
 
     // saldo de pontos usado para validar resgates: quem credita é a equipe; o cliente só debita junto com um voucher

@@ -11,6 +11,7 @@ import Cardapio from './pages/Cardapio';
 import Recompensas from './pages/Recompensas';
 import Perfil from './pages/Perfil';
 import Entrar from './pages/Entrar';
+import CompletarCadastro from './components/CompletarCadastro';
 import './styles.css';
 
 // na primeira visita o service worker é só instalado: recarregar ali apagava o formulário de quem já estava se cadastrando.
@@ -53,6 +54,15 @@ function Shell() {
     return (
       <div className="app">
         <Entrar />
+      </div>
+    );
+  }
+
+  // +18: cadastros de antes do lançamento completam CPF e data de nascimento antes de usar o app
+  if (!me.cliente.cadastroCompleto) {
+    return (
+      <div className="app">
+        <CompletarCadastro />
       </div>
     );
   }

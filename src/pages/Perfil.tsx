@@ -53,6 +53,16 @@ export default function Perfil() {
         <input id="phone" className="input" type="tel" inputMode="tel" maxLength={15} placeholder="(00) 00000-0000" value={form.telefone} onChange={(e) => setForm({ ...form, telefone: maskPhone(e.target.value) })} />
         <label className="label" htmlFor="email">E-mail</label>
         <input id="email" className="input" type="email" value={me.cliente.email} disabled />
+        <div className="form__dupla">
+          <div>
+            <label className="label" htmlFor="cpf">CPF</label>
+            <input id="cpf" className="input" value={me.cliente.cpf ?? ''} disabled />
+          </div>
+          <div>
+            <label className="label" htmlFor="nasc">Nascimento</label>
+            <input id="nasc" className="input" value={me.cliente.nascimento ? new Date(me.cliente.nascimento + 'T12:00:00').toLocaleDateString('pt-BR') : ''} disabled />
+          </div>
+        </div>
         <button className="btn btn--primary" disabled={busy}><Save size={18} /> Salvar alterações</button>
       </form>
 

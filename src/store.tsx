@@ -9,6 +9,8 @@ interface Config {
   antecedenciaMinutos: number;
   pontosPorReal: number;
   niveis: { nome: string; minimo: number }[];
+  /** Questionário opcional depois do cadastro (perguntas definidas no Cérebro). */
+  questionario?: { ativo: boolean; titulo: string; perguntas: { id: string; texto: string; opcoes: string[] }[] };
 }
 
 export interface Produto {
@@ -66,7 +68,12 @@ export interface Redemption {
 }
 
 interface Me {
-  cliente: { id: number; numero: number; nome: string; email: string; telefone: string; foto: string | null; desde: string };
+  cliente: {
+    id: number; numero: number; nome: string; email: string; telefone: string; foto: string | null; desde: string;
+    /** CPF mascarado, data de nascimento e se o cadastro tem os documentos exigidos desde o lançamento (+18). */
+    cpf: string; nascimento: string; cadastroCompleto: boolean;
+    respostas: Record<string, string> | null;
+  };
   pontos: number;
   acumulados: number;
   totalGasto: number;
@@ -85,13 +92,13 @@ interface Store {
   recompensas: Recompensa[];
   error: string | null;
   login: (email: string, senha: string) => Promise<void>;
-  cadastro: (dados: { nome: string; email: string; telefone: string; senha: string }) => Promise<void>;
+  cadastro: (dados: { nome: string; email: string; telefone: string; senha: string; cpf: string; nascimento: string; aceite: boolean; via?: string }) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   criarReserva: (r: { data: string; hora: string; pessoas: number; ambiente: string; observacoes: string }) => Promise<Reservation>;
   cancelarReserva: (id: string) => Promise<void>;
   resgatar: (recompensaId: string) => Promise<Redemption>;
-  atualizarPerfil: (dados: { nome?: string; telefone?: string; foto?: string | null }) => Promise<void>;
+  atualizarPerfil: (dados: { nome?: string; telefone?: string; foto?: string | null; cpf?: string; nascimento?: string; respostas?: Record<string, string> }) => Promise<void>;
 }
 
 const Ctx = createContext<Store | null>(null);

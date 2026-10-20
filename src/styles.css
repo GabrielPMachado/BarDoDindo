@@ -682,3 +682,30 @@ button.menu-row:active { background: var(--surface-2); }
   border-radius: 26px; border: 1px solid var(--border-strong); box-shadow: 0 18px 48px #000c; }
 .produto__capa { margin: 10px 10px 0; border-radius: 18px; }
 .produto__fechar { top: 20px; right: 20px; }
+
+/* ---------- Lançamento: cadastro +18, painel e questionário ---------- */
+.form__dupla { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.form__dupla > div { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+@media (max-width: 340px) { .form__dupla { grid-template-columns: 1fr; } }
+.aviso18 { margin: 2px 0; padding: 8px 12px; border-radius: 10px; font-size: 12.5px; line-height: 1.4; background: #c4572a1a; border: 1px solid #c4572a55; color: #f0a47f; }
+.check { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.4; color: var(--muted); cursor: pointer; margin: 4px 0; }
+.check input { width: 18px; height: 18px; margin-top: 1px; flex-shrink: 0; accent-color: var(--brand); }
+
+.painel { display: flex; align-items: center; gap: 12px; }
+.painel__eu { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; color: var(--text); }
+.painel__info { min-width: 0; display: flex; flex-direction: column; }
+.painel__info small { font-size: 12px; color: var(--muted); }
+.painel__info strong { font-family: var(--serif); font-size: 21px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.painel__info em { font-style: normal; font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase; font-weight: 600; color: var(--brand-light); }
+
+.convite { display: flex; align-items: center; gap: 12px; padding: 12px 10px 12px 14px; border-radius: 14px; background: var(--surface); border: 1px dashed var(--brand); color: var(--brand-light); }
+.convite__texto { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; text-align: left; color: var(--text); }
+.convite__texto strong { font-size: 14px; }
+.convite__texto span { font-size: 12.5px; color: var(--muted); }
+
+.questionario__topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.questionario__topo h2 { display: flex; align-items: center; gap: 8px; font-size: 18px; font-family: var(--serif); }
+.questionario__pergunta { display: flex; flex-direction: column; gap: 8px; }
+.questionario__opcoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.questionario__opcoes button { padding: 8px 14px; border-radius: 99px; border: 1px solid var(--border-strong); color: var(--text); font-size: 13.5px; }
+.questionario__opcoes button.is-on { background: var(--brand); border-color: var(--brand); color: var(--on-brand); font-weight: 600; }

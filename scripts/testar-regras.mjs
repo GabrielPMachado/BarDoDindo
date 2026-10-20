@@ -80,6 +80,16 @@ await negado('ver atualizações da equipe', () => getDocs(collection(db, 'ativi
 await negado('apagar o próprio cadastro de afilhado', () => deleteDoc(doc(db, 'clientes', uid)));
 await negado('apagar o registro do primeiro acesso', () => deleteDoc(doc(db, 'meta/setup')));
 await negado('zerar o contador de afilhados', () => setDoc(doc(db, 'meta/contadores'), { clientes: 0 }));
+// +18 e CPF: cadastro antigo completa os documentos uma única vez, com CPF próprio e maioridade
+const completar = (cpf, nascimento) => { const l = writeBatch(db); l.update(doc(db, 'clientes', uid), { cpf, nascimento }); l.set(doc(db, 'cpfs', cpf), { uid }); return l.commit(); };
+await negado('completar o cadastro sendo menor de 18 anos', () => completar('11144477735', '2015-05-10'));
+await negado('completar com CPF que já é de outro afilhado', () => completar('52998224725', '1990-01-01'));
+await negado('completar só o cadastro, sem registrar o CPF', () => updateDoc(doc(db, 'clientes', uid), { cpf: '11144477735', nascimento: '1990-01-01' }));
+await negado('registrar um CPF que não é o do próprio cadastro', () => setDoc(doc(db, 'cpfs', '39053344705'), { uid }));
+await permitido('completar o cadastro com CPF e maioridade', () => completar('11144477735', '1990-01-01'));
+await negado('trocar o CPF depois de completo', () => completar('39053344705', '1990-01-01'));
+await negado('consultar se um CPF está cadastrado', () => getDoc(doc(db, 'cpfs', '52998224725')));
+await permitido('responder o questionário opcional', () => updateDoc(doc(db, 'clientes', uid), { respostas: { p1: 'Instagram' } }));
 await signOut(auth);
 
 if (senhaAtendente) {

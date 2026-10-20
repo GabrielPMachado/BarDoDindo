@@ -5,7 +5,7 @@ import { AsyncButton, Badge, EmptyState, ErrorBox, Loading, Modal, NumberInput, 
 import { api } from '../lib/api';
 import { SelectPicker, confirmar } from '../components/pickers';
 import { reload, useCollection, useResource, type Row } from '../lib/data';
-import { useSession, type Config, type Funcao, type Usuario } from '../lib/session';
+import { useSession, type Config, type Funcao, type Questionario, type Usuario } from '../lib/session';
 
 const acoesDaFuncao = (f: Funcao, k: string) => (f.sistema ? acoesDe('edit') : acoesNaArea(f.permissoes as Record<string, unknown>, k));
 /** Resumo de um grupo (Diretoria ou departamento): o nível, se for o mesmo em todas as telas; senão, quantas telas a função acessa. */
@@ -451,7 +451,9 @@ export function Parametros() {
     if (!cfg.ambientes.length) throw new Error('Informe ao menos um ambiente.');
     const faixas = cfg.faixasInss.map((f) => f.ate);
     if (faixas.some((v, i) => i > 0 && v <= faixas[i - 1])) throw new Error('As faixas do INSS devem estar em ordem crescente.');
-    await api('/crm/config', { method: 'PUT', body: { ...cfg, horarios: [...new Set(cfg.horarios)].sort() } });
+    const questionario = cfg.questionario && { ...cfg.questionario, perguntas: cfg.questionario.perguntas.filter((p) => p.texto.trim()) };
+    if (questionario?.ativo && !questionario.perguntas.length) throw new Error('Adicione ao menos uma pergunta antes de mostrar o questionário.');
+    await api('/crm/config', { method: 'PUT', body: { ...cfg, horarios: [...new Set(cfg.horarios)].sort(), ...(questionario ? { questionario } : {}) } });
     await reload('/crm/config');
     notify('Parâmetros salvos. O aplicativo já usa as novas regras.');
   };
@@ -504,9 +506,40 @@ export function Parametros() {
           <label className="field-label" htmlFor="p-fgts">Alíquota do FGTS (%)</label>
           <NumberInput id="p-fgts" spec={{ decimals: 2, min: 0, max: 100 }} suffix="%" value={cfg.aliquotaFgts} onChange={(v) => setCfg({ ...cfg, aliquotaFgts: Number(v || 0) })} />
         </section>
+        <QuestionarioEditor q={cfg.questionario ?? { ativo: false, titulo: 'Conte um pouco sobre você', perguntas: [] }} onChange={(questionario) => setCfg({ ...cfg, questionario })} />
       </fieldset>
       {canEdit && <ChaveIA />}
     </div>
+  );
+}
+
+/**
+ * Questionário opcional do afilhado: aparece no início do app como convite (dá para adiar).
+ * Pergunta sem opções vira campo de texto; com opções, o afilhado toca em uma.
+ */
+function QuestionarioEditor({ q, onChange }: { q: Questionario; onChange: (q: Questionario) => void }) {
+  const mudar = (i: number, p: Partial<Questionario['perguntas'][number]>) => onChange({ ...q, perguntas: q.perguntas.map((x, j) => (j === i ? { ...x, ...p } : x)) });
+  return (
+    <section className="panel pad-lg questionario-editor">
+      <h2 className="panel-title">Questionário opcional do afilhado</h2>
+      <p className="muted small">Perguntas rápidas que o afilhado pode responder no aplicativo depois do cadastro. As respostas aparecem em Clientes (afilhados). Deixe as opções em branco para resposta livre.</p>
+      <label className="check-row"><input type="checkbox" checked={q.ativo} onChange={(e) => onChange({ ...q, ativo: e.target.checked })} /> Mostrar o questionário no aplicativo</label>
+      <label className="field-label" htmlFor="q-titulo">Título</label>
+      <input id="q-titulo" className="input" maxLength={80} value={q.titulo} onChange={(e) => onChange({ ...q, titulo: e.target.value })} />
+      {q.perguntas.map((p, i) => (
+        <div className="qe-pergunta" key={p.id}>
+          <input className="input" maxLength={200} placeholder={`Pergunta ${i + 1}`} aria-label={`Pergunta ${i + 1}`} value={p.texto} onChange={(e) => mudar(i, { texto: e.target.value })} />
+          <input className="input" maxLength={400} placeholder="Opções separadas por vírgula (opcional)" aria-label={`Opções da pergunta ${i + 1}`} defaultValue={p.opcoes.join(', ')}
+            onBlur={(e) => mudar(i, { opcoes: e.target.value.split(',').map((x) => x.trim()).filter(Boolean).slice(0, 10) })} />
+          <button type="button" className="icon-btn" aria-label={`Remover pergunta ${i + 1}`} onClick={() => onChange({ ...q, perguntas: q.perguntas.filter((_, j) => j !== i) })}><Trash2 size={15} /></button>
+        </div>
+      ))}
+      {q.perguntas.length < 10 && (
+        <button type="button" className="btn btn--ghost" style={{ marginTop: 10 }} onClick={() => onChange({ ...q, perguntas: [...q.perguntas, { id: Math.random().toString(36).slice(2, 10), texto: '', opcoes: [] }] })}>
+          <Plus size={16} /> Adicionar pergunta
+        </button>
+      )}
+    </section>
   );
 }
 

@@ -2,12 +2,16 @@ import { useState } from 'react';
 import { LogIn, UserPlus } from 'lucide-react';
 import { Marca } from '../components/ui';
 import { useStore } from '../store';
-import { maskPhone, phoneOk } from '../masks';
+import { maskCpf, maskPhone, nascimentoMaximo, phoneOk } from '../masks';
+import { cpfValido, idadeEm } from '../../shared/backend';
 
 export default function Entrar() {
   const { login, cadastro, error: connError } = useStore();
-  const [mode, setMode] = useState<'login' | 'cadastro'>('login');
-  const [form, setForm] = useState({ nome: '', email: '', telefone: '', senha: '', confirma: '' });
+  // quem chega pelo QR Code do bar (?via=qr) já cai no cadastro, e o cadastro registra a origem
+  const [viaQr] = useState(() => new URLSearchParams(location.search).get('via') === 'qr');
+  const [mode, setMode] = useState<'login' | 'cadastro'>(viaQr ? 'cadastro' : 'login');
+  const [form, setForm] = useState({ nome: '', email: '', telefone: '', senha: '', confirma: '', cpf: '', nascimento: '' });
+  const [aceite, setAceite] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value });
@@ -15,8 +19,21 @@ export default function Entrar() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (mode === 'cadastro' && !phoneOk(form.telefone)) {
+    if (mode === 'cadastro' && (!phoneOk(form.telefone) || !form.telefone)) {
       setError('Informe o celular completo, com DDD.');
+      return;
+    }
+    if (mode === 'cadastro' && !cpfValido(form.cpf)) {
+      setError('Informe um CPF válido.');
+      return;
+    }
+    if (mode === 'cadastro') {
+      const idade = idadeEm(form.nascimento);
+      if (idade === null) { setError('Informe sua data de nascimento.'); return; }
+      if (idade < 18) { setError('O programa de afilhados é exclusivo para maiores de 18 anos.'); return; }
+    }
+    if (mode === 'cadastro' && !aceite) {
+      setError('Para participar, marque que concorda com o uso dos dados.');
       return;
     }
     if (mode === 'cadastro' && form.senha !== form.confirma) {
@@ -26,7 +43,7 @@ export default function Entrar() {
     setBusy(true);
     try {
       if (mode === 'login') await login(form.email, form.senha);
-      else await cadastro({ nome: form.nome, email: form.email, telefone: form.telefone, senha: form.senha });
+      else await cadastro({ nome: form.nome, email: form.email, telefone: form.telefone, senha: form.senha, cpf: form.cpf, nascimento: form.nascimento, aceite, ...(viaQr ? { via: 'qr' } : {}) });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível entrar.');
     } finally {
@@ -62,7 +79,18 @@ export default function Entrar() {
             <label className="label" htmlFor="nome">Nome completo</label>
             <input id="nome" className="input" autoComplete="name" required minLength={3} maxLength={120} value={form.nome} onChange={set('nome')} />
             <label className="label" htmlFor="tel">Celular</label>
-            <input id="tel" className="input" type="tel" inputMode="tel" autoComplete="tel" maxLength={15} placeholder="(00) 00000-0000" value={form.telefone} onChange={(e) => setForm({ ...form, telefone: maskPhone(e.target.value) })} />
+            <input id="tel" className="input" type="tel" inputMode="tel" autoComplete="tel" maxLength={15} placeholder="(00) 00000-0000" required value={form.telefone} onChange={(e) => setForm({ ...form, telefone: maskPhone(e.target.value) })} />
+            <div className="form__dupla">
+              <span>
+                <label className="label" htmlFor="cpf">CPF</label>
+                <input id="cpf" className="input" inputMode="numeric" autoComplete="off" maxLength={14} placeholder="000.000.000-00" required value={form.cpf} onChange={(e) => setForm({ ...form, cpf: maskCpf(e.target.value) })} />
+              </span>
+              <span>
+                <label className="label" htmlFor="nasc">Data de nascimento</label>
+                <input id="nasc" className="input" type="date" required max={nascimentoMaximo()} min="1900-01-01" value={form.nascimento} onChange={set('nascimento')} />
+              </span>
+            </div>
+            <p className="aviso18">Programa exclusivo para maiores de 18 anos.</p>
           </>
         )}
         <label className="label" htmlFor="email">E-mail</label>
@@ -73,6 +101,10 @@ export default function Entrar() {
           <>
             <label className="label" htmlFor="confirma">Confirme a senha</label>
             <input id="confirma" className="input" type="password" autoComplete="new-password" required minLength={6} value={form.confirma} onChange={set('confirma')} />
+            <label className="check">
+              <input type="checkbox" checked={aceite} onChange={(e) => setAceite(e.target.checked)} />
+              <span>Tenho 18 anos ou mais e concordo que o Bar do Dindo use meus dados para o programa de afilhados.</span>
+            </label>
           </>
         )}
 

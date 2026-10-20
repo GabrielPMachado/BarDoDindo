@@ -21,6 +21,7 @@ import Monitoramento from './pages/Monitoramento';
 import { Clientes, Consumo, Reservas, Resgates } from './pages/Vendas';
 import { Funcoes, Parametros, Usuarios } from './pages/Config';
 import MeuPerfil from './pages/MeuPerfil';
+import QrCodeAfilhados from './pages/QrCode';
 import './styles.css';
 
 vigiarNovaVersao();
@@ -95,6 +96,7 @@ const CUSTOM: Record<string, () => ReactNode> = {
   '/financeiro/despesas': () => <Despesas />,
   '/financeiro/resultado': () => <Resultado />,
   '/vendas/clientes': () => <Clientes />,
+  '/vendas/qrcode': () => <QrCodeAfilhados />,
   '/vendas/guarnicoes': () => <CollectionPage def={COLLECTIONS.guarnicoes} before={(rows) => <CalculadoraGuarnicoes rows={rows} />} />,
   '/atendimento/reservas': () => <Reservas />,
   '/atendimento/consumo': () => <Consumo />,

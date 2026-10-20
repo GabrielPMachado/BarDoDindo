@@ -39,7 +39,9 @@ export interface Config {
   niveis: { nome: string; minimo: number }[];
   faixasInss: { ate: number; aliquota: number }[];
   aliquotaFgts: number;
+  questionario?: Questionario;
 }
+export interface Questionario { ativo: boolean; titulo: string; perguntas: { id: string; texto: string; opcoes: string[] }[] }
 
 interface Session {
   ready: boolean;

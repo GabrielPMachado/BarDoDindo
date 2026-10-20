@@ -35,7 +35,7 @@ const codigo = (e: unknown) => String((e as { code?: string } | null)?.code ?? '
 export const PAI_DO_MODULO: Record<string, string> = {
   painel: 'dir', metas: 'dir',
   reservas: 'atd', consumos: 'atd', resgates: 'atd', eventos: 'atd',
-  produtos: 'vnd', fichas: 'vnd', guarnicoes: 'vnd', clientes: 'vnd',
+  produtos: 'vnd', fichas: 'vnd', guarnicoes: 'vnd', clientes: 'vnd', qrcode: 'vnd',
   recompensas: 'mkt', criacao: 'mkt', midias: 'mkt', publicidade: 'mkt',
   projetos: 'dp', estoque: 'dp', materiais: 'dp', compras: 'dp',
   terceirizados: 'adm', fornecedores: 'adm', precos: 'adm', contratos: 'adm',
@@ -168,9 +168,39 @@ const DEFAULT_CONFIG = {
     { ate: 8475.55, aliquota: 14 },
   ],
   aliquotaFgts: 8,
+  // questionário opcional do afilhado, respondido no app depois do cadastro (perguntas definidas no Cérebro, em Parâmetros)
+  questionario: { ativo: false, titulo: 'Conte um pouco sobre você', perguntas: [] as { id: string; texto: string; opcoes: string[] }[] },
 };
 
 /* ---------- utilitários ---------- */
+/** CPF só com os dígitos, conferindo os dois dígitos verificadores (e recusando 000.000.000-00, 111… etc.). */
+export function cpfValido(v: unknown): string | null {
+  const d = String(v ?? '').replace(/\D/g, '');
+  if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return null;
+  const dv = (n: number) => { let s = 0; for (let i = 0; i < n; i++) s += Number(d[i]) * (n + 1 - i); const r = (s * 10) % 11; return r === 10 ? 0 : r; };
+  return dv(9) === Number(d[9]) && dv(10) === Number(d[10]) ? d : null;
+}
+/** Idade completa em anos numa data AAAA-MM-DD (ou null se a data for inválida). */
+export function idadeEm(nascimento: unknown, hoje = new Date()): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(nascimento ?? ''));
+  if (!m) return null;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const dt = new Date(y, mo - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d || dt > hoje) return null;
+  let idade = hoje.getFullYear() - y;
+  if (hoje.getMonth() + 1 < mo || (hoje.getMonth() + 1 === mo && hoje.getDate() < d)) idade--;
+  return idade;
+}
+/** Programa de afilhados: só maiores de 18 anos, com CPF válido. */
+function conferirDocumentos(b: Dados) {
+  const cpf = cpfValido(b.cpf);
+  if (!cpf) fail(400, 'Informe um CPF válido.');
+  const idade = idadeEm(b.nascimento);
+  if (idade === null || idade > 120) fail(400, 'Informe sua data de nascimento.');
+  if (idade! < 18) fail(403, 'O programa de afilhados é exclusivo para maiores de 18 anos.');
+  return { cpf: cpf!, nascimento: String(b.nascimento) };
+}
+const mascaraCpf = (cpf: unknown) => { const d = String(cpf ?? ''); return d.length === 11 ? `***.${d.slice(3, 6)}.***-${d.slice(9)}` : ''; };
 const now = () => new Date().toISOString();
 const str = (v: unknown, max = 500) => String(v ?? '').trim().slice(0, max);
 const emailOk = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
@@ -224,6 +254,9 @@ function resumo(consumos: Dados[], resgates: Dados[]) {
 }
 const publicCliente = (c: Dados) => ({
   id: c.numero, numero: c.numero, nome: c.nome, email: c.email, telefone: c.telefone, foto: c.foto ?? null, desde: c.criadoEm, origem: c.origem ?? 'Aplicativo',
+  // o app recebe o CPF mascarado; o cadastro está completo quando tem CPF e data de nascimento (exigidos desde o lançamento)
+  cpf: mascaraCpf(c.cpf), nascimento: c.nascimento ?? '', cadastroCompleto: !!c.cpf && !!c.nascimento,
+  respostas: c.respostas ?? null, via: c.via ?? '',
 });
 const publicUsuario = (u: Dados) => ({
   id: u.id, nome: u.nome, email: u.email, funcaoId: u.funcaoId, status: u.status, ultimoAcesso: u.ultimoAcesso ?? null, criadoEm: u.criadoEm,
@@ -500,7 +533,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   rota('GET', '/public/afilhados', async () => ({ total: Number((await documento('meta/contadores'))?.clientes) || 0 }));
   rota('GET', '/public/config', async () => {
     const c = await getConfig();
-    return { nomeEstabelecimento: c.nomeEstabelecimento, horarios: c.horarios, ambientes: c.ambientes, diasFuncionamento: c.diasFuncionamento, antecedenciaMinutos: c.antecedenciaMinutos, pontosPorReal: c.pontosPorReal, niveis: c.niveis };
+    return { nomeEstabelecimento: c.nomeEstabelecimento, horarios: c.horarios, ambientes: c.ambientes, diasFuncionamento: c.diasFuncionamento, antecedenciaMinutos: c.antecedenciaMinutos, pontosPorReal: c.pontosPorReal, niveis: c.niveis, questionario: c.questionario };
   });
   rota('GET', '/public/cardapio', async () =>
     (await colecao('cardapio'))
@@ -526,10 +559,9 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     if (!emailOk(email)) fail(400, 'Informe um e-mail válido.');
     if (senha.length < 6) fail(400, 'A senha deve ter pelo menos 6 caracteres.');
     const origem = b.origem === 'Pré-cadastro' ? 'Pré-cadastro' : 'Aplicativo';
-    if (origem === 'Pré-cadastro') {
-      if (!tel) fail(400, 'Informe o celular completo, com DDD.');
-      if (b.aceite !== true) fail(400, 'É preciso aceitar o uso dos dados para participar do programa.');
-    }
+    if (!tel) fail(400, 'Informe o celular completo, com DDD.');
+    const { cpf, nascimento } = conferirDocumentos(b);
+    if (b.aceite !== true) fail(400, 'É preciso aceitar o uso dos dados para participar do programa.');
     const { cred, nova } = await criarConta(email, senha, 'Este e-mail já está cadastrado.');
     const uid = cred.user.uid;
     try {
@@ -541,12 +573,17 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
         t.set(contadores, { clientes: numero }, { merge: true });
         t.set(doc(db, 'clientes', uid), {
           numero, nome, email: cred.user.email ?? email, telefone: tel, foto: null, criadoEm: now(), origem, aceiteEm: b.aceite === true ? now() : null,
+          cpf, nascimento, ...(b.via === 'qr' ? { via: 'QR Code' } : {}),
         });
+        // um CPF, um afilhado: o registro do CPF só pode ser criado uma vez (as regras recusam se já existir)
+        t.set(doc(db, 'cpfs', cpf), { uid });
         t.set(doc(db, 'saldos', uid), { acumulados: 0, usados: 0, ultimoResgate: '' });
       });
     } catch (e) {
       if (nova) await cred.user.delete().catch(() => undefined);
       await sair();
+      // o único bloqueio possível aqui, para quem acabou de criar a conta, é o CPF já cadastrado
+      if (codigo(e) === 'permission-denied') fail(409, 'Este CPF já está cadastrado no programa. Entre com o e-mail usado no cadastro.');
       throw e;
     }
     return { token: uid };
@@ -590,8 +627,27 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     }
     if (nome.length < 3) fail(400, 'Informe seu nome completo.');
     const lote = writeBatch(db);
-    lote.update(doc(db, 'clientes', uid), { nome, telefone: tel, foto });
-    await lote.commit();
+    const patch: Dados = { nome, telefone: tel, foto };
+    // cadastros de antes do lançamento completam CPF e data de nascimento uma única vez
+    if ((b.cpf !== undefined || b.nascimento !== undefined) && !c.cpf) {
+      const docs = conferirDocumentos(b);
+      Object.assign(patch, docs);
+      lote.set(doc(db, 'cpfs', docs.cpf), { uid });
+    }
+    // questionário opcional: respostas curtas, só às perguntas que existem
+    if (b.respostas !== undefined) {
+      const cfg = await getConfig();
+      const ids = new Set(cfg.questionario.perguntas.map((q) => q.id));
+      const r = (b.respostas && typeof b.respostas === 'object' ? b.respostas : {}) as Dados;
+      patch.respostas = { ...Object.fromEntries(Object.entries(r).filter(([k]) => ids.has(k)).map(([k, v]) => [k, str(v, 300)])), respondidoEm: now() };
+    }
+    lote.update(doc(db, 'clientes', uid), patch);
+    try {
+      await lote.commit();
+    } catch (e) {
+      if (patch.cpf && codigo(e) === 'permission-denied') fail(409, 'Este CPF já está cadastrado no programa.');
+      throw e;
+    }
     return { ok: true };
   });
   rota('POST', '/app/reservas', async ({ b }) => {
@@ -801,7 +857,19 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const ctx = await requireUsuario();
     requireAccess(ctx, 'parametros', 'editar');
     if (b.pontosPorReal !== undefined && !(Number(b.pontosPorReal) >= 0)) fail(400, 'Pontos por real inválido.');
-    if (b.horarios && !b.horarios.every((h: string) => /^\d{2}:\d{2}$/.test(h))) fail(400, 'Horários devem estar no formato HH:MM.');
+    if (b.horarios && !b.horarios.every((h: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(h))) fail(400, 'Horários devem estar no formato HH:MM (00:00 a 23:59).');
+    if (b.questionario !== undefined) {
+      const q = b.questionario as Dados;
+      const perguntas = Array.isArray(q?.perguntas) ? q.perguntas : [];
+      if (perguntas.length > 10) fail(400, 'O questionário aceita até 10 perguntas.');
+      b.questionario = {
+        ativo: q?.ativo === true, titulo: str(q?.titulo, 80) || DEFAULT_CONFIG.questionario.titulo,
+        perguntas: perguntas.map((x: Dados, i: number) => ({
+          id: str(x?.id, 20) || `p${i + 1}`, texto: str(x?.texto, 200),
+          opcoes: (Array.isArray(x?.opcoes) ? x.opcoes : []).map((o: unknown) => str(o, 60)).filter(Boolean).slice(0, 10),
+        })).filter((x: Dados) => x.texto),
+      };
+    }
     const patch = Object.fromEntries(Object.entries(b).filter(([k]) => k in DEFAULT_CONFIG));
     const lote = writeBatch(db);
     lote.set(doc(db, 'config/geral'), patch, { merge: true });
@@ -926,7 +994,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
         const dias: string[] = Array.isArray(s.dias) ? [...s.dias].sort() : [];
         const acumulados = Number(s.acumulados) || 0;
         return {
-          ...publicCliente(c), foto: undefined, pontos: acumulados - (Number(s.usados) || 0), acumulados, totalGasto: Math.round((Number(s.gasto) || 0) * 100) / 100,
+          // a equipe vê o CPF completo (nota fiscal com CPF, conferência do cadastro)
+          ...publicCliente(c), cpf: c.cpf ? String(c.cpf).replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : '', foto: undefined, pontos: acumulados - (Number(s.usados) || 0), acumulados, totalGasto: Math.round((Number(s.gasto) || 0) * 100) / 100,
           visitas: dias.length, ultimaVisita: dias.at(-1) ?? null, nivel: nivelDe(acumulados, cfg.niveis).atual?.nome ?? '',
         };
       })
@@ -955,7 +1024,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     if (!c) return fail(404, 'Afilhado não encontrado.');
     const [consumos, resgates, reservas] = await Promise.all([doCliente('consumos', c.id), doCliente('resgates', c.id), doCliente('reservas', c.id)]);
     const refs = [
-      doc(db, 'clientes', c.id), doc(db, 'saldos', c.id),
+      doc(db, 'clientes', c.id), doc(db, 'saldos', c.id), ...(c.cpf ? [doc(db, 'cpfs', String(c.cpf))] : []),
       ...consumos.flatMap((x) => [doc(db, 'consumos', x.id), ...(x.receitaId ? [doc(db, 'receitas', x.receitaId)] : [])]),
       ...resgates.map((x) => doc(db, 'resgates', x.id)), ...reservas.map((x) => doc(db, 'reservas', x.id)),
     ];
@@ -985,7 +1054,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     if (!ctx.funcao?.sistema) fail(403, 'Só a Presidência pode zerar o sistema.');
     if (b.confirmacao !== 'ZERAR TUDO') fail(400, 'Para zerar, confirme com "ZERAR TUDO".');
     const todos = async (...caminho: string[]) => (await getDocs(collection(db, caminho.join('/')))).docs.map((d) => d.ref);
-    const cols = [...Object.keys(COLLECTIONS).filter((c) => c !== 'funcoes'), 'clientes', 'saldos', 'cardapio', 'ref_colaboradores', 'ref_fornecedores', 'config', 'segredos'];
+    const cols = [...Object.keys(COLLECTIONS).filter((c) => c !== 'funcoes'), 'clientes', 'saldos', 'cpfs', 'cardapio', 'ref_colaboradores', 'ref_fornecedores', 'config', 'segredos'];
     const refs: DocumentReference[] = [];
     for (const c of cols) refs.push(...(await todos(c)));
     for (const a of new Set([...AREAS, ...MODULOS])) refs.push(...(await todos('atividades', a, 'itens')));
