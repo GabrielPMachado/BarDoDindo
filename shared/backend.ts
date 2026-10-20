@@ -82,11 +82,16 @@ function acoesDe(p: unknown): Acao[] {
   if (p === 'view') return ['ver'];
   return [];
 }
+/**
+ * Páginas criadas depois que as funções já existiam: sem a permissão gravada, valem as da página mais próxima
+ * (quem lança consumo usa o caixa e as comandas; quem cuida das reservas, o mapa de mesas). Igual a `irma()` em firestore.rules.
+ */
+export const IRMA_DA_PAGINA: Record<string, string> = { caixas: 'consumos', comandas: 'consumos', mesas: 'reservas', qrcode: 'clientes' };
 const AREAS = ['dir', 'atd', 'vnd', 'mkt', 'rh', 'dp', 'adm', 'fin', 'jur', 'fis', 'mon', 'ti', 'cfg'];
 /** Permissões de um módulo: as do próprio módulo; sem elas, as da área a que ele pertence (formato antigo). */
 export function permissaoDe(perm: Record<string, unknown>, k: string): unknown {
   const base = BASE_DA_PAGINA[k] ?? k;
-  for (const chave of [k, base, PAI_DO_MODULO[base], LEGADO[PAI_DO_MODULO[base] ?? ''], LEGADO[k]]) if (chave && chave in perm) return perm[chave];
+  for (const chave of [k, IRMA_DA_PAGINA[k], base, PAI_DO_MODULO[base], LEGADO[PAI_DO_MODULO[base] ?? ''], LEGADO[k]]) if (chave && chave in perm) return perm[chave];
   return undefined;
 }
 

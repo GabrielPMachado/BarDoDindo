@@ -56,8 +56,11 @@ service cloud.firestore {
     // só as telas-parte (com "_" ou de nome próprio) passam pelo base(): as demais já são o próprio cadastro
     function acoesEm(permissoes, k) {
       return k in permissoes ? permissoes[k]
+        // páginas criadas depois das funções: valem as da página mais próxima (Igual a IRMA_DA_PAGINA)
+        : k.matches('caixas|comandas|mesas|qrcode') && irma(k) in permissoes ? permissoes[irma(k)]
         : acoesBase(permissoes, k.matches('.*_.*|fichas|ticket|renda|relatorios|afastamentos') ? base(k) : k);
     }
+    function irma(k) { return k.matches('caixas|comandas') ? 'consumos' : k == 'mesas' ? 'reservas' : 'clientes'; }
     function acoesBase(permissoes, b) { return b in permissoes ? permissoes[b] : herdada(permissoes, pai(b), b); }
     function temAcao(p, acao) { return (p is list && acao in p) || (p is string && (p == 'edit' || (p == 'view' && acao == 'ver'))); }
     function podeNaFuncao(f, area, acao) {
