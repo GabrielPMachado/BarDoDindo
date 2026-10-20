@@ -259,7 +259,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
           {filterField?.options && (
             <select className="input input--sm" value={filter} onChange={(e) => { setFilter(e.target.value); setPage(0); }} aria-label={`Filtrar por ${filterField.label}`}>
               <option value="">{filterField.label}: todos</option>
-              {filterField.options.map((o) => <option key={o} value={o}>{o}</option>)}
+              {filterField.options.map((o) => <option key={o} value={o}>{filterField.label}: {o}</option>)}
             </select>
           )}
           {filtrosExtras.map((fx) => (
@@ -268,7 +268,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
               onChange={(e) => { setFiltros((x) => ({ ...x, [fx.key]: e.target.value })); setPage(0); }} aria-label={`Filtrar por ${fx.label}`}
             >
               <option value="">{fx.label}: todos</option>
-              {fx.opcoes.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              {fx.opcoes.map(([k, v]) => <option key={k} value={k}>{fx.label}: {v}</option>)}
             </select>
           ))}
           {Object.values(filtros).some(Boolean) && (

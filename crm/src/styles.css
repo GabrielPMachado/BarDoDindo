@@ -1360,3 +1360,7 @@ button.anexos__nome:hover { text-decoration: underline; }
 .ordem-btns { display: inline-flex; flex-direction: column; gap: 0; flex-shrink: 0; }
 .ordem-btns .icon-btn { width: 24px; height: 18px; border-radius: 5px; }
 .ordem-btns .icon-btn:disabled { opacity: .25; cursor: default; }
+/* barra de busca e filtros: quebra em linhas quando há muitos filtros, sem espremer a dica nem o contador */
+.toolbar { flex-wrap: wrap; row-gap: 8px; }
+.toolbar .search { flex: 1 1 220px; }
+.toolbar__dica, .toolbar__count { white-space: nowrap; }
