@@ -98,25 +98,38 @@ export function CaixaPage() {
             </div>
           </header>
           {pode('caixas', 'criar') ? (
-            <div className="caixa-abrir__corpo">
-              <label className="caixa-abrir__label" htmlFor="cx-ini">Troco inicial na gaveta</label>
-              <div className="caixa-abrir__valor">
-                <NumberInput id="cx-ini" spec={{ money: true, decimals: 2, min: 0, max: 100000 }} prefix="R$" value={valorInicial} onChange={setValorInicial} />
-              </div>
-              <p className="muted small">Conte as notas e moedas antes de abrir. Esse valor entra no esperado em dinheiro do fechamento.</p>
-
-              <label className="field-label" htmlFor="cx-obs">Observação (opcional)</label>
-              <input id="cx-obs" className="input" maxLength={300} placeholder="Ex.: troco conferido com o gerente" value={obs} onChange={(e) => setObs(e.target.value)} />
-
-              {fechados[0] && (
-                <div className="caixa-abrir__ultimo">
-                  <span className="muted small">Último caixa</span>
-                  <span>Fechado {quando(fechados[0].fechadoEm)} por {fechados[0].fechadoPorNome} · {brl(fechados[0].totalVendas || 0)}</span>
-                  <Diferenca v={fechados[0].fechamento?.diferenca ?? 0} />
+            <div className="caixa-abrir__corpo caixa-abrir__grade">
+              <div className="caixa-abrir__form">
+                <label className="caixa-abrir__label" htmlFor="cx-ini">Troco inicial na gaveta</label>
+                <div className="caixa-abrir__valor">
+                  <NumberInput id="cx-ini" spec={{ money: true, decimals: 2, min: 0, max: 100000 }} prefix="R$" value={valorInicial} onChange={setValorInicial} />
                 </div>
-              )}
+                <div className="caixa-abrir__atalhos" role="group" aria-label="Valores rápidos">
+                  {[0, 50, 100, 200].map((v) => (
+                    <button key={v} type="button" className={`chip${valorInicial === v ? ' is-on' : ''}`} onClick={() => setValorInicial(v)}>{v ? brl(v) : 'Sem troco'}</button>
+                  ))}
+                </div>
+                <p className="muted small">Conte as notas e moedas antes de abrir. Esse valor entra no esperado em dinheiro do fechamento.</p>
 
-              <AsyncButton className="btn btn--primary btn--lg" onClick={abrir}><LockOpen size={18} /> Abrir caixa com {brl(Number(valorInicial || 0))}</AsyncButton>
+                <label className="field-label" htmlFor="cx-obs">Observação (opcional)</label>
+                <input id="cx-obs" className="input" maxLength={300} placeholder="Ex.: troco conferido com o gerente" value={obs} onChange={(e) => setObs(e.target.value)} />
+              </div>
+
+              <aside className="caixa-abrir__lado">
+                <div className="caixa-abrir__resumo">
+                  <span className="muted small">Você vai abrir com</span>
+                  <strong>{brl(Number(valorInicial || 0))}</strong>
+                  <span className="muted small">em dinheiro na gaveta</span>
+                </div>
+                {fechados[0] && (
+                  <div className="caixa-abrir__ultimo">
+                    <span className="muted small">Último caixa</span>
+                    <span>Fechado {quando(fechados[0].fechadoEm)} por {fechados[0].fechadoPorNome} · {brl(fechados[0].totalVendas || 0)}</span>
+                    <Diferenca v={fechados[0].fechamento?.diferenca ?? 0} />
+                  </div>
+                )}
+                <AsyncButton className="btn btn--primary btn--lg" onClick={abrir}><LockOpen size={18} /> Abrir caixa</AsyncButton>
+              </aside>
             </div>
           ) : <p className="muted caixa-abrir__corpo">Peça a quem cuida do caixa para abri-lo.</p>}
         </section>
