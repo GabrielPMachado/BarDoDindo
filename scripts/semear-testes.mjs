@@ -66,5 +66,7 @@ await gravar('produtos/chopp', { nome: 'Chopp', categoria: 'Chopes', preco: 12, 
 await gravar(`usuarios/${atendente}`, { nome: 'Atendente Teste', email: 'atendente@teste.local', funcaoId: 'atendente', status: 'Ativo', criadoEm: agora });
 await gravar(`clientes/${cliente}`, { numero: 2, nome: 'Cliente Teste', email: 'cliente2@teste.local', telefone: '', criadoEm: agora });
 await gravar(`saldos/${cliente}`, { acumulados: 0, usados: 0 });
+// CPF já usado por outro afilhado (o registro de CPF é único)
+await gravar('cpfs/52998224725', { uid: 'outro-afilhado' });
 await gravar('recompensas/chopp', { nome: 'Chopp grátis', descricao: '', custo: 50, status: 'Ativa', criadoEm: agora });
 console.log('Dados de teste criados nos emuladores.');

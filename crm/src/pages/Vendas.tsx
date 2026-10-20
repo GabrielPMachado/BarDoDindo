@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Check, Minus, Plus, Receipt, Search, Trash2, X } from 'lucide-react';
 import { COLLECTIONS } from '../collections';
 import { CollectionPage } from '../components/CollectionPage';
-import { AsyncButton, Badge, EmptyState, ErrorBox, KpiRow, Loading, PageHead, notify } from '../components/ui';
+import { AsyncButton, Badge, EmptyState, ErrorBox, KpiRow, Loading, Modal, PageHead, notify } from '../components/ui';
 import { api } from '../lib/api';
 import { SelectPicker } from '../components/pickers';
 import { reload, useCollection, useResource, type Row } from '../lib/data';
@@ -25,7 +25,19 @@ interface Cliente {
   ultimaVisita: string | null;
   nivel: string;
   origem?: string;
+  cpf?: string;
+  nascimento?: string;
+  via?: string;
+  cadastroCompleto?: boolean;
+  respostas?: Record<string, string> | null;
 }
+/** Idade completa hoje a partir de AAAA-MM-DD. */
+const idade = (n?: string) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(n ?? '');
+  if (!m) return null;
+  const h = new Date();
+  return h.getFullYear() - Number(m[1]) - (h.getMonth() + 1 < Number(m[2]) || (h.getMonth() + 1 === Number(m[2]) && h.getDate() < Number(m[3])) ? 1 : 0);
+};
 
 const numero = (n: number) => `#${String(n).padStart(3, '0')}`;
 
@@ -33,6 +45,8 @@ const numero = (n: number) => `#${String(n).padStart(3, '0')}`;
 export function Clientes() {
   const { data, loading, error } = useResource<Cliente[]>('/crm/clientes');
   const { pode } = useSession();
+  const perguntas = useResource<Config>('/public/config').data?.questionario?.perguntas ?? [];
+  const [vendo, setVendo] = useState<Cliente | null>(null);
   // excluir apaga também consumos, vouchers e reservas do afilhado, por isso exige as duas permissões
   const podeExcluir = pode('clientes', 'excluir') && pode('consumos', 'excluir');
   const excluir = async (c: Cliente) => {
@@ -43,7 +57,7 @@ export function Clientes() {
   const [q, setQ] = useState('');
   const clientes = data ?? [];
   const term = q.trim().toLowerCase();
-  const list = clientes.filter((c) => !term || `${c.nome} ${c.email} ${c.telefone} ${numero(c.numero)}`.toLowerCase().includes(term));
+  const list = clientes.filter((c) => !term || `${c.nome} ${c.email} ${c.telefone} ${c.cpf ?? ''} ${numero(c.numero)}`.toLowerCase().includes(term));
   const mes = currentMonth();
 
   return (
@@ -54,13 +68,15 @@ export function Clientes() {
           { label: 'Afilhados', value: num(clientes.length) },
           { label: 'Novos este mês', value: num(clientes.filter((c) => monthOf(c.desde) === mes).length) },
           { label: 'Vindos do pré-cadastro', value: num(clientes.filter((c) => c.origem === 'Pré-cadastro').length), tone: 'info' },
+          { label: 'Pelo QR Code', value: num(clientes.filter((c) => c.via === 'QR Code').length), tone: 'info' },
+          { label: 'Cadastro incompleto (sem CPF)', value: num(clientes.filter((c) => !c.cadastroCompleto).length), tone: clientes.some((c) => !c.cadastroCompleto) ? 'warn' : undefined },
           { label: 'Pontos em circulação', value: num(clientes.reduce((t, c) => t + c.pontos, 0)) },
           { label: 'Consumo total registrado', value: brl(clientes.reduce((t, c) => t + c.totalGasto, 0)) },
         ]} />
       )}
       <div className="panel">
         <div className="toolbar">
-          <label className="search"><Search size={16} /><input placeholder="Buscar por nome, e-mail, telefone ou número" value={q} onChange={(e) => setQ(e.target.value)} /></label>
+          <label className="search"><Search size={16} /><input placeholder="Buscar por nome, e-mail, telefone, CPF ou número" value={q} onChange={(e) => setQ(e.target.value)} /></label>
           <span className="muted toolbar__count">{num(list.length)} {list.length === 1 ? 'cliente' : 'clientes'}</span>
         </div>
         {error && <ErrorBox>{error}</ErrorBox>}
@@ -71,15 +87,19 @@ export function Clientes() {
             <table className="table table--cards">
               <thead>
                 <tr>
-                  <th>Afilhado</th><th>Contato</th>
+                  <th>Afilhado</th><th>Contato</th><th>Documento</th>
                   <th className="num">Pontos</th><th className="num">Visitas</th><th className="num">Consumo total</th><th>Última visita</th><th>Cliente desde</th>{podeExcluir && <th aria-label="Ações" />}
                 </tr>
               </thead>
               <tbody>
                 {list.map((c) => (
                   <tr key={c.id}>
-                    <td data-label="Afilhado" className="text"><strong>{c.nome}</strong><div className="muted small">{numero(c.numero)}{c.origem === 'Pré-cadastro' && <> · <span className="gold">Pré-cadastro</span></>}</div></td>
+                    <td data-label="Afilhado" className="text"><strong>{c.nome}</strong><div className="muted small">{numero(c.numero)}{c.origem === 'Pré-cadastro' && <> · <span className="gold">Pré-cadastro</span></>}{c.via === 'QR Code' && <> · <span className="gold">QR Code</span></>}</div></td>
                     <td data-label="Contato" className="text"><div className="small">{c.email}</div><div className="muted small nowrap">{c.telefone ? maskPhone(c.telefone) : '—'}</div></td>
+                    <td data-label="Documento" className="text">
+                      {c.cpf ? <><div className="small nowrap">{c.cpf}</div><div className="muted small nowrap">{c.nascimento ? `${dateBR(c.nascimento)} · ${idade(c.nascimento)} anos` : ''}</div></> : <Badge tone="warn">Sem CPF</Badge>}
+                      {c.respostas && <button type="button" className="link small" onClick={() => setVendo(c)}>Ver respostas</button>}
+                    </td>
                     <td data-label="Pontos" className="num">{num(c.pontos)}</td>
                     <td data-label="Visitas" className="num">{num(c.visitas)}</td>
                     <td data-label="Consumo total" className="num">{brl(c.totalGasto)}</td>
@@ -101,6 +121,16 @@ export function Clientes() {
           </div>
         )}
       </div>
+      {vendo?.respostas && (
+        <Modal title={`Respostas de ${vendo.nome}`} onClose={() => setVendo(null)}>
+          <dl className="respostas">
+            {Object.entries(vendo.respostas).filter(([k, v]) => k !== 'respondidoEm' && v).map(([k, v]) => (
+              <div key={k}><dt>{perguntas.find((p) => p.id === k)?.texto ?? 'Pergunta removida'}</dt><dd>{v}</dd></div>
+            ))}
+          </dl>
+          {vendo.respostas.respondidoEm && <p className="muted small">Respondido em {dateBR(vendo.respostas.respondidoEm)}.</p>}
+        </Modal>
+      )}
     </div>
   );
 }

@@ -53,6 +53,10 @@
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 16px; display: flex; flex-direction: column; gap: 6px; }
   .card h2 { margin: 0 0 6px; font: 700 20px var(--serif); text-align: center; }
   #form-login > p.muted { text-align: center; }
+  .dupla { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .dupla > div { display: flex; flex-direction: column; min-width: 0; }
+  @media (max-width: 340px) { .dupla { grid-template-columns: 1fr; } }
+  .aviso18 { margin: 10px 0 0; padding: 8px 12px; border-radius: 10px; font-size: 12.5px; background: #c4572a1a; border: 1px solid #c4572a55; color: #f0a47f; }
   label.lbl { font-size: 12.5px; color: var(--muted); font-weight: 500; margin-top: 8px; }
   .input { width: 100%; height: 48px; padding: 0 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font: inherit; }
   .input:focus { outline: 0; border-color: var(--brand); }
@@ -162,6 +166,13 @@
       <input class="input" id="nome" autocomplete="name" maxlength="120" required />
       <label class="lbl" for="tel">Celular (WhatsApp)</label>
       <input class="input" id="tel" type="tel" inputmode="tel" autocomplete="tel" maxlength="15" placeholder="(00) 00000-0000" required />
+      <div class="dupla">
+        <div><label class="lbl" for="cpf">CPF</label>
+        <input class="input" id="cpf" inputmode="numeric" maxlength="14" placeholder="000.000.000-00" required /></div>
+        <div><label class="lbl" for="nasc">Data de nascimento</label>
+        <input class="input" id="nasc" type="date" min="1900-01-01" required /></div>
+      </div>
+      <p class="aviso18">Programa exclusivo para maiores de 18 anos.</p>
       <label class="lbl" for="email">E-mail</label>
       <input class="input" id="email" type="email" inputmode="email" autocomplete="email" maxlength="160" required />
       <label class="lbl" for="senha">Crie uma senha</label>
@@ -169,7 +180,7 @@
         <input class="input" id="senha" type="password" autocomplete="new-password" minlength="6" maxlength="100" placeholder="Mínimo de 6 caracteres" required />
         <button type="button" data-toggle="senha">Mostrar</button>
       </div>
-      <label class="check"><input type="checkbox" id="aceite" /> <span>Concordo que o Bar do Dindo use meus dados para o programa de afilhados e para me avisar sobre o lançamento do aplicativo.</span></label>
+      <label class="check"><input type="checkbox" id="aceite" /> <span>Tenho 18 anos ou mais e concordo que o Bar do Dindo use meus dados para o programa de afilhados e para me avisar sobre o lançamento do aplicativo.</span></label>
       <p class="error" id="erro-cadastro" role="alert"></p>
       <button class="btn btn--brand" id="btn-cadastro" type="submit">Quero meu número</button>
       <p class="muted" style="font-size:12px;text-align:center;margin:10px 0 0">Guarde seu e‑mail e senha: eles darão acesso ao aplicativo oficial.</p>
@@ -239,6 +250,7 @@
 
 <script type="module">
 import { api as dados } from '../src/api';
+import { cpfValido, idadeEm } from '../shared/backend';
 
 (() => {
   const $ = (id) => document.getElementById(id);
@@ -266,6 +278,13 @@ import { api as dados } from '../src/api';
     e.target.value = !d ? '' : d.length <= 2 ? `(${d}` : d.length <= 6 ? `(${d.slice(0, 2)}) ${d.slice(2)}`
       : d.length <= 10 ? `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}` : `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
   });
+  $('cpf').addEventListener('input', (e) => {
+    const d = e.target.value.replace(/\D/g, '').slice(0, 11);
+    e.target.value = d.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+  });
+  { const h = new Date(); h.setFullYear(h.getFullYear() - 18); $('nasc').max = h.toISOString().slice(0, 10); }
+  // QR Code do bar: /afilhado?via=qr
+  const via = new URLSearchParams(location.search).get('via') === 'qr' ? 'qr' : undefined;
   document.querySelectorAll('[data-toggle]').forEach((b) => b.addEventListener('click', () => {
     const inp = $(b.dataset.toggle);
     const ver = inp.type === 'password';
@@ -291,13 +310,17 @@ import { api as dados } from '../src/api';
     const digitos = telefone.replace(/\D/g, '').length;
     if (nome.split(/\s+/).length < 2 || nome.length < 5) return (erro.textContent = 'Informe seu nome e sobrenome.');
     if (digitos !== 10 && digitos !== 11) return (erro.textContent = 'Informe o celular completo, com DDD.');
+    const cpf = $('cpf').value, nascimento = $('nasc').value, idade = idadeEm(nascimento);
+    if (!cpfValido(cpf)) return (erro.textContent = 'Informe um CPF válido.');
+    if (idade === null) return (erro.textContent = 'Informe sua data de nascimento.');
+    if (idade < 18) return (erro.textContent = 'O programa de afilhados é exclusivo para maiores de 18 anos.');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return (erro.textContent = 'Informe um e-mail válido.');
     if (senha.length < 6) return (erro.textContent = 'A senha precisa ter pelo menos 6 caracteres.');
     if (!$('aceite').checked) return (erro.textContent = 'Para participar, marque que concorda com o uso dos dados.');
     const btn = $('btn-cadastro');
     carregando(btn, true);
     try {
-      const { token } = await api('/app/cadastro', { nome, email, telefone, senha, origem: 'Pré-cadastro', aceite: true });
+      const { token } = await api('/app/cadastro', { nome, email, telefone, senha, cpf, nascimento, via, origem: 'Pré-cadastro', aceite: true });
       const dados = await me(token);
       revelar(dados.cliente, true);
       $('form-cadastro').reset();

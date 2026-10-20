@@ -13,3 +13,14 @@ export const phoneOk = (v: string) => {
   const n = v.replace(/\D/g, '').length;
   return n === 0 || n === 10 || n === 11;
 };
+
+/** 000.000.000-00 */
+export function maskCpf(v: unknown) {
+  const d = String(v ?? '').replace(/\D/g, '').slice(0, 11);
+  return d.replace(/^(\d{3})(\d)/, '$1.$2').replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d{1,2})$/, '.$1-$2');
+}
+/** Data mais recente de nascimento aceita (18 anos atrás), para o campo de data. */
+export function nascimentoMaximo() {
+  const d = new Date(); d.setFullYear(d.getFullYear() - 18);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}

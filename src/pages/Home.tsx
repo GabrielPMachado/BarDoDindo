@@ -1,11 +1,12 @@
 import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, CalendarDays, Camera, ChevronRight, Clock, Gift, Info, MapPin, ReceiptText, Star, Utensils } from 'lucide-react';
+import { ArrowRight, CalendarDays, Camera, ChevronRight, Clock, Gift, Info, MapPin, MessageCircleQuestion, ReceiptText, Star, Utensils, X } from 'lucide-react';
+import { Questionario, useQuestionario } from '../components/Questionario';
 import { ItemFoto, ItemIcon } from '../components/ItemIcon';
 import { brl, sortCategories } from '../data';
 import { memberNumber, upcoming, useMe, useStore } from '../store';
 
-/** Atalhos usados quando o cardápio ainda não tem categorias publicadas. */
+/** Atalhos do painel do afilhado. */
 const ATALHOS = [
   { to: '/reservas', label: 'Reservar', icon: CalendarDays },
   { to: '/cardapio', label: 'Cardápio', icon: Utensils },
@@ -110,6 +111,8 @@ export default function Home() {
   const trilho = useRef<HTMLDivElement>(null);
   const [atual, setAtual] = useState(0);
   const [mostrarNumero, setMostrarNumero] = useState(false);
+  const convite = useQuestionario();
+  const [responder, setResponder] = useState(false);
   const total = 1 + slides.length;
   const aoRolar = () => {
     const el = trilho.current;
@@ -118,6 +121,36 @@ export default function Home() {
 
   return (
     <div className="page home">
+      {/* painel do afilhado: foto, nome, número e atalhos */}
+      <section className="painel">
+        <Link to="/perfil" className="painel__eu">
+          <Avatar size="md" />
+          <span className="painel__info">
+            <small>Olá,</small>
+            <strong>{me.cliente.nome.split(' ')[0]}</strong>
+            <em>Afilhado #{memberNumber(me.cliente.numero)}</em>
+          </span>
+          <ChevronRight size={20} className="muted" />
+        </Link>
+      </section>
+      <nav className="actions" aria-label="Atalhos">
+        {ATALHOS.map(({ to, label, icon: Icon }) => (
+          <Link key={to} to={to} className="action"><Icon size={24} /> {label}</Link>
+        ))}
+      </nav>
+
+      {convite.mostrar && (
+        <div className="convite">
+          <MessageCircleQuestion size={22} />
+          <button type="button" className="convite__texto" onClick={() => setResponder(true)}>
+            <strong>{convite.questionario?.titulo}</strong>
+            <span>Responda algumas perguntas rápidas (opcional).</span>
+          </button>
+          <button type="button" className="icon-btn" onClick={convite.adiar} aria-label="Agora não"><X size={18} /></button>
+        </div>
+      )}
+      {responder && <Questionario onClose={() => setResponder(false)} />}
+
       {/* cartão do bar: próxima reserva ou convite para reservar (como o "Retirar em") */}
       <Link to="/reservas" className="local">
         <span className="local__pin"><MapPin size={18} /></span>
@@ -165,21 +198,14 @@ export default function Home() {
       </section>
 
       {/* categorias em bolinhas, rolando para o lado */}
-      <nav className="bolinhas" aria-label="Categorias do cardápio">
-        {categorias.length
-          ? [...(destaques.length ? ['Destaques'] : []), ...categorias].map((c) => (
+      {categorias.length > 0 && <nav className="bolinhas" aria-label="Categorias do cardápio">
+        {[...(destaques.length ? ['Destaques'] : []), ...categorias].map((c) => (
             <Link key={c} to={`/cardapio?cat=${encodeURIComponent(c)}`} className="bolinha">
               <span className="bolinha__img">{c === 'Destaques' ? <Star size={28} strokeWidth={1.5} /> : <ItemIcon categoria={c} size="xl" />}</span>
               <span className="bolinha__nome">{c}</span>
             </Link>
-          ))
-          : ATALHOS.map(({ to, label, icon: Icon }) => (
-            <Link key={to} to={to} className="bolinha">
-              <span className="bolinha__img"><Icon size={28} strokeWidth={1.5} /></span>
-              <span className="bolinha__nome">{label}</span>
-            </Link>
           ))}
-      </nav>
+      </nav>}
 
       {/* banners */}
       <section className="carrossel" aria-label="Destaques">
