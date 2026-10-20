@@ -334,7 +334,7 @@ function useLembrada<T extends string>(chave: string, inicial: T, validas: T[]) 
   const [v, setV] = useState<T>(() => { try { const s = localStorage.getItem(k) as T | null; return s && validas.includes(s) ? s : inicial; } catch { return inicial; } });
   return [v, (n: T) => { setV(n); try { localStorage.setItem(k, n); } catch { /* sem armazenamento */ } }] as const;
 }
-function Segmentos<T extends string>({ opcoes, valor, onChange, rotulo }: { opcoes: { v: T; label: string; icon: typeof List }[]; valor: T; onChange: (v: T) => void; rotulo: string }) {
+export function Segmentos<T extends string>({ opcoes, valor, onChange, rotulo }: { opcoes: { v: T; label: string; icon: typeof List }[]; valor: T; onChange: (v: T) => void; rotulo: string }) {
   return (
     <div className="segmented visao-seletor" role="radiogroup" aria-label={rotulo}>
       {opcoes.map(({ v, label, icon: Icon }) => (

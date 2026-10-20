@@ -1317,26 +1317,29 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     if (!itens.length && !vazio) fail(400, 'Adicione ao menos um item.');
     return { itens, valor: centavos(itens.reduce((s: number, i: { total: number }) => s + i.total, 0)) };
   }
-  /** Consumo do afilhado: pontos, receita, saldo e caixa no mesmo lote. */
-  async function lancarConsumo(lote: WriteBatch, ctx: Ctx, cliente: Dados, itens: unknown[], valor: number, forma: string, caixaId: string, extra: Dados = {}) {
-    const pontos = Math.floor(valor * (await getConfig()).pontosPorReal);
+  /** Consumo: receita e caixa no mesmo lote; com afilhado, também os pontos e o saldo. Sem afilhado (cliente sem cadastro), não há pontos. */
+  async function lancarConsumo(lote: WriteBatch, ctx: Ctx, cliente: Dados | null, itens: unknown[], valor: number, forma: string, caixaId: string, extra: Dados = {}, nomeAvulso = '') {
+    const pontos = cliente ? Math.floor(valor * (await getConfig()).pontosPorReal) : 0;
     const data = now();
     const consumoRef = doc(collection(db, 'consumos')), receitaRef = doc(collection(db, 'receitas'));
+    const quem = cliente ? `${cliente.nome} (#${String(cliente.numero).padStart(3, '0')})` : nomeAvulso ? `${nomeAvulso} (sem cadastro)` : 'Cliente sem cadastro';
     const consumo = {
-      clienteId: cliente.numero, clienteUid: cliente.id, clienteNome: cliente.nome, itens, valor, pontos, formaPagamento: forma, data,
-      receitaId: receitaRef.id, caixaId, ...extra, criadoEm: data, atualizadoEm: data,
+      clienteId: cliente ? cliente.numero : null, clienteUid: cliente ? cliente.id : null, clienteNome: cliente ? cliente.nome : nomeAvulso || 'Cliente sem cadastro',
+      itens, valor, pontos, formaPagamento: forma, data, receitaId: receitaRef.id, caixaId, ...extra, criadoEm: data, atualizadoEm: data,
     };
     lote.set(consumoRef, consumo);
     lote.set(receitaRef, {
-      data: data.slice(0, 10), descricao: `Consumo · ${cliente.nome} (#${String(cliente.numero).padStart(3, '0')})`,
+      data: data.slice(0, 10), descricao: `Consumo · ${quem}`,
       categoria: 'Consumo de clientes', formaPagamento: forma, valor, origem: 'Lançamento de consumo', consumoId: consumoRef.id, caixaId, criadoEm: data, atualizadoEm: data,
     });
-    lote.set(doc(db, 'saldos', cliente.id), {
-      acumulados: increment(pontos), gasto: increment(valor), lancamentos: increment(1), dias: arrayUnion(data.slice(0, 10)),
-    }, { merge: true });
+    if (cliente) {
+      lote.set(doc(db, 'saldos', cliente.id), {
+        acumulados: increment(pontos), gasto: increment(valor), lancamentos: increment(1), dias: arrayUnion(data.slice(0, 10)),
+      }, { merge: true });
+    }
     somarNoCaixa(lote, caixaId, forma, valor);
     registrar(lote, ctx, 'consumos', 'lançou consumo para', {
-      colecao: 'consumos', alvo: `${cliente.nome} (#${String(cliente.numero).padStart(3, '0')})`, detalhe: `${brl(valor)} · ${pontos} pontos · ${forma}`,
+      colecao: 'consumos', alvo: quem, detalhe: cliente ? `${brl(valor)} · ${pontos} pontos · ${forma}` : `${brl(valor)} · ${forma}`,
     });
     return { ...consumo, id: consumoRef.id };
   }
@@ -1344,13 +1347,14 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   rota('POST', '/crm/consumos', async ({ b }) => {
     const ctx = await requireUsuario();
     requireAccess(ctx, 'consumos', 'criar');
-    const cliente = (await colecao('clientes')).find((c) => c.numero === Number(b.clienteId));
-    if (!cliente) return fail(400, 'Selecione um cliente.');
+    // o afilhado é opcional: sem ele, o consumo entra no caixa e na receita, mas não gera pontos
+    const cliente = b.clienteId ? (await colecao('clientes')).find((c) => c.numero === Number(b.clienteId)) : null;
+    if (b.clienteId && !cliente) return fail(400, 'Afilhado não encontrado.');
     const { itens, valor } = await itensDaVenda(b.itens);
     const forma = formaDe(b.formaPagamento);
     const caixa = await exigirCaixa();
     const lote = writeBatch(db);
-    const consumo = await lancarConsumo(lote, ctx, cliente, itens, valor, forma, String(caixa.id));
+    const consumo = await lancarConsumo(lote, ctx, cliente ?? null, itens, valor, forma, String(caixa.id), {}, cliente ? '' : str(b.nome, 80));
     await lote.commit();
     return consumo;
   });

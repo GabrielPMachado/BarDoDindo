@@ -389,6 +389,9 @@ select.input { appearance: none; padding-right: 30px; background-image: linear-g
 .dre__total td { border-top: 1px solid var(--border-strong); font-size: 15px; }
 
 /* ---------- lançar consumo ---------- */
+.consumo-tipo { margin-bottom: 12px; }
+/* aqui o rótulo é a escolha em si: não some no celular como nos seletores de visão */
+.consumo-tipo .visao-seletor span { display: inline; }
 .autocomplete { position: relative; }
 .autocomplete__list { list-style: none; margin: 4px 0 0; padding: 4px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 8px; }
 .autocomplete__list button { width: 100%; text-align: left; padding: 8px 10px; border-radius: 6px; display: flex; gap: 8px; align-items: baseline; }
