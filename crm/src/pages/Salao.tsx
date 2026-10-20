@@ -103,11 +103,6 @@ export function CaixaPage() {
               <div className="caixa-abrir__valor">
                 <NumberInput id="cx-ini" spec={{ money: true, decimals: 2, min: 0, max: 100000 }} prefix="R$" value={valorInicial} onChange={setValorInicial} />
               </div>
-              <div className="caixa-abrir__atalhos" role="group" aria-label="Valores rápidos">
-                {[0, 50, 100, 200].map((v) => (
-                  <button key={v} type="button" className={`chip${valorInicial === v ? ' is-on' : ''}`} onClick={() => setValorInicial(v)}>{v ? brl(v) : 'Sem troco'}</button>
-                ))}
-              </div>
               <p className="muted small">Conte as notas e moedas antes de abrir. Esse valor entra no esperado em dinheiro do fechamento.</p>
 
               <label className="field-label" htmlFor="cx-obs">Observação (opcional)</label>
@@ -246,29 +241,46 @@ function CaixaAberto({ caixa, comandasAbertas, onFechado }: { caixa: Caixa; coma
         </section>
 
         {podeMexer && (
-          <section className="panel pad-lg">
-            <h2 className="panel-title"><Lock size={18} /> Fechar caixa</h2>
-            <p className="muted small">Conte o que há em cada forma (gaveta, extrato do Pix e relatório da maquininha) e informe abaixo.</p>
-            {comandasAbertas > 0 && <p className="caixa-alerta">Há {comandasAbertas} {comandasAbertas === 1 ? 'comanda aberta' : 'comandas abertas'}. Elas continuam abertas e entram no próximo caixa quando forem fechadas.</p>}
-            <div className="caixa-contagem">
-              {Object.keys(esperado).map((f) => {
-                const dif = contado[f] === '' || contado[f] === undefined ? null : (Number(contado[f]) || 0) - esperado[f];
-                return (
-                  <div key={f} className="caixa-contagem__linha">
-                    <label htmlFor={`cnt-${f}`}>{f}<small>esperado {brl(esperado[f])}</small></label>
-                    <NumberInput id={`cnt-${f}`} spec={{ money: true, decimals: 2, min: 0, max: 1000000 }} prefix="R$" value={contado[f] ?? ''} onChange={(v) => setContado({ ...contado, [f]: v })} />
-                    <span className="caixa-contagem__dif">{dif === null ? '' : <Diferenca v={dif} />}</span>
-                  </div>
-                );
-              })}
+          <section className="panel caixa-abrir caixa-fechar">
+            <header className="caixa-abrir__head">
+              <span className="caixa-abrir__icone caixa-fechar__icone"><Lock size={22} /></span>
+              <div>
+                <span className="caixa-abrir__kicker caixa-fechar__kicker">Fechamento</span>
+                <h2 className="caixa-abrir__titulo">Fechar o caixa</h2>
+                <p className="muted small">Aberto há {desde(caixa.abertoEm)} por {caixa.abertoPorNome}</p>
+              </div>
+            </header>
+            <div className="caixa-abrir__corpo">
+              <p className="muted small">Conte o que há em cada forma (gaveta, extrato do Pix e relatório da maquininha) e informe abaixo.</p>
+              {comandasAbertas > 0 && <p className="caixa-alerta">Há {comandasAbertas} {comandasAbertas === 1 ? 'comanda aberta' : 'comandas abertas'}. Elas continuam abertas e entram no próximo caixa quando forem fechadas.</p>}
+              <div className="caixa-contagem">
+                {Object.keys(esperado).map((f) => {
+                  const dif = contado[f] === '' || contado[f] === undefined ? null : (Number(contado[f]) || 0) - esperado[f];
+                  return (
+                    <div key={f} className={`caixa-contagem__linha${dif === null ? '' : ' is-contado'}`}>
+                      <label htmlFor={`cnt-${f}`}>{f}<small>esperado {brl(esperado[f])}</small></label>
+                      <NumberInput id={`cnt-${f}`} spec={{ money: true, decimals: 2, min: 0, max: 1000000 }} prefix="R$" value={contado[f] ?? ''} onChange={(v) => setContado({ ...contado, [f]: v })} />
+                      <span className="caixa-contagem__dif">{dif === null ? <span className="muted small">a contar</span> : <Diferenca v={dif} />}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="caixa-resumo">
+                <div><span>Esperado</span><strong>{brl(totalEsperado)}</strong></div>
+                <div><span>Contado</span><strong>{brl(totalContado)}</strong></div>
+                <div className={!preenchido ? '' : Math.abs(totalContado - totalEsperado) < 0.005 ? 'is-good' : totalContado > totalEsperado ? 'is-info' : 'is-bad'}>
+                  <span>Diferença</span>
+                  <strong>{preenchido ? brl(totalContado - totalEsperado) : '—'}</strong>
+                </div>
+              </div>
+              {!preenchido && <p className="muted small">{Object.keys(esperado).filter((f) => contado[f] !== undefined && contado[f] !== '').length} de {Object.keys(esperado).length} formas contadas. Preencha todas (use 0 se não houver) para fechar.</p>}
+              <label className="field-label" htmlFor="cx-fobs">Observação do fechamento (opcional)</label>
+              <input id="cx-fobs" className="input" maxLength={300} placeholder="Ex.: falta explicada por troco errado" value={obs} onChange={(e) => setObs(e.target.value)} />
+              <AsyncButton className="btn btn--primary btn--lg" onClick={fechar} disabled={!preenchido}
+                confirm={{ title: 'Fechar o caixa?', message: `Diferença: ${brl(totalContado - totalEsperado)}. Depois de fechado, as vendas só voltam a ser lançadas com um novo caixa.`, confirmLabel: 'Fechar caixa' }}>
+                <Lock size={18} /> Fechar caixa
+              </AsyncButton>
             </div>
-            <div className="caixa-contagem__total"><span>Contado {brl(totalContado)} · esperado {brl(totalEsperado)}</span>{preenchido && <Diferenca v={totalContado - totalEsperado} />}</div>
-            <label className="field-label" htmlFor="cx-fobs">Observação do fechamento</label>
-            <input id="cx-fobs" className="input" maxLength={300} value={obs} onChange={(e) => setObs(e.target.value)} />
-            <AsyncButton className="btn btn--primary btn--lg" onClick={fechar} disabled={!preenchido}
-              confirm={{ title: 'Fechar o caixa?', message: `Diferença: ${brl(totalContado - totalEsperado)}. Depois de fechado, as vendas só voltam a ser lançadas com um novo caixa.`, confirmLabel: 'Fechar caixa' }}>
-              <Lock size={18} /> Fechar caixa
-            </AsyncButton>
           </section>
         )}
       </div>
