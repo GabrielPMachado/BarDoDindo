@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Check, Minus, Plus, QrCode, Receipt, Search, Trash2, X } from 'lucide-react';
+import { Check, Minus, Plus, QrCode, Receipt, Search, Trash2, UserX, Users, X } from 'lucide-react';
 import { COLLECTIONS } from '../collections';
 import { CollectionPage } from '../components/CollectionPage';
 import { AsyncButton, Badge, EmptyState, ErrorBox, KpiRow, Loading, Modal, PageHead, notify } from '../components/ui';
@@ -11,7 +11,7 @@ import { maskPhone } from '../lib/masks';
 import { currentMonth, monthOf } from '../lib/finance';
 import { useSession, type Config } from '../lib/session';
 import { useNavigate } from 'react-router-dom';
-import { AvisoCaixa, useCaixa } from './Salao';
+import { AvisoCaixa, Segmentos, useCaixa } from './Salao';
 
 interface Cliente {
   id: number;
@@ -174,6 +174,9 @@ export function Consumo() {
   const cfg = useResource<Config>('/crm/config').data;
   const { caixa } = useCaixa();
 
+  // o afilhado é opcional: "Sem cadastro" lança a venda sem pontos (para quem não é afilhado)
+  const [tipo, setTipo] = useState<'afilhado' | 'avulso'>('afilhado');
+  const [nomeAvulso, setNomeAvulso] = useState('');
   const [clienteQ, setClienteQ] = useState('');
   const [clienteId, setClienteId] = useState<number | null>(null);
   const [produtoQ, setProdutoQ] = useState('');
@@ -193,7 +196,8 @@ export function Consumo() {
     return { ...i, nome: String(p?.nome ?? ''), preco: Number(p?.preco) || 0 };
   });
   const total = linhas.reduce((t, l) => t + l.preco * l.quantidade, 0);
-  const pontos = Math.floor(total * (cfg?.pontosPorReal ?? 1));
+  const avulso = tipo === 'avulso';
+  const pontos = avulso ? 0 : Math.floor(total * (cfg?.pontosPorReal ?? 1));
 
   const addItem = (id: string) =>
     setItens((list) => (list.some((i) => i.produtoId === id) ? list.map((i) => (i.produtoId === id ? { ...i, quantidade: Math.min(999, i.quantidade + 1) } : i)) : [...list, { produtoId: id, quantidade: 1 }]));
@@ -203,12 +207,13 @@ export function Consumo() {
   const lancar = async () => {
     setError(null);
     try {
-      await api('/crm/consumos', { method: 'POST', body: { clienteId, itens, formaPagamento: forma } });
+      await api('/crm/consumos', { method: 'POST', body: avulso ? { nome: nomeAvulso, itens, formaPagamento: forma } : { clienteId, itens, formaPagamento: forma } });
       await Promise.all([consumos.reload(), reload('/crm/clientes'), reload('/crm/caixa')]);
-      notify(`Consumo lançado: ${pontos} pontos creditados para ${cliente?.nome}`);
+      notify(avulso ? `Consumo lançado: ${brl(total)} no ${forma}` : `Consumo lançado: ${pontos} pontos creditados para ${cliente?.nome}`);
       setItens([]);
       setClienteId(null);
       setClienteQ('');
+      setNomeAvulso('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não foi possível lançar.');
     }
@@ -220,7 +225,7 @@ export function Consumo() {
     <div className="page">
       <PageHead
         title="Lançar consumo"
-        description="Venda rápida para o afilhado (para acompanhar a noite toda, use Comandas): os pontos são creditados no aplicativo e o valor entra no caixa aberto e em Financeiro · Receita."
+        description="Venda rápida (para acompanhar a noite toda, use Comandas): o valor entra no caixa aberto e em Financeiro · Receita. Se o cliente for afilhado, os pontos são creditados no aplicativo."
       />
       <AvisoCaixa />
 
@@ -228,7 +233,16 @@ export function Consumo() {
         <div className="grid-2 grid-2--wide-left">
           <section className="panel pad-lg">
             <h2 className="panel-title">1. Cliente</h2>
-            {cliente ? (
+            <div className="consumo-tipo">
+              <Segmentos rotulo="Cliente" valor={tipo} onChange={setTipo} opcoes={[{ v: 'afilhado', label: 'Afilhado', icon: Users }, { v: 'avulso', label: 'Sem cadastro', icon: UserX }]} />
+            </div>
+            {avulso ? (
+              <div>
+                <label className="field-label" htmlFor="consumo-nome">Nome (opcional)</label>
+                <input id="consumo-nome" className="input" maxLength={80} placeholder="Ex.: João (camisa azul)" value={nomeAvulso} onChange={(e) => setNomeAvulso(e.target.value)} />
+                <p className="muted small">Sem cadastro de afilhado: a venda entra no caixa e na receita, mas não gera pontos.</p>
+              </div>
+            ) : cliente ? (
               <div className="selected-client">
                 <div>
                   <strong>{cliente.nome}</strong> <span className="muted">{numero(cliente.numero)}</span>
@@ -250,7 +264,7 @@ export function Consumo() {
                     ))}
                   </ul>
                 )}
-                {cq && !sugestoes.length && !clientes.loading && <p className="muted small">Nenhum cliente encontrado.</p>}
+                {cq && !sugestoes.length && !clientes.loading && <p className="muted small">Nenhum afilhado encontrado. Use "Sem cadastro" para lançar mesmo assim.</p>}
               </div>
             )}
 
@@ -295,11 +309,11 @@ export function Consumo() {
               </ul>
             )}
             <div className="comanda__total"><span>Total</span><strong>{brl(total)}</strong></div>
-            <div className="comanda__points">{num(pontos)} pontos para o cliente</div>
+            <div className="comanda__points">{avulso ? 'Sem cadastro: não gera pontos' : `${num(pontos)} pontos para o cliente`}</div>
             <label className="field-label" htmlFor="forma">Forma de pagamento</label>
             <SelectPicker id="forma" options={['Pix', 'Crédito', 'Débito', 'Dinheiro', 'Vale-refeição']} value={forma} onChange={setForma} />
             {error && <ErrorBox>{error}</ErrorBox>}
-            <AsyncButton className="btn btn--primary btn--lg" onClick={lancar} disabled={!cliente || !linhas.length || !caixa}>
+            <AsyncButton className="btn btn--primary btn--lg" onClick={lancar} disabled={(!avulso && !cliente) || !linhas.length || !caixa}>
               <Check size={18} /> Lançar consumo
             </AsyncButton>
           </section>
@@ -318,7 +332,7 @@ export function Consumo() {
                 {recentes.map((c) => (
                   <tr key={c.id}>
                     <td data-label="Data">{new Date(String(c.data)).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</td>
-                    <td data-label="Cliente">{String(c.clienteNome)} <span className="muted">{numero(Number(c.clienteId))}</span></td>
+                    <td data-label="Cliente">{String(c.clienteNome ?? 'Cliente sem cadastro')} <span className="muted">{c.clienteId ? numero(Number(c.clienteId)) : 'sem cadastro'}</span></td>
                     <td data-label="Itens" className="small">{(c.itens as { nome: string; quantidade: number }[]).map((i) => `${i.quantidade}× ${i.nome}`).join(', ')}</td>
                     <td data-label="Pagamento">{String(c.formaPagamento ?? '')}</td>
                     <td data-label="Valor" className="num">{brl(Number(c.valor))}</td>

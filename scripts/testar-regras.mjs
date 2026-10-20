@@ -127,6 +127,9 @@ if (senhaAtendente) {
   await permitido('abrir comanda', () => addDoc(collection(db, 'comandas'), { numero: 9, nome: 'Avulsa', mesa: 1, itens: [], total: 0, status: 'Aberta' }));
   await permitido('ver as comandas do salão', () => getDocs(collection(db, 'comandas')));
   await permitido('lançar a receita de uma comanda avulsa', () => addDoc(collection(db, 'receitas'), { descricao: 'Comanda #009', valor: 10, comandaId: 'x', caixaId: 'aberto' }));
+  // consumo sem afilhado (cliente sem cadastro): entra no caixa e na receita, sem pontos nem saldo
+  await permitido('lançar consumo sem afilhado', () => addDoc(collection(db, 'consumos'), { clienteId: null, clienteUid: null, clienteNome: 'Cliente sem cadastro', valor: 10, pontos: 0, caixaId: 'aberto' }));
+  await permitido('lançar a receita de um consumo sem afilhado', () => addDoc(collection(db, 'receitas'), { descricao: 'Consumo · Cliente sem cadastro', valor: 10, consumoId: 'x', caixaId: 'aberto' }));
   await permitido('cadastrar mesa', () => addDoc(collection(db, 'mesas'), { numero: 1, nome: 'Mesa 1', lugares: 4 }));
   await negado('alterar produto', () => addDoc(collection(db, 'produtos'), { nome: 'x', preco: 1 }));
   await negado('lançar receita avulsa', () => addDoc(collection(db, 'receitas'), { descricao: 'x', valor: 1 }));
