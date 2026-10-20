@@ -125,7 +125,8 @@ export function FieldInput({ field, value, onChange, disabled }: {
 
 /**
  * Campo numérico formatado no padrão brasileiro (1.234,56), com limites de
- * mínimo/máximo e casas decimais. Valores em R$ são digitados em centavos.
+ * mínimo/máximo e casas decimais. Valores em R$ são digitados em centavos,
+ * como no caixa eletrônico: cada dígito entra pela direita (1 → 0,01 → 0,12 → 1,25).
  */
 export function NumberInput({ value, onChange, spec, id, disabled, required, prefix, suffix, ariaLabel, placeholder }: {
   value: unknown; onChange: (v: number | '') => void; spec: NumberSpec;
@@ -163,12 +164,20 @@ export function NumberInput({ value, onChange, spec, id, disabled, required, pre
         placeholder={placeholder ?? (spec.money ? '0,00' : '0')}
         value={text}
         onChange={(e) => {
-          const [t, n] = applyNumberMask(e.target.value, spec);
+          const el = e.target;
+          const [t, n] = applyNumberMask(el.value, spec);
           setText(t);
           current.current = n;
           onChange(n);
+          // na moeda o número cresce pela direita, então o cursor fica sempre no fim
+          if (spec.money) requestAnimationFrame(() => el.setSelectionRange(el.value.length, el.value.length));
         }}
         onBlur={() => setText(fmt(current.current))}
+        // na moeda, um clique no meio do número leva o cursor para o fim (os dígitos sempre entram pela direita)
+        onMouseUp={spec.money ? (e) => {
+          const el = e.currentTarget;
+          if (el.selectionStart === el.selectionEnd) el.setSelectionRange(el.value.length, el.value.length);
+        } : undefined}
       />
       {suffix && <span>{suffix}</span>}
     </div>
