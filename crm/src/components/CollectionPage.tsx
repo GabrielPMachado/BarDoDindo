@@ -24,6 +24,7 @@ import { ItensDoFornecedor } from './ItensDoFornecedor';
 import { linkSeguro } from '../lib/links';
 import { PreencherProdutoIA } from './PreencherProdutoIA';
 import { GerarFotoIA } from './GerarFotoIA';
+import { SeletorVisao, VisaoCalendario, VisaoCartoes, VisaoQuadro, campoDoQuadro, useVisao } from './Visoes';
 import { CompraItens, itemVazio, totalItens, type ItemCompra } from './CompraItens';
 import { camposDosLocais, locaisDe, locaisNoFormulario } from '../lib/locais';
 import { calcularFicha, fichaDe, type Ficha } from '../lib/ficha';
@@ -78,6 +79,9 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   const canCreate = pode(perm, 'criar');
   const canEdit = pode(perm, 'editar');
   const canDelete = pode(perm, 'excluir');
+  // tabela, cartões com foto, quadro por status ou calendário (lembrado por tela)
+  const { visoes, visao, mudar: mudarVisao } = useVisao(def, perm);
+  const tituloDe = (r: Row) => String(r[def.fields[0].key] ?? '').trim() || '—';
   // receitas, despesas, consumos e reservas carregam só um período (escolhido na barra da tabela)
   const padraoPeriodo = PERIODO_PADRAO[def.id];
   const [periodo, setPeriodo] = useState<PeriodoKey>(padraoPeriodo ?? 'tudo');
@@ -166,6 +170,17 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   const algunsNaPagina = visible.some((r) => sel.has(r.id));
   const marcarPagina = (on: boolean) => setSel((x) => { const n = new Set(x); for (const r of visible) { if (on) n.add(r.id); else n.delete(r.id); } return n; });
   const [excluindo, setExcluindo] = useState(false);
+  /** Quadro: arrastar o cartão para outra coluna muda o status. */
+  const moverNoQuadro = async (r: Row, valor: string) => {
+    const campo = campoDoQuadro(def);
+    if (!campo) return;
+    try {
+      await col.update(r.id, { [campo.key]: valor } as Partial<Row>);
+      notify(`${tituloDe(r)}: ${campo.label.toLowerCase()} agora é "${valor}".`);
+    } catch (e) {
+      notify(e instanceof Error ? e.message : 'Não foi possível mudar.', 'error');
+    }
+  };
   const excluirSelecionados = async () => {
     const alvo = selecionados;
     if (!alvo.length) return;
@@ -280,6 +295,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
             </select>
           )}
           {soltaAnexo && all.length > 0 && <span className="muted small toolbar__dica"><Paperclip size={13} /> Arraste um PDF ou foto sobre a linha para anexar</span>}
+          <SeletorVisao visoes={visoes} valor={visao} onChange={mudarVisao} />
           <span className="muted toolbar__count">{num(rows.length)} {rows.length === 1 ? 'registro' : 'registros'}</span>
         </div>
 
@@ -315,6 +331,12 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
           </EmptyState>
         ) : rows.length === 0 ? (
           <EmptyState title="Nenhum resultado">Ajuste a busca ou o filtro.</EmptyState>
+        ) : visao === 'cartoes' ? (
+          <VisaoCartoes def={def} rows={rows} onAbrir={setEditing} fmt={formatField} titulo={tituloDe} sel={sel} marcar={marcar} />
+        ) : visao === 'quadro' ? (
+          <VisaoQuadro def={def} rows={rows} onAbrir={setEditing} fmt={formatField} titulo={tituloDe} podeMover={canEdit} onMover={(r, valor) => void moverNoQuadro(r, valor)} />
+        ) : visao === 'calendario' ? (
+          <VisaoCalendario def={def} rows={rows} onAbrir={setEditing} fmt={formatField} titulo={tituloDe} />
         ) : (
           <div className="table-wrap">
             <table className={`table table--cards ${selecionados.length ? 'table--selecionando' : ''}`}>
@@ -401,7 +423,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
           </div>
         )}
 
-        {pages > 1 && (
+        {visao === 'tabela' && pages > 1 && (
           <div className="pager">
             <button className="btn btn--ghost btn--sm" disabled={page === 0} onClick={() => setPage(page - 1)}>Anterior</button>
             <span className="muted">Página {page + 1} de {pages}</span>
