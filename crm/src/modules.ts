@@ -88,9 +88,12 @@ export const AREAS: Area[] = [
   /* ---------- Departamento Administrativo (um setor = uma área) ---------- */
   {
     key: 'atd', label: 'Atendimento', icon: ConciergeBell,
-    description: 'Reservas, comandas dos afilhados, vouchers e o calendário da casa.',
+    description: 'Reservas, caixa, comandas, mapa de mesas, vouchers e o calendário da casa.',
     items: [
       { path: '/atendimento/reservas', perm: 'reservas', label: 'Reservas' },
+      { path: '/atendimento/caixa', perm: 'caixas', label: 'Caixa' },
+      { path: '/atendimento/comandas', perm: 'comandas', label: 'Comandas' },
+      { path: '/atendimento/mesas', perm: 'mesas', label: 'Mapa de mesas' },
       { path: '/atendimento/consumo', perm: 'consumos', label: 'Lançar consumo' },
       { path: '/atendimento/vouchers', perm: 'resgates', label: 'Validar vouchers' },
       { path: '/atendimento/calendario', perm: 'eventos', label: 'Calendário' },
@@ -352,7 +355,7 @@ const CARGOS: CargoSugerido[] = [
   cargo('Sócio / Diretoria', 'Vê toda a casa e decide na Diretoria; não mexe em usuários.', { ...todasEm(TUDO, 'ver'), dir: 'total', cfg: 'ver' }),
   cargo('Gerente geral', 'Comanda a operação inteira: edita tudo e exclui no Administrativo.', { ...todasEm(OPERACAO, 'total'), dir: 'editar', fin: 'editar', rh: 'editar', jur: 'ver', mon: 'ver', ti: 'editar', cfg: 'ver' }),
   cargo('Gerente de salão', 'Atendimento, vendas e qualidade do salão.', { atd: 'total', vnd: 'editar', mkt: 'ver', dp: 'ver', fis: 'editar', mon: 'ver' }),
-  cargo('Atendente / Garçom', 'Reservas, consumos e vouchers; consulta o cardápio.', { atd: 'editar', vnd: 'ver' }, { clientes: 'none', guarnicoes: 'none' }),
+  cargo('Atendente / Garçom', 'Reservas, consumos e vouchers; consulta o cardápio.', { atd: 'editar', vnd: 'ver' }, { clientes: 'none', guarnicoes: 'none', caixas: 'ver' }),
   cargo('Caixa', 'Lança consumos e vouchers e acompanha as receitas.', { atd: 'editar' }, { produtos: 'ver', clientes: 'ver', receitas: 'ver', ticket: 'ver', renda: 'ver' }),
   cargo('Bartender', 'Fichas técnicas e cardápio, com o estoque do bar.', { vnd: 'editar' }, { clientes: 'none', estoque: 'editar', compras: 'ver', eventos: 'ver', reservas: 'ver' }),
   cargo('Compras e estoque', 'Estoque, materiais, notas, fornecedores e preços.', { dp: 'total', adm: 'total', vnd: 'ver', fin: 'ver' }),

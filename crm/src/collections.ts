@@ -619,6 +619,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'hora', label: 'Horário', type: 'time', required: true },
       { key: 'pessoas', label: 'Pessoas', type: 'number', required: true, default: 2, min: 1, max: 50 },
       { key: 'ambiente', label: 'Ambiente', type: 'text' },
+      { key: 'mesa', label: 'Mesa', type: 'number', min: 1, max: 999 },
       { key: 'origem', label: 'Origem', type: 'select', options: ['Aplicativo', 'Telefone', 'WhatsApp', 'Presencial'], default: 'Telefone', formOnly: true },
       { key: 'status', label: 'Status', type: 'select', options: ['Pendente', 'Confirmada', 'Recusada', 'Concluída', 'Não compareceu', 'Cancelada', 'Cancelada pelo cliente'], default: 'Confirmada' },
       { key: 'observacoes', label: 'Observações', type: 'textarea', wide: true, formOnly: true },

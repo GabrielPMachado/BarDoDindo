@@ -139,6 +139,19 @@ export default function Home() {
         ))}
       </nav>
 
+      {me.comanda && (
+        <section className="minha-comanda" aria-label="Minha comanda">
+          <header>
+            <span><ReceiptText size={18} /> Comanda #{String(me.comanda.numero).padStart(3, '0')}{me.comanda.mesa ? ` · Mesa ${me.comanda.mesa}` : ''}</span>
+            <b>{brl(me.comanda.total)}</b>
+          </header>
+          {me.comanda.itens.length ? (
+            <ul>{me.comanda.itens.map((i, k) => <li key={k}><span>{i.quantidade}× {i.nome}</span><span>{brl(i.total)}</span></li>)}</ul>
+          ) : <p className="muted small">Comanda aberta. Os pedidos aparecem aqui assim que forem lançados.</p>}
+          <small>Ao fechar, você ganha +{Math.floor(me.comanda.total * pontosPorReal).toLocaleString('pt-BR')} pts</small>
+        </section>
+      )}
+
       {convite.mostrar && (
         <div className="convite">
           <MessageCircleQuestion size={22} />

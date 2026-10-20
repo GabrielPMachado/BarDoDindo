@@ -82,6 +82,8 @@ interface Me {
   consumos: Consumption[];
   resgates: Redemption[];
   reservas: Reservation[];
+  /** Comanda aberta no bar agora (lançada pela equipe). */
+  comanda?: { id: string; numero: number; mesa: number | null; itens: { nome: string; quantidade: number; total: number }[]; total: number; abertaEm: string } | null;
 }
 
 interface Store {
