@@ -198,6 +198,11 @@ if (senhaModular) {
   await negado('ver consumos (módulo sem permissões, mesmo com Atendimento total)', () => getDocs(collection(db, 'consumos')));
   await negado('excluir reserva (o módulo não tem "excluir")', () => deleteDoc(doc(db, 'reservas', 'qualquer')));
   await permitido('ver o calendário (módulo não marcado: vale a área Atendimento)', () => getDocs(collection(db, 'eventos')));
+  // páginas novas (Caixa, Comandas, Mapa de mesas) herdam da página mais próxima, não da área
+  await permitido('ver o mapa de mesas (página nova: vale a de Reservas)', () => getDocs(collection(db, 'mesas')));
+  await permitido('cadastrar mesa (Reservas tem "criar")', () => addDoc(collection(db, 'mesas'), { numero: 1 }));
+  await negado('excluir mesa (Reservas não tem "excluir", mesmo com Atendimento total)', () => deleteDoc(doc(db, 'mesas', 'qualquer')));
+  await negado('ver comandas (página nova: vale a de Lançar consumo, sem permissões)', () => getDocs(collection(db, 'comandas')));
   await permitido('Entrada de notas lê o Estoque', () => getDocs(collection(db, 'estoque')));
   await permitido('Entrada de notas soma a quantidade no Estoque', () => updateDoc(doc(db, 'estoque', 'gin'), { quantidade: 3 }));
   await permitido('Resultado (DRE) lê as receitas', () => getDocs(collection(db, 'receitas')));
