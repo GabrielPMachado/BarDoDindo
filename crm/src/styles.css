@@ -1485,7 +1485,27 @@ button.anexos__nome:hover { text-decoration: underline; }
 .caixa-aviso span { flex: 1; min-width: 200px; }
 .caixa-aviso--aberto { background: #4cc27a12; border: 1px solid #4cc27a40; color: var(--good); }
 .caixa-aviso--fechado { background: #f2c14e12; border: 1px solid #f2c14e55; color: var(--warn); }
-.caixa-abrir { max-width: 520px; display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.caixa-abrir { max-width: 560px; margin: 0 0 16px; overflow: hidden; }
+.caixa-abrir__head { display: flex; gap: 16px; align-items: center; padding: 24px; background: linear-gradient(180deg, var(--surface-2), var(--surface)); border-bottom: 1px solid var(--border); }
+.caixa-abrir__head p { margin: 4px 0 0; }
+.caixa-abrir__head p::first-letter { text-transform: uppercase; }
+.caixa-abrir__icone { flex: none; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: #f2c14e14; border: 1px solid #f2c14e40; color: var(--warn); }
+.caixa-abrir__kicker { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--warn); }
+.caixa-abrir__titulo { margin: 2px 0 0; font: 600 24px/1.2 var(--serif); }
+.caixa-abrir__corpo { display: flex; flex-direction: column; gap: 8px; padding: 24px; margin: 0; }
+.caixa-abrir__label { font-size: 13px; font-weight: 600; }
+.caixa-abrir__valor .input-affix { height: 64px; border-radius: 12px; }
+.caixa-abrir__valor .input-affix span { font-size: 18px; padding: 0 4px 0 16px; }
+.caixa-abrir__valor .input { height: 62px; font: 600 28px/1 var(--sans); font-variant-numeric: tabular-nums; }
+.caixa-abrir__atalhos { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+.caixa-abrir__atalhos .chip { height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); font-size: 13px; font-variant-numeric: tabular-nums; transition: border-color .15s, background .15s; }
+.caixa-abrir__atalhos .chip:hover { border-color: var(--border-strong); }
+.caixa-abrir__atalhos .chip.is-on { border-color: var(--brand); background: #c4572a1f; color: var(--brand-light); }
+.caixa-abrir__atalhos .chip:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.caixa-abrir__ultimo { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 16px 0 8px; padding: 12px 16px; border-radius: 8px; background: var(--surface-2); font-size: 13px; }
+.caixa-abrir__ultimo > .muted { width: 100%; }
+.caixa-abrir .btn--lg { margin-top: 8px; height: 48px; font-size: 15px; }
+@media (max-width: 600px) { .caixa-abrir__head, .caixa-abrir__corpo { padding: 16px; } .caixa-abrir__titulo { font-size: 20px; } }
 .caixa-formas td, .caixa-formas th { padding: 8px 10px; }
 .caixa-formas__total td { font-weight: 700; border-top: 1px solid var(--border-strong); }
 .caixa-movs { list-style: none; padding: 0; margin: 6px 0; display: flex; flex-direction: column; gap: 6px; }

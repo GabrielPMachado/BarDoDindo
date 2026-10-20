@@ -88,18 +88,42 @@ export function CaixaPage() {
       {!carregado ? <Loading /> : caixa ? (
         <CaixaAberto caixa={caixa} comandasAbertas={abertas.length} onFechado={() => historico.reload()} />
       ) : (
-        <section className="panel pad-lg caixa-abrir">
-          <h2 className="panel-title"><Lock size={18} /> Caixa fechado</h2>
+        <section className="panel caixa-abrir">
+          <header className="caixa-abrir__head">
+            <span className="caixa-abrir__icone"><Lock size={22} /></span>
+            <div>
+              <span className="caixa-abrir__kicker">Caixa fechado</span>
+              <h2 className="caixa-abrir__titulo">Abrir o caixa</h2>
+              <p className="muted small">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+            </div>
+          </header>
           {pode('caixas', 'criar') ? (
-            <>
-              <p className="muted small">Conte o dinheiro da gaveta (troco) e abra o caixa para começar a vender.</p>
-              <label className="field-label" htmlFor="cx-ini">Troco inicial (dinheiro na gaveta)</label>
-              <NumberInput id="cx-ini" spec={{ money: true, decimals: 2, min: 0, max: 100000 }} prefix="R$" value={valorInicial} onChange={setValorInicial} />
+            <div className="caixa-abrir__corpo">
+              <label className="caixa-abrir__label" htmlFor="cx-ini">Troco inicial na gaveta</label>
+              <div className="caixa-abrir__valor">
+                <NumberInput id="cx-ini" spec={{ money: true, decimals: 2, min: 0, max: 100000 }} prefix="R$" value={valorInicial} onChange={setValorInicial} />
+              </div>
+              <div className="caixa-abrir__atalhos" role="group" aria-label="Valores rápidos">
+                {[0, 50, 100, 200].map((v) => (
+                  <button key={v} type="button" className={`chip${valorInicial === v ? ' is-on' : ''}`} onClick={() => setValorInicial(v)}>{v ? brl(v) : 'Sem troco'}</button>
+                ))}
+              </div>
+              <p className="muted small">Conte as notas e moedas antes de abrir. Esse valor entra no esperado em dinheiro do fechamento.</p>
+
               <label className="field-label" htmlFor="cx-obs">Observação (opcional)</label>
-              <input id="cx-obs" className="input" maxLength={300} value={obs} onChange={(e) => setObs(e.target.value)} />
-              <AsyncButton className="btn btn--primary btn--lg" onClick={abrir}><LockOpen size={18} /> Abrir caixa</AsyncButton>
-            </>
-          ) : <p className="muted">Peça a quem cuida do caixa para abri-lo.</p>}
+              <input id="cx-obs" className="input" maxLength={300} placeholder="Ex.: troco conferido com o gerente" value={obs} onChange={(e) => setObs(e.target.value)} />
+
+              {fechados[0] && (
+                <div className="caixa-abrir__ultimo">
+                  <span className="muted small">Último caixa</span>
+                  <span>Fechado {quando(fechados[0].fechadoEm)} por {fechados[0].fechadoPorNome} · {brl(fechados[0].totalVendas || 0)}</span>
+                  <Diferenca v={fechados[0].fechamento?.diferenca ?? 0} />
+                </div>
+              )}
+
+              <AsyncButton className="btn btn--primary btn--lg" onClick={abrir}><LockOpen size={18} /> Abrir caixa com {brl(Number(valorInicial || 0))}</AsyncButton>
+            </div>
+          ) : <p className="muted caixa-abrir__corpo">Peça a quem cuida do caixa para abri-lo.</p>}
         </section>
       )}
 
