@@ -90,13 +90,13 @@
   .reveal {
     position: fixed; inset: 0; z-index: 50; overflow-y: auto;
     background: radial-gradient(70% 45% at 50% 32%, #3e2820 0%, #16100e 55%, #070605 100%);
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+    display: flex; flex-direction: column; align-items: center; justify-content: safe center; gap: 18px;
     padding: calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom)); text-align: center;
     animation: fadeIn .4s ease both;
   }
   .reveal__rays { position: absolute; inset: -50%; pointer-events: none; opacity: .18;
     background: repeating-conic-gradient(from 0deg at 50% 50%, #e07a4c55 0deg 6deg, transparent 6deg 18deg); animation: rotate 40s linear infinite; mask: radial-gradient(circle, #000 0%, transparent 55%); -webkit-mask: radial-gradient(circle, #000 0%, transparent 55%); }
-  .reveal > *:not(.reveal__rays):not(canvas) { position: relative; z-index: 1; }
+  .reveal > *:not(.reveal__rays):not(canvas) { position: relative; z-index: 1; flex-shrink: 0; }
   .reveal__logo { border-radius: 50%; filter: drop-shadow(0 0 18px #e07a4c88); animation: drop .9s cubic-bezier(.2, 1.4, .4, 1) .15s both; }
   .reveal__label { font-size: 12px; letter-spacing: .3em; text-transform: uppercase; color: var(--brand-light); animation: up .6s ease .7s both; }
   .reveal__number {
@@ -129,6 +129,28 @@
   .reveal__actions { display: flex; gap: 10px; width: min(340px, 100%); }
   .reveal__actions .btn { margin: 0; height: 48px; font-size: 15px; }
   .confetti { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
+
+  /* convite e questionário opcional */
+  .convite { width: min(340px, 100%); padding: 14px 16px; border-radius: 14px; text-align: left; background: #c4572a14; border: 1px solid var(--border-strong); display: flex; flex-direction: column; gap: 4px; }
+  .convite strong { font: 700 16px var(--serif); }
+  .convite span { font-size: 13px; color: var(--muted); }
+  .convite .btn { margin-top: 10px; height: 44px; font-size: 14.5px; }
+  .convite--ok { align-items: center; text-align: center; }
+  .quiz { position: fixed; inset: 0; z-index: 70; overflow-y: auto; background: #070605f2; animation: fadeIn .3s ease both;
+    padding: calc(20px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom)); }
+  .quiz__box { max-width: 640px; margin: 0 auto; gap: 4px; }
+  .quiz__box h2 { margin: 0; }
+  .quiz__box > p.muted { margin: 0 0 6px; text-align: center; font-size: 13.5px; }
+  .quiz__q { display: flex; flex-direction: column; gap: 8px; padding: 14px 0; border-top: 1px solid var(--border); }
+  .quiz__q:first-of-type { border-top: 0; }
+  .quiz__q > span { font-weight: 600; font-size: 14.5px; }
+  .quiz__ops { display: flex; flex-wrap: wrap; gap: 8px; }
+  .quiz__ops button { min-height: 38px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface-2); font-size: 13.5px; transition: background .15s, border-color .15s; }
+  .quiz__ops button:hover { border-color: var(--brand); }
+  .quiz__ops button[aria-checked="true"] { background: var(--brand); border-color: var(--brand); color: var(--on-brand); font-weight: 600; }
+  .quiz__acoes { display: flex; gap: 10px; }
+  .quiz__acoes .btn { margin-top: 10px; }
+  @media (min-width: 720px) { .quiz { padding-top: 48px; } .quiz__box { padding: 24px 28px; } }
   .stage { opacity: 0; }
   /* cada parte entra com animação no momento em que aparece */
   .stage.is-in { opacity: 1; animation: up .6s ease both; }
@@ -244,7 +266,30 @@
     <button class="btn btn--brand" id="btn-share" type="button">Compartilhar</button>
     <button class="btn btn--ghost" id="btn-salvar" type="button">Salvar cartão</button>
   </div>
+  <div class="convite stage" id="convite" hidden>
+    <strong>Conte um pouco sobre você</strong>
+    <span>Perguntas rápidas e opcionais para o Dindo preparar noites do seu jeito.</span>
+    <button class="btn btn--brand" id="btn-quiz" type="button">Responder agora</button>
+  </div>
+  <div class="convite convite--ok stage" id="convite-ok" hidden>
+    <strong>Obrigado por responder!</strong>
+    <span>Suas respostas ajudam o Dindo a preparar noites do seu jeito.</span>
+  </div>
   <button class="link stage" id="btn-sair" type="button">Fechar</button>
+</div>
+
+<!-- questionário opcional -->
+<div class="quiz" id="quiz" hidden role="dialog" aria-modal="true" aria-labelledby="quiz-titulo">
+  <form class="card quiz__box" id="form-quiz" novalidate>
+    <h2 id="quiz-titulo">Conte um pouco sobre você</h2>
+    <p class="muted">É opcional e rapidinho. Responda só o que quiser.</p>
+    <div id="quiz-perguntas"></div>
+    <p class="error" id="erro-quiz" role="alert"></p>
+    <div class="quiz__acoes">
+      <button class="btn btn--ghost" id="btn-quiz-depois" type="button">Agora não</button>
+      <button class="btn btn--brand" id="btn-quiz-enviar" type="submit">Enviar respostas</button>
+    </div>
+  </form>
 </div>
 <canvas class="confetti" id="confetti" aria-hidden="true"></canvas>
 
@@ -260,6 +305,9 @@ import { cpfValido, idadeEm } from '../shared/backend';
   /* ---------- dados (mesma base do aplicativo oficial) ---------- */
   const api = (path, body) => dados(path, body ? { method: 'POST', body } : {});
   const me = () => dados('/app/me');
+  // questionário opcional (perguntas editáveis no Cérebro, em Parâmetros)
+  let questionario = null;
+  dados('/public/config').then((c) => { if (c.questionario?.ativo && c.questionario.perguntas?.length) questionario = c.questionario; }).catch(() => {});
 
   /* ---------- prova social ---------- */
   // o total de afilhados acompanha os cadastros ao vivo (a cada 1,5 s, sem leituras extras no banco)
@@ -366,7 +414,10 @@ import { cpfValido, idadeEm } from '../shared/backend';
     $('c-desde').textContent = 'Afilhado desde ' + desde;
 
     const reveal = $('reveal');
-    ['stage', 'cartao', 'acoes', 'btn-sair'].forEach((id) => $(id).classList.remove('is-in'));
+    $('convite').hidden = !questionario || !!cliente.respostas;
+    $('convite-ok').hidden = true;
+    const etapas = ['stage', 'cartao', 'acoes', ...($('convite').hidden ? [] : ['convite']), 'btn-sair'];
+    etapas.forEach((id) => $(id).classList.remove('is-in'));
     // reinicia as animações a cada abertura
     reveal.hidden = true; void reveal.offsetWidth; reveal.hidden = false;
     document.body.style.overflow = 'hidden';
@@ -378,7 +429,7 @@ import { cpfValido, idadeEm } from '../shared/backend';
       el.classList.add('is-done');
       if (navigator.vibrate) navigator.vibrate([30, 40, 60]);
       confete();
-      ['stage', 'cartao', 'acoes', 'btn-sair'].forEach((id, i) => setTimeout(() => $(id).classList.add('is-in'), reduz ? 0 : 250 + i * 280));
+      etapas.forEach((id, i) => setTimeout(() => $(id).classList.add('is-in'), reduz ? 0 : 250 + i * 280));
     };
     if (reduz) return fim();
     // contador acelerando até o número (efeito "sorteio")
@@ -392,6 +443,68 @@ import { cpfValido, idadeEm } from '../shared/backend';
     requestAnimationFrame(passo);
   }
   $('btn-sair').onclick = () => { $('reveal').hidden = true; document.body.style.overflow = ''; };
+
+  /* ---------- questionário opcional ---------- */
+  let respostas = {};
+  function abrirQuiz() {
+    respostas = {};
+    $('quiz-titulo').textContent = questionario.titulo;
+    $('erro-quiz').textContent = '';
+    const lista = $('quiz-perguntas');
+    lista.replaceChildren(...questionario.perguntas.map((p) => {
+      const bloco = document.createElement('div');
+      bloco.className = 'quiz__q';
+      const rotulo = document.createElement(p.opcoes.length ? 'span' : 'label');
+      rotulo.textContent = p.texto;
+      bloco.append(rotulo);
+      if (p.opcoes.length) {
+        const ops = document.createElement('div');
+        ops.className = 'quiz__ops';
+        ops.setAttribute('role', 'radiogroup');
+        ops.setAttribute('aria-label', p.texto);
+        for (const o of p.opcoes) {
+          const b = document.createElement('button');
+          b.type = 'button'; b.textContent = o; b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', 'false');
+          b.onclick = () => {
+            respostas[p.id] = respostas[p.id] === o ? '' : o;
+            ops.querySelectorAll('button').forEach((x) => x.setAttribute('aria-checked', String(x.textContent === respostas[p.id])));
+          };
+          ops.append(b);
+        }
+        bloco.append(ops);
+      } else {
+        const inp = document.createElement('input');
+        inp.className = 'input'; inp.id = `q-${p.id}`; inp.maxLength = 300;
+        rotulo.htmlFor = inp.id;
+        inp.oninput = () => (respostas[p.id] = inp.value);
+        bloco.append(inp);
+      }
+      return bloco;
+    }));
+    $('quiz').hidden = false;
+    $('quiz').scrollTop = 0;
+  }
+  $('btn-quiz').onclick = abrirQuiz;
+  $('btn-quiz-depois').onclick = () => { $('quiz').hidden = true; };
+  $('form-quiz').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const preenchidas = Object.fromEntries(Object.entries(respostas).map(([k, v]) => [k, v.trim()]).filter(([, v]) => v));
+    if (!Object.keys(preenchidas).length) return ($('erro-quiz').textContent = 'Responda ao menos uma pergunta ou toque em “Agora não”.');
+    const btn = $('btn-quiz-enviar');
+    carregando(btn, true);
+    try {
+      await dados('/app/me', { method: 'PATCH', body: { respostas: preenchidas } });
+      atual.respostas = preenchidas;
+      $('quiz').hidden = true;
+      $('convite').hidden = true;
+      $('convite-ok').hidden = false;
+      $('convite-ok').classList.add('is-in');
+    } catch (err) {
+      $('erro-quiz').textContent = err.message;
+    } finally {
+      carregando(btn, false, 'Enviar respostas');
+    }
+  });
 
   /* ---------- confete dourado ---------- */
   function confete() {

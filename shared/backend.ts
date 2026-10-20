@@ -175,8 +175,22 @@ const DEFAULT_CONFIG = {
     { ate: 8475.55, aliquota: 14 },
   ],
   aliquotaFgts: 8,
-  // questionário opcional do afilhado, respondido no app depois do cadastro (perguntas definidas no Cérebro, em Parâmetros)
-  questionario: { ativo: false, titulo: 'Conte um pouco sobre você', perguntas: [] as { id: string; texto: string; opcoes: string[] }[] },
+  // questionário opcional do afilhado, respondido no pré-cadastro e no app depois do cadastro (editável no Cérebro, em Parâmetros)
+  questionario: {
+    ativo: true, titulo: 'Conte um pouco sobre você',
+    perguntas: [
+      { id: 'conheceu', texto: 'Como você conheceu o Bar do Dindo?', opcoes: ['Indicação de amigos', 'Instagram', 'Passando na frente', 'Google/Maps', 'Outro'] },
+      { id: 'frequencia', texto: 'Com que frequência você costuma sair para bares?', opcoes: ['Mais de 1x por semana', '1x por semana', 'Algumas vezes por mês', 'Raramente'] },
+      { id: 'pedido', texto: 'O que você mais pede?', opcoes: ['Chopp', 'Cerveja', 'Drinks', 'Caipirinha', 'Sem álcool', 'Petiscos e porções'] },
+      { id: 'companhia', texto: 'Com quem você costuma vir?', opcoes: ['Sozinho(a)', 'Em casal', 'Com amigos', 'Com a família', 'Com colegas de trabalho'] },
+      { id: 'dia', texto: 'Qual seu dia preferido para sair?', opcoes: ['Seg a qua', 'Quinta', 'Sexta', 'Sábado', 'Domingo'] },
+      { id: 'evento', texto: 'Que tipo de evento faria você vir mais vezes?', opcoes: ['Música ao vivo', 'Futebol no telão', 'Happy hour', 'Karaokê', 'Noites temáticas', 'Promoções de chopp'] },
+      { id: 'musica', texto: 'Qual estilo de música você curte no bar?', opcoes: ['Sertanejo', 'Samba e pagode', 'Rock', 'Pop', 'MPB', 'Funk', 'Eletrônica'] },
+      { id: 'time', texto: 'Qual é o seu time do coração?', opcoes: [] },
+      { id: 'novidades', texto: 'Como prefere receber novidades e promoções?', opcoes: ['WhatsApp', 'Instagram', 'E-mail', 'Só pelo aplicativo'] },
+      { id: 'sugestao', texto: 'O que faria você vir mais vezes?', opcoes: [] },
+    ] as { id: string; texto: string; opcoes: string[] }[],
+  },
 };
 
 /* ---------- utilitários ---------- */
@@ -390,7 +404,10 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
 
   async function getConfig(): Promise<typeof DEFAULT_CONFIG & Dados> {
     const { id: _id, ...salvo } = (await documento('config/geral')) ?? {};
-    return { ...DEFAULT_CONFIG, ...salvo };
+    const cfg = { ...DEFAULT_CONFIG, ...salvo };
+    // questionário salvo sem perguntas (antes de existir o padrão) volta para as perguntas padrão
+    if (!cfg.questionario?.perguntas?.length) cfg.questionario = DEFAULT_CONFIG.questionario;
+    return cfg;
   }
 
   /* ---------- contas (Firebase Auth) ---------- */
