@@ -35,7 +35,7 @@ export interface NumberSpec {
   decimals: number;
   min: number;
   max: number;
-  /** Moeda: digitação natural ("150" = R$ 150,00; "150,5" = R$ 150,50), até 2 casas; ao sair do campo mostra os centavos. */
+  /** Moeda: estilo caixa eletrônico, os dígitos entram pela direita com os centavos já formatados ("1", "12", "125" = R$ 0,01, 0,12, 1,25). */
   money?: boolean;
 }
 
@@ -44,8 +44,14 @@ export interface NumberSpec {
  * Nunca deixa ultrapassar o máximo nem o número de casas decimais.
  */
 export function applyNumberMask(raw: string, spec: NumberSpec): [string, number | ''] {
-  // moeda segue a digitação decimal natural com 2 casas (antes era em centavos: "5" virava R$ 0,05)
-  if (spec.money) spec = { ...spec, decimals: 2 };
+  if (spec.money) {
+    // estilo caixa eletrônico: os dígitos são centavos e a vírgula fica sempre nas duas últimas casas
+    const d = onlyDigits(raw).replace(/^0+(?=\d)/, '').slice(0, 13);
+    if (!d) return ['', ''];
+    let n = Number(d) / 100;
+    if (n > spec.max) n = spec.max;
+    return [formatNumber(n, 2, true), n];
+  }
   if (spec.decimals === 0) {
     const d = onlyDigits(raw).replace(/^0+(?=\d)/, '').slice(0, 15);
     if (!d) return ['', ''];
