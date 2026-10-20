@@ -89,6 +89,10 @@ await negado('registrar um CPF que não é o do próprio cadastro', () => setDoc
 await permitido('completar o cadastro com CPF e maioridade', () => completar('11144477735', '1990-01-01'));
 await negado('trocar o CPF depois de completo', () => completar('39053344705', '1990-01-01'));
 await negado('consultar se um CPF está cadastrado', () => getDoc(doc(db, 'cpfs', '52998224725')));
+await permitido('acompanhar a própria comanda aberta', () => getDocs(query(collection(db, 'comandas'), where('clienteUid', '==', uid), where('status', '==', 'Aberta'))));
+await negado('ver a comanda de outro afilhado', () => getDoc(doc(db, 'comandas', 'de-outro')));
+await negado('listar todas as comandas', () => getDocs(collection(db, 'comandas')));
+await negado('ver o caixa', () => getDoc(doc(db, 'caixas', 'aberto')));
 await permitido('responder o questionário opcional', () => updateDoc(doc(db, 'clientes', uid), { respostas: { p1: 'Instagram' } }));
 await signOut(auth);
 
@@ -116,6 +120,14 @@ if (senhaAtendente) {
   await negado('reativar voucher sem pontos (saldo ficaria negativo)', () => setDoc(saldo, { usados: increment(25) }, { merge: true }));
   await permitido('estornar pontos que ainda estão no saldo', () => setDoc(saldo, { acumulados: increment(-10) }, { merge: true }));
   await permitido('zerar o saldo de teste', () => setDoc(saldo, { acumulados: 0, usados: 0 }, { merge: true }));
+  // caixa e comandas (Atendimento): a venda soma no caixa aberto; caixa fechado não muda
+  const somar = (id) => updateDoc(doc(db, 'caixas', id), { 'vendas.Pix': increment(10), totalVendas: increment(10), qtdVendas: increment(1) });
+  await permitido('somar venda no caixa aberto', () => somar('aberto'));
+  await negado('excluir um caixa (não tem "excluir")', () => deleteDoc(doc(db, 'caixas', 'aberto')));
+  await permitido('abrir comanda', () => addDoc(collection(db, 'comandas'), { numero: 9, nome: 'Avulsa', mesa: 1, itens: [], total: 0, status: 'Aberta' }));
+  await permitido('ver as comandas do salão', () => getDocs(collection(db, 'comandas')));
+  await permitido('lançar a receita de uma comanda avulsa', () => addDoc(collection(db, 'receitas'), { descricao: 'Comanda #009', valor: 10, comandaId: 'x', caixaId: 'aberto' }));
+  await permitido('cadastrar mesa', () => addDoc(collection(db, 'mesas'), { numero: 1, nome: 'Mesa 1', lugares: 4 }));
   await negado('alterar produto', () => addDoc(collection(db, 'produtos'), { nome: 'x', preco: 1 }));
   await negado('lançar receita avulsa', () => addDoc(collection(db, 'receitas'), { descricao: 'x', valor: 1 }));
   await permitido('editar o próprio perfil', () => updateDoc(doc(db, 'usuarios', eq.user.uid), { telefone: '(11) 91234-5678', sobre: 'Atendente do salão' }));
@@ -163,6 +175,9 @@ if (senhaMarketing) {
   await signInWithEmailAndPassword(auth, 'marketing@teste.local', senhaMarketing);
   await permitido('ver produtos (Vendas herda o "ver" de Marketing)', () => getDocs(collection(db, 'produtos')));
   await permitido('ver recompensas (Marketing)', () => getDocs(collection(db, 'recompensas')));
+  await negado('ver o caixa (sem Atendimento)', () => getDoc(doc(db, 'caixas', 'aberto')));
+  await negado('somar venda no caixa (sem Atendimento)', () => updateDoc(doc(db, 'caixas', 'aberto'), { totalVendas: increment(1) }));
+  await negado('ver comandas (sem Atendimento)', () => getDocs(collection(db, 'comandas')));
   await negado('cadastrar produto (só "ver")', () => addDoc(collection(db, 'produtos'), { nome: 'x', preco: 1 }));
   await permitido('ver o Estoque (insumos da ficha técnica)', () => getDocs(collection(db, 'estoque')));
   await negado('alterar o Estoque (só leitura para Vendas)', () => addDoc(collection(db, 'estoque'), { item: 'x', quantidade: 1 }));

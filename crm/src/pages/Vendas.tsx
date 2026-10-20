@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Check, Minus, Plus, Receipt, Search, Trash2, X } from 'lucide-react';
+import { Check, Minus, Plus, QrCode, Receipt, Search, Trash2, X } from 'lucide-react';
 import { COLLECTIONS } from '../collections';
 import { CollectionPage } from '../components/CollectionPage';
 import { AsyncButton, Badge, EmptyState, ErrorBox, KpiRow, Loading, Modal, PageHead, notify } from '../components/ui';
@@ -10,6 +10,8 @@ import { brl, dateBR, isoFromToday, num } from '../lib/format';
 import { maskPhone } from '../lib/masks';
 import { currentMonth, monthOf } from '../lib/finance';
 import { useSession, type Config } from '../lib/session';
+import { useNavigate } from 'react-router-dom';
+import { AvisoCaixa, useCaixa } from './Salao';
 
 interface Cliente {
   id: number;
@@ -46,6 +48,7 @@ export function Clientes() {
   const { data, loading, error } = useResource<Cliente[]>('/crm/clientes');
   const { pode } = useSession();
   const perguntas = useResource<Config>('/public/config').data?.questionario?.perguntas ?? [];
+  const navigate = useNavigate();
   const [vendo, setVendo] = useState<Cliente | null>(null);
   // excluir apaga também consumos, vouchers e reservas do afilhado, por isso exige as duas permissões
   const podeExcluir = pode('clientes', 'excluir') && pode('consumos', 'excluir');
@@ -62,7 +65,8 @@ export function Clientes() {
 
   return (
     <div className="page">
-      <PageHead title="Clientes (afilhados)" description="Clientes cadastrados pelo aplicativo, com pontos, consumo e frequência." />
+      <PageHead title="Clientes (afilhados)" description="Clientes cadastrados pelo aplicativo, com pontos, consumo e frequência."
+        actions={pode('qrcode', 'ver') && <button type="button" className="btn btn--ghost" onClick={() => navigate('/vendas/qrcode')}><QrCode size={16} /> QR Code Afilie-se</button>} />
       {clientes.length > 0 && (
         <KpiRow items={[
           { label: 'Afilhados', value: num(clientes.length) },
@@ -168,6 +172,7 @@ export function Consumo() {
   // a lista mostra os lançamentos recentes: basta o último mês
   const consumos = useCollection('consumos', true, isoFromToday(-30));
   const cfg = useResource<Config>('/crm/config').data;
+  const { caixa } = useCaixa();
 
   const [clienteQ, setClienteQ] = useState('');
   const [clienteId, setClienteId] = useState<number | null>(null);
@@ -199,7 +204,7 @@ export function Consumo() {
     setError(null);
     try {
       await api('/crm/consumos', { method: 'POST', body: { clienteId, itens, formaPagamento: forma } });
-      await Promise.all([consumos.reload(), reload('/crm/clientes')]);
+      await Promise.all([consumos.reload(), reload('/crm/clientes'), reload('/crm/caixa')]);
       notify(`Consumo lançado: ${pontos} pontos creditados para ${cliente?.nome}`);
       setItens([]);
       setClienteId(null);
@@ -215,8 +220,9 @@ export function Consumo() {
     <div className="page">
       <PageHead
         title="Lançar consumo"
-        description="Registre a comanda do afilhado: os pontos são creditados no aplicativo e o valor entra automaticamente em Financeiro · Receita."
+        description="Venda rápida para o afilhado (para acompanhar a noite toda, use Comandas): os pontos são creditados no aplicativo e o valor entra no caixa aberto e em Financeiro · Receita."
       />
+      <AvisoCaixa />
 
       {canEdit && (
         <div className="grid-2 grid-2--wide-left">
@@ -293,7 +299,7 @@ export function Consumo() {
             <label className="field-label" htmlFor="forma">Forma de pagamento</label>
             <SelectPicker id="forma" options={['Pix', 'Crédito', 'Débito', 'Dinheiro', 'Vale-refeição']} value={forma} onChange={setForma} />
             {error && <ErrorBox>{error}</ErrorBox>}
-            <AsyncButton className="btn btn--primary btn--lg" onClick={lancar} disabled={!cliente || !linhas.length}>
+            <AsyncButton className="btn btn--primary btn--lg" onClick={lancar} disabled={!cliente || !linhas.length || !caixa}>
               <Check size={18} /> Lançar consumo
             </AsyncButton>
           </section>
@@ -322,7 +328,7 @@ export function Consumo() {
                         <AsyncButton className="icon-btn" confirm={{ title: 'Estornar este consumo?', message: 'Os pontos do cliente e a receita correspondente serão removidos.', confirmLabel: 'Estornar', danger: true }}
                           onClick={async () => {
                             await consumos.remove(c.id);
-                            await Promise.all([reload('/crm/clientes'), reload('/crm/c/receitas')]);
+                            await Promise.all([reload('/crm/clientes'), reload('/crm/c/receitas'), reload('/crm/caixa')]);
                             notify('Consumo estornado');
                           }}>
                           <Trash2 size={16} />

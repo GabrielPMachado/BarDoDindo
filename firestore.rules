@@ -21,7 +21,7 @@ service cloud.firestore {
     // valem as da área a que ele pertence; e Vendas, separada de Marketing, herda as de Marketing.
     // Igual a PAI_DO_MODULO em shared/backend.ts.
     function pai(k) {
-      return k.matches('reservas|consumos|resgates|eventos') ? 'atd'
+      return k.matches('reservas|consumos|resgates|eventos|caixas|comandas|mesas') ? 'atd'
         : k.matches('produtos|fichas|guarnicoes|clientes|qrcode') ? 'vnd'
         : k.matches('recompensas|criacao|midias|publicidade') ? 'mkt'
         : k.matches('projetos|estoque|materiais|compras') ? 'dp'
@@ -98,13 +98,27 @@ service cloud.firestore {
       return ['metas', 'colaboradores', 'ferias', 'projetos', 'estoque', 'materiais', 'compras', 'terceirizados', 'fornecedores', 'contratos', 'precos',
         'receitas', 'despesas', 'reservas', 'consumos', 'resgates', 'criacao', 'midias', 'recompensas', 'produtos', 'guarnicoes',
         'trabalhista', 'consultoria', 'qualidade', 'naoconformidades', 'eventos', 'publicidade', 'atestados',
-        'acoes', 'creditos', 'docfin', 'investimentos', 'prestadores', 'conduta', 'advogados', 'normas', 'chamados', 'equipamentos'];
+        'acoes', 'creditos', 'docfin', 'investimentos', 'prestadores', 'conduta', 'advogados', 'normas', 'chamados', 'equipamentos',
+        'caixas', 'comandas', 'mesas'];
     }
     match /{col}/{id} {
       allow read: if col in colecoesCrm() && podeColecao(col, 'ver');
       allow create: if col in colecoesCrm() && podeColecao(col, 'criar');
       allow update: if col in colecoesCrm() && podeColecao(col, 'editar');
       allow delete: if col in colecoesCrm() && podeColecao(col, 'excluir');
+    }
+
+    // caixa: quem lança consumo ou fecha comanda vê o caixa aberto e soma a venda nele (só os totais de vendas);
+    // abrir, movimentar e fechar o caixa seguem a permissão do próprio cadastro (acima)
+    match /caixas/{id} {
+      allow read: if podeEmAlgum(['consumos', 'comandas'], 'criar') || podeEmAlgum(['consumos', 'comandas'], 'editar');
+      allow update: if resource.data.status == 'Aberto' && request.resource.data.status == 'Aberto'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['vendas', 'totalVendas', 'qtdVendas'])
+        && (podeEmAlgum(['consumos', 'comandas'], 'criar') || podeEmAlgum(['consumos', 'comandas'], 'editar') || pode('consumos', 'excluir'));
+    }
+    // o afilhado acompanha a própria comanda no aplicativo
+    match /comandas/{id} {
+      allow read: if logado() && resource.data.get('clienteUid', '') == request.auth.uid;
     }
 
     /* ---------- painel de atualizações ---------- */
@@ -240,12 +254,14 @@ service cloud.firestore {
     }
     // o lançamento de consumo usa os preços do cadastro de produtos
     match /produtos/{id} {
-      allow read: if podeVer('consumos');
+      allow read: if podeEmAlgum(['consumos', 'comandas'], 'ver');
     }
     // o lançamento de consumo gera e estorna a própria receita; o Resultado (DRE) lê receitas e despesas
     match /receitas/{id} {
       allow read: if podeEmAlgum(['resultado', 'ticket', 'renda'], 'ver');
-      allow create: if pode('consumos', 'criar') && request.resource.data.consumoId is string;
+      allow create: if (pode('consumos', 'criar') && request.resource.data.consumoId is string)
+        // comanda sem afilhado: fechar a comanda lança a venda direto na receita
+        || (pode('comandas', 'editar') && request.resource.data.comandaId is string && request.resource.data.get('consumoId', null) == null);
       allow delete: if pode('consumos', 'excluir') && resource.data.get('consumoId', null) != null;
     }
 
@@ -334,7 +350,7 @@ service cloud.firestore {
     }
     // afilhados e saldos: quem atende (reservas, consumos, vouchers), vende (clientes) ou cuida das recompensas
     function verAfilhados() {
-      return podeEmAlgum(['clientes', 'reservas', 'consumos', 'resgates', 'recompensas'], 'ver');
+      return podeEmAlgum(['clientes', 'reservas', 'consumos', 'resgates', 'recompensas'], 'ver') || pode('comandas', 'ver');
     }
     // programa de afilhados: só maiores de 18 anos (pela data de nascimento) e com CPF; um CPF por afilhado
     function cpfOk(v) { return v is string && v.matches('^[0-9]{11}$'); }

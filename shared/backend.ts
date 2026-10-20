@@ -34,7 +34,7 @@ const codigo = (e: unknown) => String((e as { code?: string } | null)?.code ?? '
  */
 export const PAI_DO_MODULO: Record<string, string> = {
   painel: 'dir', metas: 'dir',
-  reservas: 'atd', consumos: 'atd', resgates: 'atd', eventos: 'atd',
+  reservas: 'atd', consumos: 'atd', resgates: 'atd', eventos: 'atd', caixas: 'atd', comandas: 'atd', mesas: 'atd',
   produtos: 'vnd', fichas: 'vnd', guarnicoes: 'vnd', clientes: 'vnd', qrcode: 'vnd',
   recompensas: 'mkt', criacao: 'mkt', midias: 'mkt', publicidade: 'mkt',
   projetos: 'dp', estoque: 'dp', materiais: 'dp', compras: 'dp',
@@ -69,6 +69,7 @@ const COLLECTIONS: Record<string, string> = Object.fromEntries(
     'receitas', 'despesas', 'reservas', 'consumos', 'resgates', 'criacao', 'midias', 'recompensas', 'produtos', 'guarnicoes',
     'trabalhista', 'consultoria', 'qualidade', 'naoconformidades', 'funcoes',
     'eventos', 'publicidade', 'atestados', 'acoes', 'creditos', 'docfin', 'investimentos', 'prestadores', 'conduta', 'advogados', 'normas', 'chamados', 'equipamentos',
+    'caixas', 'comandas', 'mesas',
   ].map((c) => [c, c]),
 );
 /** Permissões que uma função marca em cada área. */
@@ -109,6 +110,7 @@ const REGISTRO: Record<string, string> = {
   prestadores: 'o contratado', conduta: 'o manual de conduta',
   advogados: 'o advogado', normas: 'a norma',
   chamados: 'o chamado', equipamentos: 'o equipamento',
+  caixas: 'o caixa', comandas: 'a comanda', mesas: 'a mesa',
 };
 /** Nome legível de um registro qualquer, para o painel de atualizações. */
 function nomeDe(d: Dados | null | undefined) {
@@ -601,9 +603,13 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   rota('GET', '/app/versao', async () => { await requireCliente(); return { versao }; });
   rota('GET', '/app/me', async () => {
     const { uid, c } = await requireCliente();
-    const [consumos, resgates, reservas, cfg] = await Promise.all([doCliente('consumos', uid), doCliente('resgates', uid), doCliente('reservas', uid), getConfig()]);
+    const [consumos, resgates, reservas, cfg, comandas] = await Promise.all([doCliente('consumos', uid), doCliente('resgates', uid), doCliente('reservas', uid), getConfig(),
+      // a comanda aberta no bar, para o afilhado acompanhar o que já foi lançado
+      getDocs(query(collection(db, 'comandas'), where('clienteUid', '==', uid), where('status', '==', 'Aberta'), limit(1))).catch(() => null)]);
     const r = resumo(consumos, resgates);
+    const aberta = comandas && !comandas.empty ? comandas.docs[0].data() : null;
     return {
+      comanda: aberta && { id: comandas!.docs[0].id, numero: aberta.numero, mesa: aberta.mesa ?? null, itens: aberta.itens ?? [], total: Number(aberta.total) || 0, abertaEm: aberta.abertaEm },
       cliente: publicCliente(c),
       pontos: r.pontos,
       acumulados: r.acumulados,
@@ -971,7 +977,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   /* CRM: clientes do aplicativo */
   rota('GET', '/crm/clientes', async () => {
     const ctx = await requireUsuario();
-    requireAnyAccess(ctx, ['clientes', 'reservas', 'consumos', 'resgates', 'recompensas'], 'ver');
+    requireAnyAccess(ctx, ['clientes', 'reservas', 'consumos', 'resgates', 'recompensas', 'comandas'], 'ver');
     // os totais de cada afilhado ficam no saldo (atualizados a cada consumo), sem carregar todos os consumos
     const [clientes, saldos, cfg] = await Promise.all([colecao('clientes'), colecao('saldos'), getConfig()]);
     const saldoDe = new Map(saldos.map((s) => [s.id, s]));
@@ -1161,7 +1167,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
             embalagem: x.embalagem ?? '', conteudo: Number(x.conteudo), unidade: x.unidade || 'un', preco: Number(x.preco), data: x.data ?? '',
           }));
       case 'clientes':
-        requireAnyAccess(ctx, ['clientes', 'reservas', 'consumos', 'resgates', 'recompensas'], 'ver');
+        requireAnyAccess(ctx, ['clientes', 'reservas', 'consumos', 'resgates', 'recompensas', 'comandas'], 'ver');
         return (await colecao('clientes'))
           .map((c) => ({ id: c.numero, nome: c.nome, detalhe: `#${String(c.numero).padStart(3, '0')}${c.telefone ? ' · ' + c.telefone : ''}`, telefone: c.telefone }));
       default:
@@ -1171,7 +1177,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
 
   /* CRM: produtos disponíveis para venda (o atendimento lança consumo sem acesso ao cadastro de produtos) */
   rota('GET', '/crm/produtos-venda', async () => {
-    requireAnyAccess(await requireUsuario(), ['consumos', 'produtos'], 'ver');
+    requireAnyAccess(await requireUsuario(), ['consumos', 'comandas', 'produtos'], 'ver');
     return (await colecao('produtos'))
       .filter((p) => p.status !== 'Inativo')
       .map((p) => ({ id: p.id, nome: p.nome, categoria: p.categoria, preco: Number(p.preco) || 0, foto: p.foto || undefined }))
@@ -1273,44 +1279,248 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   });
 
   /* CRM: lançamento de consumo (credita pontos e gera receita) */
-  rota('POST', '/crm/consumos', async ({ b }) => {
-    const ctx = await requireUsuario();
-    requireAccess(ctx, 'consumos', 'criar');
-    const cliente = (await colecao('clientes')).find((c) => c.numero === Number(b.clienteId));
-    if (!cliente) return fail(400, 'Selecione um cliente.');
+  /* ---------- caixa, comandas e consumo ----------
+   * Toda venda (consumo de afilhado ou comanda) entra no caixa aberto: o caixa guarda os totais por forma de pagamento,
+   * e o fechamento confere o contado com o esperado. Sem caixa aberto não se lança venda. */
+  const FORMAS_PAGAMENTO = ['Pix', 'Crédito', 'Débito', 'Dinheiro', 'Vale-refeição'];
+  const formaDe = (v: unknown) => (FORMAS_PAGAMENTO.includes(str(v, 30)) ? str(v, 30) : fail(400, 'Escolha a forma de pagamento.'));
+  const centavos = (v: number) => Math.round(v * 100) / 100;
+  const numComanda = (n: unknown) => `#${String(n).padStart(3, '0')}`;
+  async function caixaAberto(): Promise<Dados | null> {
+    const s = await getDocs(query(collection(db, 'caixas'), where('status', '==', 'Aberto'), limit(1)));
+    return s.empty ? null : { id: s.docs[0].id, ...s.docs[0].data() };
+  }
+  async function exigirCaixa() {
+    const c = await caixaAberto();
+    if (!c) fail(409, 'O caixa está fechado. Abra o caixa (Atendimento › Caixa) para lançar vendas.');
+    return c as Dados;
+  }
+  function somarNoCaixa(lote: WriteBatch, caixaId: string, forma: string, valor: number, n = 1) {
+    lote.update(doc(db, 'caixas', caixaId), { [`vendas.${forma}`]: increment(valor), totalVendas: increment(valor), qtdVendas: increment(n) });
+  }
+  /** Itens vendidos com o preço do cadastro de produtos. */
+  async function itensDaVenda(lista: unknown, vazio = false) {
     const produtos = await colecao('produtos');
-    const itens = (Array.isArray(b.itens) ? b.itens : []).map((i: Dados) => {
+    const itens = (Array.isArray(lista) ? lista : []).slice(0, 200).map((i: Dados) => {
       const p = produtos.find((x) => x.id === str(i.produtoId, 40));
       const quantidade = Math.floor(Number(i.quantidade));
       if (!p) return fail(400, 'Produto não encontrado.');
       if (!(quantidade >= 1 && quantidade <= 999)) fail(400, 'Quantidade inválida.');
       const preco = Number(p.preco) || 0;
-      return { produtoId: p.id, nome: p.nome, quantidade, preco, total: Math.round(preco * quantidade * 100) / 100 };
+      return { produtoId: p.id, nome: p.nome, quantidade, preco, total: centavos(preco * quantidade) };
     });
-    if (!itens.length) fail(400, 'Adicione ao menos um item.');
-    const valor = Math.round(itens.reduce((s: number, i: { total: number }) => s + i.total, 0) * 100) / 100;
+    if (!itens.length && !vazio) fail(400, 'Adicione ao menos um item.');
+    return { itens, valor: centavos(itens.reduce((s: number, i: { total: number }) => s + i.total, 0)) };
+  }
+  /** Consumo do afilhado: pontos, receita, saldo e caixa no mesmo lote. */
+  async function lancarConsumo(lote: WriteBatch, ctx: Ctx, cliente: Dados, itens: unknown[], valor: number, forma: string, caixaId: string, extra: Dados = {}) {
     const pontos = Math.floor(valor * (await getConfig()).pontosPorReal);
-    const forma = str(b.formaPagamento, 30) || 'Não informado';
     const data = now();
     const consumoRef = doc(collection(db, 'consumos')), receitaRef = doc(collection(db, 'receitas'));
     const consumo = {
       clienteId: cliente.numero, clienteUid: cliente.id, clienteNome: cliente.nome, itens, valor, pontos, formaPagamento: forma, data,
-      receitaId: receitaRef.id, criadoEm: data, atualizadoEm: data,
+      receitaId: receitaRef.id, caixaId, ...extra, criadoEm: data, atualizadoEm: data,
     };
-    const lote = writeBatch(db);
     lote.set(consumoRef, consumo);
     lote.set(receitaRef, {
       data: data.slice(0, 10), descricao: `Consumo · ${cliente.nome} (#${String(cliente.numero).padStart(3, '0')})`,
-      categoria: 'Consumo de clientes', formaPagamento: forma, valor, origem: 'Lançamento de consumo', consumoId: consumoRef.id, criadoEm: data, atualizadoEm: data,
+      categoria: 'Consumo de clientes', formaPagamento: forma, valor, origem: 'Lançamento de consumo', consumoId: consumoRef.id, caixaId, criadoEm: data, atualizadoEm: data,
     });
     lote.set(doc(db, 'saldos', cliente.id), {
       acumulados: increment(pontos), gasto: increment(valor), lancamentos: increment(1), dias: arrayUnion(data.slice(0, 10)),
     }, { merge: true });
+    somarNoCaixa(lote, caixaId, forma, valor);
     registrar(lote, ctx, 'consumos', 'lançou consumo para', {
       colecao: 'consumos', alvo: `${cliente.nome} (#${String(cliente.numero).padStart(3, '0')})`, detalhe: `${brl(valor)} · ${pontos} pontos · ${forma}`,
     });
-    await lote.commit();
     return { ...consumo, id: consumoRef.id };
+  }
+
+  rota('POST', '/crm/consumos', async ({ b }) => {
+    const ctx = await requireUsuario();
+    requireAccess(ctx, 'consumos', 'criar');
+    const cliente = (await colecao('clientes')).find((c) => c.numero === Number(b.clienteId));
+    if (!cliente) return fail(400, 'Selecione um cliente.');
+    const { itens, valor } = await itensDaVenda(b.itens);
+    const forma = formaDe(b.formaPagamento);
+    const caixa = await exigirCaixa();
+    const lote = writeBatch(db);
+    const consumo = await lancarConsumo(lote, ctx, cliente, itens, valor, forma, String(caixa.id));
+    await lote.commit();
+    return consumo;
+  });
+
+  /** Caixa aberto (ou nenhum) e as formas de pagamento: quem vende precisa saber se o caixa está aberto. */
+  rota('GET', '/crm/caixa', async () => {
+    const ctx = await requireUsuario();
+    const vende = ['consumos', 'comandas'].some((m) => ctx.acoes(m).some((a) => a === 'criar' || a === 'editar'));
+    if (!vende && !ctx.acoes('caixas').includes('ver')) fail(403, semPermissao);
+    return { aberto: await caixaAberto(), formas: FORMAS_PAGAMENTO };
+  });
+  rota('POST', '/crm/caixa/abrir', async ({ b }) => {
+    const ctx = await requireUsuario();
+    requireAccess(ctx, 'caixas', 'criar');
+    if (await caixaAberto()) fail(409, 'Já existe um caixa aberto. Feche-o antes de abrir outro.');
+    const valorInicial = centavos(Math.max(0, Number(b.valorInicial) || 0));
+    const t = now();
+    const ref = doc(collection(db, 'caixas'));
+    const caixa = {
+      nome: `Caixa de ${new Date(t).toLocaleDateString('pt-BR')}`, status: 'Aberto', abertoEm: t, abertoPor: ctx.usuario.id, abertoPorNome: ctx.usuario.nome,
+      valorInicial, observacao: str(b.observacao, 300), vendas: {}, totalVendas: 0, qtdVendas: 0, movimentos: [], criadoEm: t, atualizadoEm: t,
+    };
+    const lote = writeBatch(db);
+    lote.set(ref, caixa);
+    registrar(lote, ctx, 'caixas', 'abriu o caixa', { colecao: 'caixas', alvo: caixa.nome, detalhe: `Troco inicial ${brl(valorInicial)}`, registroId: ref.id });
+    await lote.commit();
+    return { ...caixa, id: ref.id };
+  });
+  async function caixaParaAlterar(ctx: Ctx, id: string) {
+    requireAccess(ctx, 'caixas', 'editar');
+    const c = await registro('caixas', id);
+    if (!c) return fail(404, 'Caixa não encontrado.');
+    if (c.status !== 'Aberto') fail(400, 'Este caixa já foi fechado.');
+    return c;
+  }
+  rota('POST', '/crm/caixa/:id/movimento', async ({ p, b }) => {
+    const ctx = await requireUsuario();
+    const c = await caixaParaAlterar(ctx, p.id);
+    const tipo = b.tipo === 'Suprimento' ? 'Suprimento' : 'Sangria';
+    const valor = centavos(Number(b.valor) || 0);
+    if (!(valor > 0)) fail(400, 'Informe o valor.');
+    const motivo = str(b.motivo, 200);
+    if (tipo === 'Sangria' && !motivo) fail(400, 'Informe o motivo da sangria.');
+    const mov = { id: Math.random().toString(36).slice(2, 10), tipo, valor, motivo, em: now(), por: ctx.usuario.nome };
+    const lote = writeBatch(db);
+    lote.update(doc(db, 'caixas', p.id), { movimentos: arrayUnion(mov), atualizadoEm: now() });
+    registrar(lote, ctx, 'caixas', tipo === 'Sangria' ? 'fez sangria no caixa' : 'fez suprimento no caixa', { colecao: 'caixas', alvo: String(c.nome), detalhe: `${brl(valor)}${motivo ? ` · ${motivo}` : ''}`, registroId: p.id });
+    await lote.commit();
+    return mov;
+  });
+  /** Esperado em cada forma: as vendas; no dinheiro, também o troco inicial, os suprimentos e as sangrias. */
+  function esperadoDoCaixa(c: Dados) {
+    const vendas = (c.vendas ?? {}) as Record<string, number>;
+    const movs = (Array.isArray(c.movimentos) ? c.movimentos : []) as { tipo: string; valor: number }[];
+    const esperado: Record<string, number> = Object.fromEntries(FORMAS_PAGAMENTO.map((f) => [f, centavos(Number(vendas[f]) || 0)]));
+    for (const [f, v] of Object.entries(vendas)) if (!(f in esperado)) esperado[f] = centavos(Number(v) || 0);
+    esperado.Dinheiro = centavos(esperado.Dinheiro + (Number(c.valorInicial) || 0) + movs.reduce((s, m) => s + (m.tipo === 'Suprimento' ? m.valor : -m.valor), 0));
+    return esperado;
+  }
+  rota('POST', '/crm/caixa/:id/fechar', async ({ p, b }) => {
+    const ctx = await requireUsuario();
+    const c = await caixaParaAlterar(ctx, p.id);
+    const esperado = esperadoDoCaixa(c);
+    const informado = (b.contado && typeof b.contado === 'object' ? b.contado : {}) as Record<string, unknown>;
+    const contado = Object.fromEntries(Object.keys(esperado).map((f) => [f, centavos(Math.max(0, Number(informado[f]) || 0))]));
+    const total = (m: Record<string, number>) => centavos(Object.values(m).reduce((s, v) => s + v, 0));
+    const diferenca = centavos(total(contado) - total(esperado));
+    const abertas = (await getDocs(query(collection(db, 'comandas'), where('status', '==', 'Aberta')))).size;
+    const t = now();
+    const fechamento = { esperado, contado, totalEsperado: total(esperado), totalContado: total(contado), diferenca, observacao: str(b.observacao, 300), comandasAbertas: abertas };
+    const lote = writeBatch(db);
+    lote.update(doc(db, 'caixas', p.id), { status: 'Fechado', fechadoEm: t, fechadoPor: ctx.usuario.id, fechadoPorNome: ctx.usuario.nome, fechamento, atualizadoEm: t });
+    registrar(lote, ctx, 'caixas', 'fechou o caixa', {
+      colecao: 'caixas', alvo: String(c.nome), registroId: p.id,
+      detalhe: `Vendas ${brl(Number(c.totalVendas) || 0)} · ${diferenca === 0 ? 'sem diferença' : `diferença ${brl(diferenca)}`}`,
+    });
+    await lote.commit();
+    return { ...c, status: 'Fechado', fechamento };
+  });
+
+  /* comandas: uma por afilhado (ou avulsa, por nome/mesa), com os itens lançados ao longo da noite */
+  rota('POST', '/crm/comandas', async ({ b }) => {
+    const ctx = await requireUsuario();
+    requireAccess(ctx, 'comandas', 'criar');
+    const mesa = b.mesa ? Math.floor(Number(b.mesa)) : null;
+    if (mesa !== null && !(mesa >= 1 && mesa <= 999)) fail(400, 'Mesa inválida.');
+    let cliente: Dados | undefined;
+    if (b.clienteId) {
+      cliente = (await colecao('clientes')).find((c) => c.numero === Number(b.clienteId));
+      if (!cliente) fail(400, 'Afilhado não encontrado.');
+      const aberta = await getDocs(query(collection(db, 'comandas'), where('clienteUid', '==', cliente!.id), where('status', '==', 'Aberta'), limit(1)));
+      if (!aberta.empty) fail(409, `${cliente!.nome} já tem a comanda ${numComanda(aberta.docs[0].data().numero)} aberta.`);
+    }
+    const nome = cliente ? String(cliente.nome) : str(b.nome, 80);
+    if (!nome && mesa === null) fail(400, 'Informe o afilhado, um nome ou a mesa.');
+    const ultima = await getDocs(query(collection(db, 'comandas'), orderBy('numero', 'desc'), limit(1)));
+    const numero = (ultima.empty ? 0 : Number(ultima.docs[0].data().numero) || 0) + 1;
+    const t = now();
+    const ref = doc(collection(db, 'comandas'));
+    const comanda = {
+      numero, nome: nome || `Mesa ${mesa}`, mesa, clienteId: cliente?.numero ?? null, clienteUid: cliente?.id ?? null, clienteNome: cliente?.nome ?? null,
+      pessoas: Math.min(50, Math.max(1, Math.floor(Number(b.pessoas) || 1))), observacao: str(b.observacao, 300),
+      itens: [], total: 0, status: 'Aberta', abertaEm: t, abertaPor: ctx.usuario.id, abertaPorNome: ctx.usuario.nome, criadoEm: t, atualizadoEm: t,
+    };
+    const lote = writeBatch(db);
+    lote.set(ref, comanda);
+    registrar(lote, ctx, 'comandas', 'abriu a comanda', { colecao: 'comandas', alvo: `${numComanda(numero)} · ${comanda.nome}`, detalhe: mesa ? `Mesa ${mesa}` : '', registroId: ref.id });
+    await lote.commit();
+    return { ...comanda, id: ref.id };
+  });
+  async function comandaAberta(ctx: Ctx, id: string) {
+    requireAccess(ctx, 'comandas', 'editar');
+    const c = await registro('comandas', id);
+    if (!c) return fail(404, 'Comanda não encontrada.');
+    if (c.status !== 'Aberta') fail(400, `A comanda ${numComanda(c.numero)} já está ${String(c.status).toLowerCase()}.`);
+    return c;
+  }
+  rota('PUT', '/crm/comandas/:id', async ({ p, b }) => {
+    const ctx = await requireUsuario();
+    const c = await comandaAberta(ctx, p.id);
+    const patch: Dados = { atualizadoEm: now() };
+    if (b.itens !== undefined) Object.assign(patch, (({ itens, valor }) => ({ itens, total: valor }))(await itensDaVenda(b.itens, true)));
+    if (b.mesa !== undefined) {
+      const mesa = b.mesa ? Math.floor(Number(b.mesa)) : null;
+      if (mesa !== null && !(mesa >= 1 && mesa <= 999)) fail(400, 'Mesa inválida.');
+      patch.mesa = mesa;
+    }
+    if (b.observacao !== undefined) patch.observacao = str(b.observacao, 300);
+    if (b.pessoas !== undefined) patch.pessoas = Math.min(50, Math.max(1, Math.floor(Number(b.pessoas) || 1)));
+    const lote = writeBatch(db);
+    lote.update(doc(db, 'comandas', p.id), patch);
+    // itens lançados são o dia a dia da comanda: só a troca de mesa vai para o histórico
+    if (patch.mesa !== undefined && patch.mesa !== c.mesa) {
+      registrar(lote, ctx, 'comandas', 'mudou a comanda de mesa', { colecao: 'comandas', alvo: `${numComanda(c.numero)} · ${c.nome}`, detalhe: `Mesa ${c.mesa ?? '—'} → ${patch.mesa ?? '—'}`, registroId: p.id });
+    }
+    await lote.commit();
+    return { ...c, ...patch };
+  });
+  rota('POST', '/crm/comandas/:id/fechar', async ({ p, b }) => {
+    const ctx = await requireUsuario();
+    const c = await comandaAberta(ctx, p.id);
+    const { itens, valor } = await itensDaVenda(c.itens);
+    const forma = formaDe(b.formaPagamento);
+    const caixa = await exigirCaixa();
+    const caixaId = String(caixa.id);
+    const t = now();
+    const lote = writeBatch(db);
+    const patch: Dados = { status: 'Fechada', itens, total: valor, formaPagamento: forma, caixaId, fechadaEm: t, fechadaPor: ctx.usuario.id, fechadaPorNome: ctx.usuario.nome, atualizadoEm: t };
+    const cliente = c.clienteUid ? (await colecao('clientes')).find((x) => x.id === c.clienteUid) : undefined;
+    if (cliente) {
+      requireAccess(ctx, 'consumos', 'criar');
+      patch.consumoId = (await lancarConsumo(lote, ctx, cliente, itens, valor, forma, caixaId, { comandaId: p.id })).id;
+    } else {
+      const receitaRef = doc(collection(db, 'receitas'));
+      lote.set(receitaRef, {
+        data: t.slice(0, 10), descricao: `Comanda ${numComanda(c.numero)} · ${c.nome}${c.mesa ? ` (mesa ${c.mesa})` : ''}`,
+        categoria: 'Vendas no salão', formaPagamento: forma, valor, origem: 'Comanda', comandaId: p.id, caixaId, criadoEm: t, atualizadoEm: t,
+      });
+      somarNoCaixa(lote, caixaId, forma, valor);
+      patch.receitaId = receitaRef.id;
+    }
+    lote.update(doc(db, 'comandas', p.id), patch);
+    registrar(lote, ctx, 'comandas', 'fechou a comanda', { colecao: 'comandas', alvo: `${numComanda(c.numero)} · ${c.nome}`, detalhe: `${brl(valor)} · ${forma}`, registroId: p.id });
+    await lote.commit();
+    return { ...c, ...patch };
+  });
+  rota('POST', '/crm/comandas/:id/cancelar', async ({ p, b }) => {
+    const ctx = await requireUsuario();
+    const c = await comandaAberta(ctx, p.id);
+    const motivo = str(b.motivo, 200);
+    const lote = writeBatch(db);
+    lote.update(doc(db, 'comandas', p.id), { status: 'Cancelada', motivoCancelamento: motivo, canceladaEm: now(), canceladaPor: ctx.usuario.nome, atualizadoEm: now() });
+    registrar(lote, ctx, 'comandas', 'cancelou a comanda', { colecao: 'comandas', alvo: `${numComanda(c.numero)} · ${c.nome}`, detalhe: motivo, registroId: p.id });
+    await lote.commit();
+    return { ok: true };
   });
 
   async function saldoDe(uid: string) {
@@ -1363,7 +1573,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     d.clienteUid = (await colecao('clientes')).find((c) => c.numero === Number(d.clienteId))?.id ?? null;
   }
   /** Coleções que crescem com o tempo e o campo de data usado para carregar só um período. */
-  const CAMPO_DATA: Record<string, string> = { receitas: 'data', despesas: 'data', consumos: 'data', reservas: 'data' };
+  const CAMPO_DATA: Record<string, string> = { receitas: 'data', despesas: 'data', consumos: 'data', reservas: 'data', comandas: 'abertaEm', caixas: 'abertoEm' };
   function colecaoDesde(col: string, desde: string | null) {
     const campo = CAMPO_DATA[col];
     if (!campo || !desde || !/^\d{4}-\d{2}-\d{2}$/.test(desde)) return colecao(col);
@@ -1563,7 +1773,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   rota('POST', '/crm/c/:col', async ({ p, b }) => {
     const ctx = await requireUsuario();
     requireColecao(ctx, p.col, 'criar');
-    if (['consumos', 'resgates'].includes(p.col)) fail(400, 'Use o fluxo próprio deste módulo.');
+    if (['consumos', 'resgates', 'caixas', 'comandas'].includes(p.col)) fail(400, 'Use o fluxo próprio deste módulo.');
     const t = now();
     const { resto, novos } = separarAnexos(b);
     conferirAnexos(p.col, novos.length, novos);
@@ -1613,6 +1823,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       patch.sistema = false;
     }
     if (p.col === 'consumos') fail(400, 'Consumos não podem ser editados. Exclua e lance novamente.');
+    if (['caixas', 'comandas'].includes(p.col)) fail(400, 'Use o fluxo próprio deste módulo.');
     // os itens de uma nota já foram somados ao estoque: para corrigir, exclua a nota (estorna) e lance de novo
     if (p.col === 'compras') { delete patch.itens; delete patch.valor; }
     if (p.col === 'receitas' && cur.consumoId) fail(400, 'Receitas geradas por consumo são alteradas pelo lançamento de consumo.');
@@ -1667,6 +1878,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     }
     if (p.col === 'receitas' && cur.consumoId) fail(400, 'Esta receita veio de um consumo. Exclua o consumo para estorná-la.');
     if (p.col === 'resgates') fail(400, 'Resgates não são excluídos. Altere o status para Cancelado.');
+    if (p.col === 'caixas') fail(400, 'Caixas não são excluídos: o histórico de aberturas e fechamentos fica guardado.');
+    if (p.col === 'comandas' && cur.status === 'Fechada') fail(400, 'Comandas fechadas não são excluídas. Estorne a venda em Lançar consumo ou em Receitas.');
     if (p.col === 'consumos' && cur.clienteUid) {
       // o estorno não pode deixar o saldo negativo: pontos já trocados por vouchers não voltam sozinhos
       const s = await saldoDe(cur.clienteUid);
@@ -1676,6 +1889,10 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       }
     }
     const lote = writeBatch(db);
+    // a venda estornada sai também do caixa, se ele ainda estiver aberto
+    if (['consumos', 'receitas'].includes(p.col) && cur.caixaId && (await getDoc(doc(db, 'caixas', String(cur.caixaId)))).data()?.status === 'Aberto') {
+      somarNoCaixa(lote, String(cur.caixaId), String(cur.formaPagamento), -(Number(cur.valor) || 0), -1);
+    }
     if (p.col === 'consumos') {
       // excluir o lançamento estorna a receita e os pontos
       if (cur.receitaId) lote.delete(doc(db, 'receitas', cur.receitaId));

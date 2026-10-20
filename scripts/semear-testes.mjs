@@ -68,5 +68,10 @@ await gravar(`clientes/${cliente}`, { numero: 2, nome: 'Cliente Teste', email: '
 await gravar(`saldos/${cliente}`, { acumulados: 0, usados: 0 });
 // CPF já usado por outro afilhado (o registro de CPF é único)
 await gravar('cpfs/52998224725', { uid: 'outro-afilhado' });
+// caixa, comandas e mesas
+await gravar('caixas/aberto', { nome: 'Caixa de teste', status: 'Aberto', abertoEm: agora, valorInicial: 100, vendas: {}, totalVendas: 0, qtdVendas: 0, movimentos: [] });
+await gravar('caixas/fechado', { nome: 'Caixa antigo', status: 'Fechado', abertoEm: agora, valorInicial: 0, vendas: {}, totalVendas: 0, qtdVendas: 0, movimentos: [] });
+await gravar('comandas/da-cliente', { numero: 1, nome: 'Cliente Teste', clienteUid: cliente, mesa: 3, itens: [], total: 0, status: 'Aberta', abertaEm: agora });
+await gravar('comandas/de-outro', { numero: 2, nome: 'Outro', clienteUid: 'outro-afilhado', mesa: 4, itens: [], total: 0, status: 'Aberta', abertaEm: agora });
 await gravar('recompensas/chopp', { nome: 'Chopp grátis', descricao: '', custo: 50, status: 'Ativa', criadoEm: agora });
 console.log('Dados de teste criados nos emuladores.');
