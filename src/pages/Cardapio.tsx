@@ -7,7 +7,7 @@ import { ItemFoto } from '../components/ItemIcon';
 import { useStore, type Produto } from '../store';
 
 export default function Cardapio() {
-  const { cardapio, config } = useStore();
+  const { cardapio } = useStore();
   const hasHighlights = cardapio.some((i) => i.destaque);
   const categories = useMemo(() => sortCategories([...new Set(cardapio.map((i) => i.categoria).filter(Boolean))]), [cardapio]);
   const tabs = hasHighlights ? ['Destaques', ...categories] : categories;
@@ -17,7 +17,6 @@ export default function Cardapio() {
   const [q, setQ] = useState('');
   const [aberto, setAberto] = useState<Produto | null>(null);
   const active = cat && tabs.includes(cat) ? cat : tabs[0];
-  const pontosPorReal = config?.pontosPorReal ?? 1;
 
   const term = q.trim().toLowerCase();
   const items = cardapio.filter((i) =>
@@ -26,8 +25,7 @@ export default function Cardapio() {
       : active === 'Destaques' ? i.destaque : i.categoria === active,
   );
 
-  const regra =
-    pontosPorReal === 1 ? 'Cada R$ 1 consumido vale 1 ponto' : `Cada R$ 1 consumido vale ${pontosPorReal.toLocaleString('pt-BR')} pontos`;
+  const regra = 'Cada item consumido rende pontos para você';
 
   if (!cardapio.length) {
     return (
@@ -71,13 +69,13 @@ export default function Cardapio() {
               </div>
               <div className="hist-row__value">
                 <strong>{brl(i.preco)}</strong>
-                <span className="gold small">+{Math.floor(i.preco * pontosPorReal)} pts</span>
+                <span className="gold small">+{i.pontos.toLocaleString('pt-BR')} pts</span>
               </div>
             </button>
           ))}
         </div>
       )}
-      {aberto && <ProdutoSheet p={aberto} pontos={Math.floor(aberto.preco * pontosPorReal)} onClose={() => setAberto(null)} />}
+      {aberto && <ProdutoSheet p={aberto} pontos={aberto.pontos} onClose={() => setAberto(null)} />}
     </div>
   );
 }

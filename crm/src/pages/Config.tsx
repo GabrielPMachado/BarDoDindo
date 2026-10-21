@@ -487,8 +487,9 @@ export function Parametros() {
 
         <section className="panel pad-lg">
           <h2 className="panel-title">Programa de fidelidade</h2>
-          <label className="field-label" htmlFor="p-ppr">Pontos por R$ 1,00 consumido</label>
-          <NumberInput id="p-ppr" spec={{ decimals: 2, min: 0, max: 100 }} suffix="pontos" value={cfg.pontosPorReal} onChange={(v) => setCfg({ ...cfg, pontosPorReal: Number(v || 0) })} />
+          <label className="field-label" htmlFor="p-ppi">Pontos por item vendido (padrão)</label>
+          <NumberInput id="p-ppi" spec={{ decimals: 0, min: 0, max: 10_000 }} suffix="pontos" value={cfg.pontosPorItem} onChange={(v) => setCfg({ ...cfg, pontosPorItem: Number(v || 0) })} />
+          <p className="muted small">Cada unidade vendida dá estes pontos ao afilhado. Para dar mais (ou menos) em um produto, preencha "Pontos por unidade" no cadastro dele.</p>
         </section>
 
         <Numeracao podeAjustar={canEdit} podeApagar={canEdit && pode('clientes', 'excluir') && pode('consumos', 'excluir')} />

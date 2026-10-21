@@ -546,6 +546,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'categoria', label: 'Categoria', type: 'select', options: ['Cervejas', 'Chopes', 'Drinks', 'Destilados', 'Vinhos', 'Petiscos', 'Porções', 'Pratos', 'Sobremesas', 'Sem álcool'], required: true },
       { key: 'preco', label: 'Preço de venda', type: 'money', required: true, min: 0.01, max: 100_000 },
       { key: 'custo', label: 'Custo', type: 'money', max: 100_000 },
+      { key: 'pontos', label: 'Pontos por unidade', type: 'number', max: 10_000, placeholder: 'Vazio = padrão de Parâmetros' },
       { key: 'noCardapio', label: 'No cardápio do app', type: 'select', options: ['Sim', 'Não'], default: 'Sim' },
       { key: 'destaque', label: 'Destaque', type: 'select', options: ['Não', 'Sim'], default: 'Não' },
       { key: 'status', label: 'Status', type: 'select', options: ['Ativo', 'Sazonal', 'Inativo'], default: 'Ativo' },

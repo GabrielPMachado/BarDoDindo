@@ -171,10 +171,9 @@ export function Consumo() {
   const canCorrigir = pode('consumos', 'editar');
   const [editando, setEditando] = useState<Row | null>(null);
   const clientes = useResource<Cliente[]>('/crm/clientes');
-  const produtos = useResource<{ id: string; nome: string; categoria: string; preco: number; foto?: string }[]>('/crm/produtos-venda').data ?? [];
+  const produtos = useResource<{ id: string; nome: string; categoria: string; preco: number; pontos: number; foto?: string }[]>('/crm/produtos-venda').data ?? [];
   // a lista mostra os lançamentos recentes: basta o último mês
   const consumos = useCollection('consumos', true, isoFromToday(-30));
-  const cfg = useResource<Config>('/crm/config').data;
   const { caixa } = useCaixa();
 
   // o afilhado é opcional: "Sem cadastro" lança a venda sem pontos (para quem não é afilhado)
@@ -196,11 +195,11 @@ export function Consumo() {
   const produtosFiltrados = produtos.filter((p) => !pq || String(p.nome).toLowerCase().includes(pq)).slice(0, 12);
   const linhas = itens.map((i) => {
     const p = produtos.find((x) => x.id === i.produtoId);
-    return { ...i, nome: String(p?.nome ?? ''), preco: Number(p?.preco) || 0 };
+    return { ...i, nome: String(p?.nome ?? ''), preco: Number(p?.preco) || 0, pontos: Number(p?.pontos) || 0 };
   });
   const total = linhas.reduce((t, l) => t + l.preco * l.quantidade, 0);
   const avulso = tipo === 'avulso';
-  const pontos = avulso ? 0 : Math.floor(total * (cfg?.pontosPorReal ?? 1));
+  const pontos = avulso ? 0 : linhas.reduce((t, l) => t + l.pontos * l.quantidade, 0);
 
   const addItem = (id: string) =>
     setItens((list) => (list.some((i) => i.produtoId === id) ? list.map((i) => (i.produtoId === id ? { ...i, quantidade: Math.min(999, i.quantidade + 1) } : i)) : [...list, { produtoId: id, quantidade: 1 }]));
@@ -363,7 +362,7 @@ export function Consumo() {
         )}
       </section>
       {editando && (
-        <EditarVenda venda={editando} produtos={produtos} pontosPorReal={cfg?.pontosPorReal ?? 1} onClose={() => setEditando(null)}
+        <EditarVenda venda={editando} produtos={produtos} onClose={() => setEditando(null)}
           onSalvo={async () => {
             await Promise.all([consumos.reload(), reload('/crm/clientes'), reload('/crm/c/receitas'), reload('/crm/caixa')]);
             setEditando(null);
@@ -375,22 +374,25 @@ export function Consumo() {
 }
 
 /** Corrige itens e forma de pagamento de uma venda do caixa aberto (receita, pontos e caixa acompanham). */
-function EditarVenda({ venda, produtos, pontosPorReal, onClose, onSalvo }: {
-  venda: Row; produtos: { id: string; nome: string; preco: number }[]; pontosPorReal: number; onClose: () => void; onSalvo: () => Promise<void>;
+function EditarVenda({ venda, produtos, onClose, onSalvo }: {
+  venda: Row; produtos: { id: string; nome: string; preco: number; pontos: number }[]; onClose: () => void; onSalvo: () => Promise<void>;
 }) {
-  const originais = (venda.itens ?? []) as { produtoId: string; nome: string; quantidade: number; preco: number }[];
-  const [itens, setItens] = useState(originais.map((i) => ({ produtoId: i.produtoId, nome: i.nome, quantidade: i.quantidade, preco: i.preco })));
+  const originais = (venda.itens ?? []) as { produtoId: string; nome: string; quantidade: number; preco: number; pontos?: number }[];
+  // os itens que já estavam na venda mantêm os pontos da hora; vendas antigas (sem pontos por item) usam o cadastro atual
+  const pontosDe = (id: string, salvo?: number) => (salvo !== undefined ? Number(salvo) || 0 : Number(produtos.find((p) => p.id === id)?.pontos) || 0);
+  const [itens, setItens] = useState(originais.map((i) => ({ produtoId: i.produtoId, nome: i.nome, quantidade: i.quantidade, preco: i.preco, pontos: i.pontos })));
   const [forma, setForma] = useState(String(venda.formaPagamento ?? 'Pix'));
   const [q, setQ] = useState('');
   const [error, setError] = useState<string | null>(null);
   const t = q.trim().toLowerCase();
   const achados = t ? produtos.filter((p) => String(p.nome).toLowerCase().includes(t)).slice(0, 8) : [];
   const total = itens.reduce((s, i) => s + i.preco * i.quantidade, 0);
+  const pontos = itens.reduce((s, i) => s + pontosDe(i.produtoId, i.pontos) * i.quantidade, 0);
   const comAfilhado = !!venda.clienteUid;
   const setQtd = (id: string, n: number) => setItens((l) => (n <= 0 ? l.filter((i) => i.produtoId !== id) : l.map((i) => (i.produtoId === id ? { ...i, quantidade: Math.min(999, n) } : i))));
-  const add = (p: { id: string; nome: string; preco: number }) => {
+  const add = (p: { id: string; nome: string; preco: number; pontos: number }) => {
     setItens((l) => (l.some((i) => i.produtoId === p.id) ? l.map((i) => (i.produtoId === p.id ? { ...i, quantidade: Math.min(999, i.quantidade + 1) } : i))
-      : [...l, { produtoId: p.id, nome: String(p.nome), quantidade: 1, preco: Number(p.preco) || 0 }]));
+      : [...l, { produtoId: p.id, nome: String(p.nome), quantidade: 1, preco: Number(p.preco) || 0, pontos: Number(p.pontos) || 0 }]));
     setQ('');
   };
   const salvar = async () => {
@@ -434,7 +436,7 @@ function EditarVenda({ venda, produtos, pontosPorReal, onClose, onSalvo }: {
           )}
         </div>
         <div className="comanda__total"><span>Total</span><strong>{brl(total)}</strong></div>
-        <div className="comanda__points">{comAfilhado ? `${num(Math.floor(total * pontosPorReal))} pontos para o cliente (antes ${num(Number(venda.pontos) || 0)})` : 'Sem cadastro: não gera pontos'}</div>
+        <div className="comanda__points">{comAfilhado ? `${num(pontos)} pontos para o cliente (antes ${num(Number(venda.pontos) || 0)})` : 'Sem cadastro: não gera pontos'}</div>
         <label className="field-label" htmlFor="venda-forma">Forma de pagamento</label>
         <SelectPicker id="venda-forma" options={['Pix', 'Crédito', 'Débito', 'Dinheiro', 'Vale-refeição']} value={forma} onChange={setForma} />
         <p className="muted small">Só dá para mudar enquanto o caixa desta venda estiver aberto. A receita, os pontos e o caixa são ajustados juntos.</p>
