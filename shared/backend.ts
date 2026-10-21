@@ -1400,6 +1400,53 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     await lote.commit();
     return consumo;
   });
+  /** Corrige itens e forma de pagamento de uma venda, só enquanto o caixa em que ela entrou estiver aberto:
+   * a receita, os pontos do afilhado, o caixa e a comanda de origem acompanham a diferença. */
+  rota('PATCH', '/crm/consumos/:id', async ({ p, b }) => {
+    const ctx = await requireUsuario();
+    requireAccess(ctx, 'consumos', 'editar');
+    const cur = await registro('consumos', p.id);
+    if (!cur) return fail(404, 'Venda não encontrada.');
+    const caixa = cur.caixaId ? await registro('caixas', String(cur.caixaId)) : null;
+    if (caixa?.status !== 'Aberto') fail(400, 'O caixa desta venda já foi fechado: ela não pode mais ser alterada.');
+    const novos = await itensDaVenda(b.itens);
+    // o que já estava na venda mantém o preço cobrado na hora; só os itens novos entram pelo preço atual
+    const antigos = new Map(((Array.isArray(cur.itens) ? cur.itens : []) as Dados[]).map((i) => [String(i.produtoId), Number(i.preco) || 0]));
+    const itens = novos.itens.map((i) => (antigos.has(i.produtoId) ? { ...i, preco: antigos.get(i.produtoId)!, total: centavos(antigos.get(i.produtoId)! * i.quantidade) } : i));
+    const valor = centavos(itens.reduce((s, i) => s + i.total, 0));
+    const forma = formaDe(b.formaPagamento);
+    const valorAntes = Number(cur.valor) || 0, formaAntes = String(cur.formaPagamento);
+    const pontosAntes = Number(cur.pontos) || 0;
+    const pontos = cur.clienteUid ? Math.floor(valor * (await getConfig()).pontosPorReal) : 0;
+    if (cur.clienteUid && pontos < pontosAntes) {
+      const s = await saldoDe(String(cur.clienteUid));
+      if (s.acumulados - (pontosAntes - pontos) < s.usados) {
+        fail(400, `O cliente já usou parte destes pontos em vouchers (saldo atual: ${s.acumulados - s.usados}, a correção retira ${pontosAntes - pontos}). Cancele os vouchers antes de diminuir a venda.`);
+      }
+    }
+    const t = now();
+    const lote = writeBatch(db);
+    lote.update(doc(db, 'consumos', p.id), { itens, valor, pontos, formaPagamento: forma, atualizadoEm: t });
+    if (cur.receitaId) lote.update(doc(db, 'receitas', String(cur.receitaId)), { valor, formaPagamento: forma, atualizadoEm: t });
+    if (cur.clienteUid && (pontos !== pontosAntes || valor !== valorAntes)) {
+      lote.set(doc(db, 'saldos', String(cur.clienteUid)), { acumulados: increment(pontos - pontosAntes), gasto: increment(centavos(valor - valorAntes)) }, { merge: true });
+    }
+    // no caixa, a venda sai da forma antiga e entra na nova (a quantidade de vendas não muda)
+    if (forma === formaAntes) {
+      if (valor !== valorAntes) somarNoCaixa(lote, String(caixa!.id), forma, centavos(valor - valorAntes), 0);
+    } else {
+      lote.update(doc(db, 'caixas', String(caixa!.id)), {
+        [`vendas.${formaAntes}`]: increment(-valorAntes), [`vendas.${forma}`]: increment(valor), totalVendas: increment(centavos(valor - valorAntes)),
+      });
+    }
+    if (cur.comandaId) lote.update(doc(db, 'comandas', String(cur.comandaId)), { itens, total: valor, formaPagamento: forma, atualizadoEm: t });
+    registrar(lote, ctx, 'consumos', 'alterou a venda de', {
+      colecao: 'consumos', alvo: String(cur.clienteNome ?? 'Cliente sem cadastro'), registroId: p.id,
+      detalhe: `${brl(valorAntes)} · ${formaAntes} → ${brl(valor)} · ${forma}${cur.clienteUid ? ` · ${pontos} pontos` : ''}`,
+    });
+    await lote.commit();
+    return { ...cur, itens, valor, pontos, formaPagamento: forma };
+  });
 
   /** Caixa aberto (ou nenhum) e as formas de pagamento: quem vende precisa saber se o caixa está aberto. */
   rota('GET', '/crm/caixa', async () => {

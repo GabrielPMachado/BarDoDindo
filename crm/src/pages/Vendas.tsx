@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Check, Minus, Plus, QrCode, Receipt, Search, Trash2, UserX, Users, X } from 'lucide-react';
+import { Check, Minus, Pencil, Plus, QrCode, Receipt, Search, Trash2, UserX, Users, X } from 'lucide-react';
 import { COLLECTIONS } from '../collections';
 import { CollectionPage } from '../components/CollectionPage';
 import { AsyncButton, Badge, EmptyState, ErrorBox, KpiRow, Loading, Modal, PageHead, notify } from '../components/ui';
@@ -167,6 +167,9 @@ export function Consumo() {
   // lançar consumo é "Criar"; apagar um lançamento (estorna pontos e receita) é "Excluir"
   const canEdit = pode('consumos', 'criar');
   const canDelete = pode('consumos', 'excluir');
+  // corrigir uma venda só vale enquanto o caixa em que ela entrou estiver aberto
+  const canCorrigir = pode('consumos', 'editar');
+  const [editando, setEditando] = useState<Row | null>(null);
   const clientes = useResource<Cliente[]>('/crm/clientes');
   const produtos = useResource<{ id: string; nome: string; categoria: string; preco: number; foto?: string }[]>('/crm/produtos-venda').data ?? [];
   // a lista mostra os lançamentos recentes: basta o último mês
@@ -338,6 +341,9 @@ export function Consumo() {
                     <td data-label="Valor" className="num">{brl(Number(c.valor))}</td>
                     <td data-label="Pontos" className="num">{num(Number(c.pontos))}</td>
                     <td className="actions-col">
+                      {canCorrigir && caixa && c.caixaId === caixa.id && (
+                        <button type="button" className="icon-btn" onClick={() => setEditando(c)} aria-label="Editar venda"><Pencil size={16} /></button>
+                      )}
                       {canDelete && (
                         <AsyncButton className="icon-btn" confirm={{ title: 'Estornar este consumo?', message: 'Os pontos do cliente e a receita correspondente serão removidos.', confirmLabel: 'Estornar', danger: true }}
                           onClick={async () => {
@@ -356,7 +362,85 @@ export function Consumo() {
           </div>
         )}
       </section>
+      {editando && (
+        <EditarVenda venda={editando} produtos={produtos} pontosPorReal={cfg?.pontosPorReal ?? 1} onClose={() => setEditando(null)}
+          onSalvo={async () => {
+            await Promise.all([consumos.reload(), reload('/crm/clientes'), reload('/crm/c/receitas'), reload('/crm/caixa')]);
+            setEditando(null);
+            notify('Venda atualizada.');
+          }} />
+      )}
     </div>
+  );
+}
+
+/** Corrige itens e forma de pagamento de uma venda do caixa aberto (receita, pontos e caixa acompanham). */
+function EditarVenda({ venda, produtos, pontosPorReal, onClose, onSalvo }: {
+  venda: Row; produtos: { id: string; nome: string; preco: number }[]; pontosPorReal: number; onClose: () => void; onSalvo: () => Promise<void>;
+}) {
+  const originais = (venda.itens ?? []) as { produtoId: string; nome: string; quantidade: number; preco: number }[];
+  const [itens, setItens] = useState(originais.map((i) => ({ produtoId: i.produtoId, nome: i.nome, quantidade: i.quantidade, preco: i.preco })));
+  const [forma, setForma] = useState(String(venda.formaPagamento ?? 'Pix'));
+  const [q, setQ] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const t = q.trim().toLowerCase();
+  const achados = t ? produtos.filter((p) => String(p.nome).toLowerCase().includes(t)).slice(0, 8) : [];
+  const total = itens.reduce((s, i) => s + i.preco * i.quantidade, 0);
+  const comAfilhado = !!venda.clienteUid;
+  const setQtd = (id: string, n: number) => setItens((l) => (n <= 0 ? l.filter((i) => i.produtoId !== id) : l.map((i) => (i.produtoId === id ? { ...i, quantidade: Math.min(999, n) } : i))));
+  const add = (p: { id: string; nome: string; preco: number }) => {
+    setItens((l) => (l.some((i) => i.produtoId === p.id) ? l.map((i) => (i.produtoId === p.id ? { ...i, quantidade: Math.min(999, i.quantidade + 1) } : i))
+      : [...l, { produtoId: p.id, nome: String(p.nome), quantidade: 1, preco: Number(p.preco) || 0 }]));
+    setQ('');
+  };
+  const salvar = async () => {
+    setError(null);
+    try {
+      await api(`/crm/consumos/${venda.id}`, { method: 'PATCH', body: { itens: itens.map((i) => ({ produtoId: i.produtoId, quantidade: i.quantidade })), formaPagamento: forma } });
+      await onSalvo();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível salvar.');
+    }
+  };
+  return (
+    <Modal title={`Editar venda · ${String(venda.clienteNome ?? 'Cliente sem cadastro')}`} width={560} onClose={onClose}
+      footer={<>
+        <button type="button" className="btn btn--ghost" onClick={onClose}>Cancelar</button>
+        <AsyncButton className="btn btn--primary" onClick={salvar} disabled={!itens.length}>Salvar</AsyncButton>
+      </>}>
+      <div className="comanda venda-edit">
+        <ul className="comanda__list">
+          {itens.map((l) => (
+            <li key={l.produtoId}>
+              <span className="comanda__name">{l.nome}</span>
+              <div className="qty">
+                <button type="button" className="icon-btn" onClick={() => setQtd(l.produtoId, l.quantidade - 1)} aria-label={`Diminuir ${l.nome}`}><Minus size={14} /></button>
+                <span>{l.quantidade}</span>
+                <button type="button" className="icon-btn" onClick={() => setQtd(l.produtoId, l.quantidade + 1)} aria-label={`Aumentar ${l.nome}`}><Plus size={14} /></button>
+              </div>
+              <strong>{brl(l.preco * l.quantidade)}</strong>
+            </li>
+          ))}
+        </ul>
+        {!itens.length && <p className="muted small">A venda precisa de ao menos um item. Para cancelar a venda inteira, use o estorno.</p>}
+        <div className="autocomplete">
+          <label className="search"><Search size={16} />
+            <input placeholder="Adicionar produto" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Adicionar produto" />
+          </label>
+          {achados.length > 0 && (
+            <ul className="autocomplete__list">
+              {achados.map((p) => <li key={p.id}><button type="button" onClick={() => add(p)}>{String(p.nome)} <span className="muted small">{brl(Number(p.preco) || 0)}</span></button></li>)}
+            </ul>
+          )}
+        </div>
+        <div className="comanda__total"><span>Total</span><strong>{brl(total)}</strong></div>
+        <div className="comanda__points">{comAfilhado ? `${num(Math.floor(total * pontosPorReal))} pontos para o cliente (antes ${num(Number(venda.pontos) || 0)})` : 'Sem cadastro: não gera pontos'}</div>
+        <label className="field-label" htmlFor="venda-forma">Forma de pagamento</label>
+        <SelectPicker id="venda-forma" options={['Pix', 'Crédito', 'Débito', 'Dinheiro', 'Vale-refeição']} value={forma} onChange={setForma} />
+        <p className="muted small">Só dá para mudar enquanto o caixa desta venda estiver aberto. A receita, os pontos e o caixa são ajustados juntos.</p>
+        {error && <ErrorBox>{error}</ErrorBox>}
+      </div>
+    </Modal>
   );
 }
 
