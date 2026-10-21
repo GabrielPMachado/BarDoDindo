@@ -7,8 +7,9 @@ interface Config {
   ambientes: string[];
   diasFuncionamento: number[];
   antecedenciaMinutos: number;
-  /** Pontos de cada item quando o produto não tem pontos próprios. */
-  pontosPorItem: number;
+  /** Tabela de pontos por preço (o cardápio já chega com os pontos de cada produto). */
+  faixasPontos: { ate: number; pontos: number }[];
+  pontosAcima: number;
   niveis: { nome: string; minimo: number }[];
   /** Questionário opcional depois do cadastro (perguntas definidas no Cérebro). */
   questionario?: { ativo: boolean; titulo: string; perguntas: { id: string; texto: string; opcoes: string[] }[] };

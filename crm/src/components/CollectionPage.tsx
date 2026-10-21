@@ -624,7 +624,10 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
               {f.type === 'ref' ? (
                 <RefPicker id={`f-${f.key}`} field={f} value={data[f.key]} linkedId={data[f.refKey!]} disabled={!canEdit} onChange={(patch) => setData((d) => ({ ...d, ...patch }))} />
               ) : (
-                <FieldInput field={f} value={data[f.key]} disabled={!canEdit} onChange={(v) => setData((d) => ({ ...d, [f.key]: v }))} />
+                // campo travado pela caixinha: fica vazio (o valor guardado não vale enquanto ela estiver desmarcada)
+                f.ativadoPor && data[f.ativadoPor] !== 'Sim'
+                  ? <FieldInput field={f} value="" disabled onChange={() => undefined} />
+                  : <FieldInput field={f} value={data[f.key]} disabled={!canEdit} onChange={(v) => setData((d) => ({ ...d, [f.key]: v }))} />
               )}
             </div>
           </Fragment>

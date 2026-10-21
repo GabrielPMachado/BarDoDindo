@@ -3,7 +3,7 @@ import { brl, daysUntil, isoToday, num, pct } from './lib/format';
 import { calcularFicha, fichaDe, precoNormalizado } from './lib/ficha';
 import { locaisDe, resumoLocais } from './lib/locais';
 
-export type FieldType = 'text' | 'textarea' | 'number' | 'money' | 'date' | 'select' | 'email' | 'phone' | 'percent' | 'cnpj' | 'time' | 'ref' | 'url';
+export type FieldType = 'text' | 'textarea' | 'number' | 'money' | 'date' | 'select' | 'email' | 'phone' | 'percent' | 'cnpj' | 'time' | 'ref' | 'url' | 'check';
 
 /** Listas que podem ser vinculadas (servidas por /api/crm/referencias/:tipo). */
 export type RefSource = 'pessoas' | 'colaboradores' | 'fornecedores' | 'clientes' | 'insumos' | 'copos' | 'utensilios' | 'materiais';
@@ -34,6 +34,8 @@ export interface Field {
   acao?: 'comprar' | 'site';
   /** Ao escolher um item, copia outros dados dele (campo do registro → campo do item). */
   fill?: Record<string, string>;
+  /** Só fica editável com a caixinha (campo "check") desta chave marcada. */
+  ativadoPor?: string;
 }
 
 /** Limites efetivos de um campo numérico, com padrões seguros por tipo. */
@@ -546,7 +548,8 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'categoria', label: 'Categoria', type: 'select', options: ['Cervejas', 'Chopes', 'Drinks', 'Destilados', 'Vinhos', 'Petiscos', 'Porções', 'Pratos', 'Sobremesas', 'Sem álcool'], required: true },
       { key: 'preco', label: 'Preço de venda', type: 'money', required: true, min: 0.01, max: 100_000 },
       { key: 'custo', label: 'Custo', type: 'money', max: 100_000 },
-      { key: 'pontos', label: 'Pontos por unidade', type: 'number', max: 10_000, placeholder: 'Vazio = padrão de Parâmetros' },
+      { key: 'pontuacaoPersonalizada', label: 'Pontuação personalizada', type: 'check', formOnly: true, placeholder: 'Definir os pontos deste produto (senão, vale a tabela de Parâmetros pelo preço)' },
+      { key: 'pontos', label: 'Pontos por unidade', type: 'number', max: 100_000, formOnly: true, ativadoPor: 'pontuacaoPersonalizada', placeholder: 'Pela tabela de Parâmetros' },
       { key: 'noCardapio', label: 'No cardápio do app', type: 'select', options: ['Sim', 'Não'], default: 'Sim' },
       { key: 'destaque', label: 'Destaque', type: 'select', options: ['Não', 'Sim'], default: 'Não' },
       { key: 'status', label: 'Status', type: 'select', options: ['Ativo', 'Sazonal', 'Inativo'], default: 'Ativo' },

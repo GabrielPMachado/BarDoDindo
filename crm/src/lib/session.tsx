@@ -31,7 +31,8 @@ export interface Usuario {
 
 export interface Config {
   nomeEstabelecimento: string;
-  pontosPorItem: number;
+  faixasPontos: { ate: number; pontos: number }[];
+  pontosAcima: number;
   horarios: string[];
   ambientes: string[];
   diasFuncionamento: number[];
