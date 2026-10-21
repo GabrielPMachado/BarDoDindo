@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  ArrowDownCircle, ArrowUpCircle, Ban, Check, LayoutGrid, List, LockOpen, Lock, Map as MapIcon, Minus, Move, Pencil, Plus, Receipt, Search, Sparkles, Store, Trash2, Users, Wallet,
+  ArrowDownCircle, ArrowUpCircle, Ban, Check, LayoutGrid, List, LockOpen, Lock, Map as MapIcon, Minus, Move, Pencil, Plus, Receipt, LocateFixed, Search, Sparkles, Store, Trash2, ZoomIn, ZoomOut, Users, Wallet,
 } from 'lucide-react';
 import { AsyncButton, Badge, EmptyState, ErrorBox, KpiRow, Loading, Modal, NumberInput, PageHead, notify } from '../components/ui';
 import { SelectPicker, confirmar } from '../components/pickers';
@@ -805,7 +805,7 @@ export function MesasPage() {
             </table>
           </div>
         )}
-        {editando && visao === 'mapa' && <p className="muted small pad">Arraste as mesas para a posição real do salão. Clique numa mesa para mudar número, lugares, formato ou ambiente.</p>}
+        {editando && visao === 'mapa' && <p className="muted small pad">Arraste as mesas para a posição real do salão; arrastando o fundo você anda pelo mapa. Clique numa mesa para mudar número, lugares, formato ou ambiente.</p>}
       </div>
       {gerar && <GerarMesas ambientes={ambientes} inicio={(mesas.at(-1)?.numero ?? 0) + 1} onClose={() => setGerar(false)} onPronto={() => { setGerar(false); col.reload(); setEditando(true); }} />}
       {form && <FormMesa mesa={form} ambientes={ambientes} usados={mesas.filter((m) => m.id !== form.id).map((m) => m.numero)} onClose={() => setForm(null)}
@@ -857,10 +857,48 @@ function MapaSalao({ mesas, editando, situacao, onMover, onClicar }: {
     const r = area.current!.getBoundingClientRect();
     return { x: Math.min(96, Math.max(2, ((e.clientX - r.left) / r.width) * 100)), y: Math.min(94, Math.max(3, ((e.clientY - r.top) / r.height) * 100)) };
   };
-  // no celular o mapa rola de lado: abre centralizado na porta do bar
+
+  // andar pelo mapa: arrastar o fundo (ou rolar com o dedo) e aproximar com + / − ou Ctrl + roda do mouse
+  const rolagem = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(1);
+  const [andando, setAndando] = useState<{ x: number; y: number; l: number; t: number } | null>(null);
+  const centro = useRef<{ cx: number; cy: number } | null>(null);
+  const mudarZoom = (f: (z: number) => number) => {
+    const el = rolagem.current;
+    if (el) centro.current = { cx: (el.scrollLeft + el.clientWidth / 2) / el.scrollWidth, cy: (el.scrollTop + el.clientHeight / 2) / el.scrollHeight };
+    setZoom((z) => Math.min(3, Math.max(1, Math.round(f(z) * 4) / 4)));
+  };
+  const irParaBar = (suave: boolean) => {
+    const el = rolagem.current;
+    if (el) el.scrollTo({ left: el.scrollWidth * 0.6 - el.clientWidth / 2, top: 0, behavior: suave ? 'smooth' : 'auto' });
+  };
+  useLayoutEffect(() => {
+    const el = rolagem.current, c = centro.current;
+    if (!el || !c) return;
+    el.scrollLeft = c.cx * el.scrollWidth - el.clientWidth / 2;
+    el.scrollTop = c.cy * el.scrollHeight - el.clientHeight / 2;
+    centro.current = null;
+  }, [zoom]);
+  useEffect(() => {
+    irParaBar(false); // no celular o mapa é mais largo que a tela: abre na porta do bar
+    const el = rolagem.current;
+    if (!el) return;
+    const roda = (e: WheelEvent) => { if (!e.ctrlKey) return; e.preventDefault(); mudarZoom((z) => z + (e.deltaY < 0 ? 0.25 : -0.25)); };
+    el.addEventListener('wheel', roda, { passive: false });
+    return () => el.removeEventListener('wheel', roda);
+  }, []);
+
   return (
-    <div className="mapa-rolagem" ref={(el) => { if (el && !el.dataset.rolou) { el.dataset.rolou = '1'; el.scrollLeft = el.scrollWidth * 0.6 - el.clientWidth / 2; } }}>
-    <div className={`mapa-salao ${editando ? 'is-editando' : ''}`} ref={area}>
+    <div className="mapa-vista">
+    <div className={`mapa-rolagem ${andando ? 'is-andando' : ''}`} ref={rolagem}
+      onPointerDown={(e) => {
+        if (e.pointerType !== 'mouse' || (e.target as HTMLElement).closest('.mesa')) return;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        setAndando({ x: e.clientX, y: e.clientY, l: e.currentTarget.scrollLeft, t: e.currentTarget.scrollTop });
+      }}
+      onPointerMove={(e) => { if (andando) { e.currentTarget.scrollLeft = andando.l - (e.clientX - andando.x); e.currentTarget.scrollTop = andando.t - (e.clientY - andando.y); } }}
+      onPointerUp={() => setAndando(null)} onPointerCancel={() => setAndando(null)}>
+    <div className={`mapa-salao ${editando ? 'is-editando' : ''}`} ref={area} style={{ '--zoom': zoom } as CSSProperties}>
       <PlantaBoulevard />
       {mesas.map((m) => {
         const p = posicao(m);
@@ -885,6 +923,13 @@ function MapaSalao({ mesas, editando, situacao, onMover, onClicar }: {
           </button>
         );
       })}
+    </div>
+    </div>
+    <div className="mapa-zoom">
+      <button type="button" className="mapa-zoom__btn" onClick={() => mudarZoom((z) => z - 0.5)} disabled={zoom <= 1} aria-label="Afastar" title="Afastar"><ZoomOut size={18} /></button>
+      <span className="mapa-zoom__valor">{Math.round(zoom * 100)}%</span>
+      <button type="button" className="mapa-zoom__btn" onClick={() => mudarZoom((z) => z + 0.5)} disabled={zoom >= 3} aria-label="Aproximar" title="Aproximar"><ZoomIn size={18} /></button>
+      <button type="button" className="mapa-zoom__btn" onClick={() => irParaBar(true)} aria-label="Ir para o bar" title="Ir para o bar"><LocateFixed size={18} /></button>
     </div>
     </div>
   );
