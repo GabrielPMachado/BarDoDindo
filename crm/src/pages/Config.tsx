@@ -561,6 +561,7 @@ function Numeracao({ podeAjustar, podeApagar }: { podeAjustar: boolean; podeApag
     <section className="panel pad-lg">
       <h2 className="panel-title">Numeração dos afilhados</h2>
       <p className="muted small">O próximo cadastro recebe o número <strong>#{String(proximo).padStart(3, '0')}</strong>. Depois de excluir afilhados (por exemplo, cadastros de teste), ajuste para a numeração voltar a seguir o maior número em uso.</p>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
       {podeAjustar && (
         <AsyncButton className="btn btn--ghost" onClick={ajustar} confirm={{ title: 'Ajustar a numeração?', message: 'O próximo afilhado receberá o número seguinte ao maior número em uso.', confirmLabel: 'Ajustar' }}>Ajustar numeração</AsyncButton>
       )}
@@ -571,6 +572,7 @@ function Numeracao({ podeAjustar, podeApagar }: { podeAjustar: boolean; podeApag
           confirmLabel: 'Apagar tudo', danger: true,
         }}><Trash2 size={16} /> Apagar todos os afilhados</AsyncButton>
       )}
+      </div>
     </section>
   );
 }
