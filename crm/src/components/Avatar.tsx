@@ -9,7 +9,7 @@ export function Avatar({ nome, foto, className }: { nome: string; foto?: string 
  * Reduz a imagem (JPEG) antes de salvar. `quadrado`: recorta no centro (foto de perfil);
  * sem recorte, o lado maior fica com `lado` px e a proporção é mantida (fotos de produtos, materiais…).
  */
-export function reduzirFoto(arquivo: File, lado = 256, quadrado = true): Promise<string> {
+export function reduzirFoto(arquivo: File, lado = 512, quadrado = true): Promise<string> {
   return new Promise((resolve, reject) => {
     if (!arquivo.type.startsWith('image/')) return reject(new Error('Escolha um arquivo de imagem.'));
     const url = URL.createObjectURL(arquivo);
