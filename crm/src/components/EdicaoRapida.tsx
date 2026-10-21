@@ -3,6 +3,7 @@ import { numberSpec, type CollectionDef, type Field } from '../collections';
 import type { Row } from '../lib/data';
 import { camposDosLocais, locaisDe, type Locais } from '../lib/locais';
 import { NumberInput, notify } from './ui';
+import { listaDe, SelectComOutro } from './OpcaoOutro';
 
 const TIPOS = ['number', 'money', 'percent', 'select', 'date'];
 /** Coleções em que a tabela não altera nada direto (o servidor recalcula ou não permite editar). */
@@ -97,11 +98,9 @@ export function CelulaRapida({ def, field, row, children, onSalvar }: {
           ))}
         </div>
       ) : field.type === 'select' ? (
-        <select className="input input--sm" aria-label={field.label} value={String(valor ?? '')}
-          onChange={(e) => { setValor(e.target.value); void salvar(e.target.value); }}>
-          {!field.required && <option value="">—</option>}
-          {[...new Set([...(valor && !field.options?.includes(String(valor)) ? [String(valor)] : []), ...(field.options ?? [])])].map((o) => <option key={o}>{o}</option>)}
-        </select>
+        <SelectComOutro className="input input--sm" aria-label={field.label} value={String(valor ?? '')} options={field.options ?? []}
+          lista={listaDe(def.id, field.key)} rotulo={field.label} vazio={field.required ? undefined : '—'}
+          onChange={setValor} onEscolha={(v) => void salvar(v)} />
       ) : field.type === 'date' ? (
         <input type="date" className="input input--sm" aria-label={field.label} value={String(valor ?? '')} onChange={(e) => setValor(e.target.value)} />
       ) : (

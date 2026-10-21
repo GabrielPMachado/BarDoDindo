@@ -10,6 +10,7 @@ import {
 } from '../lib/ficha';
 import { imprimirFicha } from '../lib/fichaPdf';
 import { useSession } from '../lib/session';
+import { listaDe, SelectComOutro } from './OpcaoOutro';
 import { PreparoFicha } from './PreparoFicha';
 import { RefPicker } from './pickers';
 import { NumberInput, notify } from './ui';
@@ -387,9 +388,8 @@ function NovoInsumo({ nome, unidade, custo, onCancelar, onCriado }: {
       <strong className="small">Novo item no Estoque</strong>
       <div className="ficha__novo-campos">
         <input className="input" aria-label="Nome do insumo" maxLength={120} value={item} onChange={(e) => setItem(e.target.value)} />
-        <select className="input" aria-label="Categoria" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
-          {['Bebidas', 'Alimentos', 'Descartáveis', 'Limpeza', 'Outros'].map((c) => <option key={c}>{c}</option>)}
-        </select>
+        <SelectComOutro aria-label="Categoria" lista={listaDe('estoque', 'categoria')} rotulo="Categoria" value={categoria} onChange={setCategoria}
+          options={['Bebidas', 'Alimentos', 'Descartáveis', 'Limpeza', 'Outros']} />
         <select className="input" aria-label="Unidade de compra" value={un} onChange={(e) => setUn(e.target.value)}>
           {unidadesEstoque.map((u) => <option key={u}>{u}</option>)}
         </select>

@@ -6,6 +6,7 @@ import type { Row } from '../lib/data';
 import { monthOf } from '../lib/finance';
 import { brl, isoToday, monthLabel } from '../lib/format';
 import { checkRange, FieldInput, Modal, notify } from './ui';
+import { listaDe } from './OpcaoOutro';
 
 /** Campos da despesa pedidos na tela (os mesmos do cadastro em Financeiro → Despesas, sem o status: nasce "A pagar"). */
 const CAMPOS = ['descricao', 'categoria', 'data', 'vencimento', 'valor', 'observacoes'];
@@ -96,7 +97,7 @@ export function LancarDespesa({ def, row, sugestao, onClose, onDone }: LancarDes
         {campos.map((f) => (
           <div key={f.key} className={`form-field ${f.wide || f.type === 'textarea' ? 'form-field--wide' : ''}`}>
             <label htmlFor={`f-${f.key}`}>{f.label}{f.required && <span className="req"> *</span>}</label>
-            <FieldInput field={f} value={dados[f.key]} onChange={(v) => setDados((d) => ({ ...d, [f.key]: v }))} />
+            <FieldInput field={f} value={dados[f.key]} lista={listaDe('despesas', f.key)} onChange={(v) => setDados((d) => ({ ...d, [f.key]: v }))} />
           </div>
         ))}
         {erro && <p className="error form-field--wide" role="alert">{erro}</p>}
