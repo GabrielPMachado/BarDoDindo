@@ -75,6 +75,13 @@ export function FieldInput({ field, value, onChange, disabled }: {
   const v = value === undefined || value === null ? '' : String(value);
   const common = { id: `f-${field.key}`, className: 'input', disabled, required: field.required, placeholder: field.placeholder };
   switch (field.type) {
+    case 'check':
+      return (
+        <label className="check-row">
+          <input id={common.id} type="checkbox" disabled={disabled} checked={v === 'Sim'} onChange={(e) => onChange(e.target.checked ? 'Sim' : 'Não')} />
+          {field.placeholder ?? 'Sim'}
+        </label>
+      );
     case 'textarea':
       return <textarea {...common} rows={3} value={v} onChange={(e) => onChange(e.target.value)} />;
     case 'select':
@@ -89,6 +96,7 @@ export function FieldInput({ field, value, onChange, disabled }: {
           required={field.required}
           spec={numberSpec(field)}
           value={value}
+          placeholder={field.placeholder}
           onChange={onChange}
           prefix={field.type === 'money' ? 'R$' : undefined}
           suffix={field.type === 'percent' ? '%' : undefined}

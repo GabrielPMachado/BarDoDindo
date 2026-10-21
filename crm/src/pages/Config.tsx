@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ArrowDownWideNarrow, ChevronDown, ChevronUp, ExternalLink, Lock, Pencil, Plus, Save, Sparkles, Trash2 } from 'lucide-react';
+import { brl } from '../lib/format';
 import { CARGOS_SUGERIDOS, GRUPOS_DE_PERMISSAO, MODULOS, NIVEIS, poderDe, acoesDe, acoesNaArea, nivelDe, type Acao, type Modulo } from '../modules';
 import { AsyncButton, Badge, EmptyState, ErrorBox, Loading, Modal, NumberInput, PageHead, notify } from '../components/ui';
 import { api } from '../lib/api';
@@ -487,9 +488,24 @@ export function Parametros() {
 
         <section className="panel pad-lg">
           <h2 className="panel-title">Programa de fidelidade</h2>
-          <label className="field-label" htmlFor="p-ppi">Pontos por item vendido (padrão)</label>
-          <NumberInput id="p-ppi" spec={{ decimals: 0, min: 0, max: 10_000 }} suffix="pontos" value={cfg.pontosPorItem} onChange={(v) => setCfg({ ...cfg, pontosPorItem: Number(v || 0) })} />
-          <p className="muted small">Cada unidade vendida dá estes pontos ao afilhado. Para dar mais (ou menos) em um produto, preencha "Pontos por unidade" no cadastro dele.</p>
+          <p className="muted small">Pontos que cada unidade vendida dá ao afilhado, pelo preço do produto. Para mudar um produto específico, marque "Pontuação personalizada" no cadastro dele.</p>
+          {cfg.faixasPontos.map((f, i) => (
+            <div className="inline-fields" key={i}>
+              <NumberInput spec={{ money: true, decimals: 2, min: 0.01, max: 100_000 }} prefix="até R$" value={f.ate} ariaLabel="Preço limite da faixa"
+                onChange={(v) => setCfg({ ...cfg, faixasPontos: cfg.faixasPontos.map((x, j) => (j === i ? { ...x, ate: Number(v || 0) } : x)) })} />
+              <NumberInput spec={{ decimals: 0, min: 0, max: 100_000 }} suffix="pontos" value={f.pontos} ariaLabel="Pontos da faixa"
+                onChange={(v) => setCfg({ ...cfg, faixasPontos: cfg.faixasPontos.map((x, j) => (j === i ? { ...x, pontos: Number(v || 0) } : x)) })} />
+              <button type="button" className="icon-btn" aria-label="Remover faixa" title="Remover faixa"
+                onClick={() => setCfg({ ...cfg, faixasPontos: cfg.faixasPontos.filter((_, j) => j !== i) })}><Trash2 size={16} /></button>
+            </div>
+          ))}
+          <button type="button" className="btn btn--ghost btn--sm" disabled={cfg.faixasPontos.length >= 20}
+            onClick={() => {
+              const ultima = cfg.faixasPontos[cfg.faixasPontos.length - 1];
+              setCfg({ ...cfg, faixasPontos: [...cfg.faixasPontos, { ate: (ultima?.ate ?? 0) + 10, pontos: (ultima?.pontos ?? 0) + 5 }] });
+            }}><Plus size={14} /> Adicionar faixa</button>
+          <label className="field-label" htmlFor="p-acima">Acima de {brl(Math.max(0, ...cfg.faixasPontos.map((f) => f.ate)))}</label>
+          <NumberInput id="p-acima" spec={{ decimals: 0, min: 0, max: 100_000 }} suffix="pontos" value={cfg.pontosAcima} onChange={(v) => setCfg({ ...cfg, pontosAcima: Number(v || 0) })} />
         </section>
 
         <Numeracao podeAjustar={canEdit} podeApagar={canEdit && pode('clientes', 'excluir') && pode('consumos', 'excluir')} />

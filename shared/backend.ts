@@ -155,10 +155,20 @@ function dataValida(v: string) {
   return !Number.isNaN(t) && new Date(t).toISOString().startsWith(v);
 }
 
-/** Pontos que cada unidade do produto dá ao afilhado: os do cadastro do produto ou, em branco, o padrão de Parâmetros. */
-function pontosDoProduto(p: Dados, padrao: number) {
+type TabelaPontos = { faixasPontos: { ate: number; pontos: number }[]; pontosAcima: number };
+/** Pontos pela tabela de Parâmetros: a primeira faixa cujo limite cobre o preço; acima da última, `pontosAcima`. */
+function pontosPelaTabela(preco: number, t: TabelaPontos) {
+  const faixa = [...(t.faixasPontos ?? [])].sort((a, b) => a.ate - b.ate).find((f) => preco <= f.ate);
+  return Math.floor(Number(faixa ? faixa.pontos : t.pontosAcima) || 0);
+}
+/** Pontos personalizados do produto (caixinha marcada no cadastro), ou null para seguir a tabela. */
+function pontosProprios(p: Dados) {
   const n = Number(p.pontos);
-  return p.pontos !== undefined && p.pontos !== null && p.pontos !== '' && Number.isFinite(n) && n >= 0 ? Math.floor(n) : Math.floor(Number(padrao) || 0);
+  return p.pontuacaoPersonalizada === 'Sim' && p.pontos !== undefined && p.pontos !== null && p.pontos !== '' && Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
+}
+/** Pontos que cada unidade do produto dá ao afilhado: os personalizados do produto ou os da tabela pelo preço. */
+function pontosDoProduto(p: Dados, t: TabelaPontos) {
+  return pontosProprios(p) ?? pontosPelaTabela(Number(p.preco) || 0, t);
 }
 /** Pontos de uma venda: soma dos pontos de cada item × quantidade. */
 function pontosDosItens(itens: Dados[]) {
@@ -167,8 +177,17 @@ function pontosDosItens(itens: Dados[]) {
 
 const DEFAULT_CONFIG = {
   nomeEstabelecimento: 'Bar do Dindo',
-  /** Pontos de cada item vendido quando o produto não tem pontos próprios no cadastro. */
-  pontosPorItem: 1,
+  /** Pontos de cada unidade vendida pelo preço do produto (quando ele não tem pontuação personalizada). */
+  faixasPontos: [
+    { ate: 10, pontos: 5 },
+    { ate: 20, pontos: 10 },
+    { ate: 30, pontos: 15 },
+    { ate: 40, pontos: 20 },
+    { ate: 50, pontos: 25 },
+    { ate: 60, pontos: 30 },
+  ],
+  /** Pontos dos produtos mais caros que a última faixa. */
+  pontosAcima: 35,
   horarios: ['18:00', '19:00', '20:00', '21:00', '22:00'],
   ambientes: ['Salão principal'],
   diasFuncionamento: [0, 1, 2, 3, 4, 5, 6], // 0 = domingo
@@ -568,14 +587,15 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   rota('GET', '/public/afilhados', async () => ({ total: Number((await documento('meta/contadores'))?.clientes) || 0 }));
   rota('GET', '/public/config', async () => {
     const c = await getConfig();
-    return { nomeEstabelecimento: c.nomeEstabelecimento, horarios: c.horarios, ambientes: c.ambientes, diasFuncionamento: c.diasFuncionamento, antecedenciaMinutos: c.antecedenciaMinutos, pontosPorItem: c.pontosPorItem, niveis: c.niveis, questionario: c.questionario };
+    return { nomeEstabelecimento: c.nomeEstabelecimento, horarios: c.horarios, ambientes: c.ambientes, diasFuncionamento: c.diasFuncionamento, antecedenciaMinutos: c.antecedenciaMinutos, faixasPontos: c.faixasPontos, pontosAcima: c.pontosAcima, niveis: c.niveis, questionario: c.questionario };
   });
   rota('GET', '/public/cardapio', async () => {
     const [itens, cfg] = await Promise.all([colecao('cardapio'), getConfig()]);
     return itens
       .map((p) => ({
         id: p.id, nome: p.nome, categoria: p.categoria, descricao: p.descricao ?? '', preco: Number(p.preco) || 0, destaque: p.destaque === true,
-        pontos: pontosDoProduto(p, cfg.pontosPorItem),
+        // o cardápio guarda só os pontos personalizados; os demais saem da tabela pelo preço
+        pontos: p.pontos !== undefined && p.pontos !== null ? Number(p.pontos) || 0 : pontosPelaTabela(Number(p.preco) || 0, cfg),
         foto: typeof p.foto === 'string' ? p.foto : '', teor: Number(p.teor) || 0,
         perfil: (p.perfil ?? {}) as Record<string, number>, notas: Array.isArray(p.notas) ? p.notas : [],
         resumo: typeof p.resumo === 'string' ? p.resumo : '', ingredientes: Array.isArray(p.ingredientes) ? p.ingredientes : [],
@@ -900,7 +920,15 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   rota('PUT', '/crm/config', async ({ b }) => {
     const ctx = await requireUsuario();
     requireAccess(ctx, 'parametros', 'editar');
-    if (b.pontosPorItem !== undefined && !(Number.isInteger(Number(b.pontosPorItem)) && Number(b.pontosPorItem) >= 0)) fail(400, 'Pontos por item inválido.');
+    if (b.faixasPontos !== undefined) {
+      const faixas = Array.isArray(b.faixasPontos) ? b.faixasPontos : [];
+      if (faixas.length > 20) fail(400, 'A tabela de pontos aceita até 20 faixas.');
+      b.faixasPontos = faixas.map((f: Dados) => ({ ate: Math.round(Number(f?.ate) * 100) / 100, pontos: Math.floor(Number(f?.pontos)) }))
+        .sort((x: Dados, y: Dados) => x.ate - y.ate);
+      if (b.faixasPontos.some((f: Dados) => !(f.ate > 0) || !(f.pontos >= 0))) fail(400, 'Cada faixa de pontos precisa de um preço limite e dos pontos.');
+      if (new Set(b.faixasPontos.map((f: Dados) => f.ate)).size !== b.faixasPontos.length) fail(400, 'Duas faixas de pontos têm o mesmo preço limite.');
+    }
+    if (b.pontosAcima !== undefined && !(Number.isInteger(Number(b.pontosAcima)) && Number(b.pontosAcima) >= 0)) fail(400, 'Pontos acima da última faixa inválidos.');
     if (b.horarios && !b.horarios.every((h: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(h))) fail(400, 'Horários devem estar no formato HH:MM (00:00 a 23:59).');
     if (b.questionario !== undefined) {
       const q = b.questionario as Dados;
@@ -1244,7 +1272,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const [produtos, cfg] = await Promise.all([colecao('produtos'), getConfig()]);
     return produtos
       .filter((p) => p.status !== 'Inativo')
-      .map((p) => ({ id: p.id, nome: p.nome, categoria: p.categoria, preco: Number(p.preco) || 0, pontos: pontosDoProduto(p, cfg.pontosPorItem), foto: p.foto || undefined }))
+      .map((p) => ({ id: p.id, nome: p.nome, categoria: p.categoria, preco: Number(p.preco) || 0, pontos: pontosDoProduto(p, cfg), foto: p.foto || undefined }))
       .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
   });
 
@@ -1371,7 +1399,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       if (!p) return fail(400, 'Produto não encontrado.');
       if (!(quantidade >= 1 && quantidade <= 999)) fail(400, 'Quantidade inválida.');
       const preco = Number(p.preco) || 0;
-      return { produtoId: p.id, nome: p.nome, quantidade, preco, total: centavos(preco * quantidade), pontos: pontosDoProduto(p, cfg.pontosPorItem) };
+      return { produtoId: p.id, nome: p.nome, quantidade, preco, total: centavos(preco * quantidade), pontos: pontosDoProduto(p, cfg) };
     });
     if (!itens.length && !vazio) fail(400, 'Adicione ao menos um item.');
     return { itens, valor: centavos(itens.reduce((s: number, i: { total: number }) => s + i.total, 0)) };
@@ -1698,8 +1726,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const teor = Number(d.teor);
     return {
       nome: d.nome ?? '', categoria: d.categoria ?? '', descricao: d.descricao ?? '', preco: Number(d.preco) || 0, destaque: d.destaque === 'Sim',
-      // pontos próprios do produto; null = usa o padrão de Parâmetros
-      pontos: d.pontos !== undefined && d.pontos !== null && d.pontos !== '' && Number(d.pontos) >= 0 ? Math.floor(Number(d.pontos)) : null,
+      // pontos personalizados do produto; null = segue a tabela de Parâmetros pelo preço
+      pontos: pontosProprios(d),
       foto: typeof d.foto === 'string' && d.foto.startsWith('data:image/') ? d.foto : '',
       teor: Number.isFinite(teor) && teor > 0 ? Math.min(100, Math.round(teor * 10) / 10) : 0,
       perfil: { docura: nota(d.docura), amargor: nota(d.amargor), acidez: nota(d.acidez), intensidade: nota(d.intensidade) },
