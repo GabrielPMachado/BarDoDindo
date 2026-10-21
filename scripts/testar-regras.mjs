@@ -8,7 +8,7 @@ import {
   addDoc, collection, connectFirestoreEmulator, deleteDoc, doc, getDoc, getDocs, getFirestore, increment, query, setDoc, updateDoc, where, writeBatch,
 } from 'firebase/firestore';
 
-const [senhaCliente, senhaAtendente, senhaMarketing, senhaAdministrativo, senhaModular] = process.argv.slice(2);
+const [senhaCliente, senhaAtendente, senhaMarketing, senhaAdministrativo, senhaModular, senhaCaixa] = process.argv.slice(2);
 const app = initializeApp({ apiKey: 'teste', projectId: 'demo-bardodindo' });
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -234,6 +234,21 @@ if (senhaModular) {
   await permitido('Ticket médio (tela não marcada: vale a do Resultado) lê as receitas', () => getDocs(collection(db, 'receitas')));
   await permitido('Despesas fixas (só a tela) lê as despesas', () => getDocs(collection(db, 'despesas')));
   await negado('Despesas fixas (só ver) não lança despesa', () => addDoc(collection(db, 'despesas'), { descricao: 'x', categoria: 'Aluguel', valor: 1, data: '2026-10-01', status: 'A pagar' }));
+  await signOut(auth);
+}
+
+if (senhaCaixa) {
+  console.log('— equipe: Atendimento completo (estorna vendas), sem excluir afilhados —');
+  await signInWithEmailAndPassword(auth, 'caixa@teste.local', senhaCaixa);
+  const estornar = (id) => {
+    const l = writeBatch(db);
+    l.delete(doc(db, 'consumos', `venda-${id}`));
+    l.delete(doc(db, 'receitas', `receita-${id}`));
+    return l.commit();
+  };
+  await negado('estornar venda de caixa fechado', () => estornar('fechada'));
+  await negado('apagar só a receita de venda de caixa fechado', () => deleteDoc(doc(db, 'receitas', 'receita-fechada')));
+  await permitido('estornar venda do caixa aberto', () => estornar('aberta'));
   await signOut(auth);
 }
 
