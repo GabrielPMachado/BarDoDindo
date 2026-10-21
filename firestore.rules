@@ -27,7 +27,7 @@ service cloud.firestore {
         : k.matches('projetos|estoque|materiais|patrimonio|compras') ? 'dp'
         : k.matches('terceirizados|fornecedores|precos|contratos') ? 'adm'
         : k.matches('qualidade|atestados|naoconformidades') ? 'fis'
-        : k.matches('receitas|despesas.*|resultado|ticket|renda|acoes|creditos|docfin|relatorios|investimentos') ? 'fin'
+        : k.matches('receitas|despesas.*|resultado|ticket|renda|acoes|creditos|docfin|relatorios|arquivos|investimentos') ? 'fin'
         : k.matches('colaboradores|prestadores.*|folha|ferias|afastamentos|conduta') ? 'rh'
         : k.matches('consultoria|trabalhista|advogados.*|normas.*') ? 'jur'
         : k.matches('logs|chamados|equipamentos') ? 'ti'
@@ -101,7 +101,7 @@ service cloud.firestore {
       return ['metas', 'colaboradores', 'ferias', 'projetos', 'estoque', 'materiais', 'patrimonio', 'compras', 'terceirizados', 'fornecedores', 'contratos', 'precos',
         'receitas', 'despesas', 'reservas', 'consumos', 'resgates', 'criacao', 'midias', 'recompensas', 'produtos', 'guarnicoes',
         'trabalhista', 'consultoria', 'qualidade', 'naoconformidades', 'eventos', 'publicidade', 'atestados',
-        'acoes', 'creditos', 'docfin', 'investimentos', 'prestadores', 'conduta', 'advogados', 'normas', 'chamados', 'equipamentos',
+        'acoes', 'creditos', 'docfin', 'arquivos', 'investimentos', 'prestadores', 'conduta', 'advogados', 'normas', 'chamados', 'equipamentos',
         'caixas', 'comandas', 'mesas'];
     }
     match /{col}/{id} {
@@ -318,7 +318,7 @@ service cloud.firestore {
     function colecoesComAnexo() {
       return ['metas', 'colaboradores', 'ferias', 'projetos', 'materiais', 'patrimonio', 'compras', 'terceirizados', 'fornecedores', 'contratos',
         'receitas', 'despesas', 'criacao', 'trabalhista', 'consultoria', 'qualidade', 'naoconformidades',
-        'publicidade', 'atestados', 'acoes', 'creditos', 'docfin', 'investimentos', 'prestadores', 'conduta', 'advogados', 'normas', 'equipamentos'];
+        'publicidade', 'atestados', 'acoes', 'creditos', 'docfin', 'arquivos', 'investimentos', 'prestadores', 'conduta', 'advogados', 'normas', 'equipamentos'];
     }
     function anexaEm(col) { return col in colecoesComAnexo() && (podeColecao(col, 'criar') || podeColecao(col, 'editar')); }
     // apaga quem edita ou exclui na área, ou quem enviou o arquivo (desfaz um envio quando o registro não chega a ser gravado)

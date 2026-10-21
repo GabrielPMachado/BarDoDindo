@@ -153,7 +153,7 @@ export const AREAS: Area[] = [
   /* ---------- Departamento Financeiro ---------- */
   {
     key: 'fin', label: 'Financeiro', icon: Wallet,
-    description: 'Contabilidade, resultado (DRE), investidores, documentos e lançamentos.',
+    description: 'Contabilidade, resultado (DRE), investidores, documentos e arquivos da empresa e lançamentos.',
     items: [
       { path: '/financeiro/receitas', perm: 'receitas', label: 'Receitas', group: 'Contabilidade geral', icon: Calculator },
       { path: '/financeiro/despesas/variaveis', perm: 'despesas_variaveis', label: 'Despesas variáveis', group: 'Contabilidade geral' },
@@ -165,6 +165,7 @@ export const AREAS: Area[] = [
       { path: '/financeiro/credito', perm: 'creditos', label: 'Crédito CNPJ', group: 'Investidores' },
       { path: '/financeiro/documentos', perm: 'docfin', label: 'Contratos onerosos e títulos', group: 'Documentos', icon: FileStack },
       { path: '/financeiro/relatorios', perm: 'relatorios', label: 'Relatórios', group: 'Documentos' },
+      { path: '/financeiro/arquivos', perm: 'arquivos', label: 'Arquivos', group: 'Documentos' },
       { path: '/financeiro/despesas', perm: 'despesas', label: 'Lançamento de despesas', group: 'Lançamentos', icon: Receipt },
       { path: '/financeiro/investimentos', perm: 'investimentos', label: 'Lançamento de investimentos', group: 'Lançamentos' },
     ],
@@ -329,7 +330,7 @@ export const COLLECTION_PAGE: Record<string, string> = {
   qualidade: '/fiscalizacao/qualidade', naoconformidades: '/fiscalizacao/nao-conformidades',
   usuarios: '/config/usuarios', funcoes: '/config/funcoes',
   eventos: '/atendimento/calendario', publicidade: '/marketing/publicidade', atestados: '/fiscalizacao/atestados',
-  acoes: '/financeiro/acoes', creditos: '/financeiro/credito', docfin: '/financeiro/documentos', investimentos: '/financeiro/investimentos',
+  acoes: '/financeiro/acoes', creditos: '/financeiro/credito', docfin: '/financeiro/documentos', arquivos: '/financeiro/arquivos', investimentos: '/financeiro/investimentos',
   prestadores: '/rh/prestadores/pf', conduta: '/rh/conduta',
   advogados: '/juridico/advogados/consultoria', normas: '/juridico/leis',
   chamados: '/ti/chamados', equipamentos: '/ti/equipamentos',
