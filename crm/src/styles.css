@@ -1668,3 +1668,26 @@ button.anexos__nome:hover { text-decoration: underline; }
   .table--cards tr.grupo-linha { padding: 0; }
   .table--cards tr.grupo-linha th { display: block; padding: 12px 14px 8px; }
 }
+/* agrupada: itens mais compactos, para os cabeçalhos dos grupos marcarem bem a separação */
+.table--agrupada tr.grupo-linha th { font-size: 12.5px; color: var(--brand); background: var(--surface-2); border-top: 1px solid var(--border-strong); }
+.table--agrupada tbody td { padding-top: 5px; padding-bottom: 5px; font-size: 13px; }
+.table--agrupada .thumb { width: 28px; height: 28px; border-radius: 6px; }
+.table--agrupada .sel-col { top: 6px; }
+.grupo-cartoes--compacto .grupo-titulo { color: var(--brand); }
+.grupo-cartoes--compacto .cartoes { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; padding: 10px 16px 16px; }
+.grupo-cartoes--compacto .cartao__foto { aspect-ratio: 16 / 9; }
+.grupo-cartoes--compacto .cartao__corpo { padding: 7px 9px 9px; gap: 1px; }
+.grupo-cartoes--compacto .cartao__titulo { font-size: 13px; }
+.grupo-cartoes--compacto .cartao__linha { font-size: 11.5px; }
+@media (max-width: 640px) {
+  .table--agrupada.table--cards tbody tr:not(.grupo-linha) { display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; padding: 6px 12px 6px 36px; }
+  .table--agrupada.table--cards td { font-size: 12px; padding: 1px 0 !important; gap: 6px; }
+  .table--agrupada.table--cards td::before { font-size: 11px; }
+  .table--agrupada.table--cards td.foto-col { display: none; }
+  .table--agrupada.table--cards td.col-titulo { grid-column: 1 / -1; padding-left: 0 !important; font-size: 13.5px; font-weight: 600; }
+  .table--agrupada.table--cards td.col-titulo::before { content: none; }
+  .table--agrupada.table--cards td.actions-col { position: absolute; top: 2px; right: 8px; width: auto; padding: 0 !important; }
+  .table--agrupada.table--cards td.sel-col { top: 8px; left: 10px; }
+  .table--agrupada.table--cards tr.grupo-linha th { padding: 10px 12px 6px; }
+  .grupo-cartoes--compacto .cartoes { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 8px 12px 12px; }
+}
