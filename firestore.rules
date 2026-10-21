@@ -219,6 +219,16 @@ service cloud.firestore {
       allow read: if true;
       allow write: if pode('parametros', 'editar');
     }
+    // opções acrescentadas pela equipe às listas com "Outro" (ex.: categoria nova do estoque): só textos, até 100 por lista.
+    // Igual a LISTA_DE_OPCOES e OPCOES_POR_LISTA em shared/backend.ts
+    match /opcoes/{lista} {
+      allow read: if daEquipe();
+      allow create, update: if daEquipe() && lista.matches('^[a-z0-9_]{1,60}$')
+        && request.resource.data.keys().hasOnly(['valores', 'atualizadoEm'])
+        && request.resource.data.valores is list && request.resource.data.valores.size() <= 100
+        && request.resource.data.atualizadoEm is string;
+      allow delete: if sistema();
+    }
     // chaves de serviços (ex.: IA que lê as notas fiscais): só a equipe logada lê; só quem edita Configurações grava
     match /segredos/{id} {
       allow read: if daEquipe();

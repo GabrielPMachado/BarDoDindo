@@ -5,7 +5,7 @@
 import { initializeApp } from 'firebase/app';
 import { connectAuthEmulator, getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import {
-  addDoc, collection, connectFirestoreEmulator, deleteDoc, doc, getDoc, getDocs, getFirestore, increment, query, setDoc, updateDoc, where, writeBatch,
+  addDoc, arrayUnion, collection, connectFirestoreEmulator, deleteDoc, doc, getDoc, getDocs, getFirestore, increment, query, setDoc, updateDoc, where, writeBatch,
 } from 'firebase/firestore';
 
 const [senhaCliente, senhaAtendente, senhaMarketing, senhaAdministrativo, senhaModular, senhaCaixa] = process.argv.slice(2);
@@ -73,6 +73,8 @@ await negado('criar reserva já confirmada', () => addDoc(collection(db, 'reserv
 await negado('criar reserva em nome de outro', () => addDoc(collection(db, 'reservas'), { clienteUid: 'outro', status: 'Pendente', origem: 'Aplicativo' }));
 await negado('virar usuário do CRM', () => setDoc(doc(db, 'usuarios', uid), { nome: 'x', email: 'x@x.x', funcaoId: 'admin', status: 'Ativo' }));
 await negado('gravar preferências do CRM', () => setDoc(doc(db, 'preferencias', uid), { painel: { ordem: [], fixados: [], ocultos: [] } }));
+await negado('afilhado lê as opções das listas do CRM', () => getDoc(doc(db, 'opcoes', 'estoque__categoria')));
+await negado('afilhado acrescenta opção às listas do CRM', () => setDoc(doc(db, 'opcoes', 'estoque__categoria'), { valores: ['x'], atualizadoEm: 'x' }));
 await negado('refazer o primeiro acesso', () => setDoc(doc(db, 'meta/setup'), { feitoEm: 'x' }));
 await negado('alterar o contador de afilhados', () => updateDoc(doc(db, 'meta/contadores'), { clientes: increment(1) }));
 await negado('gravar no cardápio', () => setDoc(doc(db, 'cardapio/x'), { nome: 'x', preco: 0 }));
@@ -177,6 +179,13 @@ if (senhaAtendente) {
   await permitido('ler as próprias preferências', () => getDoc(doc(db, 'preferencias', eq.user.uid)));
   await negado('salvar preferências de outro usuário', () => setDoc(doc(db, 'preferencias', 'outro'), { painel, atualizadoEm: 'x' }));
   await negado('ler preferências de outro usuário', () => getDoc(doc(db, 'preferencias', 'outro')));
+  // opções acrescentadas pelo "Outro" das listas
+  await permitido('acrescentar opção a uma lista', () => setDoc(doc(db, 'opcoes', 'estoque__categoria'), { valores: arrayUnion('Hortifrúti'), atualizadoEm: 'x' }, { merge: true }));
+  await permitido('ler as opções acrescentadas', () => getDoc(doc(db, 'opcoes', 'estoque__categoria')));
+  await negado('gravar outro campo nas opções', () => setDoc(doc(db, 'opcoes', 'estoque__categoria'), { valores: ['x'], atualizadoEm: 'x', extra: 1 }));
+  await negado('gravar lista de opções com nome inválido', () => setDoc(doc(db, 'opcoes', 'Estoque.Categoria'), { valores: ['x'], atualizadoEm: 'x' }));
+  await negado('gravar mais de 100 opções', () => setDoc(doc(db, 'opcoes', 'estoque__tipo'), { valores: Array.from({ length: 101 }, (_, i) => `o${i}`), atualizadoEm: 'x' }));
+  await negado('apagar a lista de opções sem ser o Administrador', () => deleteDoc(doc(db, 'opcoes', 'estoque__categoria')));
   // zerar o sistema e mexer na numeração são só do Administrador
   await negado('excluir afilhado (sem permissão em Vendas)', async () => {
     const c = (await getDocs(collection(db, 'clientes'))).docs[0];

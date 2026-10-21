@@ -69,8 +69,9 @@ export function Modal({ title, onClose, children, footer, width = 720 }: {
   );
 }
 
-export function FieldInput({ field, value, onChange, disabled }: {
-  field: Field; value: unknown; onChange: (v: unknown) => void; disabled?: boolean;
+/** `lista`: de onde vêm as opções acrescentadas pelo "Outro" nos campos de seleção (ver `listaDe`). */
+export function FieldInput({ field, value, onChange, disabled, lista }: {
+  field: Field; value: unknown; onChange: (v: unknown) => void; disabled?: boolean; lista?: string;
 }) {
   const v = value === undefined || value === null ? '' : String(value);
   const common = { id: `f-${field.key}`, className: 'input', disabled, required: field.required, placeholder: field.placeholder };
@@ -85,7 +86,7 @@ export function FieldInput({ field, value, onChange, disabled }: {
     case 'textarea':
       return <textarea {...common} rows={3} value={v} onChange={(e) => onChange(e.target.value)} />;
     case 'select':
-      return <SelectPicker id={common.id} disabled={disabled} options={field.options ?? []} value={v} onChange={onChange} />;
+      return <SelectPicker id={common.id} disabled={disabled} options={field.options ?? []} value={v} onChange={onChange} lista={lista} rotulo={field.label} />;
     case 'number':
     case 'money':
     case 'percent':

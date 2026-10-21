@@ -6,6 +6,7 @@ import { brl } from '../lib/format';
 import { lerNotaComIA, maisParecido, nomeBonito, type NotaLida } from '../lib/iaNota';
 import { LOCAIS } from '../lib/locais';
 import { reduzirFoto } from './Avatar';
+import { listaDe, SelectComOutro } from './OpcaoOutro';
 import { RefPicker } from './pickers';
 import { NumberInput, notify } from './ui';
 
@@ -196,14 +197,12 @@ export function CompraItens({ itens, somenteLeitura, onChange, onNotaLida }: {
                   <span className="badge badge--info">Novo {i.destino === 'estoque' ? 'no Estoque' : 'nos Materiais'}</span>
                   {i.destino === 'estoque' ? (
                     <>
-                      <select className="input input--sm" aria-label="Categoria" value={i.categoria} onChange={(e) => mudar(i.chave, { categoria: e.target.value })}>
-                        {CATEGORIAS.map((c) => <option key={c}>{c}</option>)}
-                      </select>
+                      <SelectComOutro className="input input--sm" aria-label="Categoria" lista={listaDe('estoque', 'categoria')} rotulo="Categoria"
+                        options={CATEGORIAS} value={i.categoria} onChange={(v) => mudar(i.chave, { categoria: v })} />
                     </>
                   ) : (
-                    <select className="input input--sm" aria-label="Tipo" value={i.tipo} onChange={(e) => mudar(i.chave, { tipo: e.target.value })}>
-                      {TIPOS.map((t) => <option key={t}>{t}</option>)}
-                    </select>
+                    <SelectComOutro className="input input--sm" aria-label="Tipo" lista={listaDe('materiais', 'tipo')} rotulo="Tipo"
+                      options={TIPOS} value={i.tipo} onChange={(v) => mudar(i.chave, { tipo: v })} />
                   )}
                 </div>
               )}

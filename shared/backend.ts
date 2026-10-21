@@ -905,6 +905,37 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     return salvo;
   });
 
+  /* CRM: opções acrescentadas pela equipe às listas com "Outro" (ex.: uma categoria nova do estoque).
+   * Cada lista é um documento em `opcoes`, com o nome "<cadastro>__<campo>". Igual às regras de `opcoes`. */
+  const LISTA_DE_OPCOES = /^[a-z0-9_]{1,60}$/;
+  const OPCOES_POR_LISTA = 100;
+  rota('GET', '/crm/opcoes', async () => {
+    await requireUsuario();
+    return Object.fromEntries((await colecao('opcoes')).map((r) => [r.id, Array.isArray(r.valores) ? r.valores.filter((v: unknown) => typeof v === 'string') : []]));
+  });
+  rota('POST', '/crm/opcoes/:lista', async ({ p, b }) => {
+    await requireUsuario();
+    if (!LISTA_DE_OPCOES.test(p.lista)) fail(400, 'Lista de opções inválida.');
+    const valor = str(b.valor, 60);
+    if (!valor) fail(400, 'Descreva a opção.');
+    const atuais = ((await documento(`opcoes/${p.lista}`))?.valores ?? []) as string[];
+    if (atuais.some((v) => v.toLowerCase() === valor.toLowerCase())) return { valores: atuais };
+    if (atuais.length >= OPCOES_POR_LISTA) fail(400, `Esta lista já tem ${OPCOES_POR_LISTA} opções acrescentadas.`);
+    const lote = writeBatch(db);
+    lote.set(doc(db, 'opcoes', p.lista), { valores: arrayUnion(valor), atualizadoEm: now() }, { merge: true });
+    await lote.commit();
+    return { valores: [...atuais, valor] };
+  });
+  rota('DELETE', '/crm/opcoes/:lista', async ({ p, b }) => {
+    await requireUsuario();
+    if (!LISTA_DE_OPCOES.test(p.lista)) fail(400, 'Lista de opções inválida.');
+    const valor = str(b.valor, 60);
+    const lote = writeBatch(db);
+    lote.set(doc(db, 'opcoes', p.lista), { valores: arrayRemove(valor), atualizadoEm: now() }, { merge: true });
+    await lote.commit();
+    return { ok: true };
+  });
+
   /* CRM: painel de atualizações (as últimas alterações das áreas que a pessoa acessa) */
   rota('GET', '/crm/atividades', async () => {
     const ctx = await requireUsuario();
@@ -1151,7 +1182,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     if (!ctx.funcao?.sistema) fail(403, 'Só a Presidência pode zerar o sistema.');
     if (b.confirmacao !== 'ZERAR TUDO') fail(400, 'Para zerar, confirme com "ZERAR TUDO".');
     const todos = async (...caminho: string[]) => (await getDocs(collection(db, caminho.join('/')))).docs.map((d) => d.ref);
-    const cols = [...Object.keys(COLLECTIONS).filter((c) => c !== 'funcoes'), 'clientes', 'saldos', 'cpfs', 'cardapio', 'ref_colaboradores', 'ref_fornecedores', 'config', 'segredos'];
+    const cols = [...Object.keys(COLLECTIONS).filter((c) => c !== 'funcoes'), 'clientes', 'saldos', 'cpfs', 'cardapio', 'ref_colaboradores', 'ref_fornecedores', 'config', 'segredos', 'opcoes'];
     const refs: DocumentReference[] = [];
     for (const c of cols) refs.push(...(await todos(c)));
     for (const a of new Set([...AREAS, ...MODULOS])) refs.push(...(await todos('atividades', a, 'itens')));

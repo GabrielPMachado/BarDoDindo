@@ -20,6 +20,7 @@ import { ANEXOS_POR_REGISTRO } from '../../../shared/backend';
 import { FichaTecnica } from './FichaTecnica';
 import { LocaisCampo, TransferirModal } from './Locais';
 import { CelulaRapida, editavelNaTabela } from './EdicaoRapida';
+import { comExtras, listaDe, useOpcoesExtras } from './OpcaoOutro';
 import { ItensDoFornecedor } from './ItensDoFornecedor';
 import { linkSeguro } from '../lib/links';
 import { PreencherProdutoIA } from './PreencherProdutoIA';
@@ -131,6 +132,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   } : {};
   const campoLink = def.fields.find((f) => f.type === 'url' && f.acao);
   const filterField = def.fields.find((f) => f.key === def.filterKey);
+  const extrasDoFiltro = useOpcoesExtras(filterField?.options?.length ? listaDe(def.id, filterField.key) : undefined);
   // filtros extras: as opções são os valores que aparecem nos registros (sem diferenciar maiúsculas)
   const chaveFiltro = (v: unknown) => String(v ?? '').trim().toLocaleLowerCase('pt-BR');
   const filtrosExtras = useMemo(() => (def.filtros ?? []).flatMap((key) => {
@@ -309,7 +311,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
           {filterField?.options && (
             <select className="input input--sm" value={filter} onChange={(e) => { setFilter(e.target.value); setPage(0); }} aria-label={`Filtrar por ${filterField.label}`}>
               <option value="">{filterField.label}: todos</option>
-              {filterField.options.map((o) => <option key={o} value={o}>{filterField.label}: {o}</option>)}
+              {(comExtras(filterField.options, extrasDoFiltro) as string[]).map((o) => <option key={o} value={o}>{filterField.label}: {o}</option>)}
             </select>
           )}
           {filtrosExtras.map((fx) => (
@@ -683,7 +685,7 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
                 // campo travado pela caixinha: fica vazio (o valor guardado não vale enquanto ela estiver desmarcada)
                 f.ativadoPor && data[f.ativadoPor] !== 'Sim'
                   ? <FieldInput field={f} value="" disabled onChange={() => undefined} />
-                  : <FieldInput field={f} value={data[f.key]} disabled={!canEdit} onChange={(v) => setData((d) => ({ ...d, [f.key]: v }))} />
+                  : <FieldInput field={f} value={data[f.key]} disabled={!canEdit} lista={listaDe(def.id, f.key)} onChange={(v) => setData((d) => ({ ...d, [f.key]: v }))} />
               )}
             </div>
           </Fragment>
