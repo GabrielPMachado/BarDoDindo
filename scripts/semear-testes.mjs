@@ -71,6 +71,11 @@ await gravar('cpfs/52998224725', { uid: 'outro-afilhado' });
 // caixa, comandas e mesas
 await gravar('caixas/aberto', { nome: 'Caixa de teste', status: 'Aberto', abertoEm: agora, valorInicial: 100, vendas: {}, totalVendas: 0, qtdVendas: 0, movimentos: [] });
 await gravar('caixas/fechado', { nome: 'Caixa antigo', status: 'Fechado', abertoEm: agora, valorInicial: 0, vendas: {}, totalVendas: 0, qtdVendas: 0, movimentos: [] });
+// uma venda em cada caixa (com a receita que ela gerou): a do caixa aberto pode ser corrigida, a do fechado não
+for (const [id, caixaId] of [['aberta', 'aberto'], ['fechada', 'fechado']]) {
+  await gravar(`consumos/venda-${id}`, { clienteId: null, clienteUid: null, clienteNome: 'Cliente sem cadastro', itens: [], valor: 10, pontos: 0, formaPagamento: 'Pix', caixaId, receitaId: `receita-${id}`, data: agora });
+  await gravar(`receitas/receita-${id}`, { descricao: 'Consumo · Cliente sem cadastro', valor: 10, formaPagamento: 'Pix', consumoId: `venda-${id}`, caixaId, data: agora.slice(0, 10) });
+}
 await gravar('comandas/da-cliente', { numero: 1, nome: 'Cliente Teste', clienteUid: cliente, mesa: 3, itens: [], total: 0, status: 'Aberta', abertaEm: agora });
 await gravar('comandas/de-outro', { numero: 2, nome: 'Outro', clienteUid: 'outro-afilhado', mesa: 4, itens: [], total: 0, status: 'Aberta', abertaEm: agora });
 await gravar('recompensas/chopp', { nome: 'Chopp grátis', descricao: '', custo: 50, status: 'Ativa', criadoEm: agora });

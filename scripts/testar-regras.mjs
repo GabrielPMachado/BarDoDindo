@@ -138,6 +138,18 @@ if (senhaAtendente) {
   // consumo sem afilhado (cliente sem cadastro): entra no caixa e na receita, sem pontos nem saldo
   await permitido('lançar consumo sem afilhado', () => addDoc(collection(db, 'consumos'), { clienteId: null, clienteUid: null, clienteNome: 'Cliente sem cadastro', valor: 10, pontos: 0, caixaId: 'aberto' }));
   await permitido('lançar a receita de um consumo sem afilhado', () => addDoc(collection(db, 'receitas'), { descricao: 'Consumo · Cliente sem cadastro', valor: 10, consumoId: 'x', caixaId: 'aberto' }));
+  // corrigir uma venda: a venda e a receita dela mudam juntas, só com o caixa da venda aberto
+  const corrigir = (id, valorReceita = 15) => {
+    const l = writeBatch(db);
+    l.update(doc(db, 'consumos', `venda-${id}`), { valor: 15, formaPagamento: 'Dinheiro' });
+    l.update(doc(db, 'receitas', `receita-${id}`), { valor: valorReceita, formaPagamento: 'Dinheiro' });
+    return l.commit();
+  };
+  await permitido('corrigir venda do caixa aberto (e a receita dela)', () => corrigir('aberta'));
+  await negado('corrigir venda de caixa fechado', () => corrigir('fechada'));
+  await negado('corrigir só a venda de caixa fechado', () => updateDoc(doc(db, 'consumos', 'venda-fechada'), { valor: 1 }));
+  await negado('receita com valor diferente da venda', () => corrigir('aberta', 99));
+  await negado('mudar a descrição da receita de uma venda', () => updateDoc(doc(db, 'receitas', 'receita-aberta'), { descricao: 'outra' }));
   await permitido('cadastrar mesa', () => addDoc(collection(db, 'mesas'), { numero: 1, nome: 'Mesa 1', lugares: 4 }));
   await negado('alterar produto', () => addDoc(collection(db, 'produtos'), { nome: 'x', preco: 1 }));
   await negado('lançar receita avulsa', () => addDoc(collection(db, 'receitas'), { descricao: 'x', valor: 1 }));

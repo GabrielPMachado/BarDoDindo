@@ -107,8 +107,9 @@ service cloud.firestore {
     match /{col}/{id} {
       allow read: if col in colecoesCrm() && podeColecao(col, 'ver');
       allow create: if col in colecoesCrm() && podeColecao(col, 'criar');
-      // caixa fechado não muda mais (nem as sangrias e os suprimentos dele)
-      allow update: if col in colecoesCrm() && podeColecao(col, 'editar') && (col != 'caixas' || resource.data.status == 'Aberto');
+      // caixa fechado não muda mais (nem as sangrias e os suprimentos dele, nem as vendas que entraram nele)
+      allow update: if col in colecoesCrm() && podeColecao(col, 'editar') && (col != 'caixas' || resource.data.status == 'Aberto')
+        && (col != 'consumos' || get(caminho('caixas', resource.data.caixaId)).data.status == 'Aberto');
       allow delete: if col in colecoesCrm() && podeColecao(col, 'excluir');
     }
 
@@ -267,6 +268,11 @@ service cloud.firestore {
         // comanda sem afilhado: fechar a comanda lança a venda direto na receita
         || (pode('comandas', 'editar') && request.resource.data.comandaId is string && request.resource.data.get('consumoId', null) == null);
       allow delete: if pode('consumos', 'excluir') && resource.data.get('consumoId', null) != null;
+      // corrigir a venda (com o caixa dela aberto) ajusta valor e forma de pagamento da receita que ela gerou
+      allow update: if pode('consumos', 'editar') && resource.data.get('consumoId', null) is string
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['valor', 'formaPagamento', 'atualizadoEm'])
+        && get(caminho('caixas', resource.data.caixaId)).data.status == 'Aberto'
+        && getAfter(caminho('consumos', resource.data.consumoId)).data.valor == request.resource.data.valor;
     }
 
     // cada área lança no DRE as despesas dos próprios cadastros (botão "Lançar despesa"), sem ganhar acesso ao Financeiro:
