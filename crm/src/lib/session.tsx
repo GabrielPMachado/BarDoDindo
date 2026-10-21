@@ -31,7 +31,7 @@ export interface Usuario {
 
 export interface Config {
   nomeEstabelecimento: string;
-  pontosPorReal: number;
+  pontosPorItem: number;
   horarios: string[];
   ambientes: string[];
   diasFuncionamento: number[];

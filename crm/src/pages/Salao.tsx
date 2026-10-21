@@ -18,14 +18,14 @@ interface Caixa {
   fechadoEm?: string; fechadoPorNome?: string;
   fechamento?: { esperado: Record<string, number>; contado: Record<string, number>; totalEsperado: number; totalContado: number; diferenca: number; observacao: string; comandasAbertas: number };
 }
-interface Item { produtoId: string; nome: string; quantidade: number; preco: number; total: number }
+interface Item { produtoId: string; nome: string; quantidade: number; preco: number; total: number; pontos?: number }
 interface Comanda {
   id: string; numero: number; nome: string; mesa: number | null; clienteId: number | null; clienteUid: string | null; clienteNome: string | null;
   pessoas: number; observacao: string; itens: Item[]; total: number; status: 'Aberta' | 'Fechada' | 'Cancelada';
   abertaEm: string; abertaPorNome: string; fechadaEm?: string; formaPagamento?: string;
 }
 interface Mesa { id: string; numero: number; nome: string; ambiente: string; lugares: number; formato: string; status: string; x?: number; y?: number }
-interface Produto { id: string; nome: string; categoria: string; preco: number; foto?: string }
+interface Produto { id: string; nome: string; categoria: string; preco: number; pontos: number; foto?: string }
 interface ClienteLite { id: string; numero: number; nome: string; email: string; telefone: string; pontos: number }
 
 const FORMAS = ['Pix', 'Crédito', 'Débito', 'Dinheiro', 'Vale-refeição'];
@@ -560,7 +560,6 @@ function DetalheComanda({ c, mesas, onClose, onMudou }: { c: Comanda; mesas: Mes
   const { caixa } = useCaixa();
   const editavel = c.status === 'Aberta' && pode('comandas', 'editar');
   const produtos = useResource<Produto[]>(editavel ? '/crm/produtos-venda' : null).data ?? [];
-  const cfg = useResource<Config>('/crm/config').data;
   const [itens, setItens] = useState<Item[]>(c.itens);
   const [busca, setBusca] = useState('');
   const [forma, setForma] = useState('Pix');
@@ -568,6 +567,8 @@ function DetalheComanda({ c, mesas, onClose, onMudou }: { c: Comanda; mesas: Mes
   const fila = useRef<Promise<unknown>>(Promise.resolve());
   useEffect(() => setItens(c.itens), [c.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const total = itens.reduce((s, i) => s + i.preco * i.quantidade, 0);
+  // ao fechar, os pontos saem do cadastro atual de cada produto
+  const pontos = itens.reduce((s, i) => s + (produtos.find((p) => p.id === i.produtoId)?.pontos ?? (Number(i.pontos) || 0)) * i.quantidade, 0);
   const t = busca.trim().toLowerCase();
   const filtrados = produtos.filter((p) => !t || `${p.nome} ${p.categoria}`.toLowerCase().includes(t)).slice(0, 18);
 
@@ -595,7 +596,7 @@ function DetalheComanda({ c, mesas, onClose, onMudou }: { c: Comanda; mesas: Mes
     await api(`/crm/comandas/${c.id}/fechar`, { method: 'POST', body: { formaPagamento: forma } });
     await recarregarVendas();
     onMudou();
-    notify(`Comanda ${numComanda(c.numero)} fechada: ${brl(total)} no ${forma}${c.clienteId ? ` e ${num(Math.floor(total * (cfg?.pontosPorReal ?? 1)))} pontos para o afilhado` : ''}.`);
+    notify(`Comanda ${numComanda(c.numero)} fechada: ${brl(total)} no ${forma}${c.clienteId ? ` e ${num(pontos)} pontos para o afilhado` : ''}.`);
     onClose();
   };
   const cancelar = async () => {
@@ -668,7 +669,7 @@ function DetalheComanda({ c, mesas, onClose, onMudou }: { c: Comanda; mesas: Mes
               </ul>
             )}
             <div className="comanda__total"><span>Total</span><strong>{brl(total)}</strong></div>
-            {c.clienteId && <div className="comanda__points">{num(Math.floor(total * (cfg?.pontosPorReal ?? 1)))} pontos para o afilhado ao fechar</div>}
+            {c.clienteId && <div className="comanda__points">{num(pontos)} pontos para o afilhado ao fechar</div>}
           </section>
         </div>
       </div>

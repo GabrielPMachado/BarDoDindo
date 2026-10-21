@@ -6,14 +6,12 @@ import { useMe, useStore, type Recompensa, type Redemption } from '../store';
 
 export default function Recompensas() {
   const me = useMe();
-  const { recompensas, resgatar, config } = useStore();
+  const { recompensas, resgatar } = useStore();
   const [pick, setPick] = useState<Recompensa | null>(null);
   const [voucher, setVoucher] = useState<Redemption | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const clearToast = useCallback(() => setToast(null), []);
-
-  const pontosPorReal = config?.pontosPorReal ?? 1;
 
   const doRedeem = async () => {
     if (!pick) return;
@@ -46,7 +44,7 @@ export default function Recompensas() {
           </div>
         </div>
         <p className="muted small points-hero__regra">
-          Cada R$ 1 consumido vale {pontosPorReal === 1 ? '1 ponto' : `${pontosPorReal.toLocaleString('pt-BR')} pontos`}
+          Cada item consumido vale pontos: veja quantos no cardápio
         </p>
       </section>
 

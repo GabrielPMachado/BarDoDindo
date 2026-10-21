@@ -155,9 +155,20 @@ function dataValida(v: string) {
   return !Number.isNaN(t) && new Date(t).toISOString().startsWith(v);
 }
 
+/** Pontos que cada unidade do produto dá ao afilhado: os do cadastro do produto ou, em branco, o padrão de Parâmetros. */
+function pontosDoProduto(p: Dados, padrao: number) {
+  const n = Number(p.pontos);
+  return p.pontos !== undefined && p.pontos !== null && p.pontos !== '' && Number.isFinite(n) && n >= 0 ? Math.floor(n) : Math.floor(Number(padrao) || 0);
+}
+/** Pontos de uma venda: soma dos pontos de cada item × quantidade. */
+function pontosDosItens(itens: Dados[]) {
+  return itens.reduce((s, i) => s + (Number(i.pontos) || 0) * (Number(i.quantidade) || 0), 0);
+}
+
 const DEFAULT_CONFIG = {
   nomeEstabelecimento: 'Bar do Dindo',
-  pontosPorReal: 1,
+  /** Pontos de cada item vendido quando o produto não tem pontos próprios no cadastro. */
+  pontosPorItem: 1,
   horarios: ['18:00', '19:00', '20:00', '21:00', '22:00'],
   ambientes: ['Salão principal'],
   diasFuncionamento: [0, 1, 2, 3, 4, 5, 6], // 0 = domingo
@@ -557,18 +568,20 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   rota('GET', '/public/afilhados', async () => ({ total: Number((await documento('meta/contadores'))?.clientes) || 0 }));
   rota('GET', '/public/config', async () => {
     const c = await getConfig();
-    return { nomeEstabelecimento: c.nomeEstabelecimento, horarios: c.horarios, ambientes: c.ambientes, diasFuncionamento: c.diasFuncionamento, antecedenciaMinutos: c.antecedenciaMinutos, pontosPorReal: c.pontosPorReal, niveis: c.niveis, questionario: c.questionario };
+    return { nomeEstabelecimento: c.nomeEstabelecimento, horarios: c.horarios, ambientes: c.ambientes, diasFuncionamento: c.diasFuncionamento, antecedenciaMinutos: c.antecedenciaMinutos, pontosPorItem: c.pontosPorItem, niveis: c.niveis, questionario: c.questionario };
   });
-  rota('GET', '/public/cardapio', async () =>
-    (await colecao('cardapio'))
+  rota('GET', '/public/cardapio', async () => {
+    const [itens, cfg] = await Promise.all([colecao('cardapio'), getConfig()]);
+    return itens
       .map((p) => ({
         id: p.id, nome: p.nome, categoria: p.categoria, descricao: p.descricao ?? '', preco: Number(p.preco) || 0, destaque: p.destaque === true,
+        pontos: pontosDoProduto(p, cfg.pontosPorItem),
         foto: typeof p.foto === 'string' ? p.foto : '', teor: Number(p.teor) || 0,
         perfil: (p.perfil ?? {}) as Record<string, number>, notas: Array.isArray(p.notas) ? p.notas : [],
         resumo: typeof p.resumo === 'string' ? p.resumo : '', ingredientes: Array.isArray(p.ingredientes) ? p.ingredientes : [],
       }))
-      .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR')),
-  );
+      .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
+  });
   const recompensasAtivas = () => lista('recompensas@ativas', query(collection(db, 'recompensas'), where('status', '==', 'Ativa')));
   rota('GET', '/public/recompensas', async () =>
     (await recompensasAtivas())
@@ -631,7 +644,10 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const r = resumo(consumos, resgates);
     const aberta = comandas && !comandas.empty ? comandas.docs[0].data() : null;
     return {
-      comanda: aberta && { id: comandas!.docs[0].id, numero: aberta.numero, mesa: aberta.mesa ?? null, itens: aberta.itens ?? [], total: Number(aberta.total) || 0, abertaEm: aberta.abertaEm },
+      comanda: aberta && {
+        id: comandas!.docs[0].id, numero: aberta.numero, mesa: aberta.mesa ?? null, itens: aberta.itens ?? [], total: Number(aberta.total) || 0, abertaEm: aberta.abertaEm,
+        pontos: pontosDosItens(Array.isArray(aberta.itens) ? aberta.itens : []),
+      },
       cliente: publicCliente(c),
       pontos: r.pontos,
       acumulados: r.acumulados,
@@ -884,7 +900,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   rota('PUT', '/crm/config', async ({ b }) => {
     const ctx = await requireUsuario();
     requireAccess(ctx, 'parametros', 'editar');
-    if (b.pontosPorReal !== undefined && !(Number(b.pontosPorReal) >= 0)) fail(400, 'Pontos por real inválido.');
+    if (b.pontosPorItem !== undefined && !(Number.isInteger(Number(b.pontosPorItem)) && Number(b.pontosPorItem) >= 0)) fail(400, 'Pontos por item inválido.');
     if (b.horarios && !b.horarios.every((h: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(h))) fail(400, 'Horários devem estar no formato HH:MM (00:00 a 23:59).');
     if (b.questionario !== undefined) {
       const q = b.questionario as Dados;
@@ -1225,9 +1241,10 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   /* CRM: produtos disponíveis para venda (o atendimento lança consumo sem acesso ao cadastro de produtos) */
   rota('GET', '/crm/produtos-venda', async () => {
     requireAnyAccess(await requireUsuario(), ['consumos', 'comandas', 'produtos'], 'ver');
-    return (await colecao('produtos'))
+    const [produtos, cfg] = await Promise.all([colecao('produtos'), getConfig()]);
+    return produtos
       .filter((p) => p.status !== 'Inativo')
-      .map((p) => ({ id: p.id, nome: p.nome, categoria: p.categoria, preco: Number(p.preco) || 0, foto: p.foto || undefined }))
+      .map((p) => ({ id: p.id, nome: p.nome, categoria: p.categoria, preco: Number(p.preco) || 0, pontos: pontosDoProduto(p, cfg.pontosPorItem), foto: p.foto || undefined }))
       .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
   });
 
@@ -1345,23 +1362,23 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   function somarNoCaixa(lote: WriteBatch, caixaId: string, forma: string, valor: number, n = 1) {
     lote.update(doc(db, 'caixas', caixaId), { [`vendas.${forma}`]: increment(valor), totalVendas: increment(valor), qtdVendas: increment(n) });
   }
-  /** Itens vendidos com o preço do cadastro de produtos. */
+  /** Itens vendidos com o preço e os pontos (por unidade) do cadastro de produtos. */
   async function itensDaVenda(lista: unknown, vazio = false) {
-    const produtos = await colecao('produtos');
+    const [produtos, cfg] = await Promise.all([colecao('produtos'), getConfig()]);
     const itens = (Array.isArray(lista) ? lista : []).slice(0, 200).map((i: Dados) => {
       const p = produtos.find((x) => x.id === str(i.produtoId, 40));
       const quantidade = Math.floor(Number(i.quantidade));
       if (!p) return fail(400, 'Produto não encontrado.');
       if (!(quantidade >= 1 && quantidade <= 999)) fail(400, 'Quantidade inválida.');
       const preco = Number(p.preco) || 0;
-      return { produtoId: p.id, nome: p.nome, quantidade, preco, total: centavos(preco * quantidade) };
+      return { produtoId: p.id, nome: p.nome, quantidade, preco, total: centavos(preco * quantidade), pontos: pontosDoProduto(p, cfg.pontosPorItem) };
     });
     if (!itens.length && !vazio) fail(400, 'Adicione ao menos um item.');
     return { itens, valor: centavos(itens.reduce((s: number, i: { total: number }) => s + i.total, 0)) };
   }
   /** Consumo: receita e caixa no mesmo lote; com afilhado, também os pontos e o saldo. Sem afilhado (cliente sem cadastro), não há pontos. */
-  async function lancarConsumo(lote: WriteBatch, ctx: Ctx, cliente: Dados | null, itens: unknown[], valor: number, forma: string, caixaId: string, extra: Dados = {}, nomeAvulso = '') {
-    const pontos = cliente ? Math.floor(valor * (await getConfig()).pontosPorReal) : 0;
+  async function lancarConsumo(lote: WriteBatch, ctx: Ctx, cliente: Dados | null, itens: Dados[], valor: number, forma: string, caixaId: string, extra: Dados = {}, nomeAvulso = '') {
+    const pontos = cliente ? pontosDosItens(itens) : 0;
     const data = now();
     const consumoRef = doc(collection(db, 'consumos')), receitaRef = doc(collection(db, 'receitas'));
     const quem = cliente ? `${cliente.nome} (#${String(cliente.numero).padStart(3, '0')})` : nomeAvulso ? `${nomeAvulso} (sem cadastro)` : 'Cliente sem cadastro';
@@ -1410,14 +1427,19 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const caixa = cur.caixaId ? await registro('caixas', String(cur.caixaId)) : null;
     if (caixa?.status !== 'Aberto') fail(400, 'O caixa desta venda já foi fechado: ela não pode mais ser alterada.');
     const novos = await itensDaVenda(b.itens);
-    // o que já estava na venda mantém o preço cobrado na hora; só os itens novos entram pelo preço atual
-    const antigos = new Map(((Array.isArray(cur.itens) ? cur.itens : []) as Dados[]).map((i) => [String(i.produtoId), Number(i.preco) || 0]));
-    const itens = novos.itens.map((i) => (antigos.has(i.produtoId) ? { ...i, preco: antigos.get(i.produtoId)!, total: centavos(antigos.get(i.produtoId)! * i.quantidade) } : i));
+    // o que já estava na venda mantém o preço cobrado e os pontos da hora; só os itens novos entram pelo cadastro atual
+    const antigos = new Map(((Array.isArray(cur.itens) ? cur.itens : []) as Dados[]).map((i) => [String(i.produtoId), i]));
+    const itens = novos.itens.map((i) => {
+      const a = antigos.get(i.produtoId);
+      if (!a) return i;
+      const preco = Number(a.preco) || 0;
+      return { ...i, preco, total: centavos(preco * i.quantidade), pontos: a.pontos !== undefined ? Number(a.pontos) || 0 : i.pontos };
+    });
     const valor = centavos(itens.reduce((s, i) => s + i.total, 0));
     const forma = formaDe(b.formaPagamento);
     const valorAntes = Number(cur.valor) || 0, formaAntes = String(cur.formaPagamento);
     const pontosAntes = Number(cur.pontos) || 0;
-    const pontos = cur.clienteUid ? Math.floor(valor * (await getConfig()).pontosPorReal) : 0;
+    const pontos = cur.clienteUid ? pontosDosItens(itens) : 0;
     if (cur.clienteUid && pontos < pontosAntes) {
       const s = await saldoDe(String(cur.clienteUid));
       if (s.acumulados - (pontosAntes - pontos) < s.usados) {
@@ -1676,6 +1698,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const teor = Number(d.teor);
     return {
       nome: d.nome ?? '', categoria: d.categoria ?? '', descricao: d.descricao ?? '', preco: Number(d.preco) || 0, destaque: d.destaque === 'Sim',
+      // pontos próprios do produto; null = usa o padrão de Parâmetros
+      pontos: d.pontos !== undefined && d.pontos !== null && d.pontos !== '' && Number(d.pontos) >= 0 ? Math.floor(Number(d.pontos)) : null,
       foto: typeof d.foto === 'string' && d.foto.startsWith('data:image/') ? d.foto : '',
       teor: Number.isFinite(teor) && teor > 0 ? Math.min(100, Math.round(teor * 10) / 10) : 0,
       perfil: { docura: nota(d.docura), amargor: nota(d.amargor), acidez: nota(d.acidez), intensidade: nota(d.intensidade) },

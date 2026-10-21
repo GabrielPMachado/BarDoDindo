@@ -99,7 +99,6 @@ export default function Home() {
   const proxima = upcoming(me.reservas)[0];
   const categorias = useMemo(() => sortCategories([...new Set(cardapio.map((i) => i.categoria).filter(Boolean))]), [cardapio]);
   const destaques = cardapio.filter((i) => i.destaque);
-  const pontosPorReal = config?.pontosPorReal ?? 1;
   const horarios = config?.horarios ?? [];
   // próxima recompensa que ainda não dá para resgatar (ou a mais cara que já dá)
   const ordenadas = [...recompensas].sort((a, b) => a.custo - b.custo);
@@ -148,7 +147,7 @@ export default function Home() {
           {me.comanda.itens.length ? (
             <ul>{me.comanda.itens.map((i, k) => <li key={k}><span>{i.quantidade}× {i.nome}</span><span>{brl(i.total)}</span></li>)}</ul>
           ) : <p className="muted small">Comanda aberta. Os pedidos aparecem aqui assim que forem lançados.</p>}
-          <small>Ao fechar, você ganha +{Math.floor(me.comanda.total * pontosPorReal).toLocaleString('pt-BR')} pts</small>
+          <small>Ao fechar, você ganha +{(me.comanda.pontos ?? 0).toLocaleString('pt-BR')} pts</small>
         </section>
       )}
 
@@ -239,7 +238,7 @@ export default function Home() {
                   <small>Destaque da casa</small>
                   <h3>{p.nome}</h3>
                   {(p.resumo || p.descricao) && <p>{p.resumo || p.descricao}</p>}
-                  <span className="banner__preco">{brl(p.preco)} <em>+{Math.floor(p.preco * pontosPorReal)} pts</em></span>
+                  <span className="banner__preco">{brl(p.preco)} <em>+{p.pontos.toLocaleString('pt-BR')} pts</em></span>
                 </div>
                 <ItemFoto foto={p.foto} categoria={p.categoria} size="xl" alt={p.nome} />
               </div>

@@ -7,7 +7,8 @@ interface Config {
   ambientes: string[];
   diasFuncionamento: number[];
   antecedenciaMinutos: number;
-  pontosPorReal: number;
+  /** Pontos de cada item quando o produto não tem pontos próprios. */
+  pontosPorItem: number;
   niveis: { nome: string; minimo: number }[];
   /** Questionário opcional depois do cadastro (perguntas definidas no Cérebro). */
   questionario?: { ativo: boolean; titulo: string; perguntas: { id: string; texto: string; opcoes: string[] }[] };
@@ -20,6 +21,8 @@ export interface Produto {
   descricao: string;
   preco: number;
   destaque: boolean;
+  /** pontos que cada unidade dá ao afilhado */
+  pontos: number;
   foto?: string;
   /** teor alcoólico em %, 0 = não informado */
   teor?: number;
@@ -83,7 +86,7 @@ interface Me {
   resgates: Redemption[];
   reservas: Reservation[];
   /** Comanda aberta no bar agora (lançada pela equipe). */
-  comanda?: { id: string; numero: number; mesa: number | null; itens: { nome: string; quantidade: number; total: number }[]; total: number; abertaEm: string } | null;
+  comanda?: { id: string; numero: number; mesa: number | null; itens: { nome: string; quantidade: number; total: number }[]; total: number; pontos: number; abertaEm: string } | null;
 }
 
 interface Store {
