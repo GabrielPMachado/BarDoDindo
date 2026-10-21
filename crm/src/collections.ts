@@ -134,8 +134,15 @@ const TONES: Record<string, Tone> = {
   Manutenção: 'warn', 'Em avaliação': 'warn', Suspenso: 'warn', Aberta: 'warn', Acordo: 'info', Média: 'warn', Sazonal: 'info',
   Atrasado: 'bad', Atrasada: 'bad', Cancelado: 'bad', Cancelada: 'bad', Vencido: 'bad', 'Não conforme': 'bad', Desligado: 'neutral',
   Encerrado: 'neutral', Inativo: 'neutral', Inativa: 'neutral', Recusada: 'bad', 'Cancelada pelo cliente': 'neutral',
-  'Não compareceu': 'bad', Descartar: 'bad', Alta: 'bad', Crítica: 'bad', Baixa: 'neutral', 'Encerrado (desfavorável)': 'bad',
+  'Não compareceu': 'bad', Descartar: 'bad', Baixado: 'neutral', Alta: 'bad', Crítica: 'bad', Baixa: 'neutral', 'Encerrado (desfavorável)': 'bad',
 };
+/** Valor do bem hoje, com depreciação linear pela vida útil (sem data ou vida útil, não calcula). */
+function valorAtualDoBem(r: Row): number | null {
+  const anos = n(r.vidaUtil);
+  if (!anos || !r.aquisicao) return null;
+  const usado = Math.max(0, -daysUntil(r.aquisicao)) / 365.25;
+  return n(r.quantidade || 1) * n(r.valor) * Math.max(0, 1 - usado / anos);
+}
 export const toneOf = (value: unknown): Tone => TONES[s(value)] ?? 'neutral';
 
 export const STATUS_KEYS = ['status', 'resultado', 'estado', 'gravidade', 'prioridade'];
@@ -289,7 +296,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   },
   materiais: {
     id: 'materiais', anexos: 'Fichas técnicas e manuais', comFoto: true, porLocal: true, area: 'materiais', title: 'Materiais', singular: 'material',
-    description: 'Patrimônio: equipamentos, utensílios, mobiliário e uniformes.',
+    description: 'Utensílios, copos, equipamentos e uniformes do dia a dia, com a quantidade em cada local.',
     filterKey: 'tipo', filtros: ['local', 'estado', 'fornecedor'], sortKey: 'material',
     fields: [
       { key: 'material', label: 'Material', type: 'text', required: true, wide: true },
@@ -309,6 +316,37 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { label: 'Valor patrimonial', value: brl(rows.reduce((t, r) => t + n(r.quantidade) * n(r.valor), 0)) },
       { label: 'Em manutenção / descarte', value: num(count(rows, 'estado', ['Manutenção', 'Descartar'])) },
     ],
+  },
+  patrimonio: {
+    id: 'patrimonio', anexos: 'Notas fiscais, garantias e laudos', comFoto: true, area: 'patrimonio', title: 'Patrimônio', singular: 'bem',
+    description: 'Bens do bar (móveis, equipamentos, eletrônicos, instalações), com número de patrimônio, valor de aquisição e depreciação.',
+    filterKey: 'categoria', filtros: ['local', 'estado'], sortKey: 'nome',
+    fields: [
+      { key: 'nome', label: 'Bem', type: 'text', required: true, wide: true, placeholder: 'Ex.: Freezer horizontal, Mesa de madeira, Chopeira' },
+      { key: 'plaqueta', label: 'Nº de patrimônio', type: 'text', placeholder: 'Ex.: PAT-0001' },
+      { key: 'categoria', label: 'Categoria', type: 'select', options: ['Equipamento', 'Mobiliário', 'Eletrônico', 'Utensílio', 'Decoração', 'Instalação / benfeitoria', 'Veículo', 'Outro'], required: true },
+      { key: 'quantidade', label: 'Quantidade', type: 'number', default: 1, min: 1, max: 100_000 },
+      { key: 'valor', label: 'Valor unitário de aquisição', type: 'money', max: 10_000_000, formOnly: true },
+      { key: 'aquisicao', label: 'Data de aquisição', type: 'date' },
+      { key: 'vidaUtil', label: 'Vida útil (anos)', type: 'number', min: 0, max: 100, formOnly: true, placeholder: 'Ex.: 10 (móveis), 5 (equipamentos)' },
+      { key: 'estado', label: 'Estado', type: 'select', options: ['Novo', 'Bom', 'Regular', 'Manutenção', 'Baixado'], default: 'Bom' },
+      { key: 'local', label: 'Local', type: 'select', options: ['Salão', 'Bar', 'Cozinha', 'Depósito', 'Escritório', 'Área externa'], formOnly: true },
+      { key: 'fornecedor', label: 'Fornecedor', type: 'ref', ref: 'fornecedores', refKey: 'fornecedorId', livre: true, formOnly: true },
+      { key: 'observacoes', label: 'Observações', type: 'textarea', formOnly: true, wide: true },
+    ],
+    computed: [
+      { label: 'Valor de aquisição', get: (r) => n(r.quantidade || 1) * n(r.valor), format: 'money' },
+      { label: 'Valor atual', get: (r) => valorAtualDoBem(r), format: 'money' },
+    ],
+    kpis: (rows) => {
+      const ativos = rows.filter((r) => r.estado !== 'Baixado');
+      return [
+        { label: 'Bens no patrimônio', value: num(ativos.reduce((t, r) => t + n(r.quantidade || 1), 0)) },
+        { label: 'Valor de aquisição', value: brl(ativos.reduce((t, r) => t + n(r.quantidade || 1) * n(r.valor), 0)) },
+        { label: 'Valor atual (depreciado)', value: brl(ativos.reduce((t, r) => t + (valorAtualDoBem(r) ?? n(r.quantidade || 1) * n(r.valor)), 0)), hint: 'Depreciação linear pela vida útil' },
+        { label: 'Em manutenção', value: num(count(rows, 'estado', ['Manutenção'])), tone: count(rows, 'estado', ['Manutenção']) ? 'warn' : 'good' },
+      ];
+    },
   },
 
   compras: {

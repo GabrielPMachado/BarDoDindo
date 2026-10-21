@@ -42,6 +42,7 @@ const GENERIC: Record<string, string> = {
   '/estrutura/projetos': 'projetos',
   '/estrutura/estoque': 'estoque',
   '/estrutura/materiais': 'materiais',
+  '/estrutura/patrimonio': 'patrimonio',
   '/estrutura/notas': 'compras',
   '/adm/terceirizados': 'terceirizados',
   '/adm/fornecedores': 'fornecedores',

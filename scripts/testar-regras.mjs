@@ -231,6 +231,8 @@ if (senhaModular) {
   await permitido('Resultado (DRE) lê as receitas', () => getDocs(collection(db, 'receitas')));
   await negado('Resultado (DRE) não lança receita', () => addDoc(collection(db, 'receitas'), { descricao: 'x', valor: 1, data: '2026-10-01' }));
   await negado('ver colaboradores', () => getDocs(collection(db, 'colaboradores')));
+  await permitido('ver o Patrimônio (módulo com "ver")', () => getDocs(collection(db, 'patrimonio')));
+  await negado('cadastrar bem no Patrimônio (o módulo só tem "ver")', () => addDoc(collection(db, 'patrimonio'), { nome: 'x', categoria: 'Mobiliário' }));
   await permitido('Ticket médio (tela não marcada: vale a do Resultado) lê as receitas', () => getDocs(collection(db, 'receitas')));
   await permitido('Despesas fixas (só a tela) lê as despesas', () => getDocs(collection(db, 'despesas')));
   await negado('Despesas fixas (só ver) não lança despesa', () => addDoc(collection(db, 'despesas'), { descricao: 'x', categoria: 'Aluguel', valor: 1, data: '2026-10-01', status: 'A pagar' }));
@@ -340,6 +342,7 @@ if (senhaAdministrativo) {
   await negado('ver guarnições e itens fixos (sem Vendas)', () => getDocs(collection(db, 'guarnicoes')));
   await negado('ver Materiais (sem Vendas nem Estrutura)', () => getDocs(collection(db, 'materiais')));
   await negado('ver as notas de compra (Estrutura)', () => getDocs(collection(db, 'compras')));
+  await negado('ver o Patrimônio (Estrutura)', () => getDocs(collection(db, 'patrimonio')));
   await permitido('ler a chave da IA (equipe logada)', () => getDoc(doc(db, 'segredos', 'ia')));
   await negado('trocar a chave da IA (sem Configurações)', () => setDoc(doc(db, 'segredos', 'ia'), { chave: 'x' }));
   await negado('anexar PDF a um contrato (Administrativo)', async () => {
