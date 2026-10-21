@@ -107,7 +107,8 @@ service cloud.firestore {
     match /{col}/{id} {
       allow read: if col in colecoesCrm() && podeColecao(col, 'ver');
       allow create: if col in colecoesCrm() && podeColecao(col, 'criar');
-      allow update: if col in colecoesCrm() && podeColecao(col, 'editar');
+      // caixa fechado não muda mais (nem as sangrias e os suprimentos dele)
+      allow update: if col in colecoesCrm() && podeColecao(col, 'editar') && (col != 'caixas' || resource.data.status == 'Aberto');
       allow delete: if col in colecoesCrm() && podeColecao(col, 'excluir');
     }
 

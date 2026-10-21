@@ -183,6 +183,7 @@ function CaixaAberto({ caixa, comandasAbertas, onFechado }: { caixa: Caixa; coma
   const esperado = esperadoDe(caixa);
   const [contado, setContado] = useState<Record<string, number | ''>>({});
   const [mov, setMov] = useState<{ tipo: 'Sangria' | 'Suprimento'; valor: number | ''; motivo: string }>({ tipo: 'Sangria', valor: '', motivo: '' });
+  const [editMov, setEditMov] = useState<{ id: string; tipo: 'Sangria' | 'Suprimento'; valor: number | ''; motivo: string } | null>(null);
   const [obs, setObs] = useState('');
   const totalEsperado = Object.values(esperado).reduce((s, v) => s + v, 0);
   const totalContado = Object.keys(esperado).reduce((s, f) => s + (Number(contado[f]) || 0), 0);
@@ -195,6 +196,18 @@ function CaixaAberto({ caixa, comandasAbertas, onFechado }: { caixa: Caixa; coma
     await reload('/crm/caixa');
     setMov({ tipo: mov.tipo, valor: '', motivo: '' });
     notify(`${mov.tipo} registrada.`);
+  };
+  const salvarMov = async () => {
+    if (!editMov) return;
+    await api(`/crm/caixa/${caixa.id}/movimento/${editMov.id}`, { method: 'PATCH', body: { tipo: editMov.tipo, valor: Number(editMov.valor || 0), motivo: editMov.motivo } });
+    await reload('/crm/caixa');
+    setEditMov(null);
+    notify('Movimentação atualizada.');
+  };
+  const excluirMov = async (m: Caixa['movimentos'][number]) => {
+    await api(`/crm/caixa/${caixa.id}/movimento/${m.id}`, { method: 'DELETE' });
+    await reload('/crm/caixa');
+    notify(`${m.tipo === 'Sangria' ? 'Sangria excluída' : 'Suprimento excluído'}.`);
   };
   const fechar = async () => {
     const r = await api<{ fechamento: Caixa['fechamento'] }>(`/crm/caixa/${caixa.id}/fechar`, { method: 'POST', body: { contado, observacao: obs } });
@@ -235,6 +248,12 @@ function CaixaAberto({ caixa, comandasAbertas, onFechado }: { caixa: Caixa; coma
                   {m.tipo === 'Sangria' ? <ArrowUpCircle size={16} className="text-bad" /> : <ArrowDownCircle size={16} className="text-good" />}
                   <span><b>{m.tipo}</b> · {hora(m.em)} · {m.por}{m.motivo ? ` · ${m.motivo}` : ''}</span>
                   <strong>{m.tipo === 'Sangria' ? '−' : '+'}{brl(m.valor)}</strong>
+                  {podeMexer && (
+                    <span className="caixa-movs__acoes">
+                      <button type="button" className="icon-btn" onClick={() => setEditMov({ id: m.id, tipo: m.tipo, valor: m.valor, motivo: m.motivo })} aria-label={`Editar ${m.tipo.toLowerCase()} de ${brl(m.valor)}`}><Pencil size={14} /></button>
+                      <AsyncButton className="icon-btn" onClick={() => excluirMov(m)} confirm={{ title: `Excluir ${m.tipo === 'Sangria' ? 'a sangria' : 'o suprimento'}?`, message: `${brl(m.valor)}${m.motivo ? ` · ${m.motivo}` : ''}. O esperado no dinheiro é recalculado.`, confirmLabel: 'Excluir', danger: true }}><Trash2 size={14} /></AsyncButton>
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
@@ -252,6 +271,27 @@ function CaixaAberto({ caixa, comandasAbertas, onFechado }: { caixa: Caixa; coma
             </div>
           )}
         </section>
+
+        {editMov && (
+          <Modal title={`Editar ${editMov.tipo === 'Sangria' ? 'sangria' : 'suprimento'}`} width={460} onClose={() => setEditMov(null)}
+            footer={<>
+              <button type="button" className="btn btn--ghost" onClick={() => setEditMov(null)}>Cancelar</button>
+              <AsyncButton className="btn btn--primary" onClick={salvarMov} disabled={!editMov.valor || (editMov.tipo === 'Sangria' && !editMov.motivo.trim())}>Salvar</AsyncButton>
+            </>}>
+            <div className="caixa-mov-edit">
+              <div className="segmented" role="radiogroup" aria-label="Tipo de movimentação">
+                {(['Sangria', 'Suprimento'] as const).map((t) => (
+                  <button key={t} type="button" role="radio" aria-checked={editMov.tipo === t} className={editMov.tipo === t ? 'is-active' : ''} onClick={() => setEditMov({ ...editMov, tipo: t })}>{t}</button>
+                ))}
+              </div>
+              <label className="field-label" htmlFor="mov-valor">Valor</label>
+              <NumberInput id="mov-valor" spec={{ money: true, decimals: 2, min: 0.01, max: 100000 }} prefix="R$" value={editMov.valor} onChange={(v) => setEditMov({ ...editMov, valor: v })} />
+              <label className="field-label" htmlFor="mov-motivo">Motivo{editMov.tipo === 'Suprimento' ? ' (opcional)' : ''}</label>
+              <input id="mov-motivo" className="input" maxLength={200} value={editMov.motivo} onChange={(e) => setEditMov({ ...editMov, motivo: e.target.value })} />
+              <p className="muted small">Só dá para mudar enquanto o caixa estiver aberto.</p>
+            </div>
+          </Modal>
+        )}
 
         {podeMexer && (
           <section className="panel caixa-abrir caixa-fechar">

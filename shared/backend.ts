@@ -1422,6 +1422,44 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     await lote.commit();
     return mov;
   });
+  /** Sangria ou suprimento já lançado: só se corrige ou apaga enquanto o caixa estiver aberto. */
+  function movimentoDoCaixa(c: Dados, mid: string) {
+    const movs = (Array.isArray(c.movimentos) ? c.movimentos : []) as Dados[];
+    const i = movs.findIndex((m) => m.id === mid);
+    if (i < 0) fail(404, 'Movimentação não encontrada.');
+    return { movs, i, mov: movs[i] };
+  }
+  rota('PATCH', '/crm/caixa/:id/movimento/:mid', async ({ p, b }) => {
+    const ctx = await requireUsuario();
+    const c = await caixaParaAlterar(ctx, p.id);
+    const { movs, i, mov } = movimentoDoCaixa(c, p.mid);
+    const tipo = b.tipo === 'Suprimento' ? 'Suprimento' : 'Sangria';
+    const valor = centavos(Number(b.valor) || 0);
+    if (!(valor > 0)) fail(400, 'Informe o valor.');
+    const motivo = str(b.motivo, 200);
+    if (tipo === 'Sangria' && !motivo) fail(400, 'Informe o motivo da sangria.');
+    const novo = { ...mov, tipo, valor, motivo, editadoEm: now(), editadoPor: ctx.usuario.nome };
+    const lote = writeBatch(db);
+    lote.update(doc(db, 'caixas', p.id), { movimentos: movs.map((m, j) => (j === i ? novo : m)), atualizadoEm: now() });
+    registrar(lote, ctx, 'caixas', `editou ${tipo === 'Sangria' ? 'a sangria' : 'o suprimento'} do caixa`, {
+      colecao: 'caixas', alvo: String(c.nome), registroId: p.id,
+      detalhe: `${mov.tipo} ${brl(Number(mov.valor) || 0)} → ${tipo} ${brl(valor)}${motivo ? ` · ${motivo}` : ''}`,
+    });
+    await lote.commit();
+    return novo;
+  });
+  rota('DELETE', '/crm/caixa/:id/movimento/:mid', async ({ p }) => {
+    const ctx = await requireUsuario();
+    const c = await caixaParaAlterar(ctx, p.id);
+    const { movs, i, mov } = movimentoDoCaixa(c, p.mid);
+    const lote = writeBatch(db);
+    lote.update(doc(db, 'caixas', p.id), { movimentos: movs.filter((_, j) => j !== i), atualizadoEm: now() });
+    registrar(lote, ctx, 'caixas', `excluiu ${mov.tipo === 'Sangria' ? 'a sangria' : 'o suprimento'} do caixa`, {
+      colecao: 'caixas', alvo: String(c.nome), registroId: p.id, detalhe: `${brl(Number(mov.valor) || 0)}${mov.motivo ? ` · ${mov.motivo}` : ''}`,
+    });
+    await lote.commit();
+    return { ok: true };
+  });
   /** Esperado em cada forma: as vendas; no dinheiro, também o troco inicial, os suprimentos e as sangrias. */
   function esperadoDoCaixa(c: Dados) {
     const vendas = (c.vendas ?? {}) as Record<string, number>;

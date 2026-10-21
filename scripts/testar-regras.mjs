@@ -124,6 +124,14 @@ if (senhaAtendente) {
   const somar = (id) => updateDoc(doc(db, 'caixas', id), { 'vendas.Pix': increment(10), totalVendas: increment(10), qtdVendas: increment(1) });
   await permitido('somar venda no caixa aberto', () => somar('aberto'));
   await negado('excluir um caixa (não tem "excluir")', () => deleteDoc(doc(db, 'caixas', 'aberto')));
+  // sangrias e suprimentos: corrigir ou apagar só com o caixa aberto
+  const movs = (id, m) => updateDoc(doc(db, 'caixas', id), { movimentos: m, atualizadoEm: new Date().toISOString() });
+  const sangria = { id: 'm1', tipo: 'Sangria', valor: 20, motivo: 'gelo', em: new Date().toISOString(), por: 'Atendente Teste' };
+  await permitido('lançar sangria no caixa aberto', () => movs('aberto', [sangria]));
+  await permitido('editar sangria no caixa aberto', () => movs('aberto', [{ ...sangria, valor: 25 }]));
+  await permitido('excluir sangria no caixa aberto', () => movs('aberto', []));
+  await negado('editar sangria de caixa fechado', () => movs('fechado', [sangria]));
+  await negado('reabrir caixa fechado', () => updateDoc(doc(db, 'caixas', 'fechado'), { status: 'Aberto' }));
   await permitido('abrir comanda', () => addDoc(collection(db, 'comandas'), { numero: 9, nome: 'Avulsa', mesa: 1, itens: [], total: 0, status: 'Aberta' }));
   await permitido('ver as comandas do salão', () => getDocs(collection(db, 'comandas')));
   await permitido('lançar a receita de uma comanda avulsa', () => addDoc(collection(db, 'receitas'), { descricao: 'Comanda #009', valor: 10, comandaId: 'x', caixaId: 'aberto' }));
