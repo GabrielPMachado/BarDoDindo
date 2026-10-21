@@ -379,7 +379,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
           <EmptyState title="Nenhum resultado">Ajuste a busca ou o filtro.</EmptyState>
         ) : visao === 'cartoes' ? (
           grupos ? grupos.map((g) => (
-            <section key={g.chave} className="grupo-cartoes">
+            <section key={g.chave} className="grupo-cartoes grupo-cartoes--compacto">
               <h3 className="grupo-titulo"><span className="muted">{campoGrupo!.label.replace(/\s*\(.*\)$/, '')}:</span> {g.titulo} <span className="grupo-titulo__qtd">{num(g.rows.length)}</span></h3>
               <VisaoCartoes def={def} rows={g.rows} onAbrir={setEditing} fmt={formatField} titulo={tituloDe} sel={sel} marcar={marcar} onAmpliar={ampliar} />
             </section>
@@ -390,7 +390,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
           <VisaoCalendario def={def} rows={rows} onAbrir={setEditing} fmt={formatField} titulo={tituloDe} />
         ) : (
           <div className="table-wrap">
-            <table className={`table table--cards ${selecionados.length ? 'table--selecionando' : ''}`}>
+            <table className={`table table--cards ${selecionados.length ? 'table--selecionando' : ''} ${grupos ? 'table--agrupada' : ''}`}>
               <thead>
                 <tr>
                   <th className="sel-col">
@@ -437,12 +437,12 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
                           : <span className="thumb thumb--vazio"><ImageOff size={14} /></span>}
                       </td>
                     )}
-                    {tableFields.map((f) => canEdit && editavelNaTabela(def, f) ? (
-                      <td key={f.key} data-label={f.label} className={cellClass(f)} onClick={(e) => e.stopPropagation()}>
+                    {tableFields.map((f, fi) => canEdit && editavelNaTabela(def, f) ? (
+                      <td key={f.key} data-label={f.label} className={`${cellClass(f)} ${fi === 0 ? 'col-titulo' : ''}`} onClick={(e) => e.stopPropagation()}>
                         <CelulaRapida def={def} field={f} row={r} onSalvar={(dados) => col.update(r.id, dados)}>{formatField(f, r[f.key])}</CelulaRapida>
                       </td>
                     ) : (
-                      <td key={f.key} data-label={f.label} className={cellClass(f)}>{formatField(f, r[f.key])}</td>
+                      <td key={f.key} data-label={f.label} className={`${cellClass(f)} ${fi === 0 ? 'col-titulo' : ''}`}>{formatField(f, r[f.key])}</td>
                     ))}
                     {def.computed?.map((c) => (
                       <td key={c.label} data-label={c.label} className={c.format === 'badge' || c.format === 'text' ? 'nowrap' : 'num'}>{formatComputed(c, r)}</td>
