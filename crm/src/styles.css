@@ -1582,6 +1582,7 @@ button.anexos__nome:hover { text-decoration: underline; }
 .mapa-legenda i.is-reservada, .mesa.is-reservada { --cor: var(--info); }
 .mapa-legenda i.is-inativa, .mesa.is-inativa { --cor: #6b625e; }
 .mapa-legenda i { background: var(--cor); }
+.mapa-legenda i.is-bar { --cor: var(--brand); }
 .mapa-rolagem { overflow-x: auto; }
 .mapa-salao {
   position: relative; margin: 14px; aspect-ratio: 16 / 10; min-height: 360px; border-radius: 14px; overflow: hidden; touch-action: none;
@@ -1593,9 +1594,9 @@ button.anexos__nome:hover { text-decoration: underline; }
 .planta__loja { position: absolute; height: 15%; background: var(--surface); border: 1px solid var(--border); }
 .planta__loja--cima { top: 0; border-top: 0; }
 .planta__loja--baixo { bottom: 0; border-bottom: 0; }
-.planta__bar { background: color-mix(in srgb, var(--brand) 22%, var(--surface)); border-color: var(--brand); display: grid; place-items: center; }
-.planta__bar b { color: var(--text); font-size: 12px; white-space: nowrap; }
-.planta__porta { position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%); width: 34%; height: 6px; border-radius: 3px; background: var(--brand); font-size: 0; }
+.planta__bar { z-index: 1; background: color-mix(in srgb, var(--brand) 40%, var(--surface)); border: 2px solid var(--brand); box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 25%, transparent), 0 6px 18px #0008; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--text); }
+.planta__bar b { color: var(--text); font-size: 13px; white-space: nowrap; }
+.planta__porta { position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%); width: 40%; height: 8px; border-radius: 4px; background: var(--brand-light); font-size: 0; }
 .planta__corredor { position: absolute; left: 39%; top: 56%; transform: translate(-50%, -50%); letter-spacing: .2em; text-transform: uppercase; opacity: .35; white-space: nowrap; }
 .planta__entrada { position: absolute; left: 6px; top: 50%; transform: translateY(-50%) rotate(180deg); writing-mode: vertical-rl; letter-spacing: .15em; text-transform: uppercase; opacity: .6; }
 .planta__praca { position: absolute; top: 0; right: 0; bottom: 0; width: 21%; border-left: 1px dashed var(--border); background: #ffffff05; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 6px; }

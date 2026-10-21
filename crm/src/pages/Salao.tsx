@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  ArrowDownCircle, ArrowUpCircle, Ban, Check, LayoutGrid, List, LockOpen, Lock, Map as MapIcon, Minus, Move, Pencil, Plus, Receipt, Search, Sparkles, Trash2, Users, Wallet,
+  ArrowDownCircle, ArrowUpCircle, Ban, Check, LayoutGrid, List, LockOpen, Lock, Map as MapIcon, Minus, Move, Pencil, Plus, Receipt, Search, Sparkles, Store, Trash2, Users, Wallet,
 } from 'lucide-react';
 import { AsyncButton, Badge, EmptyState, ErrorBox, KpiRow, Loading, Modal, NumberInput, PageHead, notify } from '../components/ui';
 import { SelectPicker, confirmar } from '../components/pickers';
@@ -756,15 +756,16 @@ export function MesasPage() {
             { v: 'mapa', label: 'Mapa', icon: MapIcon }, { v: 'cartoes', label: 'Cartões', icon: LayoutGrid }, { v: 'lista', label: 'Lista', icon: List },
           ]} />
           <span className="mapa-legenda">
-            <i className="is-livre" /> Livre <i className="is-ocupada" /> Ocupada <i className="is-reservada" /> Reservada <i className="is-inativa" /> Inativa
+            <i className="is-livre" /> Livre <i className="is-ocupada" /> Ocupada <i className="is-reservada" /> Reservada <i className="is-inativa" /> Inativa <i className="is-bar" /> Bar do Dindo
           </span>
         </div>
-        {col.loading && !mesas.length ? <Loading /> : !mesas.length ? (
+        {col.loading && !mesas.length ? <Loading /> : !mesas.length ? (<>
           <EmptyState title="Nenhuma mesa cadastrada"
             action={pode('mesas', 'criar') && <div className="row-gap">{botaoMontar}<button type="button" className="btn btn--ghost" onClick={() => setGerar(true)}><Plus size={16} /> Criar mesas</button></div>}>
             Crie as mesas do salão (você pode gerar várias de uma vez e depois arrastar cada uma para o lugar certo no mapa).
           </EmptyState>
-        ) : visao === 'mapa' ? (
+          {visao === 'mapa' && <MapaSalao mesas={[]} editando={false} situacao={situacao} onMover={salvarPosicao} onClicar={() => undefined} />}
+        </>) : visao === 'mapa' ? (
           <MapaSalao mesas={visiveis} editando={editando} situacao={situacao} onMover={salvarPosicao} onClicar={(m) => (editando ? setForm(m) : setVendo(m))} />
         ) : visao === 'cartoes' ? (
           <div className="mesas-grid pad">
@@ -856,8 +857,9 @@ function MapaSalao({ mesas, editando, situacao, onMover, onClicar }: {
     const r = area.current!.getBoundingClientRect();
     return { x: Math.min(96, Math.max(2, ((e.clientX - r.left) / r.width) * 100)), y: Math.min(94, Math.max(3, ((e.clientY - r.top) / r.height) * 100)) };
   };
+  // no celular o mapa rola de lado: abre centralizado na porta do bar
   return (
-    <div className="mapa-rolagem" ref={(el) => { if (el && !el.dataset.rolou) { el.dataset.rolou = '1'; el.scrollLeft = el.scrollWidth; } }}>
+    <div className="mapa-rolagem" ref={(el) => { if (el && !el.dataset.rolou) { el.dataset.rolou = '1'; el.scrollLeft = el.scrollWidth * 0.6 - el.clientWidth / 2; } }}>
     <div className={`mapa-salao ${editando ? 'is-editando' : ''}`} ref={area}>
       <PlantaBoulevard />
       {mesas.map((m) => {
@@ -914,7 +916,7 @@ function PlantaBoulevard() {
     <div className="planta" aria-hidden="true">
       {lojasCima.map(([a, b]) => <span key={`c${a}`} className="planta__loja planta__loja--cima" style={{ left: `${a}%`, width: `${b - a}%` }} />)}
       <span className="planta__loja planta__loja--cima planta__bar" style={{ left: '53.4%', width: '12.8%' }}>
-        <b>Bar do Dindo</b><i className="planta__porta">porta</i>
+        <Store size={18} /><b>Bar do Dindo</b><i className="planta__porta">porta</i>
       </span>
       {lojasBaixo.map(([a, b]) => <span key={`b${a}`} className="planta__loja planta__loja--baixo" style={{ left: `${a}%`, width: `${b - a}%` }} />)}
       <span className="planta__corredor">Corredor do boulevard</span>
