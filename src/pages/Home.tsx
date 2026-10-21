@@ -35,13 +35,12 @@ export function Avatar({ editable = false, size = 'lg' }: { editable?: boolean; 
       const img = new Image();
       img.onload = () => {
         const c = document.createElement('canvas');
-        const s = 480; // o dobro do tamanho na tela, para ficar nítida em celular de tela densa
+        const s = 240;
         c.width = c.height = s;
         const ctx = c.getContext('2d')!;
-        ctx.imageSmoothingQuality = 'high';
         const min = Math.min(img.width, img.height);
         ctx.drawImage(img, (img.width - min) / 2, (img.height - min) / 2, min, min, 0, 0, s, s);
-        atualizarPerfil({ foto: c.toDataURL('image/jpeg', 0.86) }).catch((e) => setErro(e.message));
+        atualizarPerfil({ foto: c.toDataURL('image/jpeg', 0.82) }).catch((e) => setErro(e.message));
       };
       img.src = reader.result as string;
     };
