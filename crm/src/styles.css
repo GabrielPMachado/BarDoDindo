@@ -1588,6 +1588,18 @@ button.anexos__nome:hover { text-decoration: underline; }
   border: 1px solid var(--border);
 }
 .mapa-salao.is-editando { border-style: dashed; border-color: var(--brand); }
+.planta { position: absolute; inset: 0; pointer-events: none; font-size: 11px; color: var(--muted); }
+.planta__loja { position: absolute; height: 15%; background: var(--surface); border: 1px solid var(--border); }
+.planta__loja--cima { top: 0; border-top: 0; }
+.planta__loja--baixo { bottom: 0; border-bottom: 0; }
+.planta__bar { background: color-mix(in srgb, var(--brand) 22%, var(--surface)); border-color: var(--brand); display: grid; place-items: center; }
+.planta__bar b { color: var(--text); font-size: 12px; white-space: nowrap; }
+.planta__porta { position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%); width: 34%; height: 6px; border-radius: 3px; background: var(--brand); font-size: 0; }
+.planta__corredor { position: absolute; left: 39%; top: 50%; transform: translate(-50%, -50%); letter-spacing: .2em; text-transform: uppercase; opacity: .35; white-space: nowrap; }
+.planta__entrada { position: absolute; left: 6px; top: 50%; transform: translateY(-50%) rotate(180deg); writing-mode: vertical-rl; letter-spacing: .15em; text-transform: uppercase; opacity: .6; }
+.planta__praca { position: absolute; top: 0; right: 0; bottom: 0; width: 21%; border-left: 1px dashed var(--border); background: #ffffff05; display: flex; flex-direction: column; justify-content: center; align-items: center; padding-top: 12%; }
+.planta__banco { position: absolute; left: 18%; top: 34%; width: 46%; aspect-ratio: 2 / 1; border: 5px solid color-mix(in srgb, #b07a45 60%, var(--border)); border-top: 0; border-radius: 0 0 999px 999px; }
+.planta__praca small { opacity: .7; }
 .mesa {
   position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
   width: 64px; height: 64px; border-radius: 12px; color: var(--text); cursor: pointer; user-select: none;
@@ -1607,7 +1619,7 @@ button.anexos__nome:hover { text-decoration: underline; }
 .mesa--balcao { width: 150px; height: 44px; border-radius: 8px; }
 .is-editando .mesa { cursor: grab; }
 .is-editando .mesa:active { cursor: grabbing; }
-@media (max-width: 700px) { .mesa { width: 46px; height: 46px; } .mesa b { font-size: 16px; } .mesa small { display: none; } .mesa--retangular.mesa--m, .mesa--retangular.mesa--g, .mesa--balcao { width: 80px; } }
+@media (max-width: 700px) { .planta { font-size: 9px; } .planta__bar b { font-size: 10px; white-space: normal; text-align: center; } .planta__corredor { display: none; } .mesa { width: 46px; height: 46px; } .mesa b { font-size: 16px; } .mesa small { display: none; } .mesa--retangular.mesa--m, .mesa--retangular.mesa--g, .mesa--balcao { width: 80px; } }
 .mesas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
 .mesa-card { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; gap: 4px 12px; align-items: center; text-align: left; padding: 12px; border-radius: 12px; color: var(--text);
   background: var(--surface-2); border: 1px solid var(--border); border-left: 4px solid var(--cor); }
