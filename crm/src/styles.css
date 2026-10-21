@@ -1691,6 +1691,23 @@ button.anexos__nome:hover { text-decoration: underline; }
   .table--agrupada.table--cards tr.grupo-linha th { padding: 10px 12px 6px; }
   .grupo-cartoes--compacto .cartoes { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 8px 12px 12px; }
 }
+/* grupos recolhíveis: o cabeçalho abre e fecha o grupo */
+.grupo-toggle { display: inline-flex; align-items: center; gap: 6px; width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; text-align: left; cursor: pointer; }
+.grupo-toggle:hover { color: var(--text); }
+.grupo-toggle__seta { flex-shrink: 0; color: var(--muted); transition: transform .15s; }
+.is-aberto > * > .grupo-toggle .grupo-toggle__seta, .is-aberto > .grupo-titulo .grupo-toggle__seta { transform: rotate(90deg); color: var(--brand); }
+.table--agrupada tr.grupo-linha th { padding-top: 10px; padding-bottom: 10px; }
+.grupo-cartoes--compacto .grupo-titulo { padding: 12px 16px; }
+.grupo-cartoes--compacto.is-aberto .grupo-titulo { padding-bottom: 0; }
+/* "Ver mais" de cada grupo */
+.table tr.grupo-mais-linha td { padding: 4px 16px 8px 34px !important; }
+.grupo-mais-cartoes { padding: 0 16px 14px; }
+.grupo-mais { color: var(--brand); }
+@media (max-width: 640px) {
+  .table--cards tr.grupo-mais-linha { padding: 2px 12px 8px; }
+  .table--cards tr.grupo-mais-linha td { display: block; text-align: left; padding: 0 !important; }
+  .table--cards tr.grupo-mais-linha td::before { content: none; }
+}
 
 /* "Outro" nas listas: campo para descrever e a pergunta se vira opção permanente */
 .select-outro { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
