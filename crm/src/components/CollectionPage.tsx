@@ -661,9 +661,11 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
 /** Foto do registro: escolher (a imagem é reduzida antes de salvar), trocar ou remover. */
 /** Tamanho guardado da foto: mídias e artes ficam maiores (até 1600 px), sempre abaixo do limite do banco. */
 async function fotoNoTamanho(arquivo: File, grande?: boolean) {
-  for (const lado of grande ? [1600, 1280, 1024, 800, 640] : [640]) {
+  // Cabe no registro do Firestore sem pesar a lista: tenta o maior tamanho que fica abaixo do limite.
+  const [lados, limite] = grande ? [[1600, 1280, 1024, 800, 640], 390_000] : [[1280, 1024, 800, 640], 200_000];
+  for (const lado of lados) {
     const foto = await reduzirFoto(arquivo, lado, false);
-    if (foto.length <= 390_000 || lado === 640) return foto;
+    if (foto.length <= limite || lado === 640) return foto;
   }
   return reduzirFoto(arquivo, 640, false);
 }

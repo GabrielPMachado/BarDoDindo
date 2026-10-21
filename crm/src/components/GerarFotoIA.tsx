@@ -60,7 +60,7 @@ export function GerarFotoIA({ data, onUsar, padrao = 'produto' }: { data: Record
   const receber = async (arquivo?: File) => {
     if (!arquivo) return;
     setErro(null);
-    try { setNova(await reduzirFoto(arquivo, 640, false)); } catch (e) { setErro(e instanceof Error ? e.message : 'Não foi possível ler a imagem.'); }
+    try { setNova(await reduzirFoto(arquivo, 1024, false)); } catch (e) { setErro(e instanceof Error ? e.message : 'Não foi possível ler a imagem.'); }
   };
 
   if (!aberto && !nova) {
