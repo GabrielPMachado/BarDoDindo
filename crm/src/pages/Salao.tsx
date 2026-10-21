@@ -842,6 +842,7 @@ function MapaSalao({ mesas, editando, situacao, onMover, onClicar }: {
   };
   return (
     <div className={`mapa-salao ${editando ? 'is-editando' : ''}`} ref={area}>
+      <PlantaBoulevard />
       {mesas.map((m) => {
         const p = posicao(m);
         const s = situacao(m);
@@ -865,6 +866,24 @@ function MapaSalao({ mesas, editando, situacao, onMover, onClicar }: {
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/** Fundo do mapa: o corredor do boulevard da Nova Olaria, com as lojas dos dois lados, a porta do bar e a praça do palco no fundo. */
+function PlantaBoulevard() {
+  const lojasCima = [[0, 13], [13, 26], [26, 39], [39, 50], [50, 61]];
+  const lojasBaixo = [[0, 14], [14, 28], [28, 42], [42, 56], [56, 68], [68, 79]];
+  return (
+    <div className="planta" aria-hidden="true">
+      {lojasCima.map(([a, b]) => <span key={`c${a}`} className="planta__loja planta__loja--cima" style={{ left: `${a}%`, width: `${b - a}%` }} />)}
+      <span className="planta__loja planta__loja--cima planta__bar" style={{ left: '61%', width: '18%' }}>
+        <b>Bar do Dindo</b><i className="planta__porta">porta</i>
+      </span>
+      {lojasBaixo.map(([a, b]) => <span key={`b${a}`} className="planta__loja planta__loja--baixo" style={{ left: `${a}%`, width: `${b - a}%` }} />)}
+      <span className="planta__corredor">Corredor do boulevard</span>
+      <span className="planta__entrada">Entrada</span>
+      <span className="planta__praca"><span className="planta__banco" /><small>Praça · palco</small></span>
     </div>
   );
 }
