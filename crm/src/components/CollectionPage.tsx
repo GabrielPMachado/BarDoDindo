@@ -31,6 +31,8 @@ import { camposDosLocais, locaisDe, locaisNoFormulario } from '../lib/locais';
 import { calcularFicha, fichaDe, type Ficha } from '../lib/ficha';
 
 const PAGE = 50;
+/** Lista agrupada (tabela): linhas mostradas por grupo antes do "Ver mais". */
+const LINHAS_POR_GRUPO = 5;
 
 function formatField(f: Field, v: unknown): ReactNode {
   if (v === undefined || v === null || v === '') return <span className="muted">—</span>;
@@ -189,41 +191,51 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
     const pos = (g: { chave: string }) => (!g.chave ? Infinity : ordem.includes(g.chave) ? ordem.indexOf(g.chave) : ordem.length);
     return [...mapa.values()].sort((a, b) => pos(a) - pos(b) || a.titulo.localeCompare(b.titulo, 'pt-BR', { numeric: true }));
   }, [rows, campoGrupo]);
-  // grupos começam recolhidos (só o cabeçalho com a contagem): toque no cabeçalho para abrir
-  const [abertos, setAbertos] = useState<Set<string>>(() => new Set());
+  /* grupos abertos, mostrando só a primeira linha de itens; "Ver mais" mostra o grupo inteiro e o cabeçalho recolhe o grupo */
+  const [fechados, setFechados] = useState<Set<string>>(() => new Set());
+  const [completos, setCompletos] = useState<Set<string>>(() => new Set());
   const idGrupo = (chave: string) => `${campoGrupo?.key}:${chave}`;
-  const aberto = (chave: string) => abertos.has(idGrupo(chave));
-  const alternarGrupo = (chave: string) => { setAbertos((x) => { const n = new Set(x); if (n.has(idGrupo(chave))) n.delete(idGrupo(chave)); else n.add(idGrupo(chave)); return n; }); setPage(0); };
-  const todosAbertos = !!grupos && grupos.every((g) => aberto(g.chave));
-  const abrirTodos = (on: boolean) => { setAbertos(on && grupos ? new Set(grupos.map((g) => idGrupo(g.chave))) : new Set()); setPage(0); };
-  const ordenadas = grupos ? grupos.flatMap((g) => (aberto(g.chave) ? g.rows : [])) : rows;
-  const indiceGrupo = new Map((grupos ?? []).map((g, i) => [g.chave, i]));
-  const grupoDe = (r: Row) => indiceGrupo.get(chaveFiltro(r[campoGrupo!.key])) ?? 0;
+  const aberto = (chave: string) => !fechados.has(idGrupo(chave));
+  const completo = (chave: string) => completos.has(idGrupo(chave));
+  const alternar = (set: typeof setFechados, chave: string) => set((x) => { const n = new Set(x); if (n.has(idGrupo(chave))) n.delete(idGrupo(chave)); else n.add(idGrupo(chave)); return n; });
+  // quantos itens cabem na primeira linha: na tabela, algumas linhas; nos cartões, quantos cartões cabem na largura do painel
+  const [larguraPainel, setLarguraPainel] = useState(0);
+  const painelRef = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return;
+    const medir = () => setLarguraPainel(el.clientWidth);
+    medir();
+    new ResizeObserver(medir).observe(el);
+  }, []);
+  const porLinha = visao === 'cartoes'
+    ? (larguraPainel && larguraPainel <= 640 ? 2 : Math.max(1, Math.floor((larguraPainel - 32 + 10) / (150 + 10))))
+    : larguraPainel && larguraPainel <= 640 ? 3 : LINHAS_POR_GRUPO;
+  type Grupo = NonNullable<typeof grupos>[number];
+  const itensDoGrupo = (g: Grupo) => (!aberto(g.chave) ? [] : completo(g.chave) ? g.rows : g.rows.slice(0, porLinha));
   const rotuloGrupo = campoGrupo?.label.replace(/\s*\(.*\)$/, '') ?? '';
-  const cabecalhoGrupo = (g: NonNullable<typeof grupos>[number]) => (
-    <tr key={`g:${g.chave}`} className={`grupo-linha ${aberto(g.chave) ? 'is-aberto' : ''}`}>
-      <th colSpan={colunas} scope="colgroup">
-        <button type="button" className="grupo-toggle" onClick={() => alternarGrupo(g.chave)} aria-expanded={aberto(g.chave)}>
-          <ChevronRight size={14} className="grupo-toggle__seta" />
-          <span className="muted">{rotuloGrupo}:</span> {g.titulo}
-          <span className="grupo-titulo__qtd">{num(g.rows.length)}</span>
-        </button>
-      </th>
-    </tr>
+  const tituloGrupo = (g: Grupo) => (
+    <button type="button" className="grupo-toggle" onClick={() => alternar(setFechados, g.chave)} aria-expanded={aberto(g.chave)} title={aberto(g.chave) ? 'Recolher o grupo' : 'Abrir o grupo'}>
+      <ChevronRight size={14} className="grupo-toggle__seta" />
+      <span className="muted">{rotuloGrupo}:</span> {g.titulo}
+      <span className="grupo-titulo__qtd">{num(g.rows.length)}</span>
+    </button>
   );
-  /** Cabeçalhos antes da linha i: os grupos recolhidos que ficam entre a linha anterior e esta, e o grupo desta linha. */
-  const cabecalhosAntes = (i: number) => {
-    const gi = grupoDe(visible[i]);
-    const ant = i > 0 ? grupoDe(visible[i - 1]) : page > 0 ? grupoDe(ordenadas[page * PAGE - 1]) : -1;
-    if (i > 0 && ant === gi) return null;
-    return grupos!.slice(ant + 1, gi + 1).map(cabecalhoGrupo);
-  };
-  /** Na última página, os grupos recolhidos depois da última linha (ou todos, se nenhum estiver aberto). */
-  const cabecalhosFinais = () => grupos!.slice(visible.length ? grupoDe(visible[visible.length - 1]) + 1 : 0).map(cabecalhoGrupo);
+  const temMais = (g: Grupo) => aberto(g.chave) && g.rows.length > porLinha;
+  const botaoVerMais = (g: Grupo) => (
+    <button type="button" className="btn btn--ghost btn--sm grupo-mais" onClick={() => alternar(setCompletos, g.chave)}>
+      {completo(g.chave) ? 'Ver menos' : `Ver mais (${num(g.rows.length - porLinha)})`}
+    </button>
+  );
+  /** Tabela agrupada: cabeçalho, as linhas visíveis do grupo e o "Ver mais", sem paginação. */
+  type ItemTabela = { tipo: 'cab'; g: Grupo } | { tipo: 'mais'; g: Grupo } | { tipo: 'linha'; r: Row };
+  const itensTabela: ItemTabela[] | null = grupos && grupos.flatMap((g): ItemTabela[] => [
+    { tipo: 'cab', g },
+    ...itensDoGrupo(g).map((r): ItemTabela => ({ tipo: 'linha', r })),
+    ...(temMais(g) ? [{ tipo: 'mais' as const, g }] : []),
+  ]);
   const colunas = 2 + (def.comFoto ? 1 : 0) + tableFields.length + (def.computed?.length ?? 0);
 
-  const pages = Math.max(1, Math.ceil(ordenadas.length / PAGE));
-  const visible = ordenadas.slice(page * PAGE, page * PAGE + PAGE);
+  const pages = grupos ? 1 : Math.max(1, Math.ceil(rows.length / PAGE));
+  const visible = grupos ? grupos.flatMap(itensDoGrupo) : rows.slice(page * PAGE, page * PAGE + PAGE);
 
   /* seleção: marca linhas para exportar só elas ou excluir várias de uma vez */
   const [sel, setSel] = useState<Set<string>>(() => new Set());
@@ -328,7 +340,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
       {def.kpis && all.length > 0 && <KpiRow items={def.kpis(all)} />}
       {before?.(all)}
 
-      <div className="panel">
+      <div className="panel" ref={painelRef}>
         <div className="toolbar">
           <label className="search">
             <Search size={16} />
@@ -369,9 +381,6 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
               {dimensoes.map((f) => <option key={f.key} value={f.key}>Agrupar: {f.label.replace(/\s*\(.*\)$/, '')}</option>)}
             </select>
           )}
-          {grupos && (visao === 'tabela' || visao === 'cartoes') && (
-            <button className="btn btn--ghost btn--sm" onClick={() => abrirTodos(!todosAbertos)}>{todosAbertos ? 'Recolher grupos' : 'Abrir grupos'}</button>
-          )}
           <SeletorVisao visoes={visoes} valor={visao} onChange={mudarVisao} />
           <span className="muted toolbar__count">{num(rows.length)} {rows.length === 1 ? 'registro' : 'registros'}</span>
         </div>
@@ -411,13 +420,9 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
         ) : visao === 'cartoes' ? (
           grupos ? grupos.map((g) => (
             <section key={g.chave} className={`grupo-cartoes grupo-cartoes--compacto ${aberto(g.chave) ? 'is-aberto' : ''}`}>
-              <h3 className="grupo-titulo">
-                <button type="button" className="grupo-toggle" onClick={() => alternarGrupo(g.chave)} aria-expanded={aberto(g.chave)}>
-                  <ChevronRight size={14} className="grupo-toggle__seta" />
-                  <span className="muted">{rotuloGrupo}:</span> {g.titulo} <span className="grupo-titulo__qtd">{num(g.rows.length)}</span>
-                </button>
-              </h3>
-              {aberto(g.chave) && <VisaoCartoes def={def} rows={g.rows} onAbrir={setEditing} fmt={formatField} titulo={tituloDe} sel={sel} marcar={marcar} onAmpliar={ampliar} />}
+              <h3 className="grupo-titulo">{tituloGrupo(g)}</h3>
+              {aberto(g.chave) && <VisaoCartoes def={def} rows={itensDoGrupo(g)} onAbrir={setEditing} fmt={formatField} titulo={tituloDe} sel={sel} marcar={marcar} onAmpliar={ampliar} />}
+              {temMais(g) && <div className="grupo-mais-cartoes">{botaoVerMais(g)}</div>}
             </section>
           )) : <VisaoCartoes def={def} rows={rows} onAbrir={setEditing} fmt={formatField} titulo={tituloDe} sel={sel} marcar={marcar} onAmpliar={ampliar} />
         ) : visao === 'quadro' ? (
@@ -450,9 +455,18 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
                 </tr>
               </thead>
               <tbody>
-                {visible.map((r, i) => (
+                {(itensTabela ?? visible.map((r): ItemTabela => ({ tipo: 'linha', r }))).map((it) => {
+                  if (it.tipo === 'cab') return (
+                    <tr key={`g:${it.g.chave}`} className={`grupo-linha ${aberto(it.g.chave) ? 'is-aberto' : ''}`}>
+                      <th colSpan={colunas} scope="colgroup">{tituloGrupo(it.g)}</th>
+                    </tr>
+                  );
+                  if (it.tipo === 'mais') return (
+                    <tr key={`m:${it.g.chave}`} className="grupo-mais-linha"><td colSpan={colunas}>{botaoVerMais(it.g)}</td></tr>
+                  );
+                  const r = it.r;
+                  return (
                   <Fragment key={r.id}>
-                  {grupos && cabecalhosAntes(i)}
                   <tr data-solta={soltaAnexo ? '' : undefined} {...arrastoNaLinha(r)}
                     className={`is-clickable ${sel.has(r.id) ? 'is-selecionado' : ''} ${soltandoEm?.id === r.id ? 'is-soltando' : ''} ${anexandoEm === r.id ? 'is-anexando' : ''}`}
                     onClick={() => setEditing(r)} title={canEdit ? 'Clique para editar' : 'Clique para ver os detalhes'}>
@@ -508,8 +522,8 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
                     </td>
                   </tr>
                   </Fragment>
-                ))}
-                {grupos && page >= pages - 1 && cabecalhosFinais()}
+                  );
+                })}
               </tbody>
             </table>
           </div>
