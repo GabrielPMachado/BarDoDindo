@@ -1699,3 +1699,12 @@ button.anexos__nome:hover { text-decoration: underline; }
 .table--agrupada tr.grupo-linha th { padding-top: 10px; padding-bottom: 10px; }
 .grupo-cartoes--compacto .grupo-titulo { padding: 12px 16px; }
 .grupo-cartoes--compacto.is-aberto .grupo-titulo { padding-bottom: 0; }
+/* "Ver mais" de cada grupo */
+.table tr.grupo-mais-linha td { padding: 4px 16px 8px 34px !important; }
+.grupo-mais-cartoes { padding: 0 16px 14px; }
+.grupo-mais { color: var(--brand); }
+@media (max-width: 640px) {
+  .table--cards tr.grupo-mais-linha { padding: 2px 12px 8px; }
+  .table--cards tr.grupo-mais-linha td { display: block; text-align: left; padding: 0 !important; }
+  .table--cards tr.grupo-mais-linha td::before { content: none; }
+}
