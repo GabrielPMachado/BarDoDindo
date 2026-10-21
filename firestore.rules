@@ -110,7 +110,12 @@ service cloud.firestore {
       // caixa fechado não muda mais (nem as sangrias e os suprimentos dele, nem as vendas que entraram nele)
       allow update: if col in colecoesCrm() && podeColecao(col, 'editar') && (col != 'caixas' || resource.data.status == 'Aberto')
         && (col != 'consumos' || get(caminho('caixas', resource.data.caixaId)).data.status == 'Aberto');
-      allow delete: if col in colecoesCrm() && podeColecao(col, 'excluir');
+      allow delete: if col in colecoesCrm() && podeColecao(col, 'excluir') && (!(col in ['consumos', 'receitas']) || vendaDeCaixaAberto(resource.data));
+    }
+    // venda (consumo ou a receita dela) só é estornada com o caixa em que entrou aberto; vendas de antes do caixa não têm caixaId.
+    // Excluir o afilhado (LGPD, exige excluir em Afilhados) apaga os consumos dele mesmo de caixas fechados
+    function vendaDeCaixaAberto(d) {
+      return !('caixaId' in d) || get(caminho('caixas', d.caixaId)).data.status == 'Aberto' || pode('clientes', 'excluir');
     }
 
     // caixa: quem lança consumo ou fecha comanda vê o caixa aberto e soma a venda nele (só os totais de vendas);
@@ -267,7 +272,7 @@ service cloud.firestore {
       allow create: if (pode('consumos', 'criar') && request.resource.data.consumoId is string)
         // comanda sem afilhado: fechar a comanda lança a venda direto na receita
         || (pode('comandas', 'editar') && request.resource.data.comandaId is string && request.resource.data.get('consumoId', null) == null);
-      allow delete: if pode('consumos', 'excluir') && resource.data.get('consumoId', null) != null;
+      allow delete: if pode('consumos', 'excluir') && resource.data.get('consumoId', null) != null && vendaDeCaixaAberto(resource.data);
       // corrigir a venda (com o caixa dela aberto) ajusta valor e forma de pagamento da receita que ela gerou
       allow update: if pode('consumos', 'editar') && resource.data.get('consumoId', null) is string
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['valor', 'formaPagamento', 'atualizadoEm'])

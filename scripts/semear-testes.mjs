@@ -10,6 +10,7 @@ export const SENHA_ATENDENTE = 'senha-atendente-123';
 export const SENHA_MARKETING = 'senha-marketing-123';
 export const SENHA_ADMINISTRATIVO = 'senha-administrativo-123';
 export const SENHA_MODULAR = 'senha-modular-123';
+export const SENHA_CAIXA = 'senha-caixa-123';
 
 /** Converte um valor JS para o formato da API REST do Firestore. */
 function valor(v) {
@@ -43,6 +44,7 @@ const atendente = await conta('atendente@teste.local', SENHA_ATENDENTE);
 const marketing = await conta('marketing@teste.local', SENHA_MARKETING);
 const administrativo = await conta('administrativo@teste.local', SENHA_ADMINISTRATIVO);
 const modular = await conta('modular@teste.local', SENHA_MODULAR);
+const caixa = await conta('caixa@teste.local', SENHA_CAIXA);
 
 await gravar('meta/setup', { feitoEm: agora });
 await gravar('meta/contadores', { clientes: 2 });
@@ -63,6 +65,9 @@ await gravar('estoque/gin', { item: 'Gin', categoria: 'Destilados', unidade: 'un
 await gravar('terceirizados/seguranca', { servico: 'Segurança', empresa: 'Vigia Ltda', categoria: 'Segurança', valor: 1500, periodicidade: 'Mensal', status: 'Ativo', criadoEm: agora });
 await gravar('midias/post', { conteudo: 'Post de inauguração', canal: 'Instagram', data: '2026-10-01', investimento: 200, status: 'Publicado', criadoEm: agora });
 await gravar('produtos/chopp', { nome: 'Chopp', categoria: 'Chopes', preco: 12, status: 'Ativo', criadoEm: agora });
+// Atendimento completo (estorna vendas), sem poder excluir afilhados
+await gravar('funcoes/caixa', { nome: 'Caixa', descricao: '', permissoes: { atd: ['ver', 'criar', 'editar', 'excluir'] }, sistema: false, criadoEm: agora });
+await gravar(`usuarios/${caixa}`, { nome: 'Caixa Teste', email: 'caixa@teste.local', funcaoId: 'caixa', status: 'Ativo', criadoEm: agora });
 await gravar(`usuarios/${atendente}`, { nome: 'Atendente Teste', email: 'atendente@teste.local', funcaoId: 'atendente', status: 'Ativo', criadoEm: agora });
 await gravar(`clientes/${cliente}`, { numero: 2, nome: 'Cliente Teste', email: 'cliente2@teste.local', telefone: '', criadoEm: agora });
 await gravar(`saldos/${cliente}`, { acumulados: 0, usados: 0 });

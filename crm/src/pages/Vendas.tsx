@@ -167,7 +167,7 @@ export function Consumo() {
   // lançar consumo é "Criar"; apagar um lançamento (estorna pontos e receita) é "Excluir"
   const canEdit = pode('consumos', 'criar');
   const canDelete = pode('consumos', 'excluir');
-  // corrigir uma venda só vale enquanto o caixa em que ela entrou estiver aberto
+  // corrigir ou estornar uma venda só vale enquanto o caixa em que ela entrou estiver aberto
   const canCorrigir = pode('consumos', 'editar');
   const [editando, setEditando] = useState<Row | null>(null);
   const clientes = useResource<Cliente[]>('/crm/clientes');
@@ -344,7 +344,7 @@ export function Consumo() {
                       {canCorrigir && caixa && c.caixaId === caixa.id && (
                         <button type="button" className="icon-btn" onClick={() => setEditando(c)} aria-label="Editar venda"><Pencil size={16} /></button>
                       )}
-                      {canDelete && (
+                      {canDelete && (!c.caixaId || c.caixaId === caixa?.id) && (
                         <AsyncButton className="icon-btn" confirm={{ title: 'Estornar este consumo?', message: 'Os pontos do cliente e a receita correspondente serão removidos.', confirmLabel: 'Estornar', danger: true }}
                           onClick={async () => {
                             await consumos.remove(c.id);

@@ -2016,6 +2016,10 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     if (p.col === 'resgates') fail(400, 'Resgates não são excluídos. Altere o status para Cancelado.');
     if (p.col === 'caixas') fail(400, 'Caixas não são excluídos: o histórico de aberturas e fechamentos fica guardado.');
     if (p.col === 'comandas' && cur.status === 'Fechada') fail(400, 'Comandas fechadas não são excluídas. Estorne a venda em Lançar consumo ou em Receitas.');
+    // venda de caixa fechado não se estorna mais: o fechamento já conferiu o que entrou
+    if (['consumos', 'receitas'].includes(p.col) && cur.caixaId && (await registro('caixas', String(cur.caixaId)))?.status !== 'Aberto') {
+      fail(400, 'O caixa desta venda já foi fechado: ela não pode mais ser estornada.');
+    }
     if (p.col === 'consumos' && cur.clienteUid) {
       // o estorno não pode deixar o saldo negativo: pontos já trocados por vouchers não voltam sozinhos
       const s = await saldoDe(cur.clienteUid);
@@ -2025,8 +2029,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       }
     }
     const lote = writeBatch(db);
-    // a venda estornada sai também do caixa, se ele ainda estiver aberto
-    if (['consumos', 'receitas'].includes(p.col) && cur.caixaId && (await getDoc(doc(db, 'caixas', String(cur.caixaId)))).data()?.status === 'Aberto') {
+    // a venda estornada sai também do caixa (que, acima, já se viu que está aberto)
+    if (['consumos', 'receitas'].includes(p.col) && cur.caixaId) {
       somarNoCaixa(lote, String(cur.caixaId), String(cur.formaPagamento), -(Number(cur.valor) || 0), -1);
     }
     if (p.col === 'consumos') {
