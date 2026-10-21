@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  ArrowDownCircle, ArrowUpCircle, Ban, Check, LayoutGrid, List, LockOpen, Lock, Map as MapIcon, Minus, Move, Pencil, Plus, Receipt, Search, Trash2, Users, Wallet,
+  ArrowDownCircle, ArrowUpCircle, Ban, Check, LayoutGrid, List, LockOpen, Lock, Map as MapIcon, Minus, Move, Pencil, Plus, Receipt, Search, Sparkles, Trash2, Users, Wallet,
 } from 'lucide-react';
 import { AsyncButton, Badge, EmptyState, ErrorBox, KpiRow, Loading, Modal, NumberInput, PageHead, notify } from '../components/ui';
 import { SelectPicker, confirmar } from '../components/pickers';
@@ -714,12 +714,23 @@ export function MesasPage() {
   const salvarPosicao = async (m: Mesa, x: number, y: number) => {
     await col.update(m.id, { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 } as Partial<Row>);
   };
+  const organizar = async () => {
+    const pos = posicoesBoulevard(visiveis.length);
+    for (const [i, m] of visiveis.entries()) await col.update(m.id, pos[i] as Partial<Row>);
+    notify(`${visiveis.length} mesas organizadas a partir da porta do bar.`);
+  };
 
   return (
     <div className="page">
       <PageHead title="Mapa de mesas" description="As mesas do salão numeradas, com a ocupação ao vivo: comandas abertas, reservas do dia e quanto cada mesa já consumiu."
         actions={podeEditar && (
           <div className="row-gap">
+            {editando && visao === 'mapa' && visiveis.length > 0 && (
+              <AsyncButton className="btn btn--ghost" onClick={organizar}
+                confirm={{ title: 'Organizar como no boulevard?', message: `As ${visiveis.length} mesas vão para o corredor em ordem: a 1 em frente à porta do bar e as seguintes em direção à entrada. As posições atuais são substituídas.`, confirmLabel: 'Organizar' }}>
+                <Sparkles size={16} /> Organizar como no boulevard
+              </AsyncButton>
+            )}
             <button type="button" className={`btn ${editando ? 'btn--primary' : 'btn--ghost'}`} onClick={() => setEditando(!editando)}><Move size={16} /> {editando ? 'Concluir edição' : 'Editar mapa'}</button>
             {pode('mesas', 'criar') && <button type="button" className="btn btn--ghost" onClick={() => setForm({ numero: (mesas.at(-1)?.numero ?? 0) + 1, lugares: 4, formato: 'Quadrada', ambiente: ambiente || ambientes[0] || '', status: 'Ativa' })}><Plus size={16} /> Nova mesa</button>}
           </div>
@@ -868,6 +879,20 @@ function MapaSalao({ mesas, editando, situacao, onMover, onClicar }: {
       })}
     </div>
   );
+}
+
+/** Posições (em %) das mesas no corredor: a 1 em frente à porta do bar e as seguintes em colunas, da porta em direção à entrada. */
+function posicoesBoulevard(n: number) {
+  const pos = [{ x: 70, y: 28 }];
+  const resto = n - 1;
+  const linhas = resto > 18 ? [26, 42, 58, 74] : [32, 50, 68];
+  const colunas = Math.max(1, Math.ceil(resto / linhas.length));
+  const passo = colunas > 1 ? Math.min(10, 54 / (colunas - 1)) : 0;
+  for (let i = 0; i < resto; i++) {
+    const c = Math.floor(i / linhas.length);
+    pos.push({ x: Math.round((62 - c * passo) * 10) / 10, y: linhas[i % linhas.length] });
+  }
+  return pos.slice(0, n);
 }
 
 /** Fundo do mapa: o corredor do boulevard da Nova Olaria, com as lojas dos dois lados, a porta do bar e a praça do palco no fundo. */
