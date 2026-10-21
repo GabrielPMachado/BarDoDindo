@@ -58,7 +58,7 @@ await gravar(`usuarios/${administrativo}`, { nome: 'Administrativo Teste', email
 // função no formato novo (uma permissão por tela): o módulo vale mais que a área; sem o módulo, vale a área
 await gravar('funcoes/modular', {
   nome: 'Por tela', descricao: '', sistema: false, criadoEm: agora,
-  permissoes: { atd: ['ver', 'criar', 'editar', 'excluir'], reservas: ['ver', 'criar'], consumos: [], compras: ['ver', 'criar', 'editar'], resultado: ['ver'], despesas_fixas: ['ver'] },
+  permissoes: { atd: ['ver', 'criar', 'editar', 'excluir'], reservas: ['ver', 'criar'], consumos: [], compras: ['ver', 'criar', 'editar'], patrimonio: ['ver'], resultado: ['ver'], despesas_fixas: ['ver'] },
 });
 await gravar(`usuarios/${modular}`, { nome: 'Modular Teste', email: 'modular@teste.local', funcaoId: 'modular', status: 'Ativo', criadoEm: agora });
 await gravar('estoque/gin', { item: 'Gin', categoria: 'Destilados', unidade: 'un', quantidade: 2, custo: 60, criadoEm: agora });

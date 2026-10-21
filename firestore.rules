@@ -24,7 +24,7 @@ service cloud.firestore {
       return k.matches('reservas|consumos|resgates|eventos|caixas|comandas|mesas') ? 'atd'
         : k.matches('produtos|fichas|guarnicoes|clientes|qrcode') ? 'vnd'
         : k.matches('recompensas|criacao|midias|publicidade') ? 'mkt'
-        : k.matches('projetos|estoque|materiais|compras') ? 'dp'
+        : k.matches('projetos|estoque|materiais|patrimonio|compras') ? 'dp'
         : k.matches('terceirizados|fornecedores|precos|contratos') ? 'adm'
         : k.matches('qualidade|atestados|naoconformidades') ? 'fis'
         : k.matches('receitas|despesas.*|resultado|ticket|renda|acoes|creditos|docfin|relatorios|investimentos') ? 'fin'
@@ -98,7 +98,7 @@ service cloud.firestore {
 
     // cadastros do CRM: cada um é o próprio módulo (permissão)
     function colecoesCrm() {
-      return ['metas', 'colaboradores', 'ferias', 'projetos', 'estoque', 'materiais', 'compras', 'terceirizados', 'fornecedores', 'contratos', 'precos',
+      return ['metas', 'colaboradores', 'ferias', 'projetos', 'estoque', 'materiais', 'patrimonio', 'compras', 'terceirizados', 'fornecedores', 'contratos', 'precos',
         'receitas', 'despesas', 'reservas', 'consumos', 'resgates', 'criacao', 'midias', 'recompensas', 'produtos', 'guarnicoes',
         'trabalhista', 'consultoria', 'qualidade', 'naoconformidades', 'eventos', 'publicidade', 'atestados',
         'acoes', 'creditos', 'docfin', 'investimentos', 'prestadores', 'conduta', 'advogados', 'normas', 'chamados', 'equipamentos',
@@ -316,7 +316,7 @@ service cloud.firestore {
     // o arquivo fica fora do registro (que guarda só nome e tamanho), em partes de até 900 mil caracteres (base64).
     // Vale a permissão da área do cadastro de origem: quem vê o cadastro abre o PDF; quem cria ou edita anexa.
     function colecoesComAnexo() {
-      return ['metas', 'colaboradores', 'ferias', 'projetos', 'materiais', 'compras', 'terceirizados', 'fornecedores', 'contratos',
+      return ['metas', 'colaboradores', 'ferias', 'projetos', 'materiais', 'patrimonio', 'compras', 'terceirizados', 'fornecedores', 'contratos',
         'receitas', 'despesas', 'criacao', 'trabalhista', 'consultoria', 'qualidade', 'naoconformidades',
         'publicidade', 'atestados', 'acoes', 'creditos', 'docfin', 'investimentos', 'prestadores', 'conduta', 'advogados', 'normas', 'equipamentos'];
     }

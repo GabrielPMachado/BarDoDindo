@@ -37,7 +37,7 @@ export const PAI_DO_MODULO: Record<string, string> = {
   reservas: 'atd', consumos: 'atd', resgates: 'atd', eventos: 'atd', caixas: 'atd', comandas: 'atd', mesas: 'atd',
   produtos: 'vnd', fichas: 'vnd', guarnicoes: 'vnd', clientes: 'vnd', qrcode: 'vnd',
   recompensas: 'mkt', criacao: 'mkt', midias: 'mkt', publicidade: 'mkt',
-  projetos: 'dp', estoque: 'dp', materiais: 'dp', compras: 'dp',
+  projetos: 'dp', estoque: 'dp', materiais: 'dp', patrimonio: 'dp', compras: 'dp',
   terceirizados: 'adm', fornecedores: 'adm', precos: 'adm', contratos: 'adm',
   qualidade: 'fis', atestados: 'fis', naoconformidades: 'fis',
   receitas: 'fin', despesas: 'fin', despesas_variaveis: 'fin', despesas_fixas: 'fin', resultado: 'fin', ticket: 'fin', renda: 'fin',
@@ -65,7 +65,7 @@ const LEGADO: Record<string, string> = { vnd: 'mkt' };
 export const MODULOS = Object.keys(PAI_DO_MODULO).concat('mon');
 /** Coleções do CRM e o módulo (permissão) que cada uma exige: o próprio cadastro. */
 const COLLECTIONS: Record<string, string> = Object.fromEntries(
-  ['metas', 'colaboradores', 'ferias', 'projetos', 'estoque', 'materiais', 'compras', 'terceirizados', 'fornecedores', 'contratos', 'precos',
+  ['metas', 'colaboradores', 'ferias', 'projetos', 'estoque', 'materiais', 'patrimonio', 'compras', 'terceirizados', 'fornecedores', 'contratos', 'precos',
     'receitas', 'despesas', 'reservas', 'consumos', 'resgates', 'criacao', 'midias', 'recompensas', 'produtos', 'guarnicoes',
     'trabalhista', 'consultoria', 'qualidade', 'naoconformidades', 'funcoes',
     'eventos', 'publicidade', 'atestados', 'acoes', 'creditos', 'docfin', 'investimentos', 'prestadores', 'conduta', 'advogados', 'normas', 'chamados', 'equipamentos',
@@ -102,7 +102,7 @@ const comNomeDaFuncao = (f: Dados) => (f.sistema ? { ...f, nome: PRESIDENCIA } :
 /** Como cada registro é citado no painel de atualizações ("cadastrou o produto …"). */
 const REGISTRO: Record<string, string> = {
   metas: 'a meta', colaboradores: 'o colaborador', ferias: 'o registro de férias/afastamento',
-  projetos: 'o projeto', estoque: 'o item de estoque', materiais: 'o material', compras: 'a nota de compra',
+  projetos: 'o projeto', estoque: 'o item de estoque', materiais: 'o material', patrimonio: 'o bem patrimonial', compras: 'a nota de compra',
   terceirizados: 'o serviço terceirizado', fornecedores: 'o fornecedor', contratos: 'o contrato', precos: 'o preço de fornecedor',
   receitas: 'a receita', despesas: 'a despesa',
   reservas: 'a reserva', consumos: 'o consumo', resgates: 'o voucher',
@@ -311,7 +311,7 @@ function inssEmpregado(salario: number, faixas: { ate: number; aliquota: number 
  * e o registro guarda só a lista com nome e tamanho: abrir a tabela não baixa nenhum PDF. */
 /** Cadastros que aceitam PDF (currículo, contratos, notas fiscais, laudos…). Igual a `colecoesComAnexo()` em firestore.rules. */
 export const COM_ANEXOS = [
-  'metas', 'colaboradores', 'ferias', 'projetos', 'materiais', 'compras', 'terceirizados', 'fornecedores', 'contratos',
+  'metas', 'colaboradores', 'ferias', 'projetos', 'materiais', 'patrimonio', 'compras', 'terceirizados', 'fornecedores', 'contratos',
   'receitas', 'despesas', 'criacao', 'trabalhista', 'consultoria', 'qualidade', 'naoconformidades',
   'publicidade', 'atestados', 'acoes', 'creditos', 'docfin', 'investimentos', 'prestadores', 'conduta', 'advogados', 'normas', 'equipamentos',
 ];
