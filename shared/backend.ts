@@ -1063,6 +1063,31 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     return { ok: true };
   });
 
+  /* CRM: excluir TODOS os afilhados (ex.: cadastros de teste antes do lançamento): cadastros, saldos, CPFs, consumos com as receitas,
+   * vouchers e reservas feitas por afilhados; a numeração volta a começar do #001. As contas de login (Firebase Auth) continuam existindo. */
+  rota('DELETE', '/crm/clientes', async () => {
+    const ctx = await requireUsuario();
+    requireAccess(ctx, 'clientes', 'excluir');
+    requireAccess(ctx, 'consumos', 'excluir');
+    requireAccess(ctx, 'parametros', 'editar');
+    const [clientes, saldos, consumos, resgates, reservas] = await Promise.all(['clientes', 'saldos', 'consumos', 'resgates', 'reservas'].map(colecao));
+    const vendas = consumos.filter((x) => x.clienteUid), vouchers = resgates.filter((x) => x.clienteUid), doApp = reservas.filter((x) => x.clienteUid);
+    const refs = [
+      ...clientes.flatMap((c) => [doc(db, 'clientes', c.id), ...(c.cpf ? [doc(db, 'cpfs', String(c.cpf))] : [])]),
+      ...saldos.map((x) => doc(db, 'saldos', x.id)),
+      ...vendas.flatMap((x) => [doc(db, 'consumos', x.id), ...(x.receitaId ? [doc(db, 'receitas', x.receitaId)] : [])]),
+      ...vouchers.map((x) => doc(db, 'resgates', x.id)), ...doApp.map((x) => doc(db, 'reservas', x.id)),
+    ];
+    await apagarEmLotes(refs, (lote) => {
+      lote.set(doc(db, 'meta', 'contadores'), { clientes: 0 });
+      registrar(lote, ctx, 'clientes', 'excluiu todos os afilhados', {
+        colecao: 'clientes', alvo: `${clientes.length} afilhado(s)`,
+        detalhe: `${vendas.length} consumo(s), ${vouchers.length} voucher(s) e ${doApp.length} reserva(s) apagados; numeração reiniciada`,
+      });
+    });
+    return { apagados: clientes.length };
+  });
+
   /* CRM: numeração dos afilhados — o próximo número volta a seguir o maior número em uso (ex.: depois de excluir afilhados de teste) */
   rota('POST', '/crm/clientes/numeracao', async () => {
     const ctx = await requireUsuario();
