@@ -143,6 +143,11 @@ function valorAtualDoBem(r: Row): number | null {
   const usado = Math.max(0, -daysUntil(r.aquisicao)) / 365.25;
   return n(r.quantidade || 1) * n(r.valor) * Math.max(0, 1 - usado / anos);
 }
+/** Tipos de documento do Arquivo; os primeiros são os que constituem a empresa. */
+export const TIPOS_DE_CONSTITUICAO = ['Contrato social', 'Alteração contratual', 'Ata de constituição / estatuto', 'Cartão CNPJ', 'Inscrição estadual', 'Inscrição municipal', 'Registro na Junta Comercial'];
+const TIPOS_DE_ARQUIVO = [...TIPOS_DE_CONSTITUICAO, 'Ofício', 'Memorando', 'Contrato', 'E-mail', 'Ata de reunião', 'Procuração', 'Certidão', 'Comunicado', 'Outro'];
+/** Documento de constituição: pelo tipo ou marcado no cadastro (ex.: a procuração dada na abertura). */
+export const ehConstituicao = (r: Row) => r.constituicao === 'Sim' || TIPOS_DE_CONSTITUICAO.includes(s(r.tipo));
 export const toneOf = (value: unknown): Tone => TONES[s(value)] ?? 'neutral';
 
 export const STATUS_KEYS = ['status', 'resultado', 'estado', 'gravidade', 'prioridade'];
@@ -900,6 +905,36 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'status', label: 'Status', type: 'select', options: ['Vigente', 'Pago', 'Encerrado', 'Cancelado'], default: 'Vigente' },
       { key: 'observacoes', label: 'Observações', type: 'textarea', formOnly: true, wide: true },
     ],
+  },
+  arquivos: {
+    id: 'arquivos', anexos: 'Arquivo do documento', area: 'arquivos', title: 'Arquivos', singular: 'arquivo',
+    description: 'Arquivo de documentos da empresa: ofícios, memorandos, contratos, e-mails em PDF e, principalmente, os documentos que constituíram a empresa.',
+    filterKey: 'tipo', filtros: ['status', 'origem'], sortKey: 'data', sortDir: 'desc',
+    fields: [
+      { key: 'titulo', label: 'Documento', type: 'text', required: true, wide: true, placeholder: 'Ex.: Contrato social da Bar do Dindo Ltda.' },
+      { key: 'tipo', label: 'Tipo', type: 'select', options: TIPOS_DE_ARQUIVO, required: true },
+      { key: 'constituicao', label: 'Constituição da empresa', type: 'check', formOnly: true, placeholder: 'É documento de constituição da empresa (contrato social, CNPJ, inscrições, atas…)' },
+      { key: 'numero', label: 'Número / protocolo', type: 'text' },
+      { key: 'data', label: 'Data do documento', type: 'date', required: true },
+      { key: 'origem', label: 'Emitente ou destinatário', type: 'text', placeholder: 'Ex.: Junta Comercial, Prefeitura, contador' },
+      { key: 'validade', label: 'Validade', type: 'date', formOnly: true },
+      { key: 'status', label: 'Status', type: 'select', options: ['Vigente', 'Arquivado', 'Substituído', 'Vencido'], default: 'Vigente' },
+      { key: 'observacoes', label: 'Observações', type: 'textarea', formOnly: true, wide: true },
+    ],
+    computed: [
+      { label: 'Grupo', get: (r) => (ehConstituicao(r) ? 'Constituição' : 'Geral'), format: 'badge', tone: (r) => (ehConstituicao(r) ? 'info' : 'neutral') },
+      { label: 'PDFs', get: (r) => (Array.isArray(r.anexos) ? r.anexos.length : 0), format: 'number', tone: (r) => (Array.isArray(r.anexos) && r.anexos.length ? 'neutral' : 'warn') },
+    ],
+    kpis: (rows) => {
+      const semArquivo = rows.filter((r) => !Array.isArray(r.anexos) || !r.anexos.length).length;
+      const vencendo = rows.filter((r) => r.validade && r.status !== 'Substituído' && daysUntil(r.validade) <= 30).length;
+      return [
+        { label: 'Documentos guardados', value: num(rows.length) },
+        { label: 'Constituição da empresa', value: num(rows.filter(ehConstituicao).length), tone: 'info' },
+        { label: 'Sem PDF anexado', value: num(semArquivo), tone: semArquivo ? 'warn' : 'good' },
+        { label: 'Vencidos ou vencendo em 30 dias', value: num(vencendo), tone: vencendo ? 'warn' : 'good' },
+      ];
+    },
   },
   investimentos: {
     id: 'investimentos', anexos: 'Notas, orçamentos e comprovantes', area: 'investimentos', title: 'Lançamento de investimentos', singular: 'investimento',

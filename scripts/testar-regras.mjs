@@ -233,6 +233,10 @@ if (senhaModular) {
   await negado('ver colaboradores', () => getDocs(collection(db, 'colaboradores')));
   await permitido('ver o Patrimônio (módulo com "ver")', () => getDocs(collection(db, 'patrimonio')));
   await negado('cadastrar bem no Patrimônio (o módulo só tem "ver")', () => addDoc(collection(db, 'patrimonio'), { nome: 'x', categoria: 'Mobiliário' }));
+  await permitido('ver os Arquivos da empresa (módulo com "ver")', () => getDocs(collection(db, 'arquivos')));
+  await permitido('cadastrar documento nos Arquivos', () => addDoc(collection(db, 'arquivos'), { titulo: 'Contrato social', tipo: 'Contrato social', data: '2026-01-10', status: 'Vigente' }));
+  await negado('excluir documento dos Arquivos (o módulo não tem "excluir")', () => deleteDoc(doc(db, 'arquivos', 'qualquer')));
+  await negado('ver os contratos onerosos (Financeiro não marcado)', () => getDocs(collection(db, 'docfin')));
   await permitido('Ticket médio (tela não marcada: vale a do Resultado) lê as receitas', () => getDocs(collection(db, 'receitas')));
   await permitido('Despesas fixas (só a tela) lê as despesas', () => getDocs(collection(db, 'despesas')));
   await negado('Despesas fixas (só ver) não lança despesa', () => addDoc(collection(db, 'despesas'), { descricao: 'x', categoria: 'Aluguel', valor: 1, data: '2026-10-01', status: 'A pagar' }));
@@ -343,6 +347,7 @@ if (senhaAdministrativo) {
   await negado('ver Materiais (sem Vendas nem Estrutura)', () => getDocs(collection(db, 'materiais')));
   await negado('ver as notas de compra (Estrutura)', () => getDocs(collection(db, 'compras')));
   await negado('ver o Patrimônio (Estrutura)', () => getDocs(collection(db, 'patrimonio')));
+  await negado('ver os Arquivos da empresa (Financeiro)', () => getDocs(collection(db, 'arquivos')));
   await permitido('ler a chave da IA (equipe logada)', () => getDoc(doc(db, 'segredos', 'ia')));
   await negado('trocar a chave da IA (sem Configurações)', () => setDoc(doc(db, 'segredos', 'ia'), { chave: 'x' }));
   await negado('anexar PDF a um contrato (Administrativo)', async () => {

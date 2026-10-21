@@ -8,6 +8,7 @@ import { AREAS_VISIVEIS as AREAS, CAMINHOS_ANTIGOS, findModule } from './modules
 import { COLLECTIONS } from './collections';
 import { Brand, Layout } from './components/Layout';
 import { CollectionPage } from './components/CollectionPage';
+import { Constituicao } from './components/Constituicao';
 import { CalculadoraGuarnicoes } from './components/CalculadoraGuarnicoes';
 import { EmptyState, Toasts } from './components/ui';
 import { ConfirmHost } from './components/pickers';
@@ -78,6 +79,7 @@ const CUSTOM: Record<string, () => ReactNode> = {
   '/financeiro/ticket-medio': () => <TicketMedio />,
   '/financeiro/renda': () => <Renda />,
   '/financeiro/documentos': () => <Parte col="docfin" titulo="Contratos onerosos e títulos" campo="tipo" valores={['Relatório']} fora />,
+  '/financeiro/arquivos': () => <CollectionPage def={COLLECTIONS.arquivos} before={(rows) => <Constituicao rows={rows} />} />,
   '/financeiro/relatorios': () => <Parte col="docfin" titulo="Relatórios" descricao="Relatórios financeiros, balancetes e prestações de contas (PDF)." campo="tipo" valores={['Relatório']} />,
   '/rh/prestadores/pf': () => <Parte col="prestadores" titulo="Pessoas físicas contratadas" descricao="Freelas, músicos, seguranças e outros profissionais autônomos que prestam serviço à casa." campo="tipo" valores={['Pessoa física']} />,
   '/rh/prestadores/pj': () => <Parte col="prestadores" titulo="Pessoas jurídicas contratadas" descricao="Empresas contratadas para serviços de pessoal: contabilidade, segurança, limpeza, eventos…" campo="tipo" valores={['Pessoa jurídica']} />,

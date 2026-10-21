@@ -1632,3 +1632,14 @@ button.anexos__nome:hover { text-decoration: underline; }
 .mesa-card__estado { font-size: 12.5px; color: var(--muted); }
 .mesa-total { margin-top: 10px; }
 .row-gap { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ---------- Arquivos: destaque da constituição da empresa ---------- */
+.constituicao { border-color: color-mix(in srgb, var(--info) 45%, var(--border)); }
+.constituicao__conta { margin-left: auto; font-weight: 400; font-size: 12.5px; }
+.constituicao__grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.constituicao__item { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px dashed var(--border-strong); border-radius: 8px; }
+.constituicao__item.is-ok { border-style: solid; border-color: var(--border); background: var(--surface-2); }
+.constituicao__item svg { flex-shrink: 0; margin-top: 2px; }
+.constituicao__item div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.constituicao__item span { font-size: 12.5px; overflow-wrap: anywhere; }
+.constituicao__outros { list-style: none; margin: 12px 0 0; padding: 10px 0 0; border-top: 1px solid var(--border); display: grid; gap: 6px; font-size: 13px; }

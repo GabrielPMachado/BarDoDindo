@@ -41,7 +41,7 @@ export const PAI_DO_MODULO: Record<string, string> = {
   terceirizados: 'adm', fornecedores: 'adm', precos: 'adm', contratos: 'adm',
   qualidade: 'fis', atestados: 'fis', naoconformidades: 'fis',
   receitas: 'fin', despesas: 'fin', despesas_variaveis: 'fin', despesas_fixas: 'fin', resultado: 'fin', ticket: 'fin', renda: 'fin',
-  acoes: 'fin', creditos: 'fin', docfin: 'fin', relatorios: 'fin', investimentos: 'fin',
+  acoes: 'fin', creditos: 'fin', docfin: 'fin', relatorios: 'fin', arquivos: 'fin', investimentos: 'fin',
   colaboradores: 'rh', prestadores: 'rh', prestadores_pj: 'rh', folha: 'rh', ferias: 'rh', afastamentos: 'rh', conduta: 'rh',
   consultoria: 'jur', trabalhista: 'jur', advogados: 'jur', advogados_trabalhista: 'jur', advogados_empresarial: 'jur',
   normas: 'jur', normas_trabalhista: 'jur', normas_empresarial: 'jur',
@@ -68,7 +68,7 @@ const COLLECTIONS: Record<string, string> = Object.fromEntries(
   ['metas', 'colaboradores', 'ferias', 'projetos', 'estoque', 'materiais', 'patrimonio', 'compras', 'terceirizados', 'fornecedores', 'contratos', 'precos',
     'receitas', 'despesas', 'reservas', 'consumos', 'resgates', 'criacao', 'midias', 'recompensas', 'produtos', 'guarnicoes',
     'trabalhista', 'consultoria', 'qualidade', 'naoconformidades', 'funcoes',
-    'eventos', 'publicidade', 'atestados', 'acoes', 'creditos', 'docfin', 'investimentos', 'prestadores', 'conduta', 'advogados', 'normas', 'chamados', 'equipamentos',
+    'eventos', 'publicidade', 'atestados', 'acoes', 'creditos', 'docfin', 'arquivos', 'investimentos', 'prestadores', 'conduta', 'advogados', 'normas', 'chamados', 'equipamentos',
     'caixas', 'comandas', 'mesas',
   ].map((c) => [c, c]),
 );
@@ -111,7 +111,7 @@ const REGISTRO: Record<string, string> = {
   qualidade: 'a inspeção', naoconformidades: 'a não conformidade',
   funcoes: 'a função',
   eventos: 'o evento', publicidade: 'a campanha', atestados: 'o atestado',
-  acoes: 'a participação', creditos: 'o crédito', docfin: 'o documento', investimentos: 'o investimento',
+  acoes: 'a participação', creditos: 'o crédito', docfin: 'o documento', arquivos: 'o arquivo', investimentos: 'o investimento',
   prestadores: 'o contratado', conduta: 'o manual de conduta',
   advogados: 'o advogado', normas: 'a norma',
   chamados: 'o chamado', equipamentos: 'o equipamento',
@@ -332,7 +332,7 @@ function inssEmpregado(salario: number, faixas: { ate: number; aliquota: number 
 export const COM_ANEXOS = [
   'metas', 'colaboradores', 'ferias', 'projetos', 'materiais', 'patrimonio', 'compras', 'terceirizados', 'fornecedores', 'contratos',
   'receitas', 'despesas', 'criacao', 'trabalhista', 'consultoria', 'qualidade', 'naoconformidades',
-  'publicidade', 'atestados', 'acoes', 'creditos', 'docfin', 'investimentos', 'prestadores', 'conduta', 'advogados', 'normas', 'equipamentos',
+  'publicidade', 'atestados', 'acoes', 'creditos', 'docfin', 'arquivos', 'investimentos', 'prestadores', 'conduta', 'advogados', 'normas', 'equipamentos',
 ];
 export const ANEXO_MAX_BYTES = 5 * 1024 * 1024;
 export const ANEXOS_POR_REGISTRO = 10;
