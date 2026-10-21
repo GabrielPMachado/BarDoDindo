@@ -1708,3 +1708,33 @@ button.anexos__nome:hover { text-decoration: underline; }
   .table--cards tr.grupo-mais-linha td { display: block; text-align: left; padding: 0 !important; }
   .table--cards tr.grupo-mais-linha td::before { content: none; }
 }
+
+/* previsão de retorno dos sócios e investidores (Ações da empresa) */
+.retorno { margin-bottom: 16px; padding: 0; overflow: hidden; }
+.retorno__cab { width: 100%; display: flex; align-items: center; gap: 10px; padding: 14px 16px; text-align: left; flex-wrap: wrap; }
+.retorno__cab > span:nth-child(2) { flex: 1; min-width: 200px; }
+.retorno__corpo { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 14px; }
+.retorno__aviso, .retorno__alerta { display: flex; gap: 8px; align-items: flex-start; margin: 0; padding: 10px 12px; border-radius: 8px; background: var(--surface-2); border-left: 3px solid var(--warn); }
+.retorno__aviso svg, .retorno__alerta svg { flex-shrink: 0; color: var(--warn); margin-top: 1px; }
+.retorno__grade { display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: 18px; align-items: start; }
+.retorno__premissas { display: flex; flex-direction: column; padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.retorno__premissas h3 { margin: 0; font-size: 14px; }
+.retorno__premissas > .muted.small { margin-top: 6px; line-height: 1.45; }
+.retorno__premissas .field-label { margin-top: 12px; display: flex; align-items: center; gap: 6px; }
+.retorno__par { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+.retorno__valor { display: block; padding: 8px 0; font-variant-numeric: tabular-nums; }
+.retorno__check { display: flex; gap: 8px; align-items: flex-start; margin-top: 12px; cursor: pointer; }
+.retorno__check input { margin-top: 2px; accent-color: var(--brand); }
+.retorno__reset { align-self: flex-start; margin-top: 14px; }
+.retorno__resultado { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.retorno__dre td { padding-top: 7px; padding-bottom: 7px; }
+.retorno__tabela td { white-space: nowrap; }
+.retorno__tabela th { white-space: normal; vertical-align: bottom; }
+.retorno__tabela tfoot td { border-top: 1px solid var(--border-strong); font-weight: 600; }
+.retorno__tipo { display: block; }
+.retorno .link-btn { display: inline-flex; align-items: center; gap: 6px; padding: 0; background: none; border: 0; color: var(--brand); cursor: pointer; }
+.retorno .link-btn:hover { text-decoration: underline; }
+.retorno__bases { margin-top: 6px; }
+.retorno__bases ul { margin: 10px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 13px; line-height: 1.45; }
+.retorno__bases strong { color: var(--text); }
+@media (max-width: 960px) { .retorno__grade { grid-template-columns: 1fr; } }

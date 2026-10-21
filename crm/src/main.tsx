@@ -10,6 +10,7 @@ import { Brand, Layout } from './components/Layout';
 import { CollectionPage } from './components/CollectionPage';
 import { Constituicao } from './components/Constituicao';
 import { CalculadoraGuarnicoes } from './components/CalculadoraGuarnicoes';
+import { PrevisaoRetorno } from './components/PrevisaoRetorno';
 import { EmptyState, Toasts } from './components/ui';
 import { ConfirmHost } from './components/pickers';
 import Login from './pages/Login';
@@ -35,7 +36,6 @@ const GENERIC: Record<string, string> = {
   '/rh/conduta': 'conduta',
   '/marketing/publicidade': 'publicidade',
   '/fiscalizacao/atestados': 'atestados',
-  '/financeiro/acoes': 'acoes',
   '/financeiro/credito': 'creditos',
   '/financeiro/investimentos': 'investimentos',
   '/ti/chamados': 'chamados',
@@ -79,6 +79,7 @@ const CUSTOM: Record<string, () => ReactNode> = {
   '/financeiro/ticket-medio': () => <TicketMedio />,
   '/financeiro/renda': () => <Renda />,
   '/financeiro/documentos': () => <Parte col="docfin" titulo="Contratos onerosos e títulos" campo="tipo" valores={['Relatório']} fora />,
+  '/financeiro/acoes': () => <CollectionPage def={COLLECTIONS.acoes} before={(rows) => <PrevisaoRetorno rows={rows} />} />,
   '/financeiro/arquivos': () => <CollectionPage def={COLLECTIONS.arquivos} before={(rows) => <Constituicao rows={rows} />} />,
   '/financeiro/relatorios': () => <Parte col="docfin" titulo="Relatórios" descricao="Relatórios financeiros, balancetes e prestações de contas (PDF)." campo="tipo" valores={['Relatório']} />,
   '/rh/prestadores/pf': () => <Parte col="prestadores" titulo="Pessoas físicas contratadas" descricao="Freelas, músicos, seguranças e outros profissionais autônomos que prestam serviço à casa." campo="tipo" valores={['Pessoa física']} />,
