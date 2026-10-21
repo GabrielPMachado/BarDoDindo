@@ -163,8 +163,39 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
     });
   }, [all, q, filter, filtros, sort, def]);
 
+  /* agrupamento: sem escolha manual, com algum filtro ativo agrupa pela primeira dimensão que não está filtrada
+     (ex.: filtrou por destaque, agrupa por categoria) e que ainda tem mais de um valor na lista */
+  const [agrupar, setAgrupar] = useState<string>('auto');
+  const dimensoes = useMemo(
+    () => [def.filterKey, ...(def.filtros ?? [])].flatMap((k) => def.fields.filter((f) => f.key === k)),
+    [def],
+  );
+  const filtrado = (k: string) => (k === def.filterKey ? !!filter : false) || !!filtros[k];
+  const algumFiltro = !!filter || Object.values(filtros).some(Boolean);
+  const variaNaLista = (k: string) => new Set(rows.map((r) => chaveFiltro(r[k]))).size > 1;
+  const grupoAuto = algumFiltro ? dimensoes.find((f) => !filtrado(f.key) && variaNaLista(f.key)) : undefined;
+  const campoGrupo = agrupar === 'auto' ? grupoAuto : agrupar === 'nenhum' ? undefined : dimensoes.find((f) => f.key === agrupar);
+  const grupos = useMemo(() => {
+    if (!campoGrupo) return null;
+    const mapa = new Map<string, { chave: string; titulo: string; rows: Row[] }>();
+    for (const r of rows) {
+      const v = String(r[campoGrupo.key] ?? '').trim();
+      const chave = chaveFiltro(v);
+      if (!mapa.has(chave)) mapa.set(chave, { chave, titulo: v || `Sem ${campoGrupo.label.toLocaleLowerCase('pt-BR')}`, rows: [] });
+      mapa.get(chave)!.rows.push(r);
+    }
+    // na ordem das opções do campo (ex.: categorias do cardápio); o resto em ordem alfabética e o vazio no fim
+    const ordem = (campoGrupo.options ?? []).map(chaveFiltro);
+    const pos = (g: { chave: string }) => (!g.chave ? Infinity : ordem.includes(g.chave) ? ordem.indexOf(g.chave) : ordem.length);
+    return [...mapa.values()].sort((a, b) => pos(a) - pos(b) || a.titulo.localeCompare(b.titulo, 'pt-BR', { numeric: true }));
+  }, [rows, campoGrupo]);
+  const ordenadas = grupos ? grupos.flatMap((g) => g.rows) : rows;
+  const grupoDe = (r: Row) => chaveFiltro(r[campoGrupo!.key]);
+  const grupoPorChave = new Map((grupos ?? []).map((g) => [g.chave, g]));
+  const colunas = 2 + (def.comFoto ? 1 : 0) + tableFields.length + (def.computed?.length ?? 0);
+
   const pages = Math.max(1, Math.ceil(rows.length / PAGE));
-  const visible = rows.slice(page * PAGE, page * PAGE + PAGE);
+  const visible = ordenadas.slice(page * PAGE, page * PAGE + PAGE);
 
   /* seleção: marca linhas para exportar só elas ou excluir várias de uma vez */
   const [sel, setSel] = useState<Set<string>>(() => new Set());
@@ -299,6 +330,17 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
             </select>
           )}
           {soltaAnexo && all.length > 0 && <span className="muted small toolbar__dica"><Paperclip size={13} /> Arraste um PDF ou foto sobre a linha para anexar</span>}
+          {dimensoes.length > 0 && (visao === 'tabela' || visao === 'cartoes') && (
+            <select
+              className={`input input--sm ${campoGrupo ? 'is-filtrando' : ''}`} value={agrupar}
+              onChange={(e) => { setAgrupar(e.target.value); setPage(0); }} aria-label="Agrupar por"
+              title="No automático, ao filtrar agrupa pelo que não está filtrado"
+            >
+              <option value="auto">Agrupar: automático{grupoAuto ? ` (${grupoAuto.label.replace(/\s*\(.*\)$/, '')})` : ''}</option>
+              <option value="nenhum">Agrupar: não agrupar</option>
+              {dimensoes.map((f) => <option key={f.key} value={f.key}>Agrupar: {f.label.replace(/\s*\(.*\)$/, '')}</option>)}
+            </select>
+          )}
           <SeletorVisao visoes={visoes} valor={visao} onChange={mudarVisao} />
           <span className="muted toolbar__count">{num(rows.length)} {rows.length === 1 ? 'registro' : 'registros'}</span>
         </div>
@@ -336,7 +378,12 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
         ) : rows.length === 0 ? (
           <EmptyState title="Nenhum resultado">Ajuste a busca ou o filtro.</EmptyState>
         ) : visao === 'cartoes' ? (
-          <VisaoCartoes def={def} rows={rows} onAbrir={setEditing} fmt={formatField} titulo={tituloDe} sel={sel} marcar={marcar} onAmpliar={ampliar} />
+          grupos ? grupos.map((g) => (
+            <section key={g.chave} className="grupo-cartoes">
+              <h3 className="grupo-titulo"><span className="muted">{campoGrupo!.label.replace(/\s*\(.*\)$/, '')}:</span> {g.titulo} <span className="grupo-titulo__qtd">{num(g.rows.length)}</span></h3>
+              <VisaoCartoes def={def} rows={g.rows} onAbrir={setEditing} fmt={formatField} titulo={tituloDe} sel={sel} marcar={marcar} onAmpliar={ampliar} />
+            </section>
+          )) : <VisaoCartoes def={def} rows={rows} onAbrir={setEditing} fmt={formatField} titulo={tituloDe} sel={sel} marcar={marcar} onAmpliar={ampliar} />
         ) : visao === 'quadro' ? (
           <VisaoQuadro def={def} rows={rows} onAbrir={setEditing} fmt={formatField} titulo={tituloDe} podeMover={canEdit} onMover={(r, valor) => void moverNoQuadro(r, valor)} onAmpliar={ampliar} />
         ) : visao === 'calendario' ? (
@@ -367,9 +414,17 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
                 </tr>
               </thead>
               <tbody>
-                {visible.map((r) => (
-                  <tr
-                    key={r.id} data-solta={soltaAnexo ? '' : undefined} {...arrastoNaLinha(r)}
+                {visible.map((r, i) => (
+                  <Fragment key={r.id}>
+                  {grupos && (i === 0 || grupoDe(visible[i - 1]) !== grupoDe(r)) && (
+                    <tr className="grupo-linha">
+                      <th colSpan={colunas} scope="colgroup">
+                        <span className="muted">{campoGrupo!.label.replace(/\s*\(.*\)$/, '')}:</span> {grupoPorChave.get(grupoDe(r))?.titulo}
+                        <span className="grupo-titulo__qtd">{num(grupoPorChave.get(grupoDe(r))?.rows.length ?? 0)}</span>
+                      </th>
+                    </tr>
+                  )}
+                  <tr data-solta={soltaAnexo ? '' : undefined} {...arrastoNaLinha(r)}
                     className={`is-clickable ${sel.has(r.id) ? 'is-selecionado' : ''} ${soltandoEm?.id === r.id ? 'is-soltando' : ''} ${anexandoEm === r.id ? 'is-anexando' : ''}`}
                     onClick={() => setEditing(r)} title={canEdit ? 'Clique para editar' : 'Clique para ver os detalhes'}>
                     <td className="sel-col" onClick={(e) => e.stopPropagation()}>
@@ -423,6 +478,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
                       </div>
                     </td>
                   </tr>
+                  </Fragment>
                 ))}
               </tbody>
             </table>
