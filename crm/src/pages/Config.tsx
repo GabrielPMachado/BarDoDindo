@@ -491,7 +491,7 @@ export function Parametros() {
           <NumberInput id="p-ppr" spec={{ decimals: 2, min: 0, max: 100 }} suffix="pontos" value={cfg.pontosPorReal} onChange={(v) => setCfg({ ...cfg, pontosPorReal: Number(v || 0) })} />
         </section>
 
-        <Numeracao podeAjustar={canEdit} />
+        <Numeracao podeAjustar={canEdit} podeApagar={canEdit && pode('clientes', 'excluir') && pode('consumos', 'excluir')} />
         <section className="panel pad-lg">
           <h2 className="panel-title">Folha de pagamento</h2>
           <p className="muted small">Tabela progressiva de contribuição do empregado ao INSS. Atualize sempre que a portaria anual for publicada.</p>
@@ -544,7 +544,7 @@ function QuestionarioEditor({ q, onChange }: { q: Questionario; onChange: (q: Qu
 }
 
 /** Numeração dos afilhados: mostra o próximo número e, depois de excluir afilhados (ex.: de teste), volta a seguir o maior número em uso. */
-function Numeracao({ podeAjustar }: { podeAjustar: boolean }) {
+function Numeracao({ podeAjustar, podeApagar }: { podeAjustar: boolean; podeApagar: boolean }) {
   const { data } = useResource<{ total: number }>('/public/afilhados');
   const proximo = (data?.total ?? 0) + 1;
   const ajustar = async () => {
@@ -552,13 +552,27 @@ function Numeracao({ podeAjustar }: { podeAjustar: boolean }) {
     await reload('/public/afilhados');
     notify(`Pronto. O próximo afilhado será o #${String(r.proximo).padStart(3, '0')}.`);
   };
+  const apagarTodos = async () => {
+    const r = await api<{ apagados: number }>('/crm/clientes', { method: 'DELETE' });
+    await Promise.all([reload('/public/afilhados'), reload('/crm/clientes')]);
+    notify(`${r.apagados} afilhado(s) apagado(s). O próximo cadastro será o #001.`);
+  };
   return (
     <section className="panel pad-lg">
       <h2 className="panel-title">Numeração dos afilhados</h2>
       <p className="muted small">O próximo cadastro recebe o número <strong>#{String(proximo).padStart(3, '0')}</strong>. Depois de excluir afilhados (por exemplo, cadastros de teste), ajuste para a numeração voltar a seguir o maior número em uso.</p>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
       {podeAjustar && (
         <AsyncButton className="btn btn--ghost" onClick={ajustar} confirm={{ title: 'Ajustar a numeração?', message: 'O próximo afilhado receberá o número seguinte ao maior número em uso.', confirmLabel: 'Ajustar' }}>Ajustar numeração</AsyncButton>
       )}
+      {podeApagar && (
+        <AsyncButton className="btn btn--ghost" onClick={apagarTodos} confirm={{
+          title: 'Apagar todos os afilhados?',
+          message: 'Apaga os cadastros, saldos de pontos, consumos (com as receitas), vouchers e reservas de todos os afilhados, e a numeração volta para #001. Não dá para desfazer. As contas de login continuam existindo: quem entrar de novo refaz o cadastro.',
+          confirmLabel: 'Apagar tudo', danger: true,
+        }}><Trash2 size={16} /> Apagar todos os afilhados</AsyncButton>
+      )}
+      </div>
     </section>
   );
 }
