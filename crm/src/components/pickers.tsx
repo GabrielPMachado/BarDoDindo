@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactN
 import { AlertTriangle, CalendarDays, Check, ChevronLeft, ChevronRight, Clock, Link2, Search, Trash2, X } from 'lucide-react';
 import type { Field } from '../collections';
 import { useResource } from '../lib/data';
+import { ehOutro, removerOpcao, useOutro } from './OpcaoOutro';
 
 /* ======================================================================
    Popover: fecha ao clicar fora ou com Esc
@@ -247,14 +248,19 @@ export function TimePicker({ value, onChange, id, disabled, required }: {
    ====================================================================== */
 type SelectOption = string | { value: string; label: string };
 
-export function SelectPicker({ options, value, onChange, id, disabled, placeholder = 'Selecione…' }: {
+/** Com "Outro" entre as opções, escolhê-lo abre um campo para descrever; com `lista`, o texto pode virar opção permanente. */
+export function SelectPicker({ options, value, onChange, id, disabled, placeholder = 'Selecione…', lista: listaOpcoes, rotulo }: {
   options: SelectOption[]; value: unknown; onChange: (v: string) => void; id?: string; disabled?: boolean; placeholder?: string;
+  lista?: string; rotulo?: string;
 }) {
-  const atual = typeof value === 'string' ? value : value === undefined || value === null ? '' : String(value);
-  const norm = options.map((o) => (typeof o === 'string' ? { value: o, label: o } : o));
+  const base = options.map((o) => (typeof o === 'string' ? { value: o, label: o } : o));
+  const outro = useOutro({ lista: listaOpcoes, options: base.map((o) => o.value), onChange, rotulo, disabled });
+  const norm = outro.opcoes.map((v) => base.find((o) => o.value === v) ?? { value: v, label: v });
+  const textoOutro = outro.descrevendo ? norm.find((o) => ehOutro(o.value))?.value ?? '' : '';
+  const atual = textoOutro || (typeof value === 'string' ? value : value === undefined || value === null ? '' : String(value));
   const opts = atual && !norm.some((o) => o.value === atual) ? [...norm, { value: atual, label: atual }] : norm;
   const lista = opts.map((o) => o.value);
-  const rotulo = (v: string) => opts.find((o) => o.value === v)?.label ?? v;
+  const rotuloDe = (v: string) => opts.find((o) => o.value === v)?.label ?? v;
   const { open, setOpen, ref } = usePopover();
   const [hi, setHi] = useState(0);
 
@@ -264,8 +270,13 @@ export function SelectPicker({ options, value, onChange, id, disabled, placehold
     setOpen(true);
   };
   const escolher = (v: string) => {
-    onChange(v);
+    outro.escolher(v);
     setOpen(false);
+  };
+  const remover = async (v: string) => {
+    setOpen(false);
+    if (!listaOpcoes || !(await confirmar({ title: `Tirar “${v}” da lista?`, message: 'A opção deixa de aparecer para escolher. Os registros que já a usam continuam com ela.', confirmLabel: 'Tirar da lista' }))) return;
+    await removerOpcao(listaOpcoes, v).catch(() => undefined);
   };
 
   return (
@@ -286,28 +297,35 @@ export function SelectPicker({ options, value, onChange, id, disabled, placehold
           if (e.key === 'Enter') { e.preventDefault(); escolher(lista[hi]); }
         }}
       >
-        <span className={atual ? '' : 'muted'}>{atual ? rotulo(atual) : placeholder}</span>
+        <span className={atual ? '' : 'muted'}>{atual ? rotuloDe(atual) : placeholder}</span>
         <ChevronRight size={14} className="select-btn__chev" />
       </button>
       {open && (
         <div className="popover reflist" role="listbox">
           {lista.map((o, idx) => (
-            <button
-              type="button"
-              key={o}
-              role="option"
-              aria-selected={o === atual}
-              className={`reflist__item ${idx === hi ? 'is-hi' : ''}`}
-              onMouseEnter={() => setHi(idx)}
-              onClick={() => escolher(o)}
-            >
-              <span className="reflist__name">{rotulo(o)}</span>
-              <span className="reflist__detail" />
-              {o === atual && <Check size={14} className="gold" />}
-            </button>
+            <div key={o} className="reflist__linha">
+              <button
+                type="button"
+                role="option"
+                aria-selected={o === atual}
+                className={`reflist__item ${idx === hi ? 'is-hi' : ''}`}
+                onMouseEnter={() => setHi(idx)}
+                onClick={() => escolher(o)}
+              >
+                <span className="reflist__name">{rotuloDe(o)}</span>
+                <span className="reflist__detail" />
+                {o === atual && <Check size={14} className="gold" />}
+              </button>
+              {outro.acrescentadas.includes(o) && (
+                <button type="button" className="icon-btn reflist__remover" title="Tirar esta opção da lista" aria-label={`Tirar “${o}” da lista`} onClick={() => void remover(o)}>
+                  <X size={14} />
+                </button>
+              )}
+            </div>
           ))}
         </div>
       )}
+      {outro.painel}
     </div>
   );
 }

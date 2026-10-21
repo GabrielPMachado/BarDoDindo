@@ -1708,3 +1708,17 @@ button.anexos__nome:hover { text-decoration: underline; }
   .table--cards tr.grupo-mais-linha td { display: block; text-align: left; padding: 0 !important; }
   .table--cards tr.grupo-mais-linha td::before { content: none; }
 }
+
+/* "Outro" nas listas: campo para descrever e a pergunta se vira opção permanente */
+.select-outro { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.outro { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.select-outro .outro { margin-top: 0; }
+.outro .input { flex: 1; min-width: 0; }
+.outro--pergunta { flex-wrap: wrap; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2, var(--surface-3)); font-size: 13px; }
+.outro__texto { flex: 1 1 220px; }
+.outro__acoes { display: flex; gap: 6px; flex-wrap: wrap; }
+.outro--pergunta .error { flex-basis: 100%; }
+.reflist__linha { display: flex; align-items: center; gap: 2px; }
+.reflist__linha .reflist__item { flex: 1; min-width: 0; }
+.reflist__remover { flex: none; opacity: .5; }
+.reflist__remover:hover, .reflist__remover:focus-visible { opacity: 1; }

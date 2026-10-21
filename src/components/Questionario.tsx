@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { MessageCircleQuestion, X } from 'lucide-react';
 import { useStore } from '../store';
 
+/** "Outro", "Outros", "Outra"... */
+const ehOutro = (o: string) => /^outr[oa]s?$/i.test(o.trim());
+
 const chave = (n: number) => `dindo:questionario-depois:${n}`;
 /** Mostra o convite do questionário opcional? (ativo, com perguntas, ainda não respondido e não adiado nesta semana) */
 export function useQuestionario() {
@@ -23,12 +26,14 @@ export function Questionario({ onClose }: { onClose: () => void }) {
   const { config, atualizarPerfil } = useStore();
   const q = config?.questionario;
   const [respostas, setRespostas] = useState<Record<string, string>>({});
+  const [outros, setOutros] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   if (!q) return null;
   const enviar = async () => {
     setBusy(true); setErro(null);
-    try { await atualizarPerfil({ respostas }); onClose(); } catch (e) { setErro(e instanceof Error ? e.message : 'Não foi possível enviar.'); } finally { setBusy(false); }
+    const finais = Object.fromEntries(Object.entries(respostas).map(([k, v]) => [k, ehOutro(v) && outros[k]?.trim() ? `${v}: ${outros[k].trim()}` : v]));
+    try { await atualizarPerfil({ respostas: finais }); onClose(); } catch (e) { setErro(e instanceof Error ? e.message : 'Não foi possível enviar.'); } finally { setBusy(false); }
   };
   return (
     <div className="overlay" onClick={onClose}>
@@ -49,7 +54,13 @@ export function Questionario({ onClose }: { onClose: () => void }) {
                     onClick={() => setRespostas((r) => ({ ...r, [p.id]: r[p.id] === o ? '' : o }))}>{o}</button>
                 ))}
               </div>
-            ) : (
+            ) : null}
+            {/* "Outro": abre um campo para contar o que é (a resposta fica "Outro: …") */}
+            {p.opcoes.length > 0 && ehOutro(respostas[p.id] ?? '') ? (
+              <input id={`q-${p.id}`} className="input questionario__outro" maxLength={200} autoFocus placeholder="Conta pra gente: qual?"
+                aria-label={`${p.texto} (outro)`} value={outros[p.id] ?? ''} onChange={(e) => setOutros((r) => ({ ...r, [p.id]: e.target.value }))} />
+            ) : null}
+            {p.opcoes.length ? null : (
               <input id={`q-${p.id}`} className="input" maxLength={300} value={respostas[p.id] ?? ''} onChange={(e) => setRespostas((r) => ({ ...r, [p.id]: e.target.value }))} />
             )}
           </div>
