@@ -714,23 +714,28 @@ export function MesasPage() {
   const salvarPosicao = async (m: Mesa, x: number, y: number) => {
     await col.update(m.id, { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 } as Partial<Row>);
   };
-  const organizar = async () => {
-    const pos = posicoesBoulevard(visiveis.length);
-    for (const [i, m] of visiveis.entries()) await col.update(m.id, pos[i] as Partial<Row>);
-    notify(`${visiveis.length} mesas organizadas a partir da porta do bar.`);
+  const montar = async () => {
+    let criadas = 0;
+    for (const d of MESAS_BOULEVARD) {
+      const existente = mesas.find((m) => m.numero === d.numero);
+      if (existente) await col.update(existente.id, { x: d.x, y: d.y } as Partial<Row>);
+      else { await col.add({ ...d, nome: `Mesa ${d.numero}`, ambiente: ambiente || ambientes[0] || 'Boulevard', status: 'Ativa' } as Partial<Row>); criadas++; }
+    }
+    notify(`${MESAS_BOULEVARD.length} mesas no lugar (${criadas} criadas), a partir da porta do bar.`);
   };
+  const botaoMontar = (
+    <AsyncButton className={`btn ${mesas.length ? 'btn--ghost' : 'btn--primary'}`} onClick={montar}
+      confirm={{ title: 'Montar as mesas do boulevard?', message: `Cria as mesas 1 a ${MESAS_BOULEVARD.length} que faltarem e põe todas no lugar da planta: a 1 em frente à porta do bar e as seguintes pelo corredor até a entrada; as últimas ficam na praça do chafariz. As posições atuais dessas mesas são substituídas.`, confirmLabel: 'Montar' }}>
+      <Sparkles size={16} /> Montar mesas do boulevard
+    </AsyncButton>
+  );
 
   return (
     <div className="page">
       <PageHead title="Mapa de mesas" description="As mesas do salão numeradas, com a ocupação ao vivo: comandas abertas, reservas do dia e quanto cada mesa já consumiu."
         actions={podeEditar && (
           <div className="row-gap">
-            {editando && visao === 'mapa' && visiveis.length > 0 && (
-              <AsyncButton className="btn btn--ghost" onClick={organizar}
-                confirm={{ title: 'Organizar como no boulevard?', message: `As ${visiveis.length} mesas vão para o corredor em ordem: a 1 em frente à porta do bar e as seguintes em direção à entrada. As posições atuais são substituídas.`, confirmLabel: 'Organizar' }}>
-                <Sparkles size={16} /> Organizar como no boulevard
-              </AsyncButton>
-            )}
+            {editando && visao === 'mapa' && pode('mesas', 'criar') && botaoMontar}
             <button type="button" className={`btn ${editando ? 'btn--primary' : 'btn--ghost'}`} onClick={() => setEditando(!editando)}><Move size={16} /> {editando ? 'Concluir edição' : 'Editar mapa'}</button>
             {pode('mesas', 'criar') && <button type="button" className="btn btn--ghost" onClick={() => setForm({ numero: (mesas.at(-1)?.numero ?? 0) + 1, lugares: 4, formato: 'Quadrada', ambiente: ambiente || ambientes[0] || '', status: 'Ativa' })}><Plus size={16} /> Nova mesa</button>}
           </div>
@@ -756,7 +761,7 @@ export function MesasPage() {
         </div>
         {col.loading && !mesas.length ? <Loading /> : !mesas.length ? (
           <EmptyState title="Nenhuma mesa cadastrada"
-            action={pode('mesas', 'criar') && <button type="button" className="btn btn--primary" onClick={() => setGerar(true)}><Plus size={16} /> Criar mesas</button>}>
+            action={pode('mesas', 'criar') && <div className="row-gap">{botaoMontar}<button type="button" className="btn btn--ghost" onClick={() => setGerar(true)}><Plus size={16} /> Criar mesas</button></div>}>
             Crie as mesas do salão (você pode gerar várias de uma vez e depois arrastar cada uma para o lugar certo no mapa).
           </EmptyState>
         ) : visao === 'mapa' ? (
@@ -852,6 +857,7 @@ function MapaSalao({ mesas, editando, situacao, onMover, onClicar }: {
     return { x: Math.min(96, Math.max(2, ((e.clientX - r.left) / r.width) * 100)), y: Math.min(94, Math.max(3, ((e.clientY - r.top) / r.height) * 100)) };
   };
   return (
+    <div className="mapa-rolagem" ref={(el) => { if (el && !el.dataset.rolou) { el.dataset.rolou = '1'; el.scrollLeft = el.scrollWidth; } }}>
     <div className={`mapa-salao ${editando ? 'is-editando' : ''}`} ref={area}>
       <PlantaBoulevard />
       {mesas.map((m) => {
@@ -878,37 +884,43 @@ function MapaSalao({ mesas, editando, situacao, onMover, onClicar }: {
         );
       })}
     </div>
+    </div>
   );
 }
 
-/** Posições (em %) das mesas no corredor: a 1 em frente à porta do bar e as seguintes em colunas, da porta em direção à entrada. */
-function posicoesBoulevard(n: number) {
-  const pos = [{ x: 70, y: 28 }];
-  const resto = n - 1;
-  const linhas = resto > 18 ? [26, 42, 58, 74] : [32, 50, 68];
-  const colunas = Math.max(1, Math.ceil(resto / linhas.length));
-  const passo = colunas > 1 ? Math.min(10, 54 / (colunas - 1)) : 0;
-  for (let i = 0; i < resto; i++) {
-    const c = Math.floor(i / linhas.length);
-    pos.push({ x: Math.round((62 - c * passo) * 10) / 10, y: linhas[i % linhas.length] });
-  }
-  return pos.slice(0, n);
-}
+/**
+ * Mesas do boulevard, conforme a planta (estudo de locação L07B) e os vídeos: no mapa a entrada fica à esquerda e a praça do
+ * chafariz à direita; o lado de cima é o do bar. Pelo corredor há três faixas: mesas quadradas junto às lojas do lado do bar,
+ * quadradas no meio e as compridas com bancos do lado do caminho de pedra. A numeração começa na porta do bar e segue até a
+ * entrada; as da praça vêm por último.
+ */
+const MESAS_BOULEVARD: { numero: number; x: number; y: number; formato: string; lugares: number }[] = (() => {
+  const lista: { x: number; y: number; formato: string; lugares: number }[] = [];
+  const passos = [60, 51.3, 42.6, 33.9, 25.2, 16.5, 7.8];
+  const compridas = [57, 44, 31, 18, 6];
+  passos.forEach((x, i) => {
+    lista.push({ x, y: 28, formato: 'Quadrada', lugares: 4 }, { x, y: 46, formato: 'Quadrada', lugares: 4 });
+    if (compridas[i] !== undefined) lista.push({ x: compridas[i], y: 66, formato: 'Retangular', lugares: 6 });
+  });
+  lista.push(...[[84, 24], [95, 24], [84, 78], [95, 78]].map(([x, y]) => ({ x, y, formato: 'Quadrada', lugares: 4 })));
+  return lista.map((m, i) => ({ numero: i + 1, ...m }));
+})();
 
-/** Fundo do mapa: o corredor do boulevard da Nova Olaria, com as lojas dos dois lados, a porta do bar e a praça do palco no fundo. */
+/** Fundo do mapa: o corredor do boulevard da Nova Olaria (planta L07B), com as lojas dos dois lados, a porta do bar, o banco curvo e a praça do chafariz no fundo. */
 function PlantaBoulevard() {
-  const lojasCima = [[0, 13], [13, 26], [26, 39], [39, 50], [50, 61]];
-  const lojasBaixo = [[0, 14], [14, 28], [28, 42], [42, 56], [56, 68], [68, 79]];
+  const lojasCima = [[0, 6.4], [6.4, 21.4], [21.4, 29.9], [29.9, 37.4], [37.4, 53.4], [66.2, 79]];
+  const lojasBaixo = [[0, 3.2], [3.2, 28.8], [28.8, 36.8], [36.8, 44.8], [44.8, 52.8], [52.8, 60.9], [60.9, 68.9], [68.9, 79]];
   return (
     <div className="planta" aria-hidden="true">
       {lojasCima.map(([a, b]) => <span key={`c${a}`} className="planta__loja planta__loja--cima" style={{ left: `${a}%`, width: `${b - a}%` }} />)}
-      <span className="planta__loja planta__loja--cima planta__bar" style={{ left: '61%', width: '18%' }}>
+      <span className="planta__loja planta__loja--cima planta__bar" style={{ left: '53.4%', width: '12.8%' }}>
         <b>Bar do Dindo</b><i className="planta__porta">porta</i>
       </span>
       {lojasBaixo.map(([a, b]) => <span key={`b${a}`} className="planta__loja planta__loja--baixo" style={{ left: `${a}%`, width: `${b - a}%` }} />)}
       <span className="planta__corredor">Corredor do boulevard</span>
       <span className="planta__entrada">Entrada</span>
-      <span className="planta__praca"><span className="planta__banco" /><small>Praça · palco</small></span>
+      <span className="planta__banco" />
+      <span className="planta__praca"><span className="planta__chafariz" /><small>Praça · chafariz</small></span>
     </div>
   );
 }
