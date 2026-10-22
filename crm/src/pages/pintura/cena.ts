@@ -20,6 +20,9 @@ export const PAREDES: { id: Parede; nome: string }[] = [
   { id: 'fundo', nome: 'Fundo' },
   { id: 'frente', nome: 'Frente' },
 ];
+/** Tudo o que pode receber tinta: as quatro paredes, o teto e o chão. */
+export type Superficie = Parede | 'teto' | 'chao';
+export const SUPERFICIES: { id: Superficie; nome: string }[] = [...PAREDES, { id: 'teto', nome: 'Teto' }, { id: 'chao', nome: 'Chão' }];
 
 /** Textura de ruído para concreto, reboco e forro (gerada no navegador, sem baixar imagens). */
 function textura(w: number, h: number, pintar: (ctx: CanvasRenderingContext2D) => void, repetir: [number, number]) {
@@ -110,7 +113,8 @@ function plano(largura: number, altura: number, furos: [number, number, number, 
 }
 
 export interface Cena {
-  pintar: (parede: Parede | 'todas', hex: string | null) => void;
+  /** 'todas' pinta as quatro paredes; teto e chão só quando escolhidos. */
+  pintar: (alvo: Superficie | 'todas', hex: string | null) => void;
   olharPara: (lado: 'fundo' | 'frente') => void;
   /** Movimento contínuo do joystick: x = lateral, y = frente/trás, de -1 a 1. */
   mover: (x: number, y: number) => void;
@@ -134,8 +138,10 @@ export function criarCena(container: HTMLElement): Cena {
   const W = LARGURA, L = COMPRIMENTO, H = ALTURA;
 
   // materiais das paredes: concreto original até escolher uma tinta
-  const matParede = {} as Record<Parede, THREE.MeshStandardMaterial>;
-  for (const p of PAREDES) matParede[p.id] = new THREE.MeshStandardMaterial({ map: tx.concreto, roughness: 0.95 });
+  const original: Record<Superficie, THREE.Texture> = { esquerda: tx.concreto, direita: tx.concreto, fundo: tx.concreto, frente: tx.concreto, teto: tx.forro, chao: tx.piso };
+  const aspereza: Record<Superficie, number> = { esquerda: 0.95, direita: 0.95, fundo: 0.95, frente: 0.95, teto: 1, chao: 0.85 };
+  const mat = {} as Record<Superficie, THREE.MeshStandardMaterial>;
+  for (const p of SUPERFICIES) mat[p.id] = new THREE.MeshStandardMaterial({ map: original[p.id], roughness: aspereza[p.id] });
 
   const add = (geo: THREE.BufferGeometry, mat: THREE.Material, pos: [number, number, number], rotY = 0) => {
     const m = new THREE.Mesh(geo, mat);
@@ -146,10 +152,10 @@ export function criarCena(container: HTMLElement): Cena {
   };
 
   // piso e forro
-  const piso = new THREE.Mesh(new THREE.PlaneGeometry(W, L), new THREE.MeshStandardMaterial({ map: tx.piso, roughness: 0.85 }));
+  const piso = new THREE.Mesh(new THREE.PlaneGeometry(W, L), mat.chao);
   piso.rotation.x = -Math.PI / 2;
   scene.add(piso);
-  const forro = new THREE.Mesh(new THREE.PlaneGeometry(W, L), new THREE.MeshStandardMaterial({ map: tx.forro, roughness: 1 }));
+  const forro = new THREE.Mesh(new THREE.PlaneGeometry(W, L), mat.teto);
   forro.rotation.x = Math.PI / 2;
   forro.position.y = H;
   scene.add(forro);
@@ -159,12 +165,12 @@ export function criarCena(container: HTMLElement): Cena {
   add(new THREE.BoxGeometry(0.12, 0.18, L), sanca, [W / 2 - 0.06, H - 0.09, 0]);
 
   // laterais (de quem entra pela frente olhando o fundo: esquerda em -x)
-  add(plano(L, H), matParede.esquerda, [-W / 2, 0, L / 2], Math.PI / 2);
-  add(plano(L, H), matParede.direita, [W / 2, 0, -L / 2], -Math.PI / 2);
+  add(plano(L, H), mat.esquerda, [-W / 2, 0, L / 2], Math.PI / 2);
+  add(plano(L, H), mat.direita, [W / 2, 0, -L / 2], -Math.PI / 2);
 
   // fundo: parede de concreto com dois pilares encostados nos cantos
-  add(plano(W, H), matParede.fundo, [-W / 2, 0, -L / 2]);
-  for (const x of [-W / 2 + 0.55, W / 2 - 0.55]) add(new THREE.BoxGeometry(0.42, H, 0.16), matParede.fundo, [x, H / 2, -L / 2 + 0.08]);
+  add(plano(W, H), mat.fundo, [-W / 2, 0, -L / 2]);
+  for (const x of [-W / 2 + 0.55, W / 2 - 0.55]) add(new THREE.BoxGeometry(0.42, H, 0.16), mat.fundo, [x, H / 2, -L / 2 + 0.08]);
 
   // frente, vista de dentro: u vai da direita (+x) para a esquerda (-x) de quem está olhando para a rua
   const vitrine = { u: 0.55, w: 2.4, h: 2.25, faixa: 0.5 };
@@ -173,10 +179,10 @@ export function criarCena(container: HTMLElement): Cena {
     [vitrine.u, 0, vitrine.w, vitrine.h + vitrine.faixa],
     [janela.u, 0, janela.w, janela.h],
   ]);
-  add(frente, matParede.frente, [W / 2, 0, L / 2], Math.PI);
+  add(frente, mat.frente, [W / 2, 0, L / 2], Math.PI);
   const ux = (u: number) => W / 2 - u; // posição x de um ponto u da frente
   // pilar de concreto entre a vitrine e a janela
-  add(new THREE.BoxGeometry(0.4, H, 0.2), matParede.frente, [ux(3.17), H / 2, L / 2 - 0.1]);
+  add(new THREE.BoxGeometry(0.4, H, 0.2), mat.frente, [ux(3.17), H / 2, L / 2 - 0.1]);
 
   const preto = new THREE.MeshStandardMaterial({ color: '#141516', roughness: 0.5, metalness: 0.4 });
   const vidro = new THREE.MeshStandardMaterial({ color: '#dfe8ef', emissive: '#cfd8df', emissiveIntensity: 0.9, roughness: 0.1 });
@@ -315,13 +321,14 @@ export function criarCena(container: HTMLElement): Cena {
   olharPara('fundo');
   loop();
 
-  const pintar = (parede: Parede | 'todas', hex: string | null) => {
-    for (const p of PAREDES) {
-      if (parede !== 'todas' && parede !== p.id) continue;
-      const m = matParede[p.id];
-      m.map = hex ? tx.reboco : tx.concreto;
+  const pintar = (alvo: Superficie | 'todas', hex: string | null) => {
+    for (const p of SUPERFICIES) {
+      if (alvo === 'todas' ? p.id === 'teto' || p.id === 'chao' : alvo !== p.id) continue;
+      const m = mat[p.id];
+      m.map = hex ? tx.reboco : original[p.id];
       m.color.set(hex ?? '#ffffff');
-      m.roughness = hex ? 0.9 : 0.95;
+      // piso pintado (tinta de piso) tem um leve acetinado
+      m.roughness = hex ? (p.id === 'chao' ? 0.6 : 0.9) : aspereza[p.id];
       m.needsUpdate = true;
     }
   };
