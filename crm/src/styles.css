@@ -1752,3 +1752,43 @@ button.anexos__nome:hover { text-decoration: underline; }
 .reflist__linha .reflist__item { flex: 1; min-width: 0; }
 .reflist__remover { flex: none; opacity: .5; }
 .reflist__remover:hover, .reflist__remover:focus-visible { opacity: 1; }
+
+/* Meu perfil → Simular pintura (temporário) */
+.pintura { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+.pintura__palco { position: relative; height: min(76vh, 760px); overflow: hidden; padding: 0; }
+.pintura__palco.is-cheia { position: fixed; inset: 0; height: auto; z-index: 300; border-radius: 0; border: 0; }
+.pintura__canvas { position: absolute; inset: 0; cursor: grab; }
+.pintura__canvas:active { cursor: grabbing; }
+.pintura__erro { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--muted); }
+.pintura__acoes { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; }
+.pintura__acoes .chip { background: #131110d9; backdrop-filter: blur(4px); }
+.pintura__dica { position: absolute; left: 12px; bottom: 10px; padding: 4px 10px; border-radius: 999px; background: #131110cc; color: var(--muted); pointer-events: none; }
+.pintura__dica .so-toque { display: none; }
+.pintura__joy { display: none; position: absolute; left: 18px; bottom: 44px; width: 104px; height: 104px; border-radius: 50%; background: #13111099; border: 1px solid #ffffff33; touch-action: none; }
+.pintura__joy span { position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px; border-radius: 50%; background: var(--brand); opacity: .9; pointer-events: none; }
+@media (pointer: coarse) {
+  .pintura__joy { display: block; }
+  .pintura__dica .so-pc { display: none; }
+  .pintura__dica .so-toque { display: inline; }
+}
+.pintura__lado { display: flex; flex-direction: column; gap: 14px; }
+.pintura__lado .panel-title { margin-bottom: 0; }
+.pintura__alvos { display: flex; flex-wrap: wrap; gap: 6px; }
+.pintura__alvos .chip.is-on { border-color: var(--brand); background: #c4572a1f; color: var(--brand-light); }
+.pintura__bolinha { width: 10px; height: 10px; border-radius: 50%; border: 1px solid #ffffff40; }
+.pintura__marca h3 { margin-bottom: 6px; font-weight: 600; }
+.pintura__cores { display: grid; grid-template-columns: repeat(auto-fill, minmax(34px, 1fr)); gap: 6px; }
+.pintura__cor { aspect-ratio: 1; border-radius: 8px; border: 1px solid #ffffff26; transition: transform .1s; }
+.pintura__cor:hover { transform: scale(1.06); }
+.pintura__cor.is-on { outline: 2px solid var(--brand); outline-offset: 2px; }
+.pintura__ficha { display: flex; gap: 12px; align-items: center; padding: 10px; border-radius: 10px; background: var(--surface-2); }
+.pintura__amostra { width: 52px; height: 52px; border-radius: 8px; flex: none; border: 1px solid #ffffff26; }
+.pintura__lojas h3 { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-weight: 600; }
+.pintura__lojas ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.pintura__lojas svg { vertical-align: -1px; }
+@media (max-width: 900px) {
+  .pintura { grid-template-columns: 1fr; }
+  /* no celular a loja fica presa no topo enquanto a paleta rola por baixo, para ver a cor mudar */
+  .pintura__palco { height: 46vh; position: sticky; top: 60px; z-index: 10; }
+}
+@media (max-width: 640px) { .pintura__palco { top: 56px; } }

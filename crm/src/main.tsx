@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, type ReactNode } from 'react';
+import { lazy, StrictMode, Suspense, useEffect, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ShieldOff } from 'lucide-react';
@@ -26,6 +26,9 @@ import MeuPerfil from './pages/MeuPerfil';
 import QrCodeAfilhados from './pages/QrCode';
 import { CaixaPage, ComandasPage, MesasPage } from './pages/Salao';
 import './styles.css';
+
+// three.js é pesado: o simulador de pintura só baixa quando a página é aberta
+const SimuladorPintura = lazy(() => import('./pages/pintura/SimuladorPintura'));
 
 vigiarNovaVersao();
 
@@ -95,6 +98,7 @@ const CUSTOM: Record<string, () => ReactNode> = {
   '/ti/logs': () => <Logs />,
   '/perfil': () => <MeuPerfil />,
   '/perfil/painel': () => <MeuPainel />,
+  '/perfil/pintura': () => <Suspense fallback={<div className="page muted">Carregando a loja em 3D…</div>}><SimuladorPintura /></Suspense>,
   '/diretoria': () => <Diretoria />,
   '/rh/folha': () => <Folha />,
   '/financeiro/receitas': () => <Receitas />,

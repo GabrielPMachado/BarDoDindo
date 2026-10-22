@@ -75,6 +75,8 @@ export const AREAS: Area[] = [
     items: [
       { path: '/perfil', perm: 'eu', label: 'Meus dados' },
       { path: '/perfil/painel', perm: 'eu', label: 'Meu painel' },
+      // temporário: será retirado depois
+      { path: '/perfil/pintura', perm: 'eu', label: 'Simular pintura (3D)' },
     ],
   },
   {
