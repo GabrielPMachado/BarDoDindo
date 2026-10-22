@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { ExternalLink, Maximize2, MapPin, Minimize2, Paintbrush, Phone, RotateCcw } from 'lucide-react';
 import { PageHead } from '../../components/ui';
-import { criarCena, PAREDES, type Cena, type Parede } from './cena';
+import { criarCena, PAREDES, SUPERFICIES, type Cena, type Superficie } from './cena';
 import { TINTAS, lojasDa, linkMapa, type Marca, type Tinta } from './tintas';
 
 const MARCAS: Marca[] = ['Suvinil', 'Coral', 'Sherwin-Williams'];
-type Alvo = Parede | 'todas';
+type Alvo = Superficie | 'todas';
 
 /** Joystick na tela (celular): devolve -1..1 em cada eixo enquanto o dedo está pressionado. */
 function Joystick({ onMove }: { onMove: (x: number, y: number) => void }) {
@@ -46,7 +46,7 @@ export default function SimuladorPintura() {
   const cena = useRef<Cena | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [alvo, setAlvo] = useState<Alvo>('todas');
-  const [cores, setCores] = useState<Record<Parede, Tinta | null>>({ esquerda: null, direita: null, fundo: null, frente: null });
+  const [cores, setCores] = useState<Record<Superficie, Tinta | null>>({ esquerda: null, direita: null, fundo: null, frente: null, teto: null, chao: null });
   const [escolhida, setEscolhida] = useState<Tinta | null>(null);
   const [cheia, setCheia] = useState(false);
 
@@ -72,7 +72,7 @@ export default function SimuladorPintura() {
     cena.current?.pintar(alvo, t?.hex ?? null);
     setCores((c) => {
       const n = { ...c };
-      for (const p of PAREDES) if (alvo === 'todas' || alvo === p.id) n[p.id] = t;
+      for (const p of alvo === 'todas' ? PAREDES : SUPERFICIES) if (alvo === 'todas' || alvo === p.id) n[p.id] = t;
       return n;
     });
   };
@@ -83,7 +83,7 @@ export default function SimuladorPintura() {
     <div className="page">
       <PageHead
         title="Simular pintura"
-        description="A loja em 3D (cerca de 4,1 m × 10 m ≈ 41 m², medidas estimadas pelas fotos). Escolha uma cor e as paredes mudam na hora. Recurso temporário."
+        description="A loja em 3D (cerca de 4,1 m × 10 m ≈ 41 m², medidas estimadas pelas fotos). Escolha uma cor e as paredes, o teto ou o chão mudam na hora. Recurso temporário."
       />
 
       <div className="pintura">
@@ -107,9 +107,9 @@ export default function SimuladorPintura() {
         <aside className="panel pad-lg pintura__lado">
           <h2 className="panel-title"><Paintbrush size={16} className="gold" /> Pintar</h2>
           <div className="pintura__alvos" role="radiogroup" aria-label="Qual parede">
-            {([{ id: 'todas', nome: 'Todas' }, ...PAREDES] as { id: Alvo; nome: string }[]).map((p) => (
+            {([{ id: 'todas', nome: 'Todas as paredes' }, ...SUPERFICIES] as { id: Alvo; nome: string }[]).map((p) => (
               <button key={p.id} role="radio" aria-checked={alvo === p.id} className={`chip${alvo === p.id ? ' is-on' : ''}`} onClick={() => setAlvo(p.id)}>
-                {p.id !== 'todas' && <i className="pintura__bolinha" style={{ background: cores[p.id as Parede]?.hex ?? '#76736f' }} />}
+                {p.id !== 'todas' && <i className="pintura__bolinha" style={{ background: cores[p.id as Superficie]?.hex ?? (p.id === 'teto' ? '#e4dccd' : '#76736f') }} />}
                 {p.nome}
               </button>
             ))}
@@ -132,7 +132,7 @@ export default function SimuladorPintura() {
               </div>
             </div>
           ))}
-          <button className="link small" onClick={() => aplicar(null)}>Voltar ao concreto original</button>
+          <button className="link small" onClick={() => aplicar(null)}>Voltar ao acabamento original</button>
 
           {escolhida && (
             <div className="pintura__ficha">
@@ -162,6 +162,7 @@ export default function SimuladorPintura() {
             </div>
           ))}
           <p className="small muted">
+            {alvo === 'chao' && <>No chão, peça a cor em tinta própria para piso (acrílica de piso ou epóxi). </>}
             Cores na tela são aproximadas e mudam com a luz do ambiente: confira no leque da loja. A tinta é preparada
             na máquina pelo nome ou código; ligue antes para confirmar a marca e o estoque.
           </p>
