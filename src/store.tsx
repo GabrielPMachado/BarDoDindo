@@ -164,8 +164,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const { versao } = await api<{ versao: number }>('/app/versao');
         if (ultima !== null && versao !== ultima) refresh();
         ultima = versao;
-      } catch {
-        /* sem sessão ou sem conexão: tenta de novo no próximo ciclo */
+      } catch (e) {
+        // registro apagado com o app aberto: recarrega, o que encerra a sessão (sem conexão: tenta no próximo ciclo)
+        if (e instanceof ApiError && e.status === 401) refresh();
       }
     }, 1000);
     return () => {

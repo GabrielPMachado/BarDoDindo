@@ -35,10 +35,14 @@ const candidatas = contas.filter((u) => agora - new Date(u.metadata.creationTime
 const sobras = [];
 for (let i = 0; i < candidatas.length; i += 100) {
   const parte = candidatas.slice(i, i + 100);
-  // getAll falha se a conta de serviço não puder ler o banco: nesse caso nada é apagado
-  const docs = await db.getAll(...parte.flatMap((u) => [db.doc(`clientes/${u.uid}`), db.doc(`usuarios/${u.uid}`)]));
-  parte.forEach((u, j) => {
-    if (!docs[2 * j].exists && !docs[2 * j + 1].exists) sobras.push(u);
+  // getAll falha se a conta de serviço não puder ler o banco: nesse caso nada é apagado.
+  // Cada registro pedido custa 1 leitura: primeiro os afilhados (a maioria); a equipe só para quem não é afilhado.
+  const clientes = await db.getAll(...parte.map((u) => db.doc(`clientes/${u.uid}`)));
+  const semCliente = parte.filter((_, j) => !clientes[j].exists);
+  if (!semCliente.length) continue;
+  const usuarios = await db.getAll(...semCliente.map((u) => db.doc(`usuarios/${u.uid}`)));
+  semCliente.forEach((u, j) => {
+    if (!usuarios[j].exists) sobras.push(u);
   });
 }
 
