@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Check, Copy, Download, ExternalLink, ImageOff, Sparkles, Upload } from 'lucide-react';
 import { GEMINI_URL, MODELOS, promptDaFoto, promptDaFotoEstoque, type PadraoFoto } from '../lib/iaFoto';
-import { reduzirFoto } from './Avatar';
+import { fotoNoTamanho } from './Avatar';
 import { notify } from './ui';
 
 async function copiar(texto: string) {
@@ -60,7 +60,7 @@ export function GerarFotoIA({ data, onUsar, padrao = 'produto' }: { data: Record
   const receber = async (arquivo?: File) => {
     if (!arquivo) return;
     setErro(null);
-    try { setNova(await reduzirFoto(arquivo, 1024, false)); } catch (e) { setErro(e instanceof Error ? e.message : 'Não foi possível ler a imagem.'); }
+    try { setNova(await fotoNoTamanho(arquivo)); } catch (e) { setErro(e instanceof Error ? e.message : 'Não foi possível ler a imagem.'); }
   };
 
   if (!aberto && !nova) {
