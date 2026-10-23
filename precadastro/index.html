@@ -56,12 +56,15 @@
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 16px; display: flex; flex-direction: column; gap: 6px; }
   .card h2 { margin: 0 0 6px; font: 700 20px var(--serif); text-align: center; }
   #form-login > p.muted { text-align: center; }
-  .dupla { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .dupla { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
   .dupla > div { display: flex; flex-direction: column; min-width: 0; }
   @media (max-width: 340px) { .dupla { grid-template-columns: 1fr; } }
   .aviso18 { margin: 10px 0 0; padding: 8px 12px; border-radius: 10px; font-size: 12.5px; background: #c4572a1a; border: 1px solid #c4572a55; color: #f0a47f; }
   label.lbl { font-size: 12.5px; color: var(--muted); font-weight: 500; margin-top: 8px; }
   .input { width: 100%; height: 48px; padding: 0 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font: inherit; }
+  /* iOS/Safari dá ao campo de data uma largura mínima própria e ele estoura a coluna */
+  .input[type="date"] { display: block; min-width: 0; max-width: 100%; -webkit-appearance: none; appearance: none; line-height: 46px; }
+  .input[type="date"]::-webkit-date-and-time-value { text-align: left; margin: 0; }
   .input:focus { outline: 0; border-color: var(--brand); }
   .pw { position: relative; }
   .pw button { position: absolute; right: 6px; top: 6px; height: 36px; border-radius: 8px; padding: 0 10px; color: var(--brand); font-size: 13px; font-weight: 600; }
