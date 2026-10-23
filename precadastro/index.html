@@ -183,8 +183,8 @@
     <div class="hero">
       <span class="eyebrow eyebrow--grande">&ldquo;Afilhie-se&rdquo;</span>
       <h1>Seja bem-vindo ao <span>Bar&nbsp;do&nbsp;Dindo</span></h1>
-      <p>Torne-se afilhado. Cadastre-se agora e <strong>garanta o seu número de afilhado</strong>. Ele será seu para sempre! Venha fazer parte da nossa história.</p>
-      <div class="proof" id="proof" hidden><span class="proof__dots"><i></i><i></i><i></i></span><span><strong id="proof-n">0</strong> afilhados já garantiram o seu</span></div>
+      <p>Torne-se membro da nossa comunidade. Cadastre-se agora e <strong>garanta o seu número de afilhado</strong>. Ele será seu para sempre! Venha fazer parte desta história!</p>
+      <div class="proof" id="proof" hidden><span class="proof__dots"><i></i><i></i><i></i></span><span><strong id="proof-n">0</strong> <span id="proof-txt">afilhados já garantiram o seu</span></span></div>
     </div>
 
     <form class="card" id="form-cadastro" novalidate style="margin-top:20px">
@@ -206,7 +206,7 @@
         <input class="input" id="senha" type="password" autocomplete="new-password" minlength="6" maxlength="100" placeholder="Mínimo de 6 caracteres" required />
         <button type="button" data-toggle="senha">Mostrar</button>
       </div>
-      <label class="check"><input type="checkbox" id="aceite" /> <span>Tenho 18 anos ou mais e concordo que o @bardodindo utilize as informações prestadas para o programa de afilhados além de ficar por dentro das novidades, recebendo informações e novidades por e-mail e/ou telefone.</span></label>
+      <label class="check"><input type="checkbox" id="aceite" /> <span>Tenho 18 anos ou mais e concordo que o @bardodindo utilize as informações prestadas no programa de afilhados e para me manter por dentro das novidades, por e-mail e/ou telefone.</span></label>
       <p class="error" id="erro-cadastro" role="alert"></p>
       <button class="btn btn--brand btn--caixa-alta" id="btn-cadastro" type="submit">Gerar número de afilhado</button>
     </form>
@@ -214,10 +214,10 @@
 
     <h2 class="secao">Como funciona</h2>
     <ol class="passos">
-      <li class="passo"><span class="passo__n">1</span><div><strong>Cadastre-se e se torne um afilhado</strong><span>Leva um minuto. Você coloca as informações necessárias (que não são muitas) e, assim que concluído, seu número é gerado, sendo permanentemente seu.</span></div></li>
-      <li class="passo"><span class="passo__n">2</span><div><strong>Some pontos a cada visita</strong><span>Informe (se quiser) seu número de afilhado e abra uma comanda no bar. Assim que ela é encerrada, o consumo se transforma em pontos acumulativos.</span></div></li>
-      <li class="passo"><span class="passo__n">3</span><div><strong>Resgate recompensas</strong><span>No histórico do seu perfil é possível acompanhar o acúmulo de pontos. Com base na sua pontuação, é possível resgatar recompensas e prêmios.</span></div></li>
-      <li class="passo"><span class="passo__n">4</span><div><strong>Afilhados</strong><span>Além de recompensas, no seu perfil será possível consultar o cardápio, reservar mesas, karaokê, videogame e muitas outras novidades exclusivas para você. Faça parte desta comunidade, afilhado!</span></div></li>
+      <li class="passo"><span class="passo__n">1</span><div><strong>Cadastre-se e se torne um afilhado</strong><span>Leva um minuto. Você preenche alguns dados (são poucos) e, ao concluir, seu número é gerado e passa a ser seu para sempre.</span></div></li>
+      <li class="passo"><span class="passo__n">2</span><div><strong>Some pontos a cada visita</strong><span>Informe (se quiser) seu número de afilhado e abra uma comanda no bar. Assim que ela for encerrada, o consumo se transforma em pontos acumulativos.</span></div></li>
+      <li class="passo"><span class="passo__n">3</span><div><strong>Resgate recompensas</strong><span>No histórico do seu perfil, você acompanha o acúmulo de pontos e, conforme a sua pontuação, resgata recompensas e prêmios.</span></div></li>
+      <li class="passo"><span class="passo__n">4</span><div><strong>Afilhados</strong><span>Além das recompensas, no aplicativo você poderá consultar o cardápio, reservar mesas, usar o karaokê e o videogame e aproveitar muitas outras novidades exclusivas. Faça parte desta comunidade, afilhado!</span></div></li>
     </ol>
 
   </section>
@@ -319,6 +319,7 @@ import { cpfValido, idadeEm } from '../shared/backend';
   const atualizarTotal = () => api('/public/afilhados').then(({ total }) => {
     if (total > 0) {
       $('proof-n').textContent = total.toLocaleString('pt-BR');
+      $('proof-txt').textContent = total === 1 ? 'afilhado já garantiu o seu' : 'afilhados já garantiram o seu';
       $('proof').hidden = false;
     }
   }).catch(() => {});
@@ -412,7 +413,7 @@ import { cpfValido, idadeEm } from '../shared/backend';
     const desde = new Date(cliente.desde).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
     $('ola').textContent = novo ? `Bem-vindo, ${primeiro}!` : `Olá de novo, ${primeiro}!`;
     $('reveal-text').textContent = novo
-      ? 'Seu número está garantido. Você será avisado quando o aplicativo for lançado; use este e‑mail e senha para entrar.'
+      ? 'Seu número está garantido. Você será avisado quando o aplicativo for lançado; use este e‑mail e esta senha para entrar.'
       : 'Este é o seu número de afilhado. Ele continua garantido para o lançamento do aplicativo.';
     $('c-num').textContent = '#' + pad(n);
     $('c-nome').textContent = cliente.nome;
