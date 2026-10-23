@@ -190,35 +190,79 @@
   .convite span { font-size: 13px; color: var(--muted); }
   .convite .btn { margin-top: 10px; height: 44px; font-size: 14.5px; }
   .convite--ok { align-items: center; text-align: center; }
-  .quiz { position: fixed; inset: 0; z-index: 70; overflow-y: auto; background: #070605f2; animation: fadeIn .3s ease both;
-    padding: calc(20px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom)); }
-  .quiz__box { position: relative; max-width: 560px; min-height: min(560px, calc(100dvh - 48px)); margin: 0 auto; gap: 14px; padding: 22px 18px; }
-  .quiz__fechar { position: absolute; top: 8px; right: 8px; width: 40px; height: 40px; border-radius: 50%; color: var(--muted); font-size: 26px; line-height: 1; }
+  /* questionário: janela com uma pergunta por vez e as opções uma por linha */
+  .quiz { position: fixed; inset: 0; z-index: 70; display: flex; align-items: flex-end; justify-content: center; background: #050404e0; backdrop-filter: blur(4px); animation: fadeIn .25s ease both; }
+  .quiz.is-fim { z-index: 55; }
+  .quiz__box { position: relative; width: 100%; max-width: 560px; height: min(720px, calc(100dvh - 24px)); padding: 0; gap: 0; overflow: hidden;
+    border-radius: 22px 22px 0 0; border-color: #c4572a55; border-bottom: 0;
+    background: radial-gradient(130% 55% at 50% -12%, #c4572a30, transparent 62%), var(--surface);
+    box-shadow: 0 -18px 60px #000c, inset 0 1px 0 #ffffff0d; animation: quizSobe .42s cubic-bezier(.2, .9, .25, 1.05) both; }
+  @keyframes quizSobe { from { transform: translateY(60px); opacity: 0; } }
+  .quiz__fechar { position: absolute; top: 12px; right: 12px; z-index: 2; width: 38px; height: 38px; border-radius: 50%; color: var(--muted); font-size: 24px; line-height: 1; background: #ffffff0a; }
   .quiz__fechar:hover { color: var(--text); background: var(--surface-2); }
-  .quiz__centro { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding: 12px 4px; }
-  .quiz__centro img { border-radius: 50%; filter: drop-shadow(0 0 18px #e07a4c77); }
-  .quiz__centro h2 { margin: 6px 0 0; font: 700 24px/1.25 var(--serif); }
-  .quiz__centro p { margin: 0; max-width: 380px; line-height: 1.55; color: var(--muted); }
+  .quiz__centro { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; padding: 28px 24px calc(28px + env(safe-area-inset-bottom)); animation: quizEntra .4s ease both; }
+  .quiz__centro.is-volta { animation-name: quizEntraVolta; }
+  .quiz__emblema { position: relative; display: grid; place-items: center; animation: quizPop .7s cubic-bezier(.2, 1.5, .4, 1) both; }
+  .quiz__emblema::before { content: ""; position: absolute; inset: -14px; border-radius: 50%; border: 1.5px solid #e07a4c55; animation: quizAnel 2.4s ease-out .6s infinite; }
+  .quiz__emblema img { border-radius: 50%; filter: drop-shadow(0 0 22px #e07a4c77); }
+  .quiz__centro h2 { margin: 6px 0 0; font: 700 25px/1.25 var(--serif); animation: quizSobeTexto .5s .12s ease both; }
+  .quiz__centro.is-fim h2 { background: linear-gradient(90deg, var(--text), var(--brand-light), var(--text)); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: quizSobeTexto .5s .12s ease both, quizBrilho 3s 1s ease-in-out infinite; }
+  .quiz__centro p { margin: 0; max-width: 380px; line-height: 1.55; color: var(--muted); animation: quizSobeTexto .5s .2s ease both; }
   .quiz__centro p strong { color: var(--text); }
-  .quiz__centro .btn { max-width: 320px; }
-  .quiz__insta { color: var(--brand-light); font-weight: 700; font-size: 17px; }
-  .quiz__q { flex: 1; display: flex; flex-direction: column; gap: 14px; animation: quizEntra .25s ease both; }
-  @keyframes quizEntra { from { opacity: 0; transform: translateX(18px); } }
-  .quiz__barra { height: 4px; margin-right: 40px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
-  .quiz__barra span { display: block; height: 100%; background: var(--brand); transition: width .3s ease; }
-  .quiz__contador { font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--brand-light); }
-  .quiz__q h2 { margin: 0; font: 600 19px/1.45 var(--serif); text-align: left; }
-  .quiz__dica { flex-basis: 100%; margin: -4px 0 2px; font-size: 13px; color: var(--muted); }
-  .quiz__ops { display: flex; flex-wrap: wrap; gap: 8px; }
-  .quiz__ops button { min-height: 42px; padding: 8px 16px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface-2); font-size: 14.5px; transition: background .15s, border-color .15s; }
-  .quiz__ops button:hover { border-color: var(--brand); }
-  .quiz__ops button[aria-checked="true"] { background: var(--brand); border-color: var(--brand); color: var(--on-brand); font-weight: 600; }
-  .quiz__ops[data-multipla] button[aria-checked="true"]::before { content: "✓ "; }
-  .quiz__texto { height: auto; min-height: 150px; padding: 12px 14px; resize: vertical; line-height: 1.5; }
-  .quiz__acoes { margin-top: auto; display: grid; grid-template-columns: auto 1fr; gap: 10px; }
-  .quiz__acoes .btn { margin-top: 0; }
-  .quiz__acoes .btn--ghost { width: 56px; font-size: 20px; }
-  @media (min-width: 720px) { .quiz { padding-top: 48px; } .quiz__box { padding: 30px 32px; } }
+  .quiz__centro .btn { max-width: 320px; animation: quizSobeTexto .5s .28s ease both; }
+  .quiz__centro .link { animation: quizSobeTexto .5s .34s ease both; color: var(--muted); }
+  .quiz__insta { color: var(--brand-light); font-weight: 700; font-size: 17px; animation: quizSobeTexto .5s .26s ease both; }
+  @keyframes quizPop { from { transform: scale(.4) rotate(-12deg); opacity: 0; } }
+  @keyframes quizAnel { from { transform: scale(.9); opacity: .9; } to { transform: scale(1.35); opacity: 0; } }
+  @keyframes quizSobeTexto { from { transform: translateY(12px); opacity: 0; } }
+  @keyframes quizBrilho { 50% { background-position: 100% 0; } }
+  .quiz__q { flex: 1; min-height: 0; display: flex; flex-direction: column; animation: quizEntra .32s cubic-bezier(.2, .8, .3, 1) both; }
+  .quiz__q.is-volta { animation-name: quizEntraVolta; }
+  @keyframes quizEntra { from { opacity: 0; transform: translateX(28px); } }
+  @keyframes quizEntraVolta { from { opacity: 0; transform: translateX(-28px); } }
+  .quiz__cabeca { padding: 24px 64px 12px 22px; display: flex; flex-direction: column; gap: 10px; }
+  .quiz__passos { list-style: none; margin: 0; padding: 0; display: flex; gap: 4px; }
+  .quiz__passos li { flex: 1; height: 4px; border-radius: 4px; background: var(--surface-3, #231e1c); }
+  .quiz__passos li.is-feito { background: var(--brand); }
+  .quiz__passos li.is-atual { background: linear-gradient(90deg, var(--brand-light), var(--brand)); box-shadow: 0 0 10px #e07a4c88; }
+  .quiz__contador { font-size: 12px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--brand-light); }
+  .quiz__miolo { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 2px 22px 18px; display: flex; flex-direction: column; gap: 14px; }
+  .quiz__miolo h2 { margin: 0; font: 600 20px/1.4 var(--serif); text-align: left; text-wrap: pretty; }
+  .quiz__dica { align-self: flex-start; margin: -4px 0 0; padding: 4px 10px; border-radius: 99px; font-size: 12.5px; color: var(--brand-light); background: #c4572a1f; }
+  .quiz__ops { display: flex; flex-direction: column; gap: 8px; }
+  .quiz__item { display: flex; flex-direction: column; gap: 6px; animation: quizSobeTexto .35s ease both; }
+  .quiz__op { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 54px; padding: 12px 16px; text-align: left; border-radius: 14px;
+    border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text); font-size: 15px; line-height: 1.35;
+    transition: border-color .18s, background .18s, transform .12s, box-shadow .18s; }
+  .quiz__op:hover { border-color: #c4572aaa; }
+  .quiz__op:active { transform: scale(.985); }
+  .quiz__op:focus-visible { outline: 2px solid var(--brand-light); outline-offset: 2px; }
+  .quiz__op[aria-checked="true"] { border-color: var(--brand); background: linear-gradient(90deg, #c4572a33, #c4572a14); box-shadow: 0 6px 22px #c4572a2b, inset 0 0 0 1px #c4572a66; font-weight: 600; }
+  .quiz__marca { width: 22px; height: 22px; flex-shrink: 0; display: grid; place-items: center; border-radius: 50%; border: 2px solid var(--border-strong); color: var(--on-brand); font-size: 13px; font-weight: 900; line-height: 1; transition: border-color .18s, background .18s; }
+  .quiz__ops[data-multipla] .quiz__marca { border-radius: 7px; }
+  .quiz__op[aria-checked="true"] .quiz__marca { border-color: var(--brand); background: var(--brand); animation: quizMarca .3s cubic-bezier(.2, 1.6, .4, 1); }
+  .quiz__op[aria-checked="true"] .quiz__marca::after { content: "✓"; }
+  @keyframes quizMarca { from { transform: scale(.3); } }
+  .quiz__op span:last-child { flex: 1; min-width: 0; }
+  .quiz__outro { height: 46px; margin-left: 36px; width: calc(100% - 36px); border-radius: 12px; animation: quizAbre .25s ease both; }
+  @keyframes quizAbre { from { opacity: 0; transform: translateY(-6px); } }
+  .quiz__caixa { position: relative; }
+  .quiz__texto { height: auto; min-height: 180px; padding: 14px 16px 28px; border-radius: 14px; resize: none; line-height: 1.55; }
+  .quiz__conta { position: absolute; right: 12px; bottom: 9px; font-size: 11.5px; color: var(--muted); }
+  .quiz__acoes { flex-shrink: 0; display: grid; grid-template-columns: 52px 1fr; gap: 10px; padding: 12px 22px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); background: #131110f2; }
+  .quiz__acoes .btn { margin-top: 0; height: 50px; border-radius: 14px; }
+  .quiz__acoes .btn--ghost { font-size: 20px; }
+  @media (min-width: 720px) {
+    .quiz { align-items: center; }
+    .quiz__box { height: min(680px, 88dvh); border-radius: 22px; border-bottom: 1px solid #c4572a55; box-shadow: 0 30px 90px #000d, 0 0 0 1px #ffffff08; animation-name: quizSurge; }
+    .quiz__cabeca { padding: 28px 70px 14px 32px; }
+    .quiz__miolo { padding: 2px 32px 22px; }
+    .quiz__miolo h2 { font-size: 22px; }
+    .quiz__acoes { padding: 14px 32px 18px; }
+  }
+  @keyframes quizSurge { from { transform: translateY(24px) scale(.96); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .quiz *, .quiz, .quiz *::before { animation: none !important; transition: none !important; } }
   .stage { opacity: 0; }
   /* cada parte entra com animação no momento em que aparece */
   .stage.is-in { opacity: 1; animation: up .6s ease both; }
@@ -706,53 +750,75 @@ import { INSTAGRAM, LIMITE_TEXTO, alternar, contador, ehOutro, montarResposta } 
   }
   function abrirQuiz() {
     marcadas = {}; outros = {};
+    inicio(false);
+    $('quiz').classList.remove('is-fim');
+    $('quiz').hidden = false;
+  }
+  function inicio(volta) {
     const total = questionario.perguntas.length;
-    telaQuiz(el('div', { className: 'quiz__centro' },
-      logoQuiz(),
+    telaQuiz(el('div', { className: `quiz__centro${volta ? ' is-volta' : ''}` },
+      el('span', { className: 'quiz__emblema' }, logoQuiz()),
       el('h2', { textContent: questionario.titulo }),
       el('p', { textContent: `São ${total} perguntas rápidas, uma de cada vez. É opcional: responda só o que quiser.` }),
       botao('Começar', 'btn btn--brand', () => pergunta(0)),
       botao('Agora não', 'link', fecharQuiz)));
-    $('quiz').hidden = false;
   }
-  function pergunta(i) {
+  function pergunta(i, volta = false) {
     const p = questionario.perguntas[i], total = questionario.perguntas.length;
     const sel = () => marcadas[p.id] ?? [];
-    const barra = el('div', { className: 'quiz__barra' }, el('span'));
-    barra.firstChild.style.width = `${((i + 1) / total) * 100}%`;
+    const passos = el('ol', { className: 'quiz__passos' }, ...questionario.perguntas.map((_, k) => el('li', { className: k < i ? 'is-feito' : k === i ? 'is-atual' : '' })));
+    passos.setAttribute('aria-hidden', 'true');
     const titulo = el('h2', { id: `q-${p.id}-t`, textContent: p.texto });
-    const outro = el('input', { className: 'input', maxLength: 200, placeholder: 'Conta pra gente: qual? (se quiser)', value: outros[p.id] ?? '', hidden: !sel().some(ehOutro) });
-    outro.setAttribute('aria-label', `${p.texto} (outro)`);
-    outro.oninput = () => (outros[p.id] = outro.value);
-    let campo;
+    const miolo = el('div', { className: 'quiz__miolo' }, titulo);
+    if (p.multipla) miolo.append(el('p', { className: 'quiz__dica', textContent: '☑ Pode marcar quantas quiser' }));
     if (p.opcoes.length) {
-      campo = el('div', { className: 'quiz__ops' });
-      campo.setAttribute('role', p.multipla ? 'group' : 'radiogroup');
-      campo.setAttribute('aria-labelledby', titulo.id);
-      if (p.multipla) { campo.dataset.multipla = ''; campo.append(el('p', { className: 'quiz__dica', textContent: 'Pode marcar quantas quiser.' })); }
-      for (const o of p.opcoes) {
-        const b = botao(o, '', () => {
-          marcadas[p.id] = alternar(p, sel(), o);
-          campo.querySelectorAll('button').forEach((x) => x.setAttribute('aria-checked', String(sel().includes(x.textContent))));
-          outro.hidden = !sel().some(ehOutro);
-          if (!outro.hidden && ehOutro(o) && sel().includes(o)) outro.focus();
-        });
+      const ops = el('div', { className: 'quiz__ops' });
+      ops.setAttribute('role', p.multipla ? 'group' : 'radiogroup');
+      ops.setAttribute('aria-labelledby', titulo.id);
+      if (p.multipla) ops.dataset.multipla = '';
+      p.opcoes.forEach((o, k) => {
+        const item = el('div', { className: 'quiz__item' });
+        item.style.animationDelay = `${60 + k * 45}ms`;
+        const b = el('button', { type: 'button', className: 'quiz__op' }, el('span', { className: 'quiz__marca' }), el('span', { textContent: o }));
         b.setAttribute('role', p.multipla ? 'checkbox' : 'radio');
         b.setAttribute('aria-checked', String(sel().includes(o)));
-        campo.append(b);
-      }
+        item.append(b);
+        // "Outro": abre um campo logo abaixo para contar o que é (a resposta fica "Outro: …")
+        if (ehOutro(o)) {
+          const outro = el('input', { className: 'input quiz__outro', maxLength: 200, placeholder: 'Conta pra gente: qual? (se quiser)', value: outros[p.id] ?? '', hidden: !sel().includes(o) });
+          outro.setAttribute('aria-label', `${p.texto} (outro)`);
+          outro.oninput = () => (outros[p.id] = outro.value);
+          item.append(outro);
+        }
+        b.onclick = () => {
+          marcadas[p.id] = alternar(p, sel(), o);
+          ops.querySelectorAll('.quiz__item').forEach((it, j) => {
+            const on = sel().includes(p.opcoes[j]);
+            it.firstChild.setAttribute('aria-checked', String(on));
+            const campo = it.querySelector('.quiz__outro');
+            if (campo) campo.hidden = !on;
+          });
+          if (ehOutro(o) && sel().includes(o)) item.querySelector('.quiz__outro').focus();
+        };
+        ops.append(item);
+      });
+      miolo.append(ops);
     } else {
-      campo = el('textarea', { className: 'input quiz__texto', rows: 6, maxLength: LIMITE_TEXTO, placeholder: 'Escreva aqui…', value: sel()[0] ?? '' });
-      campo.setAttribute('aria-labelledby', titulo.id);
-      campo.oninput = () => (marcadas[p.id] = [campo.value]);
+      const caixa = el('textarea', { className: 'input quiz__texto', rows: 6, maxLength: LIMITE_TEXTO, placeholder: 'Escreva aqui, com suas palavras…', value: sel()[0] ?? '' });
+      caixa.setAttribute('aria-labelledby', titulo.id);
+      const conta = el('small', { className: 'quiz__conta', textContent: `${caixa.value.length}/${LIMITE_TEXTO}` });
+      caixa.oninput = () => { marcadas[p.id] = [caixa.value]; conta.textContent = `${caixa.value.length}/${LIMITE_TEXTO}`; };
+      miolo.append(el('div', { className: 'quiz__caixa' }, caixa, conta));
     }
     const erro = el('p', { className: 'error' });
     erro.setAttribute('role', 'alert');
-    const responder = botao('Responder', 'btn btn--brand', () => (i + 1 < total ? pergunta(i + 1) : enviarQuiz(responder, erro)));
-    const voltar = botao('←', 'btn btn--ghost', () => (i ? pergunta(i - 1) : abrirQuiz()));
+    miolo.append(erro);
+    const responder = botao(i + 1 < total ? 'Responder' : 'Responder e enviar', 'btn btn--brand', () => (i + 1 < total ? pergunta(i + 1) : enviarQuiz(responder, erro)));
+    const voltar = botao('←', 'btn btn--ghost', () => (i ? pergunta(i - 1, true) : inicio(true)));
     voltar.setAttribute('aria-label', 'Voltar');
-    telaQuiz(el('div', { className: 'quiz__q' },
-      barra, el('small', { className: 'quiz__contador', textContent: contador(i, total) }), titulo, campo, outro, erro,
+    telaQuiz(el('div', { className: `quiz__q${volta ? ' is-volta' : ''}` },
+      el('div', { className: 'quiz__cabeca' }, passos, el('small', { className: 'quiz__contador', textContent: contador(i, total) })),
+      miolo,
       el('div', { className: 'quiz__acoes' }, voltar, responder)));
   }
   async function enviarQuiz(btn, erro) {
@@ -765,15 +831,17 @@ import { INSTAGRAM, LIMITE_TEXTO, alternar, contador, ehOutro, montarResposta } 
       $('convite-ok').hidden = false;
       $('convite-ok').classList.add('is-in');
       const insta = el('a', { className: 'quiz__insta', href: INSTAGRAM.url, target: '_blank', rel: 'noreferrer', textContent: INSTAGRAM.arroba });
-      telaQuiz(el('div', { className: 'quiz__centro' },
-        logoQuiz(),
+      telaQuiz(el('div', { className: 'quiz__centro is-fim' },
+        el('span', { className: 'quiz__emblema' }, logoQuiz()),
         el('h2', { textContent: 'Sua ajuda é o que nos move!' }),
         el('p', {}, 'Obrigado pelo seu tempo, ', el('strong', { textContent: nomeBonito(atual.nome) }), '!'),
         insta,
         botao('Fechar', 'btn btn--brand', fecharQuiz)));
+      $('quiz').classList.add('is-fim'); // o confete passa por cima da janela
+      confete();
     } catch (err) {
       erro.textContent = err.message;
-      carregando(btn, false, 'Responder');
+      carregando(btn, false, 'Responder e enviar');
     }
   }
   function fecharQuiz() { $('quiz').hidden = true; }
