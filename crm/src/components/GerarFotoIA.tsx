@@ -4,7 +4,7 @@ import { GEMINI_URL, MODELOS, promptDaFoto, promptDaFotoEstoque, type PadraoFoto
 import { fotoNoTamanho } from './Avatar';
 import { notify } from './ui';
 
-async function copiar(texto: string) {
+export async function copiar(texto: string) {
   try {
     await navigator.clipboard.writeText(texto);
     return true;
@@ -17,12 +17,12 @@ async function copiar(texto: string) {
   }
 }
 
-function baixar(url: string, nome: string) {
+export function baixar(url: string, nome: string) {
   const a = document.createElement('a');
   a.href = url; a.download = nome;
   document.body.appendChild(a); a.click(); a.remove();
 }
-const nomeArquivo = (nome: string) => nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'foto';
+export const nomeArquivo = (nome: string) => nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'foto';
 
 /**
  * "Foto no padrão do Dindo", de graça pelo app do Gemini: o Cérebro copia o pedido pronto do drink (ou do item do Estoque) e

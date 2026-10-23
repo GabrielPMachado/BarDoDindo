@@ -1795,12 +1795,21 @@ button.anexos__nome:hover { text-decoration: underline; }
 
 /* Estoque: refazer as fotos em alta qualidade pelo Gemini */
 .refazer-fotos { display: flex; flex-direction: column; gap: 12px; }
-.refazer-fotos__filtro { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; }
+.refazer-fotos__filtro { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13.5px; }
+.refazer-fotos__filtro > span { margin-right: 4px; color: var(--muted); }
+.refazer-fotos__modos { display: inline-flex; gap: 4px; padding: 4px; border-radius: 10px; background: var(--surface-3); align-self: flex-start; flex-wrap: wrap; }
+.refazer-fotos__modos button { border: 0; background: none; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; padding: 7px 12px; border-radius: 8px; cursor: pointer; }
+.refazer-fotos__modos button.is-on { background: var(--surface); color: var(--text); box-shadow: 0 0 0 1px var(--border-strong); }
+.refazer-fotos__nome { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.refazer-fotos__item.is-fora { opacity: .55; }
+.refazer-fotos__item.is-aberto { border-color: var(--brand-light); }
+.refazer-fotos__botoes { display: inline-flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+.refazer-fotos__botoes label.btn { cursor: pointer; font-weight: 600; color: var(--text); font-size: 12.5px; }
 .refazer-fotos__lista { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
 .refazer-fotos__item { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); }
 .refazer-fotos__item.is-gerando { border-color: var(--brand); }
 .refazer-fotos__item.is-salva { opacity: .7; }
-.refazer-fotos__item > strong { font-size: 13.5px; }
+.refazer-fotos__nome strong { font-size: 13.5px; }
 .refazer-fotos__item .error { margin: 0; }
 .refazer-fotos__acoes { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; min-height: 30px; font-size: 13px; }
 .refazer-fotos__acoes label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
