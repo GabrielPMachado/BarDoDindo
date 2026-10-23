@@ -98,7 +98,7 @@
 
   /* ---------- revelação do número ---------- */
   .reveal {
-    position: fixed; inset: 0; z-index: 50; overflow-y: auto;
+    position: fixed; inset: 0; z-index: 50; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y;
     background: radial-gradient(70% 45% at 50% 32%, #3e2820 0%, #16100e 55%, #070605 100%);
     display: flex; flex-direction: column; align-items: center; justify-content: safe center; gap: 18px;
     padding: calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom)); text-align: center;
