@@ -4,8 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0c0a0a" />
-<meta name="description" content="Garanta seu número de afilhado do Bar do Dindo antes do lançamento do aplicativo." />
-<title>Bar do Dindo · Garanta seu número de afilhado</title>
+<meta name="description" content="Seja bem-vindo ao Bar do Dindo. Cadastre-se e garanta o seu número de afilhado." />
+<title>Bar do Dindo · Seja bem-vindo</title>
 <link rel="icon" href="/icon.png" type="image/png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -43,6 +43,7 @@
   .hero h1 { margin: 0; font: 700 30px/1.15 var(--serif); }
   .hero h1 span { color: var(--brand-light); }
   .hero p { margin: 0; color: var(--muted); }
+  .hero p strong { color: var(--text); font-weight: 700; }
   .proof { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 13px; color: var(--muted); }
   .proof__dots { display: flex; }
   .proof__dots i { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--bg); margin-left: -7px; background: linear-gradient(135deg, var(--brand-light), var(--brand-dark)); }
@@ -81,6 +82,7 @@
   .passo div > span { font-size: 13.5px; color: var(--muted); line-height: 1.5; }
   .rodape { display: flex; flex-direction: column; align-items: center; gap: 4px; padding-top: 18px; border-top: 1px solid var(--border); text-align: center; font-size: 12px; color: var(--muted); }
   .rodape b { color: var(--brand-light); font-weight: 600; letter-spacing: .14em; text-transform: uppercase; font-size: 11px; }
+  .rodape__arroba { text-transform: none; letter-spacing: .04em; }
   .secao { margin: 22px 0 10px; text-align: center; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
   .spinner { width: 20px; height: 20px; border-radius: 50%; border: 2.5px solid #0d090755; border-top-color: var(--on-brand); animation: spin .7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -177,9 +179,9 @@
   <!-- cadastro -->
   <section id="view-cadastro">
     <div class="hero">
-      <span class="eyebrow">Em breve · Aplicativo oficial</span>
-      <h1>Garanta seu <span>número de afilhado</span></h1>
-      <p>O aplicativo do Bar do Dindo está chegando. Cadastre-se agora e reserve o seu número: ele será seu para sempre.</p>
+      <span class="eyebrow">Afilhie-se</span>
+      <h1>Seja bem-vindo ao <span>Bar&nbsp;do&nbsp;Dindo</span></h1>
+      <p>Torne-se afilhado. Cadastre-se agora e <strong>garanta o seu número de afilhado</strong>. Ele será seu para sempre! Venha fazer parte da nossa história.</p>
       <div class="proof" id="proof" hidden><span class="proof__dots"><i></i><i></i><i></i></span><span><strong id="proof-n">0</strong> afilhados já garantiram o seu</span></div>
     </div>
 
@@ -202,18 +204,18 @@
         <input class="input" id="senha" type="password" autocomplete="new-password" minlength="6" maxlength="100" placeholder="Mínimo de 6 caracteres" required />
         <button type="button" data-toggle="senha">Mostrar</button>
       </div>
-      <label class="check"><input type="checkbox" id="aceite" /> <span>Tenho 18 anos ou mais e concordo que o Bar do Dindo use meus dados para o programa de afilhados e para me avisar sobre o lançamento do aplicativo.</span></label>
+      <label class="check"><input type="checkbox" id="aceite" /> <span>Tenho 18 anos ou mais e concordo que o @bardodindo utilize as informações prestadas para o programa de afilhados e para ficar por dentro das novidades, recebendo informações e novidades por e-mail e/ou telefone.</span></label>
       <p class="error" id="erro-cadastro" role="alert"></p>
-      <button class="btn btn--brand" id="btn-cadastro" type="submit">Quero meu número</button>
-      <p class="muted" style="font-size:12px;text-align:center;margin:10px 0 0">Guarde seu e‑mail e senha: eles darão acesso ao aplicativo oficial.</p>
+      <button class="btn btn--brand" id="btn-cadastro" type="submit">Gerar número de afilhado</button>
     </form>
     <button class="link" id="ir-login" type="button" style="width:100%;margin-top:4px">Já garanti meu número</button>
 
     <h2 class="secao">Como funciona</h2>
     <ol class="passos">
-      <li class="passo"><span class="passo__n">1</span><div><strong>Cadastre-se agora</strong><span>Leva um minuto. Seu número é reservado na hora, por ordem de chegada.</span></div></li>
-      <li class="passo"><span class="passo__n">2</span><div><strong>Ganhe pontos a cada visita</strong><span>Informe seu número ao fechar a conta e o seu consumo vira pontos.</span></div></li>
-      <li class="passo"><span class="passo__n">3</span><div><strong>Troque por recompensas</strong><span>No aplicativo oficial você acompanha os pontos, resgata prêmios e reserva sua mesa.</span></div></li>
+      <li class="passo"><span class="passo__n">1</span><div><strong>Cadastre-se e se torne um afilhado</strong><span>Leva um minuto. Você coloca as informações necessárias (que não são muitas) e, assim que concluído, seu número é gerado, sendo permanentemente seu.</span></div></li>
+      <li class="passo"><span class="passo__n">2</span><div><strong>Some pontos a cada visita</strong><span>Informe (se quiser) seu número de afilhado e abra uma comanda no bar. Assim que ela é encerrada, o consumo se transforma em pontos acumulativos.</span></div></li>
+      <li class="passo"><span class="passo__n">3</span><div><strong>Resgate recompensas</strong><span>No histórico do seu perfil é possível acompanhar o acúmulo de pontos. Com base na sua pontuação, é possível resgatar recompensas e prêmios.</span></div></li>
+      <li class="passo"><span class="passo__n">4</span><div><strong>Afilhados</strong><span>Além de recompensas, no seu perfil será possível consultar o cardápio, reservar mesas, karaokê, videogame e muitas outras novidades exclusivas para você. Faça parte desta comunidade, afilhado!</span></div></li>
     </ol>
 
   </section>
@@ -237,8 +239,9 @@
   </section>
 
   <footer class="rodape">
-    <b>Bar do Dindo · Drinks e Chopp</b>
-    <span>Nova Olaria · Seus dados ficam só com o Bar do Dindo.</span>
+    <b>Bar do Dindo · <span class="rodape__arroba">@bardodindo</span></b>
+    <span>Porto Alegre, Cidade Baixa · Nova Olaria Mall: Rua Lima e Silva, 776 · Loja&nbsp;7&nbsp;B.</span>
+    <span>Seus dados estão protegidos.</span>
   </footer>
 </main>
 
@@ -375,7 +378,7 @@ import { cpfValido, idadeEm } from '../shared/backend';
     } catch (err) {
       erro.textContent = err.message;
     } finally {
-      carregando(btn, false, 'Quero meu número');
+      carregando(btn, false, 'Gerar número de afilhado');
     }
   });
 
