@@ -142,7 +142,6 @@
     /* cartão é para mexer, não para selecionar texto, arrastar imagem ou abrir menu de toque longo */
     user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
   }
-  .member-card:focus-visible { outline: 2px solid var(--brand-light); outline-offset: 4px; }
   .member-card img { -webkit-user-drag: none; pointer-events: none; }
   .member {
     position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden;
@@ -330,7 +329,7 @@
     <div class="vitrine__palco" id="vitrine">
     <div class="vitrine__caixa" id="vitrine-caixa">
     <div class="vitrine__flutua" id="vitrine-flutua">
-      <div class="member-card" id="cartao-face" role="button" tabindex="0" aria-label="Cartão do afilhado. Toque para virar.">
+      <div class="member-card" id="cartao-face" role="img" aria-label="Cartão do afilhado">
       <div class="member">
         <div class="member__top">
           <div class="member__title">Afilhado do<br />Bar do Dindo</div>
@@ -630,12 +629,12 @@ import { INSTAGRAM, LIMITE_TEXTO, alternar, contador, ehOutro, montarResposta } 
     vitrine.addEventListener('pointerup', solta);
     vitrine.addEventListener('pointercancel', solta);
     vitrine.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse' && !arrasto) mouse.x = mouse.y = 0; });
+    // no iPhone o navegador ainda rola ou dá zoom se o toque não for barrado já no início
+    vitrine.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
     vitrine.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+    // a tela da revelação nunca anda para os lados (o cartão inclinado não pode empurrá-la)
+    $('reveal').addEventListener('scroll', (e) => { if (e.target.scrollLeft) e.target.scrollLeft = 0; });
     vitrine.addEventListener('contextmenu', (e) => e.preventDefault());
-    card.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowRight') { e.preventDefault(); vira(); }
-      else if (e.key === 'ArrowLeft') { e.preventDefault(); vira(-1); }
-    });
     $('cartao-virar').addEventListener('click', () => vira());
     // a cada nova revelação o cartão volta de frente
     $('cartao').addEventListener('animationstart', (e) => {
@@ -671,7 +670,7 @@ import { INSTAGRAM, LIMITE_TEXTO, alternar, contador, ehOutro, montarResposta } 
     etapas.forEach((id) => $(id).classList.remove('is-in'));
     // reinicia as animações a cada abertura
     reveal.hidden = true; void reveal.offsetWidth; reveal.hidden = false;
-    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = document.body.style.overflow = 'hidden';
 
     const el = $('numero');
     el.classList.remove('is-done');
@@ -693,7 +692,7 @@ import { INSTAGRAM, LIMITE_TEXTO, alternar, contador, ehOutro, montarResposta } 
     };
     requestAnimationFrame(passo);
   }
-  $('btn-sair').onclick = () => { $('reveal').hidden = true; document.body.style.overflow = ''; };
+  $('btn-sair').onclick = () => { $('reveal').hidden = true; document.documentElement.style.overflow = document.body.style.overflow = ''; };
 
   /* ---------- questionário opcional: abertura com o emblema, uma pergunta por vez e agradecimento ---------- */
   let marcadas = {}, outros = {}, demonstracao = false;
