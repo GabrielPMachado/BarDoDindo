@@ -369,6 +369,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   // (`instancia` permite várias sessões no mesmo processo, ex.: roteiros de teste com vários afilhados)
   const app = initializeApp(firebaseConfig, instancia);
   const auth = getAuth(app);
+  auth.languageCode = 'pt-BR'; // e-mails do Firebase (ex.: redefinição de senha) em português
   // VITE_LONG_POLLING=1 só em builds locais de teste atrás de proxy, onde a conexão contínua do Firestore não passa
   const db = initializeFirestore(app, { ignoreUndefinedProperties: true, ...(import.meta.env.VITE_LONG_POLLING === '1' ? { experimentalForceLongPolling: true } : {}) });
   if (EMULADOR) {
@@ -441,6 +442,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   }
 
   /* ---------- contas (Firebase Auth) ---------- */
+  const EMAIL_COM_CONTA = 'Este e-mail já tem uma conta no Bar do Dindo (de um cadastro anterior), com outra senha. Use a senha de antes ou toque em "Esqueci minha senha" para criar uma nova.';
   const credencialInvalida = (e: unknown) =>
     ['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found', 'auth/invalid-email', 'auth/user-disabled', 'auth/missing-password'].includes(codigo(e));
 
@@ -619,10 +621,11 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     if (!tel) fail(400, 'Informe o celular completo, com DDD.');
     const { cpf, nascimento } = conferirDocumentos(b);
     if (b.aceite !== true) fail(400, 'É preciso aceitar o uso dos dados para participar do programa.');
-    const { cred, nova } = await criarConta(email, senha, 'Este e-mail já está cadastrado.');
+    // apagar afilhados (ou zerar o sistema) remove o cadastro, mas a conta de login continua: quem volta usa a senha de antes ou cria outra
+    const { cred, nova } = await criarConta(email, senha, EMAIL_COM_CONTA);
     const uid = cred.user.uid;
     try {
-      if (!nova && (await getDoc(doc(db, 'clientes', uid))).exists()) fail(409, 'Este e-mail já está cadastrado.');
+      if (!nova && (await getDoc(doc(db, 'clientes', uid))).exists()) fail(409, 'Este e-mail já está cadastrado. Entre com ele para ver o seu número.');
       // o número de afilhado é sequencial: sai do contador na mesma transação que cria o cadastro
       await runTransaction(db, async (t) => {
         const contadores = doc(db, 'meta/contadores');
@@ -649,9 +652,20 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const { user } = await entrar(str(b.email, 160), String(b.senha ?? ''));
     if (!(await getDoc(doc(db, 'clientes', user.uid))).exists()) {
       await sair();
-      fail(401, 'E-mail ou senha incorretos.');
+      fail(404, 'Não encontramos um cadastro de afilhado com este e-mail. Faça o cadastro com ele e esta mesma senha.');
     }
     return { token: user.uid };
+  });
+  /* app: esqueci a senha. Não diz se o e-mail tem conta; o link do e-mail cria a nova senha */
+  rota('POST', '/app/redefinir-senha', async ({ b }) => {
+    const email = str(b.email, 160).toLowerCase();
+    if (!emailOk(email)) fail(400, 'Informe o seu e-mail para receber o link.');
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (e) {
+      if (!['auth/user-not-found', 'auth/invalid-email'].includes(codigo(e))) throw e;
+    }
+    return { ok: true };
   });
   rota('POST', '/app/logout', async () => { await sair(); return { ok: true }; });
   /* app: sinal de mudança (os dados já chegam ao vivo do Firestore; o app só pergunta se algo mudou, sem leituras extras) */
@@ -1139,7 +1153,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   });
 
   /* CRM: excluir TODOS os afilhados (ex.: cadastros de teste antes do lançamento): cadastros, saldos, CPFs, consumos com as receitas,
-   * vouchers e reservas feitas por afilhados; a numeração volta a começar do #001. As contas de login (Firebase Auth) continuam existindo. */
+   * vouchers e reservas feitas por afilhados; a numeração volta a começar do #001. As contas de login (Firebase Auth) continuam existindo
+   * (só o Admin SDK as apaga): quem se cadastrar de novo com o mesmo e-mail usa a senha de antes ou "Esqueci minha senha". */
   rota('DELETE', '/crm/clientes', async () => {
     const ctx = await requireUsuario();
     requireAccess(ctx, 'clientes', 'excluir');
@@ -1176,7 +1191,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   });
 
   /* CRM: zerar o sistema (só a Presidência). Apaga TODOS os dados, inclusive usuários, funções e parâmetros:
-   * o sistema volta ao "primeiro acesso". As contas de login (Firebase Auth) continuam existindo. */
+   * o sistema volta ao "primeiro acesso". As contas de login (Firebase Auth) continuam existindo (só o Admin SDK as apaga):
+   * quem se cadastrar de novo com o mesmo e-mail usa a senha de antes ou "Esqueci minha senha". */
   rota('POST', '/crm/admin/zerar', async ({ b }) => {
     const ctx = await requireUsuario();
     if (!ctx.funcao?.sistema) fail(403, 'Só a Presidência pode zerar o sistema.');
