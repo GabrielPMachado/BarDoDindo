@@ -737,6 +737,11 @@ import { cpfValido, idadeEm } from '../shared/backend';
     a.download = `afilhado-${pad(atual.numero)}-bar-do-dindo.png`;
     a.click();
   };
+
+  /* ---------- demonstração: ?demo=cartao abre a revelação com um afilhado de exemplo, sem cadastro ---------- */
+  if (new URLSearchParams(location.search).get('demo') === 'cartao') {
+    revelar({ numero: 8, nome: 'yuri gotuzzo da silva', desde: new Date().toISOString(), respostas: {} }, true);
+  }
 })();
 </script>
 </body>
