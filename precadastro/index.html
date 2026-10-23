@@ -86,7 +86,7 @@
   .passo:first-child { border-top: 0; padding-top: 4px; }
   .passo__n { font: 800 26px/1 var(--serif); color: var(--brand-light); font-variant-numeric: tabular-nums; }
   .passo strong { display: block; font-size: 15px; font-weight: 600; margin-bottom: 2px; }
-  .passo div > span { font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+  .passo div > span { display: block; font-size: 13.5px; color: var(--muted); line-height: 1.5; text-align: justify; hyphens: auto; -webkit-hyphens: auto; }
   .rodape { display: flex; flex-direction: column; align-items: center; gap: 4px; padding-top: 18px; border-top: 1px solid var(--border); text-align: center; font-size: 12px; color: var(--muted); }
   .rodape b { color: var(--brand-light); font-weight: 600; letter-spacing: .14em; text-transform: uppercase; font-size: 11px; }
   .rodape__arroba { text-transform: none; letter-spacing: .04em; }
@@ -116,7 +116,7 @@
   }
   .reveal__number.is-done { animation: pulse .7s ease; }
   .reveal__hello { font: 700 22px var(--serif); }
-  .reveal__text { color: var(--muted); max-width: 340px; margin: 0; }
+  .reveal__text { color: var(--muted); max-width: 340px; margin: 0; text-align: justify; hyphens: auto; -webkit-hyphens: auto; }
 
   /* cartão do afilhado */
   .member-wrap { width: min(340px, 100%); perspective: 900px; }
