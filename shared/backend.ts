@@ -9,7 +9,7 @@ import {
   reauthenticateWithCredential, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, updatePassword, type UserCredential,
 } from 'firebase/auth';
 import {
-  arrayRemove, arrayUnion, collection, connectFirestoreEmulator, doc, getDoc, getDocs, increment, initializeFirestore, limit, onSnapshot, orderBy, query, runTransaction, where, writeBatch,
+  arrayRemove, arrayUnion, collection, connectFirestoreEmulator, doc, getDoc, getDocs, increment, initializeFirestore, limit, onSnapshot, orderBy, persistentLocalCache, persistentMultipleTabManager, query, runTransaction, where, writeBatch,
   type DocumentReference, type Query, type WriteBatch,
 } from 'firebase/firestore';
 import { EMULADOR, EMULADOR_AUTH, EMULADOR_FIRESTORE, firebaseConfig } from './firebase-config';
@@ -371,7 +371,11 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   const auth = getAuth(app);
   auth.languageCode = 'pt-BR'; // e-mails do Firebase (ex.: redefinição de senha) em português
   // VITE_LONG_POLLING=1 só em builds locais de teste atrás de proxy, onde a conexão contínua do Firestore não passa
-  const db = initializeFirestore(app, { ignoreUndefinedProperties: true, ...(import.meta.env.VITE_LONG_POLLING === '1' ? { experimentalForceLongPolling: true } : {}) });
+  // cópia local no aparelho (IndexedDB), compartilhada entre as abas: ao recarregar a página ou abrir outra aba, as
+  // consultas retomam de onde pararam e o Firestore só cobra os registros que mudaram (até 30 min sem conexão),
+  // em vez de ler as coleções inteiras de novo. Sem IndexedDB (Node, roteiros de teste) ou nos emuladores, só memória.
+  const cacheLocal = !EMULADOR && typeof indexedDB !== 'undefined' ? { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) } : {};
+  const db = initializeFirestore(app, { ignoreUndefinedProperties: true, ...cacheLocal, ...(import.meta.env.VITE_LONG_POLLING === '1' ? { experimentalForceLongPolling: true } : {}) });
   if (EMULADOR) {
     connectAuthEmulator(auth, EMULADOR_AUTH, { disableWarnings: true });
     connectFirestoreEmulator(db, EMULADOR_FIRESTORE.host, EMULADOR_FIRESTORE.port);
@@ -492,11 +496,18 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   }
 
   /* ---------- autenticação ---------- */
+  // última confirmação no servidor de que o afilhado não tem registro (o app pergunta /app/versao a cada 1 s)
+  const semRegistro = new Map<string, number>();
   async function requireCliente() {
     const u = auth.currentUser;
     if (!u) return fail(401, 'Sessão expirada. Entre novamente.');
-    // o cache pode ainda dizer "não existe" logo após o cadastro de quem já tinha conta (ex.: alguém da equipe): confirma no servidor
-    const c = (await documento(`clientes/${u.uid}`)) ?? (await getDoc(doc(db, 'clientes', u.uid)).then((s) => (s.exists() ? ({ ...s.data(), id: s.id } as Dados) : null)));
+    // o cache pode ainda dizer "não existe" logo após o cadastro de quem já tinha conta (ex.: alguém da equipe): confirma no
+    // servidor, no máximo a cada 30 s. Sem esse limite, um afilhado apagado com o app aberto gastava 1 leitura por segundo.
+    let c = await documento(`clientes/${u.uid}`);
+    if (!c && Date.now() - (semRegistro.get(u.uid) ?? 0) > 30000) {
+      c = await getDoc(doc(db, 'clientes', u.uid)).then((s) => (s.exists() ? ({ ...s.data(), id: s.id } as Dados) : null));
+      if (!c) semRegistro.set(u.uid, Date.now());
+    }
     if (!c) return fail(401, 'Sessão expirada. Entre novamente.');
     return { uid: u.uid, c };
   }

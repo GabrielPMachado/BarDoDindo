@@ -1,11 +1,12 @@
 # Apaga as contas de login do Firebase que ficaram sem cadastro (ver scripts/limpar-contas.mjs).
-# Roda a cada 10 minutos (o GitHub pode atrasar alguns minutos) e também pelo botão "Run workflow" em Actions.
+# Roda a cada 30 minutos (o GitHub pode atrasar alguns minutos) e também pelo botão "Run workflow" em Actions.
+# Cada rodada custa cerca de 1 leitura do Firestore por conta de login (cota grátis: 50 mil por dia).
 # A conta de serviço precisa dos papéis "Administrador do Firebase Authentication" e "Leitor do Cloud Datastore".
 
 name: Limpar contas de login sem cadastro
 on:
   schedule:
-    - cron: '*/10 * * * *'
+    - cron: '*/30 * * * *'
   workflow_dispatch:
     inputs:
       simular:
