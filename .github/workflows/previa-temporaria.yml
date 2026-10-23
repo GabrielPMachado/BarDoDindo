@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       expira:
-        description: Tempo até o link expirar (ex.: 30m, 2h, 1d)
+        description: "Tempo até o link expirar (ex.: 30m, 2h, 1d)"
         default: 30m
         required: true
 permissions:
