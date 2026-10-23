@@ -737,7 +737,7 @@ button.menu-row:active { background: var(--surface-2); }
 .quiz-app__centro { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; padding: 24px 24px calc(28px + var(--safe-bottom)); animation: quizEntra .4s ease both; }
 .quiz-app__centro.is-volta { animation-name: quizEntraVolta; }
 .quiz-app__centro h2 { font-family: var(--serif); font-size: 25px; line-height: 1.25; animation: quizSobeTexto .5s .12s ease both; }
-.quiz-app__centro p { max-width: 380px; line-height: 1.55; text-align: justify; text-align-last: center; hyphens: manual; animation: quizSobeTexto .5s .2s ease both; }
+.quiz-app__centro p { max-width: 380px; line-height: 1.55; text-align: justify; hyphens: manual; animation: quizSobeTexto .5s .2s ease both; }
 .quiz-app__centro .btn { width: 100%; max-width: 320px; margin-top: 8px; animation: quizSobeTexto .5s .28s ease both; }
 .quiz-app__emblema { position: relative; display: grid; place-items: center; animation: quizPop .7s cubic-bezier(.2, 1.5, .4, 1) both; }
 .quiz-app__emblema::before { content: ""; position: absolute; inset: -14px; border-radius: 50%; border: 1.5px solid #e07a4c55; animation: quizAnel 2.4s ease-out .6s infinite; }
