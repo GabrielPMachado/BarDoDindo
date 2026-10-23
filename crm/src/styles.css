@@ -1479,8 +1479,35 @@ button.anexos__nome:hover { text-decoration: underline; }
 .respostas dt { font-size: 12.5px; color: var(--muted); }
 .respostas dd { margin: 2px 0 0; font-weight: 500; }
 .questionario-editor { grid-column: 1 / -1; }
-.qe-pergunta { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; margin-top: 8px; }
-@media (max-width: 760px) { .qe-pergunta { grid-template-columns: 1fr; } }
+.qe-topo { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.qe-topo > div { flex: 1; min-width: 240px; }
+.qe-topo .btn { flex-shrink: 0; }
+.qe-lista { list-style: none; margin: 16px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr)); gap: 12px; align-items: start; }
+.qe-card { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+.qe-card:focus-within { border-color: var(--border-strong); }
+.qe-card__topo { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.qe-card__num { font: 700 13px var(--serif); color: var(--brand-light); min-width: 26px; height: 26px; display: grid; place-items: center; border-radius: 8px; background: #c4572a1f; }
+.qe-card__acoes { display: inline-flex; margin-left: auto; }
+.qe-card__acoes .icon-btn:disabled, .qe-opcao__acoes .icon-btn:disabled { opacity: .3; cursor: default; }
+.qe-card__texto { height: auto; min-height: 60px; field-sizing: content; padding: 8px 12px; resize: vertical; line-height: 1.45; background: var(--surface); }
+.qe-card__nota { margin: 0; padding: 0 2px; }
+.qe-opcoes { display: flex; flex-direction: column; gap: 6px; }
+.qe-opcao { display: flex; align-items: center; gap: 8px; }
+.qe-opcao .input { height: 34px; flex: 1; min-width: 0; background: var(--surface); }
+.qe-opcao__marca { width: 14px; height: 14px; flex-shrink: 0; border: 1.5px solid var(--border-strong); border-radius: 50%; }
+.qe-opcao__marca.is-quadrado { border-radius: 4px; }
+.qe-opcao--outro .qe-opcao__marca { border-color: var(--info); }
+.qe-opcao__dica { flex-shrink: 0; }
+.qe-opcao__acoes { display: inline-flex; flex-shrink: 0; }
+.qe-opcao__acoes .icon-btn { width: 28px; height: 28px; }
+.qe-opcoes__mais { display: flex; flex-wrap: wrap; gap: 6px; padding-left: 22px; margin-top: 2px; }
+.qe-rodape { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+@media (max-width: 640px) {
+  .qe-card__topo .segmented { order: 3; width: 100%; }
+  .qe-card__topo .segmented button { flex: 1; padding: 6px 4px; }
+  .qe-opcao__dica { display: none; }
+  .qe-rodape .btn { flex: 1; }
+}
 .check-row { display: flex; align-items: center; gap: 8px; margin: 10px 0; cursor: pointer; font-size: 14px; }
 .check-row input { width: 16px; height: 16px; accent-color: var(--brand); }
 

@@ -192,19 +192,33 @@
   .convite--ok { align-items: center; text-align: center; }
   .quiz { position: fixed; inset: 0; z-index: 70; overflow-y: auto; background: #070605f2; animation: fadeIn .3s ease both;
     padding: calc(20px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom)); }
-  .quiz__box { max-width: 640px; margin: 0 auto; gap: 4px; }
-  .quiz__box h2 { margin: 0; }
-  .quiz__box > p.muted { margin: 0 0 6px; text-align: center; font-size: 13.5px; }
-  .quiz__q { display: flex; flex-direction: column; gap: 8px; padding: 14px 0; border-top: 1px solid var(--border); }
-  .quiz__q:first-of-type { border-top: 0; }
-  .quiz__q > span { font-weight: 600; font-size: 14.5px; }
+  .quiz__box { position: relative; max-width: 560px; min-height: min(560px, calc(100dvh - 48px)); margin: 0 auto; gap: 14px; padding: 22px 18px; }
+  .quiz__fechar { position: absolute; top: 8px; right: 8px; width: 40px; height: 40px; border-radius: 50%; color: var(--muted); font-size: 26px; line-height: 1; }
+  .quiz__fechar:hover { color: var(--text); background: var(--surface-2); }
+  .quiz__centro { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding: 12px 4px; }
+  .quiz__centro img { border-radius: 50%; filter: drop-shadow(0 0 18px #e07a4c77); }
+  .quiz__centro h2 { margin: 6px 0 0; font: 700 24px/1.25 var(--serif); }
+  .quiz__centro p { margin: 0; max-width: 380px; line-height: 1.55; color: var(--muted); }
+  .quiz__centro p strong { color: var(--text); }
+  .quiz__centro .btn { max-width: 320px; }
+  .quiz__insta { color: var(--brand-light); font-weight: 700; font-size: 17px; }
+  .quiz__q { flex: 1; display: flex; flex-direction: column; gap: 14px; animation: quizEntra .25s ease both; }
+  @keyframes quizEntra { from { opacity: 0; transform: translateX(18px); } }
+  .quiz__barra { height: 4px; margin-right: 40px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+  .quiz__barra span { display: block; height: 100%; background: var(--brand); transition: width .3s ease; }
+  .quiz__contador { font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--brand-light); }
+  .quiz__q h2 { margin: 0; font: 600 19px/1.45 var(--serif); text-align: left; }
+  .quiz__dica { flex-basis: 100%; margin: -4px 0 2px; font-size: 13px; color: var(--muted); }
   .quiz__ops { display: flex; flex-wrap: wrap; gap: 8px; }
-  .quiz__ops button { min-height: 38px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface-2); font-size: 13.5px; transition: background .15s, border-color .15s; }
+  .quiz__ops button { min-height: 42px; padding: 8px 16px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface-2); font-size: 14.5px; transition: background .15s, border-color .15s; }
   .quiz__ops button:hover { border-color: var(--brand); }
   .quiz__ops button[aria-checked="true"] { background: var(--brand); border-color: var(--brand); color: var(--on-brand); font-weight: 600; }
-  .quiz__acoes { display: flex; gap: 10px; }
-  .quiz__acoes .btn { margin-top: 10px; }
-  @media (min-width: 720px) { .quiz { padding-top: 48px; } .quiz__box { padding: 24px 28px; } }
+  .quiz__ops[data-multipla] button[aria-checked="true"]::before { content: "✓ "; }
+  .quiz__texto { height: auto; min-height: 150px; padding: 12px 14px; resize: vertical; line-height: 1.5; }
+  .quiz__acoes { margin-top: auto; display: grid; grid-template-columns: auto 1fr; gap: 10px; }
+  .quiz__acoes .btn { margin-top: 0; }
+  .quiz__acoes .btn--ghost { width: 56px; font-size: 20px; }
+  @media (min-width: 720px) { .quiz { padding-top: 48px; } .quiz__box { padding: 30px 32px; } }
   .stage { opacity: 0; }
   /* cada parte entra com animação no momento em que aparece */
   .stage.is-in { opacity: 1; animation: up .6s ease both; }
@@ -381,23 +395,18 @@
 </div>
 
 <!-- questionário opcional -->
-<div class="quiz" id="quiz" hidden role="dialog" aria-modal="true" aria-labelledby="quiz-titulo">
-  <form class="card quiz__box" id="form-quiz" novalidate>
-    <h2 id="quiz-titulo">Conte um pouco sobre você</h2>
-    <p class="muted">É opcional e rapidinho. Responda só o que quiser.</p>
-    <div id="quiz-perguntas"></div>
-    <p class="error" id="erro-quiz" role="alert"></p>
-    <div class="quiz__acoes">
-      <button class="btn btn--ghost" id="btn-quiz-depois" type="button">Agora não</button>
-      <button class="btn btn--brand" id="btn-quiz-enviar" type="submit">Enviar respostas</button>
-    </div>
-  </form>
+<div class="quiz" id="quiz" hidden role="dialog" aria-modal="true" aria-label="Questionário do afilhado">
+  <div class="card quiz__box">
+    <button class="quiz__fechar" id="btn-quiz-fechar" type="button" aria-label="Fechar">×</button>
+    <div class="quiz__corpo" id="quiz-corpo" style="display: contents"></div>
+  </div>
 </div>
 <canvas class="confetti" id="confetti" aria-hidden="true"></canvas>
 
 <script type="module">
 import { api as dados } from '../src/api';
 import { cpfValido, idadeEm } from '../shared/backend';
+import { INSTAGRAM, LIMITE_TEXTO, alternar, contador, ehOutro, montarResposta } from '../shared/questionario';
 
 (() => {
   const $ = (id) => document.getElementById(id);
@@ -409,7 +418,7 @@ import { cpfValido, idadeEm } from '../shared/backend';
   const me = () => dados('/app/me');
   // questionário opcional (perguntas editáveis no Cérebro, em Parâmetros)
   let questionario = null;
-  dados('/public/config').then((c) => { if (c.questionario?.ativo && c.questionario.perguntas?.length) questionario = c.questionario; }).catch(() => {});
+  const configCarregada = dados('/public/config').then((c) => { if (c.questionario?.ativo && c.questionario.perguntas?.length) questionario = c.questionario; }).catch(() => {});
 
   /* ---------- prova social ---------- */
   // o total de afilhados acompanha os cadastros ao vivo (a cada 1,5 s, sem leituras extras no banco)
@@ -686,67 +695,90 @@ import { cpfValido, idadeEm } from '../shared/backend';
   }
   $('btn-sair').onclick = () => { $('reveal').hidden = true; document.body.style.overflow = ''; };
 
-  /* ---------- questionário opcional ---------- */
-  let respostas = {};
-  function abrirQuiz() {
-    respostas = {};
-    $('quiz-titulo').textContent = questionario.titulo;
-    $('erro-quiz').textContent = '';
-    const lista = $('quiz-perguntas');
-    lista.replaceChildren(...questionario.perguntas.map((p) => {
-      const bloco = document.createElement('div');
-      bloco.className = 'quiz__q';
-      const rotulo = document.createElement(p.opcoes.length ? 'span' : 'label');
-      rotulo.textContent = p.texto;
-      bloco.append(rotulo);
-      if (p.opcoes.length) {
-        const ops = document.createElement('div');
-        ops.className = 'quiz__ops';
-        ops.setAttribute('role', 'radiogroup');
-        ops.setAttribute('aria-label', p.texto);
-        for (const o of p.opcoes) {
-          const b = document.createElement('button');
-          b.type = 'button'; b.textContent = o; b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', 'false');
-          b.onclick = () => {
-            respostas[p.id] = respostas[p.id] === o ? '' : o;
-            ops.querySelectorAll('button').forEach((x) => x.setAttribute('aria-checked', String(x.textContent === respostas[p.id])));
-          };
-          ops.append(b);
-        }
-        bloco.append(ops);
-      } else {
-        const inp = document.createElement('input');
-        inp.className = 'input'; inp.id = `q-${p.id}`; inp.maxLength = 300;
-        rotulo.htmlFor = inp.id;
-        inp.oninput = () => (respostas[p.id] = inp.value);
-        bloco.append(inp);
-      }
-      return bloco;
-    }));
-    $('quiz').hidden = false;
+  /* ---------- questionário opcional: abertura com o emblema, uma pergunta por vez e agradecimento ---------- */
+  let marcadas = {}, outros = {}, demonstracao = false;
+  const el = (tag, props = {}, ...filhos) => { const e = Object.assign(document.createElement(tag), props); e.append(...filhos); return e; };
+  const logoQuiz = () => el('img', { src: $('logo').src, width: 112, height: 112, alt: 'Bar do Dindo' });
+  const botao = (texto, classe, onclick) => el('button', { type: 'button', className: classe, textContent: texto, onclick });
+  function telaQuiz(...filhos) {
+    $('quiz-corpo').replaceChildren(...filhos);
     $('quiz').scrollTop = 0;
   }
-  $('btn-quiz').onclick = abrirQuiz;
-  $('btn-quiz-depois').onclick = () => { $('quiz').hidden = true; };
-  $('form-quiz').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const preenchidas = Object.fromEntries(Object.entries(respostas).map(([k, v]) => [k, v.trim()]).filter(([, v]) => v));
-    if (!Object.keys(preenchidas).length) return ($('erro-quiz').textContent = 'Responda ao menos uma pergunta ou toque em “Agora não”.');
-    const btn = $('btn-quiz-enviar');
+  function abrirQuiz() {
+    marcadas = {}; outros = {};
+    const total = questionario.perguntas.length;
+    telaQuiz(el('div', { className: 'quiz__centro' },
+      logoQuiz(),
+      el('h2', { textContent: questionario.titulo }),
+      el('p', { textContent: `São ${total} perguntas rápidas, uma de cada vez. É opcional: responda só o que quiser.` }),
+      botao('Começar', 'btn btn--brand', () => pergunta(0)),
+      botao('Agora não', 'link', fecharQuiz)));
+    $('quiz').hidden = false;
+  }
+  function pergunta(i) {
+    const p = questionario.perguntas[i], total = questionario.perguntas.length;
+    const sel = () => marcadas[p.id] ?? [];
+    const barra = el('div', { className: 'quiz__barra' }, el('span'));
+    barra.firstChild.style.width = `${((i + 1) / total) * 100}%`;
+    const titulo = el('h2', { id: `q-${p.id}-t`, textContent: p.texto });
+    const outro = el('input', { className: 'input', maxLength: 200, placeholder: 'Conta pra gente: qual? (se quiser)', value: outros[p.id] ?? '', hidden: !sel().some(ehOutro) });
+    outro.setAttribute('aria-label', `${p.texto} (outro)`);
+    outro.oninput = () => (outros[p.id] = outro.value);
+    let campo;
+    if (p.opcoes.length) {
+      campo = el('div', { className: 'quiz__ops' });
+      campo.setAttribute('role', p.multipla ? 'group' : 'radiogroup');
+      campo.setAttribute('aria-labelledby', titulo.id);
+      if (p.multipla) { campo.dataset.multipla = ''; campo.append(el('p', { className: 'quiz__dica', textContent: 'Pode marcar quantas quiser.' })); }
+      for (const o of p.opcoes) {
+        const b = botao(o, '', () => {
+          marcadas[p.id] = alternar(p, sel(), o);
+          campo.querySelectorAll('button').forEach((x) => x.setAttribute('aria-checked', String(sel().includes(x.textContent))));
+          outro.hidden = !sel().some(ehOutro);
+          if (!outro.hidden && ehOutro(o) && sel().includes(o)) outro.focus();
+        });
+        b.setAttribute('role', p.multipla ? 'checkbox' : 'radio');
+        b.setAttribute('aria-checked', String(sel().includes(o)));
+        campo.append(b);
+      }
+    } else {
+      campo = el('textarea', { className: 'input quiz__texto', rows: 6, maxLength: LIMITE_TEXTO, placeholder: 'Escreva aqui…', value: sel()[0] ?? '' });
+      campo.setAttribute('aria-labelledby', titulo.id);
+      campo.oninput = () => (marcadas[p.id] = [campo.value]);
+    }
+    const erro = el('p', { className: 'error' });
+    erro.setAttribute('role', 'alert');
+    const responder = botao('Responder', 'btn btn--brand', () => (i + 1 < total ? pergunta(i + 1) : enviarQuiz(responder, erro)));
+    const voltar = botao('←', 'btn btn--ghost', () => (i ? pergunta(i - 1) : abrirQuiz()));
+    voltar.setAttribute('aria-label', 'Voltar');
+    telaQuiz(el('div', { className: 'quiz__q' },
+      barra, el('small', { className: 'quiz__contador', textContent: contador(i, total) }), titulo, campo, outro, erro,
+      el('div', { className: 'quiz__acoes' }, voltar, responder)));
+  }
+  async function enviarQuiz(btn, erro) {
+    const respostas = Object.fromEntries(questionario.perguntas.map((p) => [p.id, montarResposta(p, marcadas[p.id] ?? [], outros[p.id] ?? '')]).filter(([, v]) => v));
     carregando(btn, true);
     try {
-      await dados('/app/me', { method: 'PATCH', body: { respostas: preenchidas } });
-      atual.respostas = preenchidas;
-      $('quiz').hidden = true;
+      if (!demonstracao) await dados('/app/me', { method: 'PATCH', body: { respostas } });
+      atual.respostas = respostas;
       $('convite').hidden = true;
       $('convite-ok').hidden = false;
       $('convite-ok').classList.add('is-in');
+      const insta = el('a', { className: 'quiz__insta', href: INSTAGRAM.url, target: '_blank', rel: 'noreferrer', textContent: INSTAGRAM.arroba });
+      telaQuiz(el('div', { className: 'quiz__centro' },
+        logoQuiz(),
+        el('h2', { textContent: 'Sua ajuda é o que nos move!' }),
+        el('p', {}, 'Obrigado pelo seu tempo, ', el('strong', { textContent: nomeBonito(atual.nome) }), '!'),
+        insta,
+        botao('Fechar', 'btn btn--brand', fecharQuiz)));
     } catch (err) {
-      $('erro-quiz').textContent = err.message;
-    } finally {
-      carregando(btn, false, 'Enviar respostas');
+      erro.textContent = err.message;
+      carregando(btn, false, 'Responder');
     }
-  });
+  }
+  function fecharQuiz() { $('quiz').hidden = true; }
+  $('btn-quiz').onclick = abrirQuiz;
+  $('btn-quiz-fechar').onclick = fecharQuiz;
 
   /* ---------- confete dourado ---------- */
   function confete() {
@@ -909,9 +941,11 @@ import { cpfValido, idadeEm } from '../shared/backend';
     } finally { btn.disabled = false; }
   };
 
-  /* ---------- demonstração: ?demo=cartao abre a revelação com um afilhado de exemplo, sem cadastro ---------- */
-  if (new URLSearchParams(location.search).get('demo') === 'cartao') {
-    revelar({ numero: 8, nome: 'yuri gotuzzo da silva', desde: new Date().toISOString(), respostas: {} }, true);
+  /* ---------- demonstração: ?demo=cartao (ou ?demo=questionario) abre a revelação com um afilhado de exemplo, sem cadastro,
+     com o convite do questionário; dá para responder tudo, mas nada é gravado ---------- */
+  if (['cartao', 'questionario'].includes(new URLSearchParams(location.search).get('demo'))) {
+    demonstracao = true;
+    configCarregada.then(() => revelar({ numero: 8, nome: 'yuri gotuzzo da silva', desde: new Date().toISOString(), respostas: null }, true));
   }
 })();
 </script>

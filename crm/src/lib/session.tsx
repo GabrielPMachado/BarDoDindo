@@ -42,7 +42,7 @@ export interface Config {
   aliquotaFgts: number;
   questionario?: Questionario;
 }
-export interface Questionario { ativo: boolean; titulo: string; perguntas: { id: string; texto: string; opcoes: string[] }[] }
+export interface Questionario { versao?: number; ativo: boolean; titulo: string; perguntas: { id: string; texto: string; opcoes: string[]; multipla?: boolean }[] }
 
 interface Session {
   ready: boolean;

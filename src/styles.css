@@ -721,3 +721,29 @@ button.menu-row:active { background: var(--surface-2); }
 .minha-comanda li { display: flex; justify-content: space-between; gap: 10px; }
 .minha-comanda small { font-size: 12px; color: var(--brand-light); font-weight: 600; }
 .questionario__outro { margin-top: -2px; }
+
+/* questionário do afilhado: uma pergunta por vez */
+.quiz-app__fundo { z-index: 70; }
+.sheet.quiz-app { position: relative; max-width: 560px; min-height: min(560px, 85dvh); padding: 22px 20px calc(22px + var(--safe-bottom)); gap: 0; }
+.quiz-app__fechar { position: absolute; top: 10px; right: 10px; }
+.quiz-app__centro { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; padding: 18px 6px; }
+.quiz-app__centro h2 { font-family: var(--serif); font-size: 24px; line-height: 1.25; }
+.quiz-app__centro p { max-width: 380px; line-height: 1.5; }
+.quiz-app__centro .btn { width: 100%; max-width: 320px; margin-top: 6px; }
+.quiz-app__centro .logo__img { border-radius: 50%; filter: drop-shadow(0 0 18px #e07a4c66); }
+.quiz-app__depois { color: var(--muted); font-size: 14px; padding: 6px 10px; }
+.quiz-app__insta { color: var(--brand-light); font-weight: 700; font-size: 17px; letter-spacing: .02em; }
+.quiz-app__pergunta { flex: 1; display: flex; flex-direction: column; gap: 14px; animation: quizEntra .25s ease; }
+@keyframes quizEntra { from { opacity: 0; transform: translateX(18px); } }
+.quiz-app__barra { height: 4px; border-radius: 4px; background: var(--surface-3); margin-right: 40px; overflow: hidden; }
+.quiz-app__barra span { display: block; height: 100%; background: var(--brand); border-radius: 4px; transition: width .3s ease; }
+.quiz-app__contador { font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--brand-light); }
+.quiz-app__pergunta h2 { font-family: var(--serif); font-size: 19px; line-height: 1.4; font-weight: 600; }
+.quiz-app__dica { flex-basis: 100%; margin: -4px 0 2px; }
+.quiz-app .questionario__opcoes button { display: inline-flex; align-items: center; gap: 6px; padding: 10px 16px; font-size: 14.5px; }
+.quiz-app__texto { resize: vertical; min-height: 140px; line-height: 1.5; font: inherit; }
+.quiz-app__acoes { margin-top: auto; padding-top: 10px; display: grid; grid-template-columns: auto 1fr; gap: 10px; }
+@media (min-width: 720px) {
+  .quiz-app__fundo { align-items: center; }
+  .sheet.quiz-app { border-radius: 18px; border-bottom: 1px solid var(--border-strong); padding: 30px 32px; }
+}
