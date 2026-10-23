@@ -60,7 +60,7 @@ function Mes({ eventos }: { eventos: Row[] }) {
           <button className="btn btn--ghost btn--sm" onClick={() => { const d = new Date(); d.setDate(1); setBase(d); setDia(hoje); }}>Hoje</button>
         </div>
         <span className="calendario__resumo muted small">
-          <b>{num(doMes.length)}</b> {doMes.length === 1 ? 'reserva' : 'reservas'} · <b>{num(pessoasDe(doMes))}</b> pessoas no mês
+          <b>{num(doMes.length)}</b> {doMes.length === 1 ? 'reserva' : 'reservas'} · <b>{num(pessoasDe(doMes))}</b> {pessoasDe(doMes) === 1 ? 'pessoa' : 'pessoas'} no mês
           {doMes.some((r) => r.status === 'Pendente') && <> · <span className="text-warn">{num(doMes.filter((r) => r.status === 'Pendente').length)} aguardando</span></>}
         </span>
         <div className="segmented" role="radiogroup" aria-label="Mostrar">
@@ -87,12 +87,12 @@ function Mes({ eventos }: { eventos: Row[] }) {
               >
                 <span className="calendario__cab">
                   <span className="calendario__n">{d.getDate()}</span>
-                  {pessoas > 0 && <span className="calendario__pessoas" title={`${rs.length} reservas · ${pessoas} pessoas`}><Users size={11} /> {pessoas}</span>}
+                  {pessoas > 0 && <span className="calendario__pessoas" title={`${rs.length} ${rs.length === 1 ? 'reserva' : 'reservas'} · ${pessoas} ${pessoas === 1 ? 'pessoa' : 'pessoas'}`}><Users size={11} /> {pessoas}</span>}
                 </span>
                 {itens.slice(0, 4).map(({ tipo, r }) => tipo === 'ev' ? (
                   <span key={r.id} className="calendario__ev" title={String(r.titulo)}><PartyPopper size={10} /> {String(r.titulo)}</span>
                 ) : (
-                  <span key={r.id} className={`calendario__rs tom-${toneOf(r.status)}`} title={`${hora(r.hora)} · ${r.clienteNome} · ${r.pessoas} pessoas · ${r.status}`}>
+                  <span key={r.id} className={`calendario__rs tom-${toneOf(r.status)}`} title={`${hora(r.hora)} · ${r.clienteNome} · ${r.pessoas} ${Number(r.pessoas) === 1 ? 'pessoa' : 'pessoas'} · ${r.status}`}>
                     <i /> <b>{hora(r.hora)}</b> {primeiro(r.clienteNome)} <small>{num(Number(r.pessoas) || 0)}p</small>
                   </span>
                 ))}
@@ -122,7 +122,7 @@ function Mes({ eventos }: { eventos: Row[] }) {
               <PartyPopper size={16} />
               <div>
                 <b>{String(e.titulo)}</b>
-                <span className="muted small">{[e.tipo, e.horario ? hora(e.horario) : '', e.publico ? `${e.publico} pessoas esperadas` : ''].filter(Boolean).join(' · ')}</span>
+                <span className="muted small">{[e.tipo, e.horario ? hora(e.horario) : '', e.publico ? `${e.publico} ${Number(e.publico) === 1 ? 'pessoa esperada' : 'pessoas esperadas'}` : ''].filter(Boolean).join(' · ')}</span>
               </div>
             </div>
           ))}

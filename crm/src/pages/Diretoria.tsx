@@ -323,7 +323,7 @@ function PainelDeBlocos(info: PainelInfo) {
   });
   add(vendas, {
     id: 'x-ticket-mes', titulo: 'Ticket médio do mês', tipo: 'kpi', extra: { area: 'Atendimento', descricao: 'Valor médio por comanda lançada no mês.' },
-    render: kpi({ label: `Ticket médio · ${monthName(mes)}`, value: consumosMes.length ? brl(sumBy(consumosMes) / consumosMes.length) : '—', hint: `${num(consumosMes.length)} comandas no mês` }),
+    render: kpi({ label: `Ticket médio · ${monthName(mes)}`, value: consumosMes.length ? brl(sumBy(consumosMes) / consumosMes.length) : '—', hint: `${num(consumosMes.length)} ${consumosMes.length === 1 ? 'comanda' : 'comandas'} no mês` }),
   });
   add(vendas, {
     id: 'x-vouchers', titulo: 'Vouchers a entregar', tipo: 'kpi', extra: { area: 'Atendimento', descricao: 'Recompensas resgatadas no aplicativo que ainda não foram entregues.' },
@@ -487,7 +487,7 @@ function PainelDeBlocos(info: PainelInfo) {
   add(can('rh'), {
     id: 'x-proximas-ferias', titulo: 'Próximas férias', tipo: 'painel', extra: { area: 'Pessoal', descricao: 'Férias e afastamentos agendados, do mais próximo ao mais distante.' },
     render: painel('Próximas férias', verTodos('/rh/ferias'), (
-      <MiniLista vazio="Nenhuma férias agendada." itens={proximasFerias.slice(0, 8).map((f) => ({
+      <MiniLista vazio="Sem férias agendadas." itens={proximasFerias.slice(0, 8).map((f) => ({
         key: f.id, principal: String(f.colaborador ?? 'Colaborador'), detalhe: `${f.tipo ?? ''} · ${dateBR(f.inicio)} a ${dateBR(f.fim)}`,
       }))} />
     )),
@@ -533,7 +533,7 @@ function PainelDeBlocos(info: PainelInfo) {
   });
   add(can('adm'), {
     id: 'x-custo-terceirizados', titulo: 'Terceirizados por mês', tipo: 'kpi', extra: { area: 'Administrativo', descricao: 'Custo mensal dos serviços terceirizados ativos cobrados por mês.' },
-    render: kpi({ label: 'Terceirizados por mês', value: brl(sumBy(terceirosAtivos.filter((t) => t.periodicidade === 'Mensal'))), hint: `${num(terceirosAtivos.length)} serviços ativos` }),
+    render: kpi({ label: 'Terceirizados por mês', value: brl(sumBy(terceirosAtivos.filter((t) => t.periodicidade === 'Mensal'))), hint: `${num(terceirosAtivos.length)} ${terceirosAtivos.length === 1 ? 'serviço ativo' : 'serviços ativos'}` }),
   });
   add(can('fin'), {
     id: 'x-receitas-categoria', titulo: 'Receitas por categoria', tipo: 'painel', extra: { area: 'Financeiro', descricao: 'De onde veio a receita do mês, por categoria.' },

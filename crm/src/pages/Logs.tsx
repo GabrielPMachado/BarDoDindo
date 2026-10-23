@@ -31,7 +31,7 @@ function valor(colecao: string, k: string, v: unknown): string {
   if (typeof v === 'boolean') return v ? 'Sim' : 'Não';
   if (Array.isArray(v)) return v.length ? `${v.length} ${v.length === 1 ? 'item' : 'itens'}` : '—';
   if (typeof v === 'object') {
-    if (k === 'ficha') { const it = (v as { itens?: unknown[] }).itens; return `${Array.isArray(it) ? it.length : 0} insumos`; }
+    if (k === 'ficha') { const it = (v as { itens?: unknown[] }).itens; const n = Array.isArray(it) ? it.length : 0; return `${n} ${n === 1 ? 'insumo' : 'insumos'}`; }
     return Object.entries(v as Record<string, unknown>).filter(([, x]) => x !== null && x !== '' && !(Array.isArray(x) && !x.length))
       .map(([a, x]) => `${a}: ${typeof x === 'object' ? (Array.isArray(x) ? x.join(', ') : '…') : String(x)}`).join(' · ') || '—';
   }

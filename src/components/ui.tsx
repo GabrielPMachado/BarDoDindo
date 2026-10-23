@@ -59,7 +59,7 @@ function useNotifications() {
       const quando = `${parseDate(r.data).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}, às ${r.hora}`;
       out.push(
         r.status === 'Confirmada'
-          ? { id: `r-${r.id}-ok`, title: 'Reserva confirmada', body: `Sua mesa para ${r.pessoas} está garantida: ${quando}.`, icon: CheckCircle2 }
+          ? { id: `r-${r.id}-ok`, title: 'Reserva confirmada', body: `Sua mesa para ${r.pessoas} ${r.pessoas === 1 ? 'pessoa' : 'pessoas'} está garantida: ${quando}.`, icon: CheckCircle2 }
           : { id: `r-${r.id}-pend`, title: 'Reserva em análise', body: `Aguardando confirmação do bar para ${quando}.`, icon: Clock },
       );
     }

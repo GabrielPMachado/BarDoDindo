@@ -44,7 +44,7 @@ export default function Recompensas() {
           </div>
         </div>
         <p className="muted small points-hero__regra">
-          Cada item consumido vale pontos: veja quantos no cardápio
+          Cada item consumido vale pontos: veja quantos no cardápio.
         </p>
       </section>
 

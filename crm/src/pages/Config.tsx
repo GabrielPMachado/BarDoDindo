@@ -672,7 +672,7 @@ function Numeracao({ podeAjustar, podeApagar }: { podeAjustar: boolean; podeApag
   const apagarTodos = async () => {
     const r = await api<{ apagados: number }>('/crm/clientes', { method: 'DELETE' });
     await Promise.all([reload('/public/afilhados'), reload('/crm/clientes')]);
-    notify(`${r.apagados} afilhado(s) apagado(s). O próximo cadastro será o #001.`);
+    notify(`${r.apagados} ${r.apagados === 1 ? 'afilhado apagado' : 'afilhados apagados'}. O próximo cadastro será o #001.`);
   };
   return (
     <section className="panel pad-lg">

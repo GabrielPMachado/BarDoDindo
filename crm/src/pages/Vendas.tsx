@@ -66,7 +66,7 @@ export function Clientes() {
   return (
     <div className="page">
       <PageHead title="Clientes (afilhados)" description="Clientes cadastrados pelo aplicativo, com pontos, consumo e frequência."
-        actions={pode('qrcode', 'ver') && <button type="button" className="btn btn--ghost" onClick={() => navigate('/vendas/qrcode')}><QrCode size={16} /> QR Code Afilie-se</button>} />
+        actions={pode('qrcode', 'ver') && <button type="button" className="btn btn--ghost" onClick={() => navigate('/vendas/qrcode')}><QrCode size={16} /> QR Code Afilhie-se</button>} />
       {clientes.length > 0 && (
         <KpiRow items={[
           { label: 'Afilhados', value: num(clientes.length) },

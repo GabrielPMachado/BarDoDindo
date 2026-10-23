@@ -28,7 +28,7 @@ async function desenhar(canvas: HTMLCanvasElement, url: string, tamanho: number)
   ctx.restore();
 }
 
-/** QR Code "Afilie-se": leva ao cadastro de afilhados e marca a origem (QR Code) no cadastro. Baixa em PNG ou imprime um cartaz. */
+/** QR Code "Afilhie-se": leva ao cadastro de afilhados e marca a origem (QR Code) no cadastro. Baixa em PNG ou imprime um cartaz. */
 export default function QrCodeAfilhados() {
   const [destino, setDestino] = useState<Destino>('app');
   const url = `${location.origin}${DESTINOS[destino].caminho}`;
@@ -60,7 +60,7 @@ export default function QrCodeAfilhados() {
 
   return (
     <div className="page">
-      <PageHead title="QR Code Afilie-se" description="Coloque nas mesas, no balcão e na entrada: quem aponta a câmera cai direto no cadastro de afilhados (só maiores de 18 anos)." />
+      <PageHead title="QR Code Afilhie-se" description="Coloque nas mesas, no balcão e na entrada: quem aponta a câmera cai direto no cadastro de afilhados (só maiores de 18 anos)." />
       <div className="qr-grid">
         <section className="panel pad-lg qr-painel">
           <canvas ref={tela} className="qr-canvas" aria-label={`QR Code para ${url}`} />

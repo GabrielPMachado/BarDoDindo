@@ -57,7 +57,7 @@ export function Folha() {
             <span>
               {folha.lancada
                 ? `A folha de ${monthName(mes)} já foi lançada pelo Financeiro como contas a pagar.`
-                : `O lançamento da folha como despesa é feito pelo Financeiro, em Financeiro → Despesas.`}
+                : `O lançamento da folha como despesa é feito em Financeiro → Despesas.`}
             </span>
             {!folha.lancada && podeLancar && <Link className="link" to="/financeiro/despesas">Ir para Despesas</Link>}
           </div>

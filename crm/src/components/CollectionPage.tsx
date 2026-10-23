@@ -266,8 +266,8 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
     const ok = await confirmar({
       title: `Excluir ${alvo.length} ${alvo.length === 1 ? 'registro' : 'registros'}?`,
       message: alvo.length <= 5
-        ? alvo.map((r) => String(r[def.fields[0].key] ?? '—')).join(', ') + '. Essa ação não pode ser desfeita.'
-        : 'Essa ação não pode ser desfeita.',
+        ? alvo.map((r) => String(r[def.fields[0].key] ?? '—')).join(', ') + '. Esta ação não pode ser desfeita.'
+        : 'Esta ação não pode ser desfeita.',
       confirmLabel: 'Excluir', danger: true,
     });
     if (!ok) return;
@@ -381,7 +381,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
             <select
               className={`input input--sm ${campoGrupo ? 'is-filtrando' : ''}`} value={agrupar}
               onChange={(e) => { setAgrupar(e.target.value); setPage(0); }} aria-label="Agrupar por"
-              title="No automático, ao filtrar agrupa pelo que não está filtrado"
+              title="No automático, ao filtrar, agrupa pelo que não está filtrado."
             >
               <option value="auto">Agrupar: automático{grupoAuto ? ` (${grupoAuto.label.replace(/\s*\(.*\)$/, '')})` : ''}</option>
               <option value="nenhum">Agrupar: não agrupar</option>

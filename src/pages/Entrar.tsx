@@ -133,9 +133,6 @@ export default function Entrar() {
         {(mode === 'login' || error?.includes('Esqueci minha senha')) && (
           <button type="button" className="btn btn--ghost" disabled={busy} onClick={esqueci}><KeyRound size={18} /> Esqueci minha senha</button>
         )}
-        {mode === 'cadastro' && (
-          <p className="muted small center">Ao se cadastrar você passa a acumular pontos a cada consumo no bar.</p>
-        )}
       </form>
       </div>
     </div>
