@@ -12,7 +12,7 @@ interface Config {
   pontosAcima: number;
   niveis: { nome: string; minimo: number }[];
   /** Questionário opcional depois do cadastro (perguntas definidas no Cérebro). */
-  questionario?: { ativo: boolean; titulo: string; perguntas: { id: string; texto: string; opcoes: string[] }[] };
+  questionario?: { ativo: boolean; titulo: string; perguntas: { id: string; texto: string; opcoes: string[]; multipla?: boolean }[] };
 }
 
 export interface Produto {

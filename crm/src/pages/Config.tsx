@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowDownWideNarrow, ChevronDown, ChevronUp, ExternalLink, Lock, Pencil, Plus, Save, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowDownWideNarrow, ChevronDown, ChevronUp, ExternalLink, Lock, Pencil, Plus, Save, Sparkles, Trash2, X } from 'lucide-react';
 import { brl } from '../lib/format';
 import { CARGOS_SUGERIDOS, GRUPOS_DE_PERMISSAO, MODULOS, NIVEIS, poderDe, acoesDe, acoesNaArea, nivelDe, type Acao, type Modulo } from '../modules';
 import { AsyncButton, Badge, EmptyState, ErrorBox, Loading, Modal, NumberInput, PageHead, notify } from '../components/ui';
 import { api } from '../lib/api';
 import { SelectPicker, confirmar } from '../components/pickers';
 import { reload, useCollection, useResource, type Row } from '../lib/data';
+import { QUESTIONARIO_PADRAO } from '../../../shared/backend';
 import { useSession, type Config, type Funcao, type Questionario, type Usuario } from '../lib/session';
 
 const acoesDaFuncao = (f: Funcao, k: string) => (f.sistema ? acoesDe('edit') : acoesNaArea(f.permissoes as Record<string, unknown>, k));
@@ -456,7 +457,12 @@ export function Parametros() {
     if (!cfg.ambientes.length) throw new Error('Informe ao menos um ambiente.');
     const faixas = cfg.faixasInss.map((f) => f.ate);
     if (faixas.some((v, i) => i > 0 && v <= faixas[i - 1])) throw new Error('As faixas do INSS devem estar em ordem crescente.');
-    const questionario = cfg.questionario && { ...cfg.questionario, perguntas: cfg.questionario.perguntas.filter((p) => p.texto.trim()) };
+    const questionario = cfg.questionario && {
+      ...cfg.questionario,
+      perguntas: cfg.questionario.perguntas.filter((p) => p.texto.trim()).map((p) => ({ ...p, opcoes: p.opcoes.map((o) => o.trim()).filter(Boolean) })),
+    };
+    const semOpcoes = cfg.questionario?.perguntas.find((p) => p.texto.trim() && p.opcoes.length && !p.opcoes.some((o) => o.trim()));
+    if (semOpcoes) throw new Error(`Escreva ao menos uma opção em "${semOpcoes.texto.trim()}" ou mude o tipo para Texto livre.`);
     if (questionario?.ativo && !questionario.perguntas.length) throw new Error('Adicione ao menos uma pergunta antes de mostrar o questionário.');
     await api('/crm/config', { method: 'PUT', body: { ...cfg, horarios: [...new Set(cfg.horarios)].sort(), ...(questionario ? { questionario } : {}) } });
     editado.current = false;
@@ -528,40 +534,129 @@ export function Parametros() {
           <label className="field-label" htmlFor="p-fgts">Alíquota do FGTS (%)</label>
           <NumberInput id="p-fgts" spec={{ decimals: 2, min: 0, max: 100 }} suffix="%" value={cfg.aliquotaFgts} onChange={(v) => setCfg({ ...cfg, aliquotaFgts: Number(v || 0) })} />
         </section>
-        <QuestionarioEditor q={cfg.questionario ?? { ativo: false, titulo: 'Conte um pouco sobre você', perguntas: [] }} onChange={(questionario) => setCfg({ ...cfg, questionario })} />
+        <QuestionarioEditor q={cfg.questionario ?? { ...QUESTIONARIO_PADRAO, ativo: false }} onChange={(questionario) => setCfg({ ...cfg, questionario })} />
       </fieldset>
       {canEdit && <ChaveIA />}
     </div>
   );
 }
 
+type Pergunta = Questionario['perguntas'][number];
+type TipoPergunta = 'unica' | 'multipla' | 'texto';
+const tipoDe = (p: Pergunta): TipoPergunta => (!p.opcoes.length ? 'texto' : p.multipla ? 'multipla' : 'unica');
+const TIPOS: { id: TipoPergunta; nome: string }[] = [{ id: 'unica', nome: 'Escolha única' }, { id: 'multipla', nome: 'Várias escolhas' }, { id: 'texto', nome: 'Texto livre' }];
+const ehOutro = (o: string) => /^outr[oa]s?$/i.test(o.trim());
+const novoId = () => Math.random().toString(36).slice(2, 10);
+const MAX_PERGUNTAS = 15, MAX_OPCOES = 12;
+
 /**
- * Questionário opcional do afilhado: aparece no início do app como convite (dá para adiar).
- * Pergunta sem opções vira campo de texto; com opções, o afilhado toca em uma.
+ * Questionário opcional do afilhado (pré-cadastro e app): uma pergunta por vez, com opções em botões.
+ * A opção "Outro" abre um campo para o afilhado escrever; "Texto livre" vira uma caixa de texto.
  */
 function QuestionarioEditor({ q, onChange }: { q: Questionario; onChange: (q: Questionario) => void }) {
-  const mudar = (i: number, p: Partial<Questionario['perguntas'][number]>) => onChange({ ...q, perguntas: q.perguntas.map((x, j) => (j === i ? { ...x, ...p } : x)) });
+  const perguntas = q.perguntas;
+  const trocar = (lista: Pergunta[]) => onChange({ ...q, perguntas: lista });
+  const mudar = (i: number, p: Partial<Pergunta>) => trocar(perguntas.map((x, j) => (j === i ? { ...x, ...p } : x)));
+  const mover = (i: number, d: number) => {
+    const lista = [...perguntas];
+    [lista[i], lista[i + d]] = [lista[i + d], lista[i]];
+    trocar(lista);
+  };
+  const remover = async (i: number) => {
+    if (perguntas[i].texto.trim() && !(await confirmar({ title: 'Remover a pergunta?', message: `"${perguntas[i].texto}" sai do questionário. As respostas já dadas a ela deixam de aparecer.`, confirmLabel: 'Remover', danger: true }))) return;
+    trocar(perguntas.filter((_, j) => j !== i));
+  };
+  const restaurar = async () => {
+    if (await confirmar({ title: 'Voltar para as perguntas padrão?', message: 'As perguntas atuais são trocadas pelas do questionário padrão do Bar do Dindo. Só vale depois de salvar.', confirmLabel: 'Usar as padrão' })) {
+      onChange({ ...q, titulo: QUESTIONARIO_PADRAO.titulo, perguntas: QUESTIONARIO_PADRAO.perguntas.map((p) => ({ ...p, opcoes: [...p.opcoes] })) });
+    }
+  };
   return (
     <section className="panel pad-lg questionario-editor">
-      <h2 className="panel-title">Questionário opcional do afilhado</h2>
-      <p className="muted small">Perguntas rápidas que o afilhado pode responder no aplicativo depois do cadastro. As respostas aparecem em Clientes (afilhados). Deixe as opções em branco para resposta livre.</p>
-      <label className="check-row"><input type="checkbox" checked={q.ativo} onChange={(e) => onChange({ ...q, ativo: e.target.checked })} /> Mostrar o questionário no aplicativo</label>
+      <div className="qe-topo">
+        <div>
+          <h2 className="panel-title">Questionário do afilhado</h2>
+          <p className="muted small">Aparece no pré-cadastro e no aplicativo, uma pergunta por vez. É opcional para o afilhado. As respostas aparecem em Clientes (afilhados).</p>
+        </div>
+        <a className="btn btn--ghost btn--sm" href="/afilhado?demo=questionario" target="_blank" rel="noreferrer"><ExternalLink size={14} /> Ver como o afilhado vê</a>
+      </div>
+      <label className="check-row"><input type="checkbox" checked={q.ativo} onChange={(e) => onChange({ ...q, ativo: e.target.checked })} /> Mostrar o questionário aos afilhados</label>
       <label className="field-label" htmlFor="q-titulo">Título</label>
       <input id="q-titulo" className="input" maxLength={80} value={q.titulo} onChange={(e) => onChange({ ...q, titulo: e.target.value })} />
-      {q.perguntas.map((p, i) => (
-        <div className="qe-pergunta" key={p.id}>
-          <input className="input" maxLength={200} placeholder={`Pergunta ${i + 1}`} aria-label={`Pergunta ${i + 1}`} value={p.texto} onChange={(e) => mudar(i, { texto: e.target.value })} />
-          <input className="input" maxLength={400} placeholder="Opções separadas por vírgula (opcional)" aria-label={`Opções da pergunta ${i + 1}`} defaultValue={p.opcoes.join(', ')}
-            onBlur={(e) => mudar(i, { opcoes: e.target.value.split(',').map((x) => x.trim()).filter(Boolean).slice(0, 10) })} />
-          <button type="button" className="icon-btn" aria-label={`Remover pergunta ${i + 1}`} onClick={() => onChange({ ...q, perguntas: q.perguntas.filter((_, j) => j !== i) })}><Trash2 size={15} /></button>
+
+      <ol className="qe-lista">
+        {perguntas.map((p, i) => (
+          <li className="qe-card" key={p.id}>
+            <header className="qe-card__topo">
+              <span className="qe-card__num">{String(i + 1).padStart(2, '0')}</span>
+              <div className="segmented segmented--sm" role="radiogroup" aria-label={`Tipo da pergunta ${i + 1}`}>
+                {TIPOS.map((t) => (
+                  <button key={t.id} type="button" role="radio" aria-checked={tipoDe(p) === t.id} className={tipoDe(p) === t.id ? 'is-active' : ''}
+                    onClick={() => mudar(i, t.id === 'texto' ? { opcoes: [], multipla: false } : { multipla: t.id === 'multipla', opcoes: p.opcoes.length ? p.opcoes : [''] })}>{t.nome}</button>
+                ))}
+              </div>
+              <span className="qe-card__acoes">
+                <button type="button" className="icon-btn" disabled={i === 0} onClick={() => mover(i, -1)} aria-label={`Subir a pergunta ${i + 1}`} title="Subir"><ChevronUp size={16} /></button>
+                <button type="button" className="icon-btn" disabled={i === perguntas.length - 1} onClick={() => mover(i, 1)} aria-label={`Descer a pergunta ${i + 1}`} title="Descer"><ChevronDown size={16} /></button>
+                <button type="button" className="icon-btn" onClick={() => void remover(i)} aria-label={`Remover a pergunta ${i + 1}`} title="Remover"><Trash2 size={15} /></button>
+              </span>
+            </header>
+            <textarea className="input qe-card__texto" rows={Math.max(2, Math.ceil(p.texto.length / 55))} maxLength={500} placeholder="Escreva a pergunta" aria-label={`Pergunta ${i + 1}`}
+              value={p.texto} onChange={(e) => mudar(i, { texto: e.target.value })} />
+            {tipoDe(p) === 'texto' ? (
+              <p className="muted small qe-card__nota">O afilhado responde com as próprias palavras, numa caixa de texto.</p>
+            ) : (
+              <Opcoes p={p} n={i + 1} onChange={(opcoes) => mudar(i, { opcoes })} />
+            )}
+          </li>
+        ))}
+      </ol>
+      <div className="qe-rodape">
+        {perguntas.length < MAX_PERGUNTAS && (
+          <button type="button" className="btn btn--ghost" onClick={() => trocar([...perguntas, { id: novoId(), texto: '', opcoes: [''] }])}>
+            <Plus size={16} /> Adicionar pergunta
+          </button>
+        )}
+        <button type="button" className="btn btn--ghost" onClick={() => void restaurar()}>Voltar para as perguntas padrão</button>
+      </div>
+    </section>
+  );
+}
+
+/** Opções de uma pergunta: cada uma num campo, com botões para reordenar, remover e acrescentar (inclusive "Outro"). */
+function Opcoes({ p, n, onChange }: { p: Pergunta; n: number; onChange: (opcoes: string[]) => void }) {
+  const ops = p.opcoes;
+  const mudar = (j: number, v: string) => onChange(ops.map((o, k) => (k === j ? v : o)));
+  const mover = (j: number, d: number) => {
+    const lista = [...ops];
+    [lista[j], lista[j + d]] = [lista[j + d], lista[j]];
+    onChange(lista);
+  };
+  // "Outro" fica sempre por último
+  const temOutro = ops.some(ehOutro);
+  const acrescentar = (v: string) => onChange(temOutro ? [...ops.filter((o) => !ehOutro(o)), v, ...ops.filter(ehOutro)] : [...ops, v]);
+  return (
+    <div className="qe-opcoes">
+      {ops.map((o, j) => (
+        <div className={`qe-opcao${ehOutro(o) ? ' qe-opcao--outro' : ''}`} key={j}>
+          <span className={`qe-opcao__marca${p.multipla ? ' is-quadrado' : ''}`} aria-hidden="true" />
+          <input className="input" maxLength={60} value={o} placeholder={`Opção ${j + 1}`} aria-label={`Pergunta ${n}, opção ${j + 1}`}
+            autoFocus={!o && j === ops.length - 1 && j > 0} onChange={(e) => mudar(j, e.target.value)} />
+          {ehOutro(o) && <span className="badge badge--info qe-opcao__dica">abre campo para escrever</span>}
+          <span className="qe-opcao__acoes">
+            <button type="button" className="icon-btn" disabled={j === 0} onClick={() => mover(j, -1)} aria-label={`Subir a opção ${j + 1}`}><ChevronUp size={15} /></button>
+            <button type="button" className="icon-btn" disabled={j === ops.length - 1} onClick={() => mover(j, 1)} aria-label={`Descer a opção ${j + 1}`}><ChevronDown size={15} /></button>
+            <button type="button" className="icon-btn" disabled={ops.length === 1} onClick={() => onChange(ops.filter((_, k) => k !== j))} aria-label={`Remover a opção ${j + 1}`}><X size={15} /></button>
+          </span>
         </div>
       ))}
-      {q.perguntas.length < 10 && (
-        <button type="button" className="btn btn--ghost" style={{ marginTop: 10 }} onClick={() => onChange({ ...q, perguntas: [...q.perguntas, { id: Math.random().toString(36).slice(2, 10), texto: '', opcoes: [] }] })}>
-          <Plus size={16} /> Adicionar pergunta
-        </button>
+      {ops.length < MAX_OPCOES && (
+        <div className="qe-opcoes__mais">
+          <button type="button" className="chip" onClick={() => acrescentar('')}><Plus size={13} /> Opção</button>
+          {!temOutro && <button type="button" className="chip" onClick={() => onChange([...ops, 'Outro'])}><Plus size={13} /> "Outro" com campo livre</button>}
+        </div>
       )}
-    </section>
+    </div>
   );
 }
 

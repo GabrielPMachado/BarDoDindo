@@ -175,6 +175,8 @@ function pontosDosItens(itens: Dados[]) {
   return itens.reduce((s, i) => s + (Number(i.pontos) || 0) * (Number(i.quantidade) || 0), 0);
 }
 
+/** Pergunta do questionário do afilhado (igual em src/store.tsx e crm/src/lib/session.tsx). */
+export type Pergunta = { id: string; texto: string; opcoes: string[]; multipla?: boolean };
 const DEFAULT_CONFIG = {
   nomeEstabelecimento: 'Bar do Dindo',
   /** Pontos de cada unidade vendida pelo preço do produto (quando ele não tem pontuação personalizada). */
@@ -205,23 +207,28 @@ const DEFAULT_CONFIG = {
     { ate: 8475.55, aliquota: 14 },
   ],
   aliquotaFgts: 8,
-  // questionário opcional do afilhado, respondido no pré-cadastro e no app depois do cadastro (editável no Cérebro, em Parâmetros)
+  // questionário opcional do afilhado, respondido no pré-cadastro e no app depois do cadastro (editável no Cérebro, em Parâmetros).
+  // Pergunta sem opções é de texto livre; a opção "Outro" abre um campo para escrever; "multipla" deixa marcar várias.
+  // versao: ao trocar as perguntas padrão, subir o número faz o questionário salvo antes voltar para as novas.
   questionario: {
-    ativo: true, titulo: 'Conte um pouco sobre você',
+    versao: 3, ativo: true, titulo: 'Questionário do afilhado',
     perguntas: [
-      { id: 'conheceu', texto: 'Como você conheceu o Bar do Dindo?', opcoes: ['Indicação de amigos', 'Instagram', 'Passando na frente', 'Google/Maps', 'Outro'] },
-      { id: 'frequencia', texto: 'Com que frequência você costuma sair para bares?', opcoes: ['Mais de 1x por semana', '1x por semana', 'Algumas vezes por mês', 'Raramente'] },
-      { id: 'pedido', texto: 'O que você mais pede?', opcoes: ['Chopp', 'Cerveja', 'Drinks', 'Caipirinha', 'Sem álcool', 'Petiscos e porções'] },
-      { id: 'companhia', texto: 'Com quem você costuma vir?', opcoes: ['Sozinho(a)', 'Em casal', 'Com amigos', 'Com a família', 'Com colegas de trabalho'] },
-      { id: 'dia', texto: 'Qual seu dia preferido para sair?', opcoes: ['Seg a qua', 'Quinta', 'Sexta', 'Sábado', 'Domingo'] },
-      { id: 'evento', texto: 'Que tipo de evento faria você vir mais vezes?', opcoes: ['Música ao vivo', 'Futebol no telão', 'Happy hour', 'Karaokê', 'Noites temáticas', 'Promoções de chopp'] },
-      { id: 'musica', texto: 'Qual estilo de música você curte no bar?', opcoes: ['Sertanejo', 'Samba e pagode', 'Rock', 'Pop', 'MPB', 'Funk', 'Eletrônica'] },
-      { id: 'time', texto: 'Qual é o seu time do coração?', opcoes: [] },
-      { id: 'novidades', texto: 'Como prefere receber novidades e promoções?', opcoes: ['WhatsApp', 'Instagram', 'E-mail', 'Só pelo aplicativo'] },
-      { id: 'sugestao', texto: 'O que faria você vir mais vezes?', opcoes: [] },
-    ] as { id: string; texto: string; opcoes: string[] }[],
+      { id: 'sobre', texto: 'Nós do Bar do Dindo estamos criando um espaço acolhedor e aconchegante com cerveja artesanal, drinks, música boa, televisão para eventos, bem como karaokê e videogame. Tudo pensando nos nossos afilhados. Portanto, comece contando um pouco de você e por que se “afilhiou” ao Bar do Dindo.', opcoes: [] },
+      { id: 'olaria', texto: 'Como você conheceu o Nova Olaria Mall, na Cidade Baixa?', opcoes: ['Já conhecia pela Cidade Baixa', 'Indicação de amigos', 'Redes sociais', 'Outro'] },
+      { id: 'conheceu', texto: 'Como você conheceu o Bar do Dindo?', multipla: true, opcoes: ['Redes sociais', 'Indicação de amigos', 'Indicação do Dindo', 'Já conhecia pela Cidade Baixa', 'Outro'] },
+      { id: 'pedido', texto: 'O que você mais gosta de pedir no Bar do Dindo?', multipla: true, opcoes: ['Cerveja artesanal', 'Drinks clássicos e autorais', 'Petiscos', 'Doses', 'Bebidas não alcoólicas', 'Outro'] },
+      { id: 'frequencia', texto: 'Com que frequência você costuma sair para bares e festas?', opcoes: ['Mais de 1x por semana', '1x por semana', 'Algumas vezes por mês', 'Raramente'] },
+      { id: 'dia', texto: 'Quais seus dias preferidos para sair?', multipla: true, opcoes: ['Seg a qua', 'Quinta', 'Sexta', 'Sábado', 'Domingo'] },
+      { id: 'eventos', texto: 'Quais eventos você gostaria de ver no Bar do Dindo?', multipla: true, opcoes: ['Música ao vivo', 'Futebol no telão', 'Happy hour', 'Karaokê', 'Noites temáticas', 'Filmes e séries no telão', 'Promoções de chopp e drinks', 'Videogame', 'Outro'] },
+      { id: 'novidades', texto: 'Como prefere receber novidades e promoções?', multipla: true, opcoes: ['WhatsApp', 'Instagram', 'E-mail', 'Só pelo aplicativo'] },
+      { id: 'musica', texto: 'Quais estilos musicais não podem faltar na playlist do Bar do Dindo?', multipla: true, opcoes: ['Sertanejo', 'Samba e pagode', 'Rock', 'Pop', 'MPB', 'Funk', 'Eletrônica', 'Outro'] },
+      { id: 'sugestao', texto: 'Agora que você já se tornou um afilhado do Bar do Dindo e conhece nossa proposta, nos diga, nas suas próprias palavras, qualquer conselho, sugestão ou feedback que ache interessante a ponto de agregar à comunidade. Contamos com você, afilhado(a)!', opcoes: [] },
+    ] as Pergunta[],
   },
 };
+
+/** Perguntas padrão do questionário do afilhado (o Cérebro oferece voltar para elas). */
+export const QUESTIONARIO_PADRAO = DEFAULT_CONFIG.questionario;
 
 /* ---------- utilitários ---------- */
 /** CPF só com os dígitos, conferindo os dois dígitos verificadores (e recusando 000.000.000-00, 111… etc.). */
@@ -440,8 +447,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   async function getConfig(): Promise<typeof DEFAULT_CONFIG & Dados> {
     const { id: _id, ...salvo } = (await documento('config/geral')) ?? {};
     const cfg = { ...DEFAULT_CONFIG, ...salvo };
-    // questionário salvo sem perguntas (antes de existir o padrão) volta para as perguntas padrão
-    if (!cfg.questionario?.perguntas?.length) cfg.questionario = DEFAULT_CONFIG.questionario;
+    // questionário salvo sem perguntas (antes de existir o padrão) ou de uma versão anterior das perguntas padrão volta para as padrão
+    if (!cfg.questionario?.perguntas?.length || !(cfg.questionario.versao >= DEFAULT_CONFIG.questionario.versao)) cfg.questionario = DEFAULT_CONFIG.questionario;
     return cfg;
   }
 
@@ -723,12 +730,12 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       Object.assign(patch, docs);
       lote.set(doc(db, 'cpfs', docs.cpf), { uid });
     }
-    // questionário opcional: respostas curtas, só às perguntas que existem
+    // questionário opcional: só as perguntas que existem (texto livre até 2.000 caracteres)
     if (b.respostas !== undefined) {
       const cfg = await getConfig();
       const ids = new Set(cfg.questionario.perguntas.map((q) => q.id));
       const r = (b.respostas && typeof b.respostas === 'object' ? b.respostas : {}) as Dados;
-      patch.respostas = { ...Object.fromEntries(Object.entries(r).filter(([k]) => ids.has(k)).map(([k, v]) => [k, str(v, 300)])), respondidoEm: now() };
+      patch.respostas = { ...Object.fromEntries(Object.entries(r).filter(([k]) => ids.has(k)).map(([k, v]) => [k, str(v, 2000)])), respondidoEm: now() };
     }
     lote.update(doc(db, 'clientes', uid), patch);
     try {
@@ -989,13 +996,14 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     if (b.questionario !== undefined) {
       const q = b.questionario as Dados;
       const perguntas = Array.isArray(q?.perguntas) ? q.perguntas : [];
-      if (perguntas.length > 10) fail(400, 'O questionário aceita até 10 perguntas.');
+      if (perguntas.length > 15) fail(400, 'O questionário aceita até 15 perguntas.');
       b.questionario = {
+        versao: DEFAULT_CONFIG.questionario.versao,
         ativo: q?.ativo === true, titulo: str(q?.titulo, 80) || DEFAULT_CONFIG.questionario.titulo,
-        perguntas: perguntas.map((x: Dados, i: number) => ({
-          id: str(x?.id, 20) || `p${i + 1}`, texto: str(x?.texto, 200),
-          opcoes: (Array.isArray(x?.opcoes) ? x.opcoes : []).map((o: unknown) => str(o, 60)).filter(Boolean).slice(0, 10),
-        })).filter((x: Dados) => x.texto),
+        perguntas: perguntas.map((x: Dados, i: number) => {
+          const opcoes = [...new Set((Array.isArray(x?.opcoes) ? x.opcoes : []).map((o: unknown) => str(o, 60)).filter(Boolean))].slice(0, 12) as string[];
+          return { id: str(x?.id, 20) || `p${i + 1}`, texto: str(x?.texto, 500), opcoes, ...(x?.multipla === true && opcoes.length ? { multipla: true } : {}) };
+        }).filter((x: Dados) => x.texto),
       };
     }
     const patch = Object.fromEntries(Object.entries(b).filter(([k]) => k in DEFAULT_CONFIG));
