@@ -211,17 +211,17 @@ const DEFAULT_CONFIG = {
   // Pergunta sem opções é de texto livre; a opção "Outro" abre um campo para escrever; "multipla" deixa marcar várias.
   // versao: ao trocar as perguntas padrão, subir o número faz o questionário salvo antes voltar para as novas.
   questionario: {
-    versao: 2, ativo: true, titulo: 'Questionário do afilhado',
+    versao: 3, ativo: true, titulo: 'Questionário do afilhado',
     perguntas: [
       { id: 'sobre', texto: 'Nós do Bar do Dindo estamos criando um espaço acolhedor e aconchegante com cerveja artesanal, drinks, música boa, televisão para eventos, bem como karaokê e videogame. Tudo pensando nos nossos afilhados. Portanto, comece contando um pouco de você e por que se “afilhiou” ao Bar do Dindo.', opcoes: [] },
       { id: 'olaria', texto: 'Como você conheceu o Nova Olaria Mall, na Cidade Baixa?', opcoes: ['Já conhecia pela Cidade Baixa', 'Indicação de amigos', 'Redes sociais', 'Outro'] },
-      { id: 'conheceu', texto: 'Como você conheceu o Bar do Dindo?', opcoes: ['Redes sociais', 'Indicação de amigos', 'Indicação do Dindo', 'Já conhecia pela Cidade Baixa', 'Outro'] },
-      { id: 'pedido', texto: 'O que você mais gosta de pedir no Bar do Dindo?', opcoes: ['Cerveja artesanal', 'Drinks clássicos e autorais', 'Petiscos', 'Doses', 'Bebidas não alcoólicas', 'Outro'] },
+      { id: 'conheceu', texto: 'Como você conheceu o Bar do Dindo?', multipla: true, opcoes: ['Redes sociais', 'Indicação de amigos', 'Indicação do Dindo', 'Já conhecia pela Cidade Baixa', 'Outro'] },
+      { id: 'pedido', texto: 'O que você mais gosta de pedir no Bar do Dindo?', multipla: true, opcoes: ['Cerveja artesanal', 'Drinks clássicos e autorais', 'Petiscos', 'Doses', 'Bebidas não alcoólicas', 'Outro'] },
       { id: 'frequencia', texto: 'Com que frequência você costuma sair para bares e festas?', opcoes: ['Mais de 1x por semana', '1x por semana', 'Algumas vezes por mês', 'Raramente'] },
-      { id: 'dia', texto: 'Qual seu dia preferido para sair?', opcoes: ['Seg a qua', 'Quinta', 'Sexta', 'Sábado', 'Domingo'] },
+      { id: 'dia', texto: 'Quais seus dias preferidos para sair?', multipla: true, opcoes: ['Seg a qua', 'Quinta', 'Sexta', 'Sábado', 'Domingo'] },
       { id: 'eventos', texto: 'Quais eventos você gostaria de ver no Bar do Dindo?', multipla: true, opcoes: ['Música ao vivo', 'Futebol no telão', 'Happy hour', 'Karaokê', 'Noites temáticas', 'Filmes e séries no telão', 'Promoções de chopp e drinks', 'Videogame', 'Outro'] },
-      { id: 'novidades', texto: 'Como prefere receber novidades e promoções?', opcoes: ['WhatsApp', 'Instagram', 'E-mail', 'Só pelo aplicativo'] },
-      { id: 'musica', texto: 'Qual estilo musical não pode faltar na playlist do Bar do Dindo?', opcoes: ['Sertanejo', 'Samba e pagode', 'Rock', 'Pop', 'MPB', 'Funk', 'Eletrônica', 'Outro'] },
+      { id: 'novidades', texto: 'Como prefere receber novidades e promoções?', multipla: true, opcoes: ['WhatsApp', 'Instagram', 'E-mail', 'Só pelo aplicativo'] },
+      { id: 'musica', texto: 'Quais estilos musicais não podem faltar na playlist do Bar do Dindo?', multipla: true, opcoes: ['Sertanejo', 'Samba e pagode', 'Rock', 'Pop', 'MPB', 'Funk', 'Eletrônica', 'Outro'] },
       { id: 'sugestao', texto: 'Agora que você já se tornou um afilhado do Bar do Dindo e conhece nossa proposta, nos diga, nas suas próprias palavras, qualquer conselho, sugestão ou feedback que ache interessante a ponto de agregar à comunidade. Contamos com você, afilhado(a)!', opcoes: [] },
     ] as Pergunta[],
   },
