@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowDownWideNarrow, ChevronDown, ChevronUp, ExternalLink, Lock, Pencil, Plus, Save, Sparkles, Trash2 } from 'lucide-react';
 import { brl } from '../lib/format';
 import { CARGOS_SUGERIDOS, GRUPOS_DE_PERMISSAO, MODULOS, NIVEIS, poderDe, acoesDe, acoesNaArea, nivelDe, type Acao, type Modulo } from '../modules';
@@ -436,9 +436,13 @@ export function Parametros() {
   const { pode } = useSession();
   const canEdit = pode('parametros', 'editar');
   const res = useResource<Config>('/crm/config');
-  const [cfg, setCfg] = useState<Config | null>(null);
+  const [cfg, mostrar] = useState<Config | null>(null);
+  // a tela recarrega os parâmetros sozinha (a cada minuto e a cada mudança no sistema): com alterações ainda não
+  // salvas, a recarga não pode trocar o que a pessoa está editando pelo que está gravado
+  const editado = useRef(false);
+  const setCfg = (c: Config) => { editado.current = true; mostrar(c); };
   useEffect(() => {
-    if (res.data) setCfg(res.data);
+    if (res.data && !editado.current) mostrar(res.data);
   }, [res.data]);
   if (!cfg) return <Loading />;
 
@@ -455,6 +459,7 @@ export function Parametros() {
     const questionario = cfg.questionario && { ...cfg.questionario, perguntas: cfg.questionario.perguntas.filter((p) => p.texto.trim()) };
     if (questionario?.ativo && !questionario.perguntas.length) throw new Error('Adicione ao menos uma pergunta antes de mostrar o questionário.');
     await api('/crm/config', { method: 'PUT', body: { ...cfg, horarios: [...new Set(cfg.horarios)].sort(), ...(questionario ? { questionario } : {}) } });
+    editado.current = false;
     await reload('/crm/config');
     notify('Parâmetros salvos. O aplicativo já usa as novas regras.');
   };
