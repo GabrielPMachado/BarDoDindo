@@ -704,7 +704,7 @@ button.menu-row:active { background: var(--surface-2); }
 .convite { display: flex; align-items: center; gap: 12px; padding: 12px 10px 12px 14px; border-radius: 14px; background: var(--surface); border: 1px dashed var(--brand); color: var(--brand-light); }
 .convite__texto { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; text-align: left; color: var(--text); }
 .convite__texto strong { font-size: 14px; }
-.convite__texto span { font-size: 12.5px; color: var(--muted); }
+.convite__texto span { font-size: 12.5px; color: var(--muted); text-align: justify; hyphens: manual; }
 
 .questionario__topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .questionario__topo h2 { display: flex; align-items: center; gap: 8px; font-size: 18px; font-family: var(--serif); }
@@ -737,7 +737,7 @@ button.menu-row:active { background: var(--surface-2); }
 .quiz-app__centro { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; padding: 24px 24px calc(28px + var(--safe-bottom)); animation: quizEntra .4s ease both; }
 .quiz-app__centro.is-volta { animation-name: quizEntraVolta; }
 .quiz-app__centro h2 { font-family: var(--serif); font-size: 25px; line-height: 1.25; animation: quizSobeTexto .5s .12s ease both; }
-.quiz-app__centro p { max-width: 380px; line-height: 1.55; animation: quizSobeTexto .5s .2s ease both; }
+.quiz-app__centro p { max-width: 380px; line-height: 1.55; text-align: justify; text-align-last: center; hyphens: manual; animation: quizSobeTexto .5s .2s ease both; }
 .quiz-app__centro .btn { width: 100%; max-width: 320px; margin-top: 8px; animation: quizSobeTexto .5s .28s ease both; }
 .quiz-app__emblema { position: relative; display: grid; place-items: center; animation: quizPop .7s cubic-bezier(.2, 1.5, .4, 1) both; }
 .quiz-app__emblema::before { content: ""; position: absolute; inset: -14px; border-radius: 50%; border: 1.5px solid #e07a4c55; animation: quizAnel 2.4s ease-out .6s infinite; }
@@ -761,7 +761,7 @@ button.menu-row:active { background: var(--surface-2); }
 .quiz-app__passos li.is-atual { background: linear-gradient(90deg, var(--brand-light), var(--brand)); box-shadow: 0 0 10px #e07a4c88; }
 .quiz-app__contador { font-size: 12px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--brand-light); }
 .quiz-app__miolo { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 2px 22px 18px; display: flex; flex-direction: column; gap: 14px; }
-.quiz-app__miolo h2 { font-family: var(--serif); font-size: 20px; line-height: 1.4; font-weight: 600; text-wrap: pretty; }
+.quiz-app__miolo h2 { font-family: var(--serif); font-size: 20px; line-height: 1.4; font-weight: 600; text-align: justify; hyphens: manual; }
 .quiz-app__dica { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; margin-top: -4px; padding: 4px 10px; border-radius: 99px; font-size: 12.5px; color: var(--brand-light); background: #c4572a1f; }
 
 .quiz-opcoes { display: flex; flex-direction: column; gap: 8px; }
