@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Check, ExternalLink, ImageOff, Loader2, RefreshCw, Sparkles, Square, Upload } from 'lucide-react';
+import { Check, Download, ExternalLink, ImageOff, Loader2, RefreshCw, Sparkles, Square, Upload } from 'lucide-react';
 import type { Row } from '../lib/data';
 import { ErroDaChave, GEMINI_URL, MODELOS, gerarFotoEstoque, promptDaFotoEstoque } from '../lib/iaFoto';
 import { fotoNoTamanho } from './Avatar';
@@ -11,6 +11,24 @@ type Estado = { st: 'fila' | 'gerando' | 'aberto' | 'pronta' | 'erro' | 'salva';
 type Modo = 'gratis' | 'automatico';
 
 const temFoto = (r: Row) => typeof r.foto === 'string' && !!r.foto;
+/** extensão do arquivo pelo tipo da data URL (a foto atual pode ser JPEG, PNG ou WebP) */
+const extensao = (dataUrl: string) => ({ 'image/png': 'png', 'image/webp': 'webp' } as Record<string, string>)[dataUrl.slice(5, dataUrl.indexOf(';'))] ?? 'jpg';
+const nomeReferencia = (r: Row) => `referencia-${nomeArquivo(String(r.item ?? ''))}.${extensao(String(r.foto))}`;
+/**
+ * Baixa a foto atual por um endereço blob: data URLs grandes no href falham em parte dos navegadores (o download sai vazio
+ * ou nem começa). O endereço é liberado depois, quando o download já começou.
+ */
+function baixarFoto(dataUrl: string, nome: string) {
+  try {
+    const [cab, dados] = dataUrl.split(',');
+    const bin = atob(dados ?? '');
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([bytes], { type: cab.slice(5, cab.indexOf(';')) }));
+    baixar(url, nome);
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } catch { baixar(dataUrl, nome); }
+}
 const pedidoDe = (r: Row) => promptDaFotoEstoque({
   item: String(r.item ?? ''), categoria: String(r.categoria ?? ''), unidade: String(r.unidade ?? ''), conteudo: r.conteudo, conteudoUnidade: String(r.conteudoUnidade ?? ''),
 }, temFoto(r));
@@ -27,11 +45,13 @@ export function RefazerFotos({ rows, onSalvar, onFim, onClose }: {
   onFim: () => Promise<unknown> | void;
   onClose: () => void;
 }) {
-  const itens = [...rows].sort((a, b) => String(a.item ?? '').localeCompare(String(b.item ?? ''), 'pt-BR'));
+  const todos = [...rows].sort((a, b) => String(a.item ?? '').localeCompare(String(b.item ?? ''), 'pt-BR'));
   const [modo, setModo] = useState<Modo>('gratis');
   // começam marcados os itens que já têm foto (a leva antiga, em baixa qualidade)
-  const [marcados, setMarcados] = useState<Set<string>>(() => new Set(itens.filter(temFoto).map((r) => r.id)));
+  const [marcados, setMarcados] = useState<Set<string>>(() => new Set(todos.filter(temFoto).map((r) => r.id)));
   const [estados, setEstados] = useState<Record<string, Estado>>({});
+  // o item cuja foto já foi trocada sai da lista
+  const itens = todos.filter((r) => estados[r.id]?.st !== 'salva');
   const [rodando, setRodando] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erroGeral, setErroGeral] = useState<string | null>(null);
@@ -53,12 +73,13 @@ export function RefazerFotos({ rows, onSalvar, onFim, onClose }: {
   const abrirNoGemini = (r: Row) => {
     const copiou = copiar(pedidoDe(r));
     const modelo = MODELOS.estoque;
+    // a foto atual vai primeiro: o navegador costuma barrar o segundo download do mesmo clique, e a referência é a que importa
+    if (temFoto(r)) baixarFoto(String(r.foto), nomeReferencia(r));
     if (!modeloBaixado.current) { baixar(modelo.url, modelo.arquivo); modeloBaixado.current = true; }
-    if (temFoto(r)) baixar(String(r.foto), `referencia-${nomeArquivo(String(r.item ?? ''))}.jpg`);
     window.open(GEMINI_URL, '_blank', 'noopener');
     mudar(r.id, { st: 'aberto' });
     void copiou.then((ok) => notify(ok
-      ? `Pedido de "${String(r.item ?? '')}" copiado. No Gemini: cole o pedido, anexe a foto modelo${temFoto(r) ? ' e a foto de referência' : ''} e envie.`
+      ? `Pedido de "${String(r.item ?? '')}" copiado. No Gemini: cole o pedido, anexe a foto modelo${temFoto(r) ? ' e a foto de referência (se ela não baixou, use "Baixar foto atual" no cartão do item)' : ''} e envie.`
       : 'Fotos baixadas, mas não deu para copiar o pedido: toque em "Abrir de novo" no cartão do item.', ok ? 'ok' : 'error'));
   };
 
@@ -92,14 +113,16 @@ export function RefazerFotos({ rows, onSalvar, onFim, onClose }: {
     }
   };
 
-  const salvar = async () => {
+  /** Troca as fotos e tira da lista na hora os itens trocados. */
+  const salvar = async (lista: Row[] = prontas) => {
     setSalvando(true);
     let feitas = 0;
     try {
-      for (const r of prontas) {
+      for (const r of lista) {
         try {
           await onSalvar(r.id, estados[r.id].nova!);
           mudar(r.id, { ...estados[r.id], st: 'salva' });
+          marcar(r.id, false);
           feitas++;
         } catch (e) {
           mudar(r.id, { ...estados[r.id], st: 'erro', erro: e instanceof Error ? e.message : 'Não foi possível salvar.' });
@@ -177,10 +200,16 @@ export function RefazerFotos({ rows, onSalvar, onFim, onClose }: {
                 {e.st === 'erro' && <p className="error small">{e.erro}</p>}
                 <div className="refazer-fotos__acoes">
                   {e.st === 'salva' ? <span className="refazer-fotos__ok"><Check size={14} /> Trocada</span> : e.st === 'pronta' && (
-                    <label><input type="checkbox" checked={!!e.usar} onChange={(ev) => mudar(r.id, { ...e, usar: ev.target.checked })} /> Trocar por esta</label>
+                    <span className="refazer-fotos__botoes">
+                      <label><input type="checkbox" checked={!!e.usar} onChange={(ev) => mudar(r.id, { ...e, usar: ev.target.checked })} /> Trocar por esta</label>
+                      <button className="btn btn--primary btn--sm" disabled={rodando || salvando} onClick={() => void salvar([r])}><Check size={13} /> Trocar agora</button>
+                    </span>
                   )}
                   {modo === 'gratis' && marcado && e.st !== 'salva' && (
                     <span className="refazer-fotos__botoes">
+                      {temFoto(r) && (
+                        <button className="btn btn--ghost btn--sm" onClick={() => baixarFoto(String(r.foto), nomeReferencia(r))} title="Baixa a foto atual para anexar no Gemini"><Download size={13} /> Baixar foto atual</button>
+                      )}
                       <button className="btn btn--ghost btn--sm" disabled={salvando} onClick={() => abrirNoGemini(r)} title="Copia o pedido, baixa as fotos e abre o Gemini"><ExternalLink size={13} /> {e.st === 'fila' ? 'Abrir no Gemini' : 'Abrir de novo'}</button>
                       <label className="btn btn--ghost btn--sm">
                         <Upload size={13} /> {e.nova ? 'Outra foto' : 'Enviar foto pronta'}

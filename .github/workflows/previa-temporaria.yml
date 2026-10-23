@@ -1,0 +1,40 @@
+# Gera, sob demanda, um link de prévia do site que some sozinho (padrão: 30 minutos).
+# Rodar em Actions > "Prévia temporária" > Run workflow. O canal live nunca é tocado.
+
+name: Prévia temporária
+on:
+  workflow_dispatch:
+    inputs:
+      expira:
+        description: "Tempo até o link expirar (ex.: 30m, 2h, 1d)"
+        default: 30m
+        required: true
+permissions:
+  contents: read
+jobs:
+  previa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            crm/package-lock.json
+      - run: npm ci
+      - run: npm --prefix crm ci
+      - run: npm run build:all
+      - id: deploy
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BARDO_C0878 }}
+          projectId: bardo-c0878
+          channelId: temporaria
+          expires: ${{ inputs.expira }}
+      - name: Link da prévia
+        run: |
+          echo "Prévia: ${{ steps.deploy.outputs.details_url }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Cartão: ${{ steps.deploy.outputs.details_url }}/precadastro/?demo=cartao" >> "$GITHUB_STEP_SUMMARY"
+          echo "Expira em: ${{ steps.deploy.outputs.expire_time }}" >> "$GITHUB_STEP_SUMMARY"
