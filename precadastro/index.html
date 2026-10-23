@@ -901,7 +901,8 @@ import { cpfValido, idadeEm } from '../shared/backend';
       const blob = await imagemCartao('stories');
       const arq = new File([blob], nome, { type: 'image/png' });
       if (navigator.canShare?.({ files: [arq] })) {
-        await navigator.share({ files: [arq], text: 'Sou afilhado do @bardodindo! 🧡' }).catch(() => {});
+        // só a imagem: com texto junto, o iPhone tira o Instagram da lista (ou ele recebe só o texto)
+        await navigator.share({ files: [arq] }).catch(() => {});
       } else {
         baixa(blob, nome);
       }
