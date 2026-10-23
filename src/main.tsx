@@ -2,6 +2,7 @@ import { StrictMode, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { registerSW } from 'virtual:pwa-register';
+import { Capacitor } from '@capacitor/core';
 import { StoreProvider, useStore } from './store';
 import { BottomNav, ConfirmSheet, Spinner, TopBar } from './components/ui';
 import Home from './pages/Home';
@@ -86,11 +87,26 @@ function Shell() {
   );
 }
 
+// Antes do lançamento só o pré-cadastro fica aberto: na web, quem abre o app vai para /afilhado.
+// Para liberar o app, troque para true. Para testar o app mesmo assim, abra com ?app=1 (vale até fechar a aba).
+const APP_LIBERADO = false;
+const testeDoApp = (() => {
+  try {
+    if (new URLSearchParams(location.search).has('app')) sessionStorage.setItem('app-liberado', '1');
+    return sessionStorage.getItem('app-liberado') === '1';
+  } catch {
+    return false;
+  }
+})();
+const redirecionar = !APP_LIBERADO && !testeDoApp && !Capacitor.isNativePlatform() && !import.meta.env.DEV
+  && !location.pathname.startsWith('/afilhado'); // nunca em laço, se o servidor errar a rota
+if (redirecionar) location.replace('/afilhado');
+
 // HashRouter funciona igual na web e dentro do Capacitor (Android/iOS)
 // reaproveita a raiz se o módulo for reexecutado (atualização em desenvolvimento)
 const container = document.getElementById('root') as HTMLElement & { __root?: Root };
 container.__root ??= createRoot(container);
-container.__root.render(
+if (!redirecionar) container.__root.render(
   <StrictMode>
     <StoreProvider>
       <HashRouter>
