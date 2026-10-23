@@ -177,7 +177,11 @@
   .member__tag { font-size: 10.5px; letter-spacing: .02em; color: var(--brand-light); white-space: nowrap; }
 
   .reveal__actions { display: flex; gap: 10px; width: min(360px, 100%); }
+  .reveal__actions { flex-direction: column; }
+  .reveal__duplo { display: flex; gap: 10px; }
   .reveal__actions .btn { margin: 0; height: 48px; font-size: 15px; }
+  .btn--insta { color: #fff; background: linear-gradient(115deg, #f9ce34 0%, #ee2a7b 45%, #6228d7 100%); }
+  .btn--insta:hover:not(:disabled) { filter: brightness(1.07); }
   .confetti { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
 
   /* convite e questionário opcional */
@@ -355,8 +359,14 @@
     </div>
   </div>
   <div class="reveal__actions stage" id="acoes">
-    <button class="btn btn--brand" id="btn-share" type="button">Compartilhar</button>
-    <button class="btn btn--ghost" id="btn-salvar" type="button">Salvar cartão</button>
+    <button class="btn btn--insta" id="btn-insta" type="button">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r=".6" fill="currentColor"/></svg>
+      Compartilhar no Instagram
+    </button>
+    <div class="reveal__duplo">
+      <button class="btn btn--ghost" id="btn-share" type="button">Compartilhar link</button>
+      <button class="btn btn--ghost" id="btn-salvar" type="button">Salvar cartão</button>
+    </div>
   </div>
   <div class="convite stage" id="convite" hidden>
     <strong>Queremos conhecê-lo, afilhado (a)!</strong>
@@ -774,39 +784,128 @@ import { cpfValido, idadeEm } from '../shared/backend';
       else {
         await navigator.clipboard.writeText(`${texto} ${url}`);
         $('btn-share').textContent = 'Texto copiado!';
-        setTimeout(() => ($('btn-share').textContent = 'Compartilhar'), 2000);
+        setTimeout(() => ($('btn-share').textContent = 'Compartilhar link'), 2000);
       }
     } catch { /* compartilhamento cancelado */ }
   };
 
-  $('btn-salvar').onclick = async () => {
+  /* ---------- salvar cartão: imagem em alta (1440×1800, formato de post) com frente e verso ---------- */
+  const desenhaCartao = (g, logo, verso) => {
+    // desenha o cartão no tamanho da página (340×212,5); quem chama ajusta a escala
+    const L = 340, A = 212.5, R = 18;
+    const forma = () => { g.beginPath(); g.roundRect(0, 0, L, A, R); };
+    g.save();
+    g.shadowColor = '#000000d9'; g.shadowBlur = 34; g.shadowOffsetY = 16;
+    const bg = g.createLinearGradient(0, 0, L, A);
+    bg.addColorStop(0, '#2a1c17'); bg.addColorStop(.55, '#140f0e'); bg.addColorStop(1, '#251814');
+    forma(); g.fillStyle = bg; g.fill();
+    g.restore();
+    g.save(); forma(); g.clip();
+    if (verso) {
+      g.fillStyle = (() => { const s = g.createLinearGradient(0, 0, L, 0); s.addColorStop(0, '#0b0807'); s.addColorStop(.5, '#1d1412'); s.addColorStop(1, '#0b0807'); return s; })();
+      g.fillRect(0, 18, L, 30);
+      g.fillStyle = '#3a2720'; g.fillRect(0, 18, L, .7); g.fillRect(0, 47.3, L, .7);
+      g.globalAlpha = .1; g.drawImage(logo, L - 124, A - 124, 150, 150); g.globalAlpha = 1;
+      g.fillStyle = '#f3ece6'; g.font = '700 15px "Roboto Slab"'; g.fillText('Coração de Dindo sempre cabe mais um!', 20, 76);
+      // aviso com quebra de linha e o número em destaque
+      g.font = '400 11px Inter';
+      const partes = [['Apresente este cartão ou informe o nº ', '#a59990', '400'], ['#' + pad(atual.numero), '#e07a4c', '700'], [' a cada visita para registrarmos nossos momentos no seu histórico.', '#a59990', '400']];
+      let x = 20, y = 95;
+      for (const [txt, cor, peso] of partes) for (const palavra of txt.split(/(?<= )/)) {
+        g.font = `${peso} 11px Inter`;
+        const w = g.measureText(palavra).width;
+        if (x + w > L - 20 && x > 20) { x = 20; y += 15.4; }
+        g.fillStyle = cor; g.fillText(palavra, x, y); x += w;
+      }
+      g.fillStyle = '#a59990'; g.font = '400 10px Inter'; g.fillText('Boulevard Nova Olaria', 20, A - 30); g.fillText('R. Gen. Lima e Silva, 776', 20, A - 16.5);
+    } else {
+      g.save(); g.shadowColor = '#e07a4c77'; g.shadowBlur = 14; g.drawImage(logo, L - 96, 12, 84, 84); g.restore();
+      const t = g.createLinearGradient(0, 22, 0, 60);
+      t.addColorStop(0, '#ffe1d1'); t.addColorStop(.6, '#e07a4c'); t.addColorStop(1, '#c4572a');
+      g.fillStyle = t; g.font = '800 17px "Roboto Slab"'; g.fillText('AFILHADO DO', 20, 37); g.fillText('BAR DO DINDO', 20, 56.5);
+      g.fillStyle = '#e07a4c'; g.font = '800 32px "Roboto Slab"'; g.fillText('#' + pad(atual.numero), 20, 135);
+      const nome = nomeCurto(atual.nome);
+      g.fillStyle = '#f3ece6'; g.font = '600 15px Inter'; g.fillText(nome.length > 26 ? nome.slice(0, 25) + '…' : nome, 20, A - 32);
+      g.fillStyle = '#a59990'; g.font = '400 10px Inter'; g.fillText(desdeTexto(atual.desde), 20, A - 17);
+    }
+    g.fillStyle = '#e07a4c'; g.font = '400 10.5px Inter'; g.textAlign = 'right'; g.fillText('@bardodindo', L - 20, A - 17); g.textAlign = 'left';
+    // reflexo diagonal
+    const brilho = g.createLinearGradient(0, 0, L, A);
+    brilho.addColorStop(.25, '#ffffff00'); brilho.addColorStop(.42, '#ffffff14'); brilho.addColorStop(.6, '#ffffff00');
+    g.fillStyle = brilho; g.fillRect(0, 0, L, A);
+    g.restore();
+    forma(); g.strokeStyle = verso ? '#5a3828' : '#7a4b36'; g.lineWidth = 1; g.stroke();
+  };
+
+  // monta a imagem do cartão: 'post' (1440×1800, para salvar) ou 'stories' (1080×1920, para o Instagram)
+  const imagemCartao = async (formato) => {
     await document.fonts.ready;
-    const W = 1080, H = 675, c = document.createElement('canvas');
-    c.width = W; c.height = H;
-    const g = c.getContext('2d');
-    const r = 48;
-    g.beginPath(); g.moveTo(r, 0); g.arcTo(W, 0, W, H, r); g.arcTo(W, H, 0, H, r); g.arcTo(0, H, 0, 0, r); g.arcTo(0, 0, W, 0, r); g.closePath(); g.clip();
-    const bg = g.createLinearGradient(0, 0, W, H);
-    bg.addColorStop(0, '#251915'); bg.addColorStop(0.55, '#140f0e'); bg.addColorStop(1, '#231713');
-    g.fillStyle = bg; g.fillRect(0, 0, W, H);
-    g.strokeStyle = '#6b4230'; g.lineWidth = 4; g.strokeRect(2, 2, W - 4, H - 4);
     const logo = $('logo');
     if (!logo.complete) await logo.decode().catch(() => undefined);
-    g.save(); g.shadowColor = '#e07a4c88'; g.shadowBlur = 40; g.drawImage(logo, W - 300, 36, 250, 250); g.restore();
-    const titulo = g.createLinearGradient(0, 70, 0, 200);
-    titulo.addColorStop(0, '#ffe1d1'); titulo.addColorStop(0.6, '#e07a4c'); titulo.addColorStop(1, '#c4572a');
-    g.fillStyle = titulo; g.font = '800 54px "Roboto Slab"'; g.fillText('AFILHADO DO', 64, 120); g.fillText('BAR DO DINDO', 64, 186);
-    const ouro = g.createLinearGradient(0, 290, 0, 420);
-    ouro.addColorStop(0, '#ffe1d1'); ouro.addColorStop(0.5, '#e07a4c'); ouro.addColorStop(1, '#8e3b1a');
-    g.fillStyle = ouro; g.font = '900 140px "Roboto Slab"'; g.fillText('#' + pad(atual.numero), 58, 420);
-    const nome = nomeCurto(atual.nome);
-    g.fillStyle = '#f4ede7'; g.font = '600 44px Inter'; g.fillText(nome.length > 28 ? nome.slice(0, 27) + '…' : nome, 64, 552);
-    g.fillStyle = '#a38d84'; g.font = '500 28px Inter'; g.fillText(desdeTexto(atual.desde), 64, 610);
-    g.fillStyle = '#e07a4c'; g.font = '600 30px Inter'; g.textAlign = 'right'; g.fillText('@bardodindo', W - 64, 610);
+    const st = formato === 'stories';
+    const W = st ? 1080 : 1440, H = st ? 1920 : 1800, c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    // fundo: luz quente no centro e raios bem suaves, como na tela da revelação
+    const fundo = g.createRadialGradient(W / 2, H * .42, 0, W / 2, H * .42, H * .75);
+    fundo.addColorStop(0, '#3e2820'); fundo.addColorStop(.5, '#16100e'); fundo.addColorStop(1, '#070605');
+    g.fillStyle = fundo; g.fillRect(0, 0, W, H);
+    g.save(); g.translate(W / 2, H * .42);
+    const raios = g.createRadialGradient(0, 0, 0, 0, 0, W * .8);
+    raios.addColorStop(0, '#e07a4c17'); raios.addColorStop(1, '#e07a4c00');
+    g.fillStyle = raios;
+    for (let i = 0; i < 24; i++) { g.beginPath(); g.moveTo(0, 0); g.arc(0, 0, H, (i * 15) * Math.PI / 180, (i * 15 + 5) * Math.PI / 180); g.closePath(); g.fill(); }
+    g.restore();
+    // posições de cada formato (nos Stories, longe das faixas que o Instagram cobre em cima e embaixo)
+    const L = st
+      ? { logo: [180, 170], rotulo: 410, largura: 880, frente: 800, verso: 1300, frase: 1660, linha: 1724 }
+      : { logo: [70, 160], rotulo: 300, largura: 960, frente: 715, verso: 1255, frase: 1650, linha: 1712 };
+    g.save(); g.shadowColor = '#e07a4c99'; g.shadowBlur = 50; g.drawImage(logo, W / 2 - L.logo[1] / 2, L.logo[0], L.logo[1], L.logo[1]); g.restore();
+    g.textAlign = 'center';
+    g.fillStyle = '#e07a4c'; g.font = '600 30px Inter'; g.letterSpacing = '9px';
+    g.fillText('CARTÃO DE AFILHADO', W / 2 + 4, L.rotulo);
+    g.letterSpacing = '0px'; g.textAlign = 'left';
+    // verso atrás, frente na frente, levemente inclinados
+    const k = L.largura / 340;
+    const poe = (cx, cy, ang, verso) => {
+      g.save(); g.translate(cx, cy); g.rotate(ang * Math.PI / 180); g.scale(k, k); g.translate(-170, -106.25);
+      desenhaCartao(g, logo, verso); g.restore();
+    };
+    poe(W / 2 + 30, L.verso, 4, true);
+    poe(W / 2 - 24, L.frente, -4, false);
+    // rodapé: nos Stories o @ vem em destaque para marcarem o bar
+    g.textAlign = 'center';
+    if (st) {
+      g.fillStyle = '#e07a4c'; g.font = '800 64px "Roboto Slab"'; g.fillText('@bardodindo', W / 2, L.frase);
+      g.fillStyle = '#a59990'; g.font = '500 30px Inter'; g.fillText('Boulevard Nova Olaria  ·  Porto Alegre', W / 2, L.linha);
+    } else {
+      g.fillStyle = '#f3ece6'; g.font = '700 40px "Roboto Slab"'; g.fillText('Nos vemos no Bar do Dindo!', W / 2, L.frase);
+      g.fillStyle = '#a59990'; g.font = '500 28px Inter'; g.fillText('@bardodindo  ·  Boulevard Nova Olaria  ·  Porto Alegre', W / 2, L.linha);
+    }
+    return new Promise((ok) => c.toBlob(ok, 'image/png'));
+  };
+  const baixa = (blob, nome) => {
     const a = document.createElement('a');
-    a.href = c.toDataURL('image/png');
-    a.download = `afilhado-${pad(atual.numero)}-bar-do-dindo.png`;
-    a.click();
+    a.href = URL.createObjectURL(blob); a.download = nome; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  };
+
+  $('btn-salvar').onclick = async () => baixa(await imagemCartao('post'), `afilhado-${pad(atual.numero)}-bar-do-dindo.png`);
+
+  // Instagram: no celular abre o menu de compartilhar com a imagem (Stories, Direct...); sem isso, baixa a imagem
+  $('btn-insta').onclick = async () => {
+    const btn = $('btn-insta');
+    btn.disabled = true;
+    try {
+      const nome = `afilhado-${pad(atual.numero)}-stories.png`;
+      const blob = await imagemCartao('stories');
+      const arq = new File([blob], nome, { type: 'image/png' });
+      if (navigator.canShare?.({ files: [arq] })) {
+        await navigator.share({ files: [arq], text: 'Sou afilhado do @bardodindo! 🧡' }).catch(() => {});
+      } else {
+        baixa(blob, nome);
+      }
+    } finally { btn.disabled = false; }
   };
 
   /* ---------- demonstração: ?demo=cartao abre a revelação com um afilhado de exemplo, sem cadastro ---------- */
