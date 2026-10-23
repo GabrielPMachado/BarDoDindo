@@ -30,6 +30,17 @@ jobs:
           java-version: 21
       - name: Testar regras do Firestore
         run: npm run testar:regras
+      # o Firebase limita a quantidade de canais de prévia: apaga os de PRs já fechados (nunca o live)
+      - name: Apagar prévias de PRs fechados
+        continue-on-error: true
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BARDO_C0878 }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/conta.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/conta.json"
+          abertos=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 100 --json number --jq '.[].number') || exit 1
+          node scripts/limpar-previas.mjs $abertos
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
