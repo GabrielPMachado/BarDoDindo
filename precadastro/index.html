@@ -79,6 +79,8 @@
   .btn--ghost { border: 1px solid var(--border-strong); color: var(--text); }
   .error { color: var(--red); font-size: 13px; margin: 8px 0 0; min-height: 0; }
   .link { color: var(--brand); font-weight: 600; text-align: center; padding: 10px; }
+  .aviso-senha { margin: 0; font-size: 14px; text-align: center; }
+  .aviso-senha:empty { display: none; }
   .passos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
   .passo { display: grid; grid-template-columns: 40px 1fr; gap: 14px; align-items: start; padding: 14px 0; border-top: 1px solid var(--border); }
   .passo:first-child { border-top: 0; padding-top: 4px; }
@@ -243,6 +245,8 @@
       </div>
       <label class="check"><input type="checkbox" id="aceite" /> <span>Tenho 18 anos ou mais e concordo que o @bardodindo utilize as informações prestadas no programa de afilhados e para me manter por dentro das novidades, por e-mail e/ou telefone.</span></label>
       <p class="error" id="erro-cadastro" role="alert"></p>
+      <button class="link" id="esqueci-cadastro" type="button" hidden>Esqueci minha senha</button>
+      <p class="muted aviso-senha" id="aviso-cadastro" role="status"></p>
       <button class="btn btn--brand btn--caixa-alta" id="btn-cadastro" type="submit">Gerar número de afilhado</button>
     </form>
     <button class="link" id="ir-login" type="button" style="width:100%;margin-top:4px">Já garanti meu número</button>
@@ -271,6 +275,8 @@
       </div>
       <p class="error" id="erro-login" role="alert"></p>
       <button class="btn btn--brand" id="btn-login" type="submit">Ver meu número</button>
+      <button class="link" id="esqueci-login" type="button">Esqueci minha senha</button>
+      <p class="muted aviso-senha" id="aviso-login" role="status"></p>
     </form>
     <button class="link" id="ir-cadastro" type="button" style="width:100%;margin-top:6px">Ainda não tenho cadastro</button>
   </section>
@@ -419,6 +425,8 @@ import { cpfValido, idadeEm } from '../shared/backend';
     e.preventDefault();
     const erro = $('erro-cadastro');
     erro.textContent = '';
+    $('esqueci-cadastro').hidden = true;
+    $('aviso-cadastro').textContent = '';
     const nome = $('nome').value.trim(), email = $('email').value.trim(), telefone = $('tel').value, senha = $('senha').value;
     const digitos = telefone.replace(/\D/g, '').length;
     if (nome.split(/\s+/).length < 2 || nome.length < 5) return (erro.textContent = 'Informe seu nome e sobrenome.');
@@ -439,16 +447,34 @@ import { cpfValido, idadeEm } from '../shared/backend';
       $('form-cadastro').reset();
     } catch (err) {
       erro.textContent = err.message;
+      // e-mail com conta de um cadastro anterior (ex.: afilhados apagados): oferece criar uma nova senha
+      $('esqueci-cadastro').hidden = !err.message.includes('Esqueci minha senha');
     } finally {
       carregando(btn, false, 'Gerar número de afilhado');
     }
   });
+
+  /* ---------- esqueci a senha ---------- */
+  const esqueci = (campo, erro, aviso) => async () => {
+    const email = $(campo).value.trim();
+    $(erro).textContent = '';
+    $(aviso).textContent = '';
+    try {
+      await api('/app/redefinir-senha', { email });
+      $(aviso).textContent = `Se ${email} tiver uma conta, você receberá um e-mail com o link para criar uma nova senha. Confira também o spam.`;
+    } catch (err) {
+      $(erro).textContent = err.message;
+    }
+  };
+  $('esqueci-cadastro').onclick = esqueci('email', 'erro-cadastro', 'aviso-cadastro');
+  $('esqueci-login').onclick = esqueci('l-email', 'erro-login', 'aviso-login');
 
   /* ---------- já cadastrado ---------- */
   $('form-login').addEventListener('submit', async (e) => {
     e.preventDefault();
     const erro = $('erro-login');
     erro.textContent = '';
+    $('aviso-login').textContent = '';
     const btn = $('btn-login');
     carregando(btn, true);
     try {

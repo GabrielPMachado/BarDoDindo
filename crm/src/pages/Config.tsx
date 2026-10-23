@@ -585,7 +585,7 @@ function Numeracao({ podeAjustar, podeApagar }: { podeAjustar: boolean; podeApag
       {podeApagar && (
         <AsyncButton className="btn btn--ghost" onClick={apagarTodos} confirm={{
           title: 'Apagar todos os afilhados?',
-          message: 'Apaga os cadastros, saldos de pontos, consumos (com as receitas), vouchers e reservas de todos os afilhados, e a numeração volta para #001. Não dá para desfazer. As contas de login continuam existindo: quem entrar de novo refaz o cadastro.',
+          message: 'Apaga os cadastros, saldos de pontos, consumos (com as receitas), vouchers e reservas de todos os afilhados, e a numeração volta para #001. Não dá para desfazer. As contas de login continuam existindo: quem se cadastrar de novo com o mesmo e-mail usa a senha de antes ou "Esqueci minha senha".',
           confirmLabel: 'Apagar tudo', danger: true,
         }}><Trash2 size={16} /> Apagar todos os afilhados</AsyncButton>
       )}

@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { LogIn, UserPlus } from 'lucide-react';
+import { KeyRound, LogIn, UserPlus } from 'lucide-react';
 import { Marca } from '../components/ui';
 import { useStore } from '../store';
+import { api } from '../api';
 import { maskCpf, maskPhone, nascimentoMaximo, phoneOk } from '../masks';
 import { cpfValido, idadeEm } from '../../shared/backend';
 
@@ -13,12 +14,14 @@ export default function Entrar() {
   const [form, setForm] = useState({ nome: '', email: '', telefone: '', senha: '', confirma: '', cpf: '', nascimento: '' });
   const [aceite, setAceite] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setAviso(null);
     if (mode === 'cadastro' && (!phoneOk(form.telefone) || !form.telefone)) {
       setError('Informe o celular completo, com DDD.');
       return;
@@ -50,6 +53,20 @@ export default function Entrar() {
       setBusy(false);
     }
   };
+  // o e-mail pode ter conta de um cadastro apagado: o link cria uma nova senha
+  const esqueci = async () => {
+    setError(null);
+    setAviso(null);
+    setBusy(true);
+    try {
+      await api('/app/redefinir-senha', { method: 'POST', body: { email: form.email } });
+      setAviso(`Se ${form.email.trim()} tiver uma conta, você receberá um e-mail com o link para criar uma nova senha. Confira também o spam.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível enviar o e-mail.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div className="auth">
@@ -59,10 +76,10 @@ export default function Entrar() {
 
       <div className="auth__card">
       <div className="tabs" role="tablist">
-        <button role="tab" aria-selected={mode === 'login'} className={mode === 'login' ? 'is-active' : ''} onClick={() => { setMode('login'); setError(null); }}>
+        <button role="tab" aria-selected={mode === 'login'} className={mode === 'login' ? 'is-active' : ''} onClick={() => { setMode('login'); setError(null); setAviso(null); }}>
           Entrar
         </button>
-        <button role="tab" aria-selected={mode === 'cadastro'} className={mode === 'cadastro' ? 'is-active' : ''} onClick={() => { setMode('cadastro'); setError(null); }}>
+        <button role="tab" aria-selected={mode === 'cadastro'} className={mode === 'cadastro' ? 'is-active' : ''} onClick={() => { setMode('cadastro'); setError(null); setAviso(null); }}>
           Quero ser afilhado
         </button>
       </div>
@@ -109,9 +126,13 @@ export default function Entrar() {
         )}
 
         {(error || connError) && <p className="error">{error ?? connError}</p>}
+        {aviso && <p className="muted small center" role="status">{aviso}</p>}
         <button className="btn btn--primary" disabled={busy}>
           {mode === 'login' ? <><LogIn size={18} /> Entrar</> : <><UserPlus size={18} /> Criar minha conta</>}
         </button>
+        {(mode === 'login' || error?.includes('Esqueci minha senha')) && (
+          <button type="button" className="btn btn--ghost" disabled={busy} onClick={esqueci}><KeyRound size={18} /> Esqueci minha senha</button>
+        )}
         {mode === 'cadastro' && (
           <p className="muted small center">Ao se cadastrar você passa a acumular pontos a cada consumo no bar.</p>
         )}
