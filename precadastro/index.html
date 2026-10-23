@@ -117,21 +117,30 @@
   .reveal__text { color: var(--muted); max-width: 340px; margin: 0; }
 
   /* cartão do afilhado */
+  .member-wrap { width: min(340px, 100%); perspective: 900px; }
+  .member__float { animation: flutua 5s ease-in-out infinite; transform-style: preserve-3d; }
   .member {
-    width: min(340px, 100%); aspect-ratio: 1.6; border-radius: 18px; padding: 18px 20px; text-align: left;
+    --rx: 0deg; --ry: 0deg; --gx: 50%; --gy: 30%;
+    width: 100%; aspect-ratio: 1.6; position: relative; touch-action: pan-y; cursor: grab;
+    transform: rotateX(var(--rx)) rotateY(var(--ry)); transition: transform .5s cubic-bezier(.2, .9, .3, 1), box-shadow .5s; border-radius: 18px; padding: 18px 20px; text-align: left;
     background: linear-gradient(135deg, #251915 0%, #140f0e 55%, #231713 100%); border: 1px solid #6b4230;
     box-shadow: 0 24px 60px #000c, inset 0 1px 0 #ffffff14; display: flex; flex-direction: column; justify-content: space-between;
     overflow: hidden; transform-origin: center;
   }
   .member::after { content: ''; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 30%, #fff3 45%, transparent 60%); transform: translateX(-120%); pointer-events: none; }
-  .member.is-in::after { animation: shine 1.4s ease .8s; }
-  .member__top { display: flex; justify-content: space-between; align-items: flex-start; }
-  .member__logo { border-radius: 50%; }
-  .member__num { font: 800 34px var(--serif); color: var(--brand-light); letter-spacing: .04em; }
+  .member-wrap.is-in .member::after { animation: shine 1.4s ease .8s; }
+  .member.is-tilt { transition: transform .08s linear, box-shadow .08s linear; }
+  .member__glare { position: absolute; inset: 0; pointer-events: none; border-radius: inherit; mix-blend-mode: soft-light;
+    background: radial-gradient(circle at var(--gx) var(--gy), #ffffff55 0%, #ffffff14 30%, transparent 60%); }
+  .member__top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .member__title { font: 800 17px/1.15 var(--serif); letter-spacing: .02em; text-transform: uppercase;
+    background: linear-gradient(180deg, #ffe1d1 0%, var(--brand-light) 60%, var(--brand) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .member__logo { border-radius: 50%; margin: -6px -8px 0 0; filter: drop-shadow(0 0 14px #e07a4c77); }
+  .member__num { font: 800 32px/1 var(--serif); color: var(--brand-light); letter-spacing: .04em; }
   .member__bottom { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; }
   .member__name { font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .member__since { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
-  .member__tag { font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--brand); white-space: nowrap; }
+  .member__since { font-size: 10px; white-space: nowrap; color: var(--muted); margin-top: 2px; }
+  .member__tag { font-size: 10.5px; letter-spacing: .02em; color: var(--brand-light); white-space: nowrap; }
 
   .reveal__actions { display: flex; gap: 10px; width: min(340px, 100%); }
   .reveal__actions .btn { margin: 0; height: 48px; font-size: 15px; }
@@ -161,17 +170,19 @@
   .stage { opacity: 0; }
   /* cada parte entra com animação no momento em que aparece */
   .stage.is-in { opacity: 1; animation: up .6s ease both; }
-  .member.stage.is-in { animation: flip 1s cubic-bezier(.2, .9, .3, 1) both; }
+  .member-wrap.stage.is-in { animation: flip 1s cubic-bezier(.2, .9, .3, 1) both; }
 
   @keyframes fadeIn { from { opacity: 0; } }
   @keyframes up { from { opacity: 0; transform: translateY(18px); } }
   @keyframes drop { 0% { opacity: 0; transform: translateY(-120px) rotate(-12deg) scale(.6); } 100% { opacity: 1; transform: none; } }
   @keyframes pulse { 0% { transform: scale(1); } 40% { transform: scale(1.12); } 100% { transform: scale(1); } }
   @keyframes flip { 0% { opacity: 0; transform: perspective(900px) rotateY(-80deg) translateY(20px); } 100% { opacity: 1; transform: none; } }
+  @keyframes flutua { 0%, 100% { transform: translateY(0) rotateX(2deg) rotateY(-3deg); } 50% { transform: translateY(-8px) rotateX(-2deg) rotateY(3deg); } }
   @keyframes shine { to { transform: translateX(120%); } }
   @keyframes rotate { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0s !important; }
+    .member__float { animation: none; }
   }
 </style>
 </head>
@@ -260,14 +271,20 @@
     <div class="reveal__hello" id="ola"></div>
     <p class="reveal__text" id="reveal-text" style="margin-top:8px"></p>
   </div>
-  <div class="member stage" id="cartao">
-    <div class="member__top">
-      <img class="member__logo" src="../shared/assets/logo.webp" width="54" height="54" alt="Bar do Dindo" />
-    </div>
-    <div class="member__num" id="c-num">#000</div>
-    <div class="member__bottom">
-      <div style="min-width:0"><div class="member__name" id="c-nome"></div><div class="member__since" id="c-desde"></div></div>
-      <span class="member__tag">Afilhado fundador</span>
+  <div class="member-wrap stage" id="cartao">
+    <div class="member__float">
+      <div class="member" id="cartao-face">
+        <div class="member__top">
+          <div class="member__title">Afilhado do<br />Bar do Dindo</div>
+          <img class="member__logo" src="../shared/assets/logo.webp" width="84" height="84" alt="Bar do Dindo" />
+        </div>
+        <div class="member__num" id="c-num">#000</div>
+        <div class="member__bottom">
+          <div style="min-width:0"><div class="member__name" id="c-nome"></div><div class="member__since" id="c-desde"></div></div>
+          <span class="member__tag">@bardodindo</span>
+        </div>
+        <div class="member__glare" aria-hidden="true"></div>
+      </div>
     </div>
   </div>
   <div class="reveal__actions stage" id="acoes">
@@ -275,9 +292,9 @@
     <button class="btn btn--ghost" id="btn-salvar" type="button">Salvar cartão</button>
   </div>
   <div class="convite stage" id="convite" hidden>
-    <strong>Conte um pouco sobre você</strong>
-    <span>Perguntas rápidas e opcionais para o Dindo preparar noites do seu jeito.</span>
-    <button class="btn btn--brand" id="btn-quiz" type="button">Responder agora</button>
+    <strong>Queremos conhecê-lo, afilhado (a)!</strong>
+    <span>Caso queira (opcional), responda um simples questionário para podermos esperá-lo da melhor forma possível. Coração de Dindo sempre cabe mais um!</span>
+    <button class="btn btn--brand" id="btn-quiz" type="button">QUESTIONÁRIO DO AFILHADO</button>
   </div>
   <div class="convite convite--ok stage" id="convite-ok" hidden>
     <strong>Obrigado por responder!</strong>
@@ -407,20 +424,67 @@ import { cpfValido, idadeEm } from '../shared/backend';
     }
   });
 
+  /* ---------- cartão: primeiro e último nome, data completa ---------- */
+  const nomeCurto = (nome) => { const p = nome.trim().split(/\s+/); return p.length > 1 ? `${p[0]} ${p[p.length - 1]}` : p[0]; };
+  const desdeTexto = (d) => 'Afilhado desde o dia ' + new Date(d).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  /* ---------- cartão 3D: inclina com o mouse, o dedo ou o giroscópio ---------- */
+  (() => {
+    const face = $('cartao-face');
+    if (reduz) return;
+    const MAX = 16;
+    const inclina = (x, y) => { // x e y entre -1 e 1
+      x = Math.max(-1, Math.min(1, x)); y = Math.max(-1, Math.min(1, y));
+      face.style.setProperty('--ry', (x * MAX).toFixed(2) + 'deg');
+      face.style.setProperty('--rx', (-y * MAX).toFixed(2) + 'deg');
+      face.style.setProperty('--gx', (50 + x * 45).toFixed(1) + '%');
+      face.style.setProperty('--gy', (40 + y * 45).toFixed(1) + '%');
+      face.style.boxShadow = `${(-x * 22).toFixed(0)}px ${(28 - y * 14).toFixed(0)}px 60px #000c, inset 0 1px 0 #ffffff14`;
+    };
+    const solta = () => { face.classList.remove('is-tilt'); face.style.boxShadow = ''; ['--rx', '--ry', '--gx', '--gy'].forEach((v) => face.style.removeProperty(v)); };
+    const peloPonteiro = (e) => {
+      const r = face.getBoundingClientRect();
+      face.classList.add('is-tilt');
+      inclina(((e.clientX - r.left) / r.width) * 2 - 1, ((e.clientY - r.top) / r.height) * 2 - 1);
+    };
+    face.addEventListener('pointermove', peloPonteiro);
+    face.addEventListener('pointerdown', peloPonteiro);
+    face.addEventListener('pointerleave', solta);
+    face.addEventListener('pointerup', (e) => { if (e.pointerType !== 'mouse') solta(); });
+    face.addEventListener('pointercancel', solta);
+
+    // giroscópio do celular (no iPhone precisa de permissão, pedida no primeiro toque no cartão)
+    let base = null, giro = false;
+    const peloGiro = (e) => {
+      if (e.beta == null || e.gamma == null || $('reveal').hidden) return;
+      if (!base) base = { b: e.beta, g: e.gamma };
+      if (face.matches(':active')) return;
+      face.classList.add('is-tilt');
+      inclina((e.gamma - base.g) / 25, (e.beta - base.b) / 25);
+    };
+    const ligaGiro = () => { if (giro) return; giro = true; addEventListener('deviceorientation', peloGiro); };
+    const DOE = window.DeviceOrientationEvent;
+    if (DOE && typeof DOE.requestPermission === 'function') {
+      face.addEventListener('click', () => DOE.requestPermission().then((r) => r === 'granted' && ligaGiro()).catch(() => {}), { once: true });
+    } else if (DOE && matchMedia('(pointer: coarse)').matches) ligaGiro();
+    $('cartao').addEventListener('animationstart', () => { base = null; });
+  })();
+
   /* ---------- revelação animada ---------- */
   let atual = null;
   function revelar(cliente, novo) {
     atual = cliente;
     const n = cliente.numero;
     const primeiro = cliente.nome.split(' ')[0];
-    const desde = new Date(cliente.desde).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-    $('ola').textContent = novo ? `Bem-vindo, ${primeiro}!` : `Olá de novo, ${primeiro}!`;
-    $('reveal-text').textContent = novo
-      ? 'Seu número está garantido. Você será avisado quando o aplicativo for lançado; use este e‑mail e esta senha para entrar.'
+    $('ola').textContent = novo ? `Bem-vindo, ${cliente.nome.trim()}!` : `Olá de novo, ${primeiro}!`;
+    $('reveal-text').innerHTML = novo
+      ? 'Seu número foi gerado e está garantido. Parabéns! Nós do Bar do Dindo estamos muito felizes com a sua chegada e lhe esperamos para boas histórias!<br /><br />'
+        + 'Lembre-se de sempre, quando nos visitar, informar o seu nº de afilhado para podermos registrar todos os nossos momentos no seu histórico junto ao Bar.<br /><br />'
+        + 'Você será avisado quando o aplicativo for lançado, além, é claro, de todas as novidades e promoções. Use este e-mail e senha para acessar.'
       : 'Este é o seu número de afilhado. Ele continua garantido para o lançamento do aplicativo.';
     $('c-num').textContent = '#' + pad(n);
-    $('c-nome').textContent = cliente.nome;
-    $('c-desde').textContent = 'Afilhado desde ' + desde;
+    $('c-nome').textContent = nomeCurto(cliente.nome);
+    $('c-desde').textContent = desdeTexto(cliente.desde);
 
     const reveal = $('reveal');
     $('convite').hidden = !questionario || !!cliente.respostas;
@@ -569,14 +633,17 @@ import { cpfValido, idadeEm } from '../shared/backend';
     g.strokeStyle = '#6b4230'; g.lineWidth = 4; g.strokeRect(2, 2, W - 4, H - 4);
     const logo = $('logo');
     if (!logo.complete) await logo.decode().catch(() => undefined);
-    g.drawImage(logo, 60, 48, 150, 150);
-    const ouro = g.createLinearGradient(0, 260, 0, 400);
+    g.save(); g.shadowColor = '#e07a4c88'; g.shadowBlur = 40; g.drawImage(logo, W - 300, 36, 250, 250); g.restore();
+    const titulo = g.createLinearGradient(0, 70, 0, 200);
+    titulo.addColorStop(0, '#ffe1d1'); titulo.addColorStop(0.6, '#e07a4c'); titulo.addColorStop(1, '#c4572a');
+    g.fillStyle = titulo; g.font = '800 54px "Roboto Slab"'; g.fillText('AFILHADO DO', 64, 120); g.fillText('BAR DO DINDO', 64, 186);
+    const ouro = g.createLinearGradient(0, 290, 0, 420);
     ouro.addColorStop(0, '#ffe1d1'); ouro.addColorStop(0.5, '#e07a4c'); ouro.addColorStop(1, '#8e3b1a');
-    g.fillStyle = ouro; g.font = '900 150px "Roboto Slab"'; g.fillText('#' + pad(atual.numero), 58, 400);
-    g.fillStyle = '#f4ede7'; g.font = '600 40px Inter'; g.fillText(atual.nome.length > 32 ? atual.nome.slice(0, 31) + '…' : atual.nome, 64, 560);
-    g.fillStyle = '#a38d84'; g.font = '500 24px Inter';
-    g.fillText(('Afilhado desde ' + new Date(atual.desde).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })).toUpperCase(), 64, 610);
-    g.fillStyle = '#c4572a'; g.font = '600 24px Inter'; g.textAlign = 'right'; g.fillText('AFILHADO FUNDADOR', W - 64, 610);
+    g.fillStyle = ouro; g.font = '900 140px "Roboto Slab"'; g.fillText('#' + pad(atual.numero), 58, 420);
+    const nome = nomeCurto(atual.nome);
+    g.fillStyle = '#f4ede7'; g.font = '600 44px Inter'; g.fillText(nome.length > 28 ? nome.slice(0, 27) + '…' : nome, 64, 552);
+    g.fillStyle = '#a38d84'; g.font = '500 28px Inter'; g.fillText(desdeTexto(atual.desde), 64, 610);
+    g.fillStyle = '#e07a4c'; g.font = '600 30px Inter'; g.textAlign = 'right'; g.fillText('@bardodindo', W - 64, 610);
     const a = document.createElement('a');
     a.href = c.toDataURL('image/png');
     a.download = `afilhado-${pad(atual.numero)}-bar-do-dindo.png`;
