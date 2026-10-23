@@ -119,32 +119,40 @@
   .reveal__text { color: var(--muted); max-width: 340px; margin: 0; }
 
   /* cartão do afilhado */
-  .member-wrap { width: min(340px, 100%); perspective: 900px; }
-  .member__float { animation: flutua 5s ease-in-out infinite; transform-style: preserve-3d; }
-  /* o cartão gira inteiro (inclinação + virada); frente e verso são as duas faces */
+  .member-wrap { width: min(360px, 100%); }
+  /* quadro próprio do cartão: o 3D acontece só aqui dentro, sem invadir os textos em volta */
+  .vitrine { border-radius: 22px; overflow: hidden; isolation: isolate; border: 1px solid var(--border-strong);
+    background: radial-gradient(80% 75% at 50% 42%, #33221b 0%, #181211 68%, #110d0c 100%); box-shadow: inset 0 1px 0 #ffffff0d, 0 18px 44px #0008; }
+  .vitrine__palco { position: relative; display: grid; place-items: center; padding: 30px 28px 40px; perspective: 1100px;
+    touch-action: pan-y; cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+  .vitrine__palco.is-arrastando { cursor: grabbing; }
+  .vitrine__caixa { position: relative; z-index: 1; transform-style: preserve-3d; }
+  .vitrine__flutua { width: 340px; transform-origin: 0 0; transform-style: preserve-3d; }
+  .vitrine__chao { position: absolute; left: 18%; right: 18%; bottom: 16px; height: 24px; pointer-events: none;
+    border-radius: 50%; background: radial-gradient(closest-side, #000d, transparent); filter: blur(6px); }
+  .vitrine__rodape { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 10px 9px 16px; border-top: 1px solid #ffffff10; background: #0000002e; }
+  .vitrine__virar { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; height: 34px; padding: 0 14px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+    color: var(--brand-light); border: 1px solid var(--border-strong); background: #c4572a14; transition: background .15s, border-color .15s; }
+  .vitrine__virar:hover { background: #c4572a26; border-color: var(--brand); }
+  /* o cartão gira inteiro; frente e verso são as duas faces */
   .member-card {
-    --rx: 0deg; --ry: 0deg; --flip: 0deg; --gx: 50%; --gy: 30%;
-    position: relative; width: 100%; aspect-ratio: 1.6; border-radius: 18px; transform-style: preserve-3d; cursor: grab;
-    transform: rotateX(var(--rx)) rotateY(calc(var(--ry) + var(--flip)));
-    transition: transform .5s cubic-bezier(.2, .9, .3, 1);
+    --gx: 50%; --gy: 30%;
+    position: relative; width: 100%; aspect-ratio: 1.6; border-radius: 18px; transform-style: preserve-3d; cursor: inherit;
     /* cartão é para mexer, não para selecionar texto, arrastar imagem ou abrir menu de toque longo */
-    touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
   }
-  .member-card.is-flipping { transition: transform .7s cubic-bezier(.3, 1.3, .5, 1); }
-  .member-card.is-tilt { transition: transform .08s linear; }
   .member-card:focus-visible { outline: 2px solid var(--brand-light); outline-offset: 4px; }
   .member-card img { -webkit-user-drag: none; pointer-events: none; }
   .member {
     position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden;
-    transition: box-shadow .5s; border-radius: 18px; padding: 18px 20px; text-align: left;
+    transform: translateZ(1px); border-radius: 18px; padding: 18px 20px; text-align: left;
     background: linear-gradient(135deg, #251915 0%, #140f0e 55%, #231713 100%); border: 1px solid #6b4230;
     box-shadow: var(--sombra, 0 24px 60px #000c, inset 0 1px 0 #ffffff14); display: flex; flex-direction: column; justify-content: space-between;
     overflow: hidden; transform-origin: center;
   }
   .member::after { content: ''; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 30%, #fff3 45%, transparent 60%); transform: translateX(-120%); pointer-events: none; }
   .member-wrap.is-in .member:not(.member--back)::after { animation: shine 1.4s ease .8s; }
-  .member-card.is-tilt .member { transition: box-shadow .08s linear; }
-  .member--back { transform: rotateY(180deg); padding: 0 0 16px; justify-content: flex-start; gap: 0; }
+  .member--back { transform: rotateY(180deg) translateZ(1px); padding: 0 0 16px; justify-content: flex-start; gap: 0; }
   .member__stripe { height: 30px; margin-top: 18px; background: linear-gradient(90deg, #0b0807, #1d1412 50%, #0b0807); border-block: 1px solid #3a2720; }
   .member__marca { position: absolute; right: -26px; bottom: -26px; opacity: .1; filter: grayscale(.2); }
   .member__verso { position: relative; flex: 1; display: flex; flex-direction: column; justify-content: space-between; padding: 12px 20px 0; }
@@ -152,9 +160,11 @@
   .member__aviso { font-size: 11px; line-height: 1.4; color: var(--muted); margin-top: 4px; }
   .member__aviso b { color: var(--brand-light); }
   .member__end { font-size: 10px; line-height: 1.35; color: var(--muted); }
-  .member-wrap .member__dica { margin: 12px 0 0; font-size: 12px; color: var(--muted); text-align: center; }
-  .member__glare { position: absolute; inset: 0; pointer-events: none; border-radius: inherit; mix-blend-mode: soft-light;
-    background: radial-gradient(circle at var(--gx) var(--gy), #ffffff55 0%, #ffffff14 30%, transparent 60%); }
+  .member__dica { margin: 0; font-size: 12px; line-height: 1.3; color: var(--muted); text-align: left; transition: opacity .4s; }
+  .member__dica.is-oculta { opacity: .45; }
+  .member__glare { position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+    background: radial-gradient(circle at var(--gx) var(--gy), #ffffff26 0%, #ffffff0a 30%, transparent 62%),
+      linear-gradient(105deg, transparent 38%, #ffd9c418 48%, transparent 58%) var(--gx) 0 / 260% 100% no-repeat; }
   .member__top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
   .member__title { font: 800 17px/1.15 var(--serif); letter-spacing: .02em; text-transform: uppercase;
     background: linear-gradient(180deg, #ffe1d1 0%, var(--brand-light) 60%, var(--brand) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
@@ -165,12 +175,12 @@
   .member__since { font-size: 10px; white-space: nowrap; color: var(--muted); margin-top: 2px; }
   .member__tag { font-size: 10.5px; letter-spacing: .02em; color: var(--brand-light); white-space: nowrap; }
 
-  .reveal__actions { display: flex; gap: 10px; width: min(340px, 100%); }
+  .reveal__actions { display: flex; gap: 10px; width: min(360px, 100%); }
   .reveal__actions .btn { margin: 0; height: 48px; font-size: 15px; }
   .confetti { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
 
   /* convite e questionário opcional */
-  .convite { width: min(340px, 100%); padding: 14px 16px; border-radius: 14px; text-align: left; background: #c4572a14; border: 1px solid var(--border-strong); display: flex; flex-direction: column; gap: 4px; }
+  .convite { width: min(360px, 100%); padding: 14px 16px; border-radius: 14px; text-align: left; background: #c4572a14; border: 1px solid var(--border-strong); display: flex; flex-direction: column; gap: 4px; }
   .convite strong { font: 700 16px var(--serif); }
   .convite span { font-size: 13px; color: var(--muted); }
   .convite .btn { margin-top: 10px; height: 44px; font-size: 14.5px; }
@@ -200,12 +210,10 @@
   @keyframes drop { 0% { opacity: 0; transform: translateY(-120px) rotate(-12deg) scale(.6); } 100% { opacity: 1; transform: none; } }
   @keyframes pulse { 0% { transform: scale(1); } 40% { transform: scale(1.12); } 100% { transform: scale(1); } }
   @keyframes flip { 0% { opacity: 0; transform: perspective(900px) rotateY(-80deg) translateY(20px); } 100% { opacity: 1; transform: none; } }
-  @keyframes flutua { 0%, 100% { transform: translateY(0) rotateX(2deg) rotateY(-3deg); } 50% { transform: translateY(-8px) rotateX(-2deg) rotateY(3deg); } }
   @keyframes shine { to { transform: translateX(120%); } }
   @keyframes rotate { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0s !important; }
-    .member__float { animation: none; }
   }
 </style>
 </head>
@@ -299,7 +307,10 @@
     <p class="reveal__text" id="reveal-text" style="margin-top:8px"></p>
   </div>
   <div class="member-wrap stage" id="cartao">
-    <div class="member__float">
+    <div class="vitrine">
+    <div class="vitrine__palco" id="vitrine">
+    <div class="vitrine__caixa" id="vitrine-caixa">
+    <div class="vitrine__flutua" id="vitrine-flutua">
       <div class="member-card" id="cartao-face" role="button" tabindex="0" aria-label="Cartão do afilhado. Toque para virar.">
       <div class="member">
         <div class="member__top">
@@ -330,7 +341,17 @@
       </div>
       </div>
     </div>
-    <p class="member__dica" id="cartao-dica">Toque no cartão para ver o verso</p>
+    </div>
+    <div class="vitrine__chao" id="vitrine-chao" aria-hidden="true"></div>
+    </div>
+    <div class="vitrine__rodape">
+      <p class="member__dica" id="cartao-dica">Arraste para girar · toque para virar</p>
+      <button class="vitrine__virar" id="cartao-virar" type="button">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>
+        Virar
+      </button>
+    </div>
+    </div>
   </div>
   <div class="reveal__actions stage" id="acoes">
     <button class="btn btn--brand" id="btn-share" type="button">Compartilhar</button>
@@ -498,64 +519,110 @@ import { cpfValido, idadeEm } from '../shared/backend';
   const nomeCurto = (nome) => { const p = nomeBonito(nome).split(' '); return p.length > 1 ? `${p[0]} ${p[p.length - 1]}` : p[0]; };
   const desdeTexto = (d) => 'Afilhado desde o dia ' + new Date(d).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
 
-  /* ---------- cartão 3D: inclina com o mouse, o dedo ou o giroscópio ---------- */
+  /* ---------- cartão 3D: fica num quadro próprio; arrasta para girar, toca para virar ---------- */
   (() => {
-    const face = $('cartao-face');
-    // virar: um toque ou clique sem arrastar (ou Enter/Espaço pelo teclado)
-    let virado = false, toque = null;
-    const vira = () => {
-      virado = !virado;
-      face.classList.remove('is-tilt'); face.classList.add('is-flipping');
-      face.style.setProperty('--flip', virado ? '180deg' : '0deg');
-      $('cartao-dica').textContent = virado ? 'Toque no cartão para ver a frente' : 'Toque no cartão para ver o verso';
-      setTimeout(() => face.classList.remove('is-flipping'), 700);
-    };
-    face.addEventListener('pointerdown', (e) => { toque = { x: e.clientX, y: e.clientY, t: performance.now() }; });
-    face.addEventListener('pointerup', (e) => {
-      if (toque && Math.hypot(e.clientX - toque.x, e.clientY - toque.y) < 8 && performance.now() - toque.t < 500) vira();
-      toque = null;
-    });
-    face.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); vira(); } });
-    face.addEventListener('contextmenu', (e) => e.preventDefault());
-    $('cartao').addEventListener('animationstart', () => { if (virado) vira(); });
-    if (reduz) return;
-    const MAX = 16;
-    const inclina = (x, y) => { // x e y entre -1 e 1
-      x = Math.max(-1, Math.min(1, x)); y = Math.max(-1, Math.min(1, y));
-      face.style.setProperty('--ry', (x * MAX).toFixed(2) + 'deg');
-      face.style.setProperty('--rx', (-y * MAX).toFixed(2) + 'deg');
-      face.style.setProperty('--gx', (50 + x * 45).toFixed(1) + '%');
-      face.style.setProperty('--gy', (40 + y * 45).toFixed(1) + '%');
-      face.style.setProperty('--sombra', `${(-x * 22).toFixed(0)}px ${(28 - y * 14).toFixed(0)}px 60px #000c, inset 0 1px 0 #ffffff14`);
-    };
-    const solta = () => { face.classList.remove('is-tilt'); ['--rx', '--ry', '--gx', '--gy', '--sombra'].forEach((v) => face.style.removeProperty(v)); };
-    const peloPonteiro = (e) => {
-      if (face.classList.contains('is-flipping')) return;
-      const r = face.getBoundingClientRect();
-      face.classList.add('is-tilt');
-      inclina(((e.clientX - r.left) / r.width) * 2 - 1, ((e.clientY - r.top) / r.height) * 2 - 1);
-    };
-    face.addEventListener('pointermove', peloPonteiro);
-    face.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse') face.setPointerCapture(e.pointerId); peloPonteiro(e); });
-    face.addEventListener('pointerleave', solta);
-    face.addEventListener('pointerup', (e) => { if (e.pointerType !== 'mouse') solta(); });
-    face.addEventListener('pointercancel', solta);
+    const card = $('cartao-face'), vitrine = $('vitrine'), caixa = $('vitrine-caixa'), flutua = $('vitrine-flutua'), chao = $('vitrine-chao');
+    const L = 340, A = 212.5; // o cartão é desenhado nesse tamanho e ampliado ou reduzido para caber no quadro
+    let escala = 1, arrasto = null, raf = 0, rodando = false, mexeu = false;
+    // ângulos atuais, velocidades e o lado que está virado para a frente (múltiplo de 180°)
+    const s = { rx: 0, ry: 0, vx: 0, vy: 0, lado: 0 };
+    const mouse = { x: 0, y: 0 };
+    const limita = (v, a, b) => Math.max(a, Math.min(b, v));
 
-    // giroscópio do celular (no iPhone precisa de permissão, pedida no primeiro toque no cartão)
-    let base = null, giro = false;
-    const peloGiro = (e) => {
-      if (e.beta == null || e.gamma == null || $('reveal').hidden) return;
-      if (!base) base = { b: e.beta, g: e.gamma };
-      if (face.matches(':active')) return;
-      face.classList.add('is-tilt');
-      inclina((e.gamma - base.g) / 25, (e.beta - base.b) / 25);
+    const ajusta = () => {
+      const largura = vitrine.clientWidth - 56;
+      escala = limita(largura / L, .6, 1.15);
+      caixa.style.width = (L * escala).toFixed(1) + 'px';
+      caixa.style.height = (A * escala).toFixed(1) + 'px';
     };
-    const ligaGiro = () => { if (giro) return; giro = true; addEventListener('deviceorientation', peloGiro); };
-    const DOE = window.DeviceOrientationEvent;
-    if (DOE && typeof DOE.requestPermission === 'function') {
-      face.addEventListener('click', () => DOE.requestPermission().then((r) => r === 'granted' && ligaGiro()).catch(() => {}), { once: true });
-    } else if (DOE && matchMedia('(pointer: coarse)').matches) ligaGiro();
-    $('cartao').addEventListener('animationstart', () => { base = null; });
+    new ResizeObserver(ajusta).observe(vitrine);
+
+    // mola: o cartão persegue o alvo com suavidade, sem tranco
+    const quadro = (agora, antes) => {
+      const passos = limita(Math.round((agora - antes) / 16.7), 1, 4);
+      const alvoY = arrasto ? arrasto.alvoY : s.lado + mouse.x * 12;
+      const alvoX = arrasto ? arrasto.alvoX : -mouse.y * 9;
+      const k = arrasto ? .22 : .07, amort = arrasto ? .62 : .8;
+      for (let i = 0; i < passos; i++) {
+        s.vy = (s.vy + (alvoY - s.ry) * k) * amort; s.ry += s.vy;
+        s.vx = (s.vx + (alvoX - s.rx) * k) * amort; s.rx += s.vx;
+      }
+      const f = reduz ? 0 : Math.sin(agora / 1100); // flutuação
+      flutua.style.transform = `translateY(${(f * 5).toFixed(2)}px) scale(${escala.toFixed(3)})`;
+      chao.style.transform = `scaleX(${(1 - f * .06).toFixed(3)})`;
+      chao.style.opacity = (.7 + f * .12).toFixed(2);
+      card.style.transform = `rotateX(${s.rx.toFixed(2)}deg) rotateY(${s.ry.toFixed(2)}deg)`;
+      // reflexo e sombra acompanham o ângulo da face que está à mostra
+      let r = ((s.ry % 360) + 540) % 360 - 180;
+      if (Math.abs(r) > 90) r = r > 0 ? r - 180 : r + 180;
+      card.style.setProperty('--gx', (50 - r * 2.2).toFixed(1) + '%');
+      card.style.setProperty('--gy', (35 + s.rx * 2.5).toFixed(1) + '%');
+      card.style.setProperty('--sombra', `${(r * .4).toFixed(0)}px ${(20 - s.rx * .5).toFixed(0)}px 44px #000b, inset 0 1px 0 #ffffff14`);
+      raf = requestAnimationFrame((t) => quadro(t, agora));
+    };
+    // só anima enquanto o cartão está na tela
+    const liga = (sim) => {
+      if (sim === rodando) return;
+      rodando = sim;
+      if (sim) { const t = performance.now(); quadro(t, t); } else cancelAnimationFrame(raf);
+    };
+    new IntersectionObserver(([e]) => liga(e.isIntersecting && !$('reveal').hidden)).observe(vitrine);
+
+    const some = () => { if (!mexeu) { mexeu = true; $('cartao-dica').classList.add('is-oculta'); } };
+    const vira = (dir = 1) => { s.lado += 180 * dir; some(); };
+
+    // arrastar para os lados gira; arrastar para cima ou para baixo continua rolando a página
+    vitrine.addEventListener('pointerdown', (e) => {
+      if (e.button > 0) return;
+      arrasto = { x: e.clientX, y: e.clientY, ry: s.ry, rx: s.rx, alvoY: s.ry, alvoX: s.rx, moveu: false, hist: [[e.clientX, performance.now()]], id: e.pointerId };
+    });
+    vitrine.addEventListener('pointermove', (e) => {
+      if (!arrasto) {
+        if (e.pointerType !== 'mouse') return;
+        const r = vitrine.getBoundingClientRect();
+        mouse.x = limita((e.clientX - (r.left + r.width / 2)) / (r.width / 2), -1, 1);
+        mouse.y = limita((e.clientY - (r.top + r.height / 2)) / (r.height / 2), -1, 1);
+        return;
+      }
+      const dx = e.clientX - arrasto.x, dy = e.clientY - arrasto.y;
+      if (!arrasto.moveu && Math.hypot(dx, dy) > 6) {
+        arrasto.moveu = true; some();
+        vitrine.setPointerCapture(arrasto.id); vitrine.classList.add('is-arrastando');
+      }
+      arrasto.alvoY = arrasto.ry + dx * .5;
+      arrasto.alvoX = limita(arrasto.rx - dy * .25, -22, 22);
+      arrasto.hist.push([e.clientX, performance.now()]);
+      if (arrasto.hist.length > 5) arrasto.hist.shift();
+    });
+    const solta = (e) => {
+      if (!arrasto) return;
+      const a = arrasto; arrasto = null;
+      vitrine.classList.remove('is-arrastando');
+      if (e.pointerType !== 'mouse') mouse.x = mouse.y = 0;
+      if (!a.moveu) { if (e.type === 'pointerup') vira(); return; }
+      // ao soltar, assenta na face mais próxima, levando em conta o embalo do arrasto
+      const [x0, t0] = a.hist[0], [x1, t1] = a.hist[a.hist.length - 1];
+      const vel = t1 > t0 ? (x1 - x0) / (t1 - t0) : 0;
+      s.lado = Math.round((a.alvoY + vel * 120) / 180) * 180;
+    };
+    vitrine.addEventListener('pointerup', solta);
+    vitrine.addEventListener('pointercancel', solta);
+    vitrine.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse' && !arrasto) mouse.x = mouse.y = 0; });
+    vitrine.addEventListener('contextmenu', (e) => e.preventDefault());
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowRight') { e.preventDefault(); vira(); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); vira(-1); }
+    });
+    $('cartao-virar').addEventListener('click', () => vira());
+    // a cada nova revelação o cartão volta de frente
+    $('cartao').addEventListener('animationstart', (e) => {
+      if (e.target !== $('cartao')) return;
+      Object.assign(s, { rx: 0, ry: 0, vx: 0, vy: 0, lado: 0 });
+      mexeu = false; $('cartao-dica').classList.remove('is-oculta');
+      ajusta(); liga(true);
+    });
+    $('cartao-dica').textContent = matchMedia('(hover: hover)').matches
+      ? 'Arraste para girar · clique para virar' : 'Arraste para girar · toque para virar';
   })();
 
   /* ---------- revelação animada ---------- */
