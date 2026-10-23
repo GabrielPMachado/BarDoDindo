@@ -65,17 +65,14 @@ interface Comum {
   fmt: (f: Field, v: unknown) => ReactNode;
   titulo: (r: Row) => string;
 }
-/** Os campos que aparecem no cartão: os da tabela, menos o título, o status e a foto. */
-const camposDoCartao = (def: CollectionDef, sem: string[] = []) =>
-  def.fields.filter((f) => !f.formOnly && f.key !== def.fields[0].key && !STATUS_KEYS.includes(f.key) && !sem.includes(f.key) && f.type !== 'url').slice(0, 3);
 const statusDe = (def: CollectionDef, r: Row) => {
   const f = def.fields.find((x) => STATUS_KEYS.includes(x.key) && r[x.key]);
   return f ? String(r[f.key]) : '';
 };
 
 /* ---------- cartões (galeria com foto) ---------- */
-export function VisaoCartoes({ def, rows, onAbrir, fmt, titulo, sel, marcar, onAmpliar }: Comum & { sel: Set<string>; marcar: (id: string, on: boolean) => void; onAmpliar: (r: Row) => void }) {
-  const campos = camposDoCartao(def);
+/* O cartão mostra só o título (e foto/status); os demais campos aparecem ao abrir o item. */
+export function VisaoCartoes({ def, rows, onAbrir, titulo, sel, marcar, onAmpliar }: Comum & { sel: Set<string>; marcar: (id: string, on: boolean) => void; onAmpliar: (r: Row) => void }) {
   return (
     <div className="cartoes">
       {rows.map((r) => {
@@ -92,9 +89,6 @@ export function VisaoCartoes({ def, rows, onAbrir, fmt, titulo, sel, marcar, onA
             </div>
             <div className="cartao__corpo">
               <b className="cartao__titulo">{titulo(r)}</b>
-              {campos.map((f) => (r[f.key] !== undefined && r[f.key] !== '' && r[f.key] !== null) && (
-                <span key={f.key} className="cartao__linha"><span className="muted">{f.label}</span> {fmt(f, r[f.key])}</span>
-              ))}
             </div>
           </article>
         );
@@ -104,10 +98,9 @@ export function VisaoCartoes({ def, rows, onAbrir, fmt, titulo, sel, marcar, onA
 }
 
 /* ---------- quadro por status (arrastar o cartão muda o status) ---------- */
-export function VisaoQuadro({ def, rows, onAbrir, fmt, titulo, podeMover, onMover, onAmpliar }: Comum & { podeMover: boolean; onMover: (r: Row, valor: string) => void; onAmpliar: (r: Row) => void }) {
+export function VisaoQuadro({ def, rows, onAbrir, titulo, podeMover, onMover, onAmpliar }: Comum & { podeMover: boolean; onMover: (r: Row, valor: string) => void; onAmpliar: (r: Row) => void }) {
   const campo = campoDoQuadro(def)!;
   const colunas = [...(campo.options ?? []), ...(rows.some((r) => !r[campo.key] || !campo.options?.includes(String(r[campo.key]))) ? ['—'] : [])];
-  const campos = camposDoCartao(def, [campo.key]).slice(0, 2);
   const [sobre, setSobre] = useState<string | null>(null);
   const [arrastando, setArrastando] = useState<string | null>(null);
   const daColuna = (c: string) => rows.filter((r) => (c === '—' ? !r[campo.key] || !campo.options?.includes(String(r[campo.key])) : r[campo.key] === c));
@@ -141,9 +134,6 @@ export function VisaoQuadro({ def, rows, onAbrir, fmt, titulo, podeMover, onMove
                 >
                   {typeof r.foto === 'string' && r.foto && <img src={r.foto} alt="" loading="lazy" title="Ver maior" onClick={(e) => { e.stopPropagation(); onAmpliar(r); }} />}
                   <b>{titulo(r)}</b>
-                  {campos.map((f) => (r[f.key] !== undefined && r[f.key] !== '' && r[f.key] !== null) && (
-                    <span key={f.key} className="small"><span className="muted">{f.label}:</span> {fmt(f, r[f.key])}</span>
-                  ))}
                   {/* celular: sem arrastar, muda pelo seletor */}
                   {podeMover && (
                     <select className="quadro__mover" value={String(r[campo.key] ?? '')} onClick={(e) => e.stopPropagation()} onChange={(e) => onMover(r, e.target.value)} aria-label={`Mudar ${campo.label.toLowerCase()} de ${titulo(r)}`}>
