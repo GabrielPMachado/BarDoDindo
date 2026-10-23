@@ -1,0 +1,30 @@
+# Apaga as contas de login do Firebase que ficaram sem cadastro (ver scripts/limpar-contas.mjs).
+# Roda a cada 10 minutos (o GitHub pode atrasar alguns minutos) e também pelo botão "Run workflow" em Actions.
+# A conta de serviço precisa dos papéis "Administrador do Firebase Authentication" e "Leitor do Cloud Datastore".
+
+name: Limpar contas de login sem cadastro
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+    inputs:
+      simular:
+        description: 'Só listar, sem apagar'
+        type: boolean
+        default: false
+concurrency: limpar-contas
+jobs:
+  limpar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --no-save --no-package-lock firebase-admin@13
+      - name: Apagar contas sem cadastro
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BARDO_C0878 }}
+        run: |
+          echo "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/conta.json"
+          GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/conta.json" node scripts/limpar-contas.mjs ${{ inputs.simular && '--simular' || '' }}

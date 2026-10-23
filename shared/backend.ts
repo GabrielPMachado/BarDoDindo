@@ -621,7 +621,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     if (!tel) fail(400, 'Informe o celular completo, com DDD.');
     const { cpf, nascimento } = conferirDocumentos(b);
     if (b.aceite !== true) fail(400, 'É preciso aceitar o uso dos dados para participar do programa.');
-    // apagar afilhados (ou zerar o sistema) remove o cadastro, mas a conta de login continua: quem volta usa a senha de antes ou cria outra
+    // apagar afilhados (ou zerar o sistema) remove o cadastro; a conta de login só some com a limpeza automática (scripts/limpar-contas.mjs)
     const { cred, nova } = await criarConta(email, senha, EMAIL_COM_CONTA);
     const uid = cred.user.uid;
     try {
@@ -1153,8 +1153,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   });
 
   /* CRM: excluir TODOS os afilhados (ex.: cadastros de teste antes do lançamento): cadastros, saldos, CPFs, consumos com as receitas,
-   * vouchers e reservas feitas por afilhados; a numeração volta a começar do #001. As contas de login (Firebase Auth) continuam existindo
-   * (só o Admin SDK as apaga): quem se cadastrar de novo com o mesmo e-mail usa a senha de antes ou "Esqueci minha senha". */
+   * vouchers e reservas feitas por afilhados; a numeração volta a começar do #001. As contas de login (Firebase Auth) só o Admin SDK
+   * apaga: a rotina scripts/limpar-contas.mjs (GitHub Actions, a cada 10 min) remove as que ficaram sem cadastro. */
   rota('DELETE', '/crm/clientes', async () => {
     const ctx = await requireUsuario();
     requireAccess(ctx, 'clientes', 'excluir');
@@ -1191,8 +1191,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   });
 
   /* CRM: zerar o sistema (só a Presidência). Apaga TODOS os dados, inclusive usuários, funções e parâmetros:
-   * o sistema volta ao "primeiro acesso". As contas de login (Firebase Auth) continuam existindo (só o Admin SDK as apaga):
-   * quem se cadastrar de novo com o mesmo e-mail usa a senha de antes ou "Esqueci minha senha". */
+   * o sistema volta ao "primeiro acesso". As contas de login (Firebase Auth) só o Admin SDK apaga:
+   * a rotina scripts/limpar-contas.mjs (GitHub Actions, a cada 10 min) remove as que ficaram sem cadastro. */
   rota('POST', '/crm/admin/zerar', async ({ b }) => {
     const ctx = await requireUsuario();
     if (!ctx.funcao?.sistema) fail(403, 'Só a Presidência pode zerar o sistema.');
