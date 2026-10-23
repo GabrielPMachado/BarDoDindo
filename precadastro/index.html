@@ -121,17 +121,16 @@
 
   /* cartão do afilhado */
   .member-wrap { width: min(360px, 100%); }
-  /* quadro próprio do cartão: o 3D acontece só aqui dentro, sem invadir os textos em volta */
-  .vitrine { border-radius: 22px; overflow: hidden; isolation: isolate; border: 1px solid var(--border-strong);
-    background: radial-gradient(80% 75% at 50% 42%, #33221b 0%, #181211 68%, #110d0c 100%); box-shadow: inset 0 1px 0 #ffffff0d, 0 18px 44px #0008; }
+  /* área própria do cartão (sem moldura visível): o espaço em volta deixa o 3D girar sem encostar nos textos */
+  .vitrine { isolation: isolate; }
   .vitrine__palco { position: relative; display: grid; place-items: center; padding: 30px 28px 40px; perspective: 1100px;
-    touch-action: pan-y; cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+    touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
   .vitrine__palco.is-arrastando { cursor: grabbing; }
   .vitrine__caixa { position: relative; z-index: 1; transform-style: preserve-3d; }
   .vitrine__flutua { width: 340px; transform-origin: 0 0; transform-style: preserve-3d; }
   .vitrine__chao { position: absolute; left: 18%; right: 18%; bottom: 16px; height: 24px; pointer-events: none;
     border-radius: 50%; background: radial-gradient(closest-side, #000d, transparent); filter: blur(6px); }
-  .vitrine__rodape { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 10px 9px 16px; border-top: 1px solid #ffffff10; background: #0000002e; }
+  .vitrine__rodape { display: flex; align-items: center; justify-content: center; gap: 12px; }
   .vitrine__virar { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; height: 34px; padding: 0 14px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
     color: var(--brand-light); border: 1px solid var(--border-strong); background: #c4572a14; transition: background .15s, border-color .15s; }
   .vitrine__virar:hover { background: #c4572a26; border-color: var(--brand); }
@@ -161,7 +160,7 @@
   .member__aviso { font-size: 11px; line-height: 1.4; color: var(--muted); margin-top: 4px; }
   .member__aviso b { color: var(--brand-light); }
   .member__end { font-size: 10px; line-height: 1.35; color: var(--muted); }
-  .member__dica { margin: 0; font-size: 12px; line-height: 1.3; color: var(--muted); text-align: left; transition: opacity .4s; }
+  .member__dica { margin: 0; font-size: 12px; line-height: 1.3; color: var(--muted); transition: opacity .4s; }
   .member__dica.is-oculta { opacity: .45; }
   .member__glare { position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
     background: radial-gradient(circle at var(--gx) var(--gy), #ffffff26 0%, #ffffff0a 30%, transparent 62%),
@@ -572,7 +571,7 @@ import { cpfValido, idadeEm } from '../shared/backend';
     const some = () => { if (!mexeu) { mexeu = true; $('cartao-dica').classList.add('is-oculta'); } };
     const vira = (dir = 1) => { s.lado += 180 * dir; some(); };
 
-    // arrastar para os lados gira; arrastar para cima ou para baixo continua rolando a página
+    // arrastar sobre o cartão gira (a página não rola junto); fora dele a página rola normalmente
     vitrine.addEventListener('pointerdown', (e) => {
       if (e.button > 0) return;
       arrasto = { x: e.clientX, y: e.clientY, ry: s.ry, rx: s.rx, alvoY: s.ry, alvoX: s.rx, moveu: false, hist: [[e.clientX, performance.now()]], id: e.pointerId };
