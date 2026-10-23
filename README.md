@@ -8,6 +8,8 @@ Três partes que compartilham **um único projeto Firebase** (Authentication + F
 | **CRM / Gestão** (computador) | `crm/` | Equipe do bar | `/crm` |
 | **Pré-cadastro** | `precadastro/` | Clientes, antes do lançamento | `/afilhado` |
 
+Até o lançamento, o app do afilhado fica fechado na web: quem abre `/` vai para o pré-cadastro (`APP_LIBERADO` em `src/main.tsx`; para testar o app, abra `/?app=1`). O app instalado pelo Android/iOS não é afetado.
+
 As telas chamam `api('/app/...')` e `api('/crm/...')` como antes; quem atende essas rotas é `shared/backend.ts`, no próprio navegador, lendo e gravando no Firestore. O que cada pessoa pode ler ou gravar é decidido em `firestore.rules`.
 
 Nenhum dado vem pré-cadastrado: cardápio, recompensas, clientes, equipe e lançamentos começam vazios e são preenchidos pelo uso real.
