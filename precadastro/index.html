@@ -154,8 +154,10 @@
   .member-wrap.is-in .member:not(.member--back)::after { animation: shine 1.4s ease .8s; }
   .member--back { transform: rotateY(180deg) translateZ(1px); padding: 0 0 16px; justify-content: flex-start; gap: 0; }
   .member__stripe { height: 30px; margin-top: 18px; background: linear-gradient(90deg, #0b0807, #1d1412 50%, #0b0807); border-block: 1px solid #3a2720; display: grid; place-items: center; }
-  /* frase "estampada" na tarja: baixo-relevo com sombra escura em cima e brilho embaixo */
-  .member__stripe span { font: 600 11.5px/1 var(--serif); letter-spacing: .06em; color: #4a3630; text-shadow: 0 -1px 0 #000c, 0 1px 0 #ffffff1c; white-space: nowrap; }
+  /* frase estampada na tarja em prata: o brilho corre pelas letras conforme o cartão inclina (--gx) */
+  .member__stripe span { font: 600 11.5px/1 var(--serif); letter-spacing: .06em; white-space: nowrap; color: #b9bec5;
+    background: linear-gradient(105deg, #7d828a 0%, #b9bec5 30%, #f4f6f8 45%, #ffffff 50%, #c9cdd3 56%, #858a92 75%, #b0b5bc 100%) var(--gx, 50%) 0 / 300% 100%;
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 -1px 0 #000d) drop-shadow(0 1px 0 #ffffff14); }
   .member__marca { position: absolute; right: -26px; bottom: -26px; opacity: .1; filter: grayscale(.2); }
   .member__verso { position: relative; flex: 1; display: flex; flex-direction: column; justify-content: space-between; padding: 12px 20px 0; }
   .member__frase { font: 700 13.5px/1.3 var(--serif); color: var(--text); }
@@ -807,12 +809,13 @@ import { cpfValido, idadeEm } from '../shared/backend';
       g.fillStyle = (() => { const s = g.createLinearGradient(0, 0, L, 0); s.addColorStop(0, '#0b0807'); s.addColorStop(.5, '#1d1412'); s.addColorStop(1, '#0b0807'); return s; })();
       g.fillRect(0, 18, L, 30);
       g.fillStyle = '#3a2720'; g.fillRect(0, 18, L, .7); g.fillRect(0, 47.3, L, .7);
-      // frase estampada na tarja (mesmo baixo-relevo da página)
+      // frase estampada em prata na tarja (mesmo efeito da página)
       const tarja = 'Coração de Dindo sempre cabe mais um!';
       g.save(); g.font = '600 11.5px "Roboto Slab"'; g.letterSpacing = '.7px'; g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.fillStyle = '#000c'; g.fillText(tarja, L / 2, 32);
-      g.fillStyle = '#ffffff1c'; g.fillText(tarja, L / 2, 34);
-      g.fillStyle = '#4a3630'; g.fillText(tarja, L / 2, 33);
+      g.fillStyle = '#000d'; g.fillText(tarja, L / 2, 32);
+      const prata = g.createLinearGradient(L * .2, 20, L * .8, 46);
+      [[0, '#7d828a'], [.3, '#b9bec5'], [.45, '#f4f6f8'], [.5, '#ffffff'], [.56, '#c9cdd3'], [.75, '#858a92'], [1, '#b0b5bc']].forEach(([o, c]) => prata.addColorStop(o, c));
+      g.fillStyle = prata; g.fillText(tarja, L / 2, 33);
       g.restore();
       g.globalAlpha = .1; g.drawImage(logo, L - 124, A - 124, 150, 150); g.globalAlpha = 1;
       // saudação com o nome em destaque (a fonte diminui se o nome for longo)
