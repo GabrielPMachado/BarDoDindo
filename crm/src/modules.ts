@@ -109,7 +109,7 @@ export const AREAS: Area[] = [
       { path: '/vendas/fichas', perm: 'fichas', label: 'Fichas técnicas' },
       { path: '/vendas/guarnicoes', perm: 'guarnicoes', label: 'Guarnições e itens fixos' },
       { path: '/vendas/clientes', perm: 'clientes', label: 'Clientes (afilhados)' },
-      { path: '/vendas/qrcode', perm: 'qrcode', label: 'QR Code Afilie-se' },
+      { path: '/vendas/qrcode', perm: 'qrcode', label: 'QR Code Afilhie-se' },
     ],
   },
   {
@@ -189,7 +189,7 @@ export const AREAS: Area[] = [
   /* ---------- Departamento Jurídico ---------- */
   {
     key: 'jur', label: 'Jurídico', icon: Scale,
-    description: 'Consultoria jurídica, trabalhista e tributário, área empresarial, advogados e a biblioteca de leis.',
+    description: 'Consultoria jurídica, trabalhista e tributária, área empresarial, advogados e a biblioteca de leis.',
     items: [
       { path: '/juridico/consultoria', perm: 'consultoria', label: 'Demandas de consultoria', group: 'Consultoria jurídica', icon: Gavel },
       { path: '/juridico/advogados/consultoria', perm: 'advogados', label: 'Advogados', group: 'Consultoria jurídica' },

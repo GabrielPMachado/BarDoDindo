@@ -49,7 +49,7 @@ export function CelulaRapida({ def, field, row, children, onSalvar }: {
     if (porLocal) return salvarLocais(v as Locais);
     const antes = row[field.key] ?? '';
     if (String(v ?? '') === String(antes)) { setEditando(false); return; }
-    if (field.required && (v === '' || v === null || v === undefined)) { notify(`${field.label} é obrigatório.`, 'error'); return; }
+    if (field.required && (v === '' || v === null || v === undefined)) { notify(`Preencha o campo "${field.label}".`, 'error'); return; }
     setSalvando(true);
     try {
       await onSalvar({ [field.key]: v === '' ? null : v });

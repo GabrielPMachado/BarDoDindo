@@ -268,6 +268,7 @@ export function gerarPassos(f: Ficha): string[] {
     case 'Liquidificador':
       return [`Bata ${todos} no liquidificador${temGelo ? ' com gelo' : ''} até ficar homogêneo.`, `Sirva ${noCopo}.`, ...fim];
     default:
-      return [temGelo ? `Encha o ${copo.toLowerCase()} com gelo.` : `Separe o ${copo.toLowerCase()}.`, `Adicione ${todos}.`, 'Mexa levemente com a bailarina.', ...fim];
+      const oCopo = noCopo.replace(/^n/, '');
+      return [temGelo ? `Encha ${oCopo} com gelo.` : `Separe ${oCopo}.`, `Adicione ${todos}.`, 'Mexa levemente com a bailarina.', ...fim];
   }
 }

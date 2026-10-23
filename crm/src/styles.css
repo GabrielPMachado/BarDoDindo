@@ -1447,7 +1447,7 @@ button.anexos__nome:hover { text-decoration: underline; }
 .quadro__cartao img { cursor: zoom-in; }
 .foto-campo__ver { margin-top: 8px; }
 
-/* ---------- QR Code Afilie-se ---------- */
+/* ---------- QR Code Afilhie-se ---------- */
 .qr-grid { display: grid; grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: 16px; align-items: start; }
 @media (max-width: 760px) { .qr-grid { grid-template-columns: 1fr; } }
 .qr-painel { display: flex; flex-direction: column; align-items: center; gap: 12px; }

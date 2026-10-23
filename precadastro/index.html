@@ -318,7 +318,7 @@
         <input class="input" id="senha" type="password" autocomplete="new-password" minlength="6" maxlength="100" placeholder="Mínimo de 6 caracteres" required />
         <button type="button" data-toggle="senha">Mostrar</button>
       </div>
-      <label class="check"><input type="checkbox" id="aceite" /> <span>Tenho 18 anos ou mais e concordo que o @bardodindo utilize as informações prestadas no programa de afilhados e para me manter por dentro das novidades, por e-mail e/ou telefone.</span></label>
+      <label class="check"><input type="checkbox" id="aceite" /> <span>Tenho 18 anos ou mais e concordo que o @bardodindo utilize as informações prestadas para o programa de afilhados e para me manter por dentro das novidades, por e-mail e/ou telefone.</span></label>
       <p class="error" id="erro-cadastro" role="alert"></p>
       <button class="link" id="esqueci-cadastro" type="button" hidden>Esqueci minha senha</button>
       <p class="muted aviso-senha" id="aviso-cadastro" role="status"></p>
@@ -328,7 +328,7 @@
 
     <h2 class="secao">Como funciona</h2>
     <ol class="passos">
-      <li class="passo"><span class="passo__n">1</span><div><strong>Cadastre-se e se torne um afilhado</strong><span>Leva um minuto. Você preenche alguns dados (são poucos) e, ao concluir, seu número é gerado e passa a ser seu para sempre.</span></div></li>
+      <li class="passo"><span class="passo__n">1</span><div><strong>Cadastre-se e se torne um afilhado</strong><span>Leva um minuto. Você preenche poucos dados e, ao concluir, seu número é gerado e passa a ser seu para sempre.</span></div></li>
       <li class="passo"><span class="passo__n">2</span><div><strong>Some pontos a cada visita</strong><span>Informe (se quiser) seu número de afilhado e abra uma comanda no bar. Assim que ela for encerrada, o consumo se transforma em pontos acumulativos.</span></div></li>
       <li class="passo"><span class="passo__n">3</span><div><strong>Resgate recompensas</strong><span>No histórico do seu perfil, você acompanha o acúmulo de pontos e, conforme a sua pontuação, resgata recompensas e prêmios.</span></div></li>
       <li class="passo"><span class="passo__n">4</span><div><strong>Afilhados</strong><span>Além das recompensas, no aplicativo você poderá consultar o cardápio, reservar mesas, usar o karaokê e o videogame e aproveitar muitas outras novidades exclusivas. Faça parte desta comunidade, afilhado!</span></div></li>
@@ -358,7 +358,7 @@
 
   <footer class="rodape">
     <b>Bar do Dindo · <span class="rodape__arroba">@bardodindo</span></b>
-    <span>Porto Alegre, Cidade Baixa · Nova Olaria Mall: Rua Lima e Silva, 776 · Loja&nbsp;7&nbsp;B.</span>
+    <span>Porto Alegre, Cidade Baixa · Nova Olaria Mall: Rua Lima e Silva, 776 · Loja&nbsp;7B</span>
     <span>Seus dados estão protegidos.</span>
   </footer>
 </main>
@@ -396,7 +396,7 @@
         <img class="member__marca" src="../shared/assets/logo.webp" width="150" height="150" alt="" aria-hidden="true" draggable="false" />
         <div class="member__verso">
           <div>
-            <div class="member__frase">Bem-vindo, afilhado (a) <span id="c-nome2"></span>.</div>
+            <div class="member__frase">Bem-vindo, afilhado(a) <span id="c-nome2"></span>.</div>
             <div class="member__aviso">Apresente este cartão ou informe o nº <b id="c-num2">#000</b> no Bar do Dindo para registrarmos nossos momentos no seu histórico.</div>
           </div>
           <div class="member__bottom">
@@ -431,8 +431,8 @@
     </div>
   </div>
   <div class="convite stage" id="convite" hidden>
-    <strong>Queremos conhecê-lo, afilhado (a)!</strong>
-    <span>Caso queira (opcional), responda um simples questionário para podermos esperá-lo da melhor forma possível. Coração de Dindo sempre cabe mais um!</span>
+    <strong>Queremos conhecê-lo, afilhado(a)!</strong>
+    <span>Se quiser, responda a um questionário rapidinho para podermos esperá-lo da melhor forma possível. Coração de Dindo sempre cabe mais um!</span>
     <button class="btn btn--brand" id="btn-quiz" type="button">QUESTIONÁRIO DO AFILHADO</button>
   </div>
   <div class="convite convite--ok stage" id="convite-ok" hidden>
@@ -704,9 +704,9 @@ import { INSTAGRAM, LIMITE_TEXTO, alternar, contador, ehOutro, montarResposta } 
     const nome = nomeBonito(cliente.nome);
     $('ola').textContent = novo ? `Bem-vindo, ${nome}!` : `Olá de novo, ${nome.split(' ')[0]}!`;
     $('reveal-text').innerHTML = novo
-      ? 'Seu número foi gerado e está garantido. Parabéns! Nós do Bar do Dindo estamos muito felizes com a sua chegada e lhe esperamos para boas histórias!<br /><br />'
+      ? 'Seu número foi gerado e está garantido. Parabéns! Nós do Bar do Dindo estamos muito felizes com a sua chegada e esperamos você para boas histórias!<br /><br />'
         + 'Lembre-se de sempre, quando nos visitar, informar o seu nº de afilhado para podermos registrar todos os nossos momentos no seu histórico junto ao Bar.<br /><br />'
-        + 'Você será avisado quando o aplicativo for lançado, além, é claro, de todas as novidades e promoções. Use este e-mail e senha para acessar.'
+        + 'Você será avisado quando o aplicativo for lançado, além, é claro, de todas as novidades e promoções. Use este e-mail e esta senha para acessar.'
       : 'Este é o seu número de afilhado. Ele continua garantido para o lançamento do aplicativo.';
     $('c-num').textContent = $('c-num2').textContent = '#' + pad(n);
     $('c-nome').textContent = $('c-nome2').textContent = nomeCurto(cliente.nome);
@@ -919,7 +919,7 @@ import { INSTAGRAM, LIMITE_TEXTO, alternar, contador, ehOutro, montarResposta } 
       g.restore();
       g.globalAlpha = .1; g.drawImage(logo, L - 124, A - 124, 150, 150); g.globalAlpha = 1;
       // saudação com o nome em destaque (a fonte diminui se o nome for longo)
-      const nome = nomeCurto(atual.nome), ola = 'Bem-vindo, afilhado (a) ';
+      const nome = nomeCurto(atual.nome), ola = 'Bem-vindo, afilhado(a) ';
       let tam = 13.5;
       const mede = () => { g.font = `700 ${tam}px "Roboto Slab"`; return g.measureText(ola + nome + '.').width; };
       while (mede() > L - 40 && tam > 9) tam -= .5;

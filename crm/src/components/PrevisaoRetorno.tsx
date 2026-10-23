@@ -18,7 +18,7 @@ const pc2 = { decimals: 2, min: 0, max: 100 };
 
 /** As regras das leis da biblioteca que entram na conta. */
 const BASES = [
-  ['Código Civil, arts. 1.007 e 1.008', 'o lucro é dividido na proporção das quotas de cada sócio, salvo outra regra no contrato social; nenhum sócio pode ser excluído dos lucros.'],
+  ['Código Civil, arts. 1.007 e 1.008', 'o lucro é dividido na proporção das cotas de cada sócio, salvo outra regra no contrato social; nenhum sócio pode ser excluído dos lucros.'],
   ['Código Civil, arts. 1.009 e 1.059', 'só se distribui lucro real: com prejuízo, a previsão é zero, porque lucro fictício ou que reduz o capital tem de ser devolvido.'],
   ['Código Civil, arts. 1.065 e 1.078', 'a distribuição depende do balanço anual e da aprovação das contas pelos sócios.'],
   ['Constituição, arts. 145, 150 e 153, III; CTN, arts. 43 e 44', 'o IR incide sobre a renda, com base no lucro real, presumido ou arbitrado; por isso o regime tributário muda o resultado.'],

@@ -59,7 +59,7 @@ export default function Perfil() {
             <input id="cpf" className="input" value={me.cliente.cpf ?? ''} disabled />
           </div>
           <div>
-            <label className="label" htmlFor="nasc">Nascimento</label>
+            <label className="label" htmlFor="nasc">Data de nascimento</label>
             <input id="nasc" className="input" value={me.cliente.nascimento ? new Date(me.cliente.nascimento + 'T12:00:00').toLocaleDateString('pt-BR') : ''} disabled />
           </div>
         </div>

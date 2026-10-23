@@ -85,7 +85,7 @@ export function Layout({ children }: { children: ReactNode }) {
           .catch((e: Error) => notify(e.message || 'Não foi possível salvar o painel.', 'error')),
       };
     };
-    const lista = [opcao('meu painel', 'Meu painel', meuPainel)];
+    const lista = [opcao('meu painel', 'meu painel', meuPainel)];
     if (access('painel') !== 'none') lista.push(opcao('painel executivo', 'Painel executivo', executivo));
     return lista;
   };

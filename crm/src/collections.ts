@@ -207,7 +207,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     filterKey: 'tipo', filtros: ['colaborador', 'status'], sortKey: 'inicio',
     fields: [
       { key: 'colaborador', label: 'Colaborador', type: 'ref', ref: 'colaboradores', refKey: 'colaboradorId', required: true },
-      { key: 'tipo', label: 'Tipo', type: 'select', options: ['Férias', 'Atestado médico', 'Falta', 'Falta justificada', 'Licença maternidade', 'Licença paternidade', 'Afastamento INSS', 'Outro'], required: true },
+      { key: 'tipo', label: 'Tipo', type: 'select', options: ['Férias', 'Atestado médico', 'Falta', 'Falta justificada', 'Licença-maternidade', 'Licença-paternidade', 'Afastamento INSS', 'Outro'], required: true },
       { key: 'inicio', label: 'Início', type: 'date', required: true },
       { key: 'fim', label: 'Término', type: 'date', required: true },
       { key: 'status', label: 'Status', type: 'select', options: ['Agendado', 'Em andamento', 'Concluído', 'Cancelado'], default: 'Agendado' },
@@ -499,7 +499,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   /* ---------------- Financeiro ---------------- */
   receitas: {
     id: 'receitas', anexos: 'Notas fiscais e comprovantes', feminino: true, area: 'receitas', title: 'Receitas', singular: 'receita',
-    description: 'Entradas do caixa. Consumos lançados para clientes do aplicativo entram aqui automaticamente.',
+    description: 'Entradas do caixa. Consumos lançados para clientes do aplicativo aparecem aqui automaticamente.',
     filterKey: 'categoria', filtros: ['formaPagamento'], sortKey: 'data', sortDir: 'desc',
     fields: [
       { key: 'data', label: 'Data', type: 'date', required: true },
@@ -637,7 +637,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'custo', label: 'Valor por drink / porção', type: 'money', required: true, min: 0.01, max: 1_000 },
       { key: 'padrao', label: 'Já vem marcado nas fichas novas', type: 'select', options: ['Não', 'Sim'], default: 'Não' },
       { key: 'status', label: 'Situação', type: 'select', options: ['Ativo', 'Inativo'], default: 'Ativo' },
-      { key: 'observacoes', label: 'Como chegou no valor', type: 'textarea', formOnly: true, wide: true, placeholder: 'Ex.: saco de gelo de 5 kg a R$ 15,00 serve uns 50 copos → R$ 0,30 por drink' },
+      { key: 'observacoes', label: 'Como chegou ao valor', type: 'textarea', formOnly: true, wide: true, placeholder: 'Ex.: saco de gelo de 5 kg a R$ 15,00 serve uns 50 copos → R$ 0,30 por drink' },
     ],
     kpis: (rows) => [
       { label: 'Itens ativos', value: num(count(rows, 'status', ['Ativo'])) },
