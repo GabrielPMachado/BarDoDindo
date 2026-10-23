@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, type DragEvent, type ReactNode, Fragment } from 'react';
-import { ArrowDown, ArrowLeftRight, ArrowUp, Camera, ChevronDown, ChevronRight, Download, FileSpreadsheet, FileText, Globe, ImageOff, Maximize2, Paperclip, Pencil, Plus, Receipt, Search, Sheet, ShoppingCart, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowLeftRight, ArrowUp, Camera, ChevronDown, ChevronRight, Download, FileSpreadsheet, FileText, Globe, ImageOff, Maximize2, Paperclip, Pencil, Plus, Receipt, Search, Sheet, ShoppingCart, Sparkles, Trash2, X } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { findModule } from '../modules';
 import { numberSpec, STATUS_KEYS, termos, toneOf, type CollectionDef, type Computed, type Field } from '../collections';
@@ -11,7 +11,7 @@ import { desdeDe, PERIODO_PADRAO, PERIODOS, type PeriodoKey } from '../lib/perio
 import { AsyncButton, Badge, checkRange, EmptyState, ErrorBox, FieldInput, KpiRow, Loading, Modal, PageHead, notify } from './ui';
 import { confirmar, RefPicker } from './pickers';
 import { api } from '../lib/api';
-import { reduzirFoto } from './Avatar';
+import { fotoNoTamanho } from './Avatar';
 import { ContextMenu, type MenuPos } from './ContextMenu';
 import { colunasDe, exportarCsv, exportarExcel, exportarPdf } from '../lib/exportar';
 import { LancarDespesa } from './LancarDespesa';
@@ -25,6 +25,7 @@ import { ItensDoFornecedor } from './ItensDoFornecedor';
 import { linkSeguro } from '../lib/links';
 import { PreencherProdutoIA } from './PreencherProdutoIA';
 import { GerarFotoIA } from './GerarFotoIA';
+import { RefazerFotos } from './RefazerFotos';
 import { Ampliar } from './Ampliar';
 import { SeletorVisao, VisaoCalendario, VisaoCartoes, VisaoQuadro, campoDoQuadro, useVisao } from './Visoes';
 import { CompraItens, itemVazio, totalItens, type ItemCompra } from './CompraItens';
@@ -101,6 +102,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   const [sort, setSort] = useState<{ key: string; dir: 'asc' | 'desc' }>({ key: def.sortKey ?? def.fields[0].key, dir: def.sortDir ?? 'asc' });
   const [page, setPage] = useState(0);
   const [editing, setEditing] = useState<Row | 'new' | null>(null);
+  const [refazendoFotos, setRefazendoFotos] = useState(false);
   const [lancando, setLancando] = useState<Row | null>(null);
   const [transferindo, setTransferindo] = useState<Row | null>(null);
 
@@ -326,6 +328,9 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
             >
               <Download size={16} /> {exportando ? 'Gerando…' : selecionados.length ? `Exportar ${selecionados.length}` : 'Exportar'} <ChevronDown size={14} />
             </button>
+            {def.fotoPadrao === 'estoque' && canEdit && (
+              <button className="btn btn--ghost" disabled={!all.length} onClick={() => setRefazendoFotos(true)}><Sparkles size={16} /> Refazer fotos em alta</button>
+            )}
             {canCreate && <button className="btn btn--primary" onClick={() => setEditing('new')}><Plus size={16} /> {termos(def).novo}</button>}
           </>
         }
@@ -558,6 +563,15 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
         <LancarDespesa def={def} row={lancando} sugestao={def.despesa(lancando)} onClose={() => setLancando(null)} onDone={col.reload} />
       )}
 
+      {refazendoFotos && (
+        <RefazerFotos
+          rows={all}
+          onSalvar={(id, foto) => api(`/crm/c/${def.id}/${id}`, { method: 'PUT', body: { foto } })}
+          onFim={col.reload}
+          onClose={() => setRefazendoFotos(false)}
+        />
+      )}
+
       {editing && (
         <RecordForm
           def={def}
@@ -761,17 +775,6 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
 }
 
 /** Foto do registro: escolher (a imagem é reduzida antes de salvar), trocar ou remover. */
-/** Tamanho guardado da foto: mídias e artes ficam maiores (até 1600 px), sempre abaixo do limite do banco. */
-async function fotoNoTamanho(arquivo: File, grande?: boolean) {
-  // Cabe no registro do Firestore sem pesar a lista: tenta o maior tamanho que fica abaixo do limite.
-  const [lados, limite] = grande ? [[1600, 1280, 1024, 800, 640], 390_000] : [[1280, 1024, 800, 640], 200_000];
-  for (const lado of lados) {
-    const foto = await reduzirFoto(arquivo, lado, false);
-    if (foto.length <= limite || lado === 640) return foto;
-  }
-  return reduzirFoto(arquivo, 640, false);
-}
-
 function FotoCampo({ valor, disabled, grande, titulo, onChange }: { valor: string; disabled: boolean; grande?: boolean; titulo?: string; onChange: (foto: string) => void }) {
   const [erro, setErro] = useState<string | null>(null);
   const [aberta, setAberta] = useState(false);

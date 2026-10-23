@@ -1792,3 +1792,19 @@ button.anexos__nome:hover { text-decoration: underline; }
   .pintura__palco { height: 46vh; position: sticky; top: 60px; z-index: 10; }
 }
 @media (max-width: 640px) { .pintura__palco { top: 56px; } }
+
+/* Estoque: refazer as fotos em alta qualidade pelo Gemini */
+.refazer-fotos { display: flex; flex-direction: column; gap: 12px; }
+.refazer-fotos__filtro { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; }
+.refazer-fotos__lista { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.refazer-fotos__item { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); }
+.refazer-fotos__item.is-gerando { border-color: var(--brand); }
+.refazer-fotos__item.is-salva { opacity: .7; }
+.refazer-fotos__item > strong { font-size: 13.5px; }
+.refazer-fotos__item .error { margin: 0; }
+.refazer-fotos__acoes { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; min-height: 30px; font-size: 13px; }
+.refazer-fotos__acoes label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.refazer-fotos__ok { display: inline-flex; align-items: center; gap: 4px; color: var(--good); font-weight: 600; }
+.refazer-fotos .spin { animation: girar 1s linear infinite; }
+@keyframes girar { to { transform: rotate(360deg); } }
+@media (max-width: 520px) { .refazer-fotos__lista { grid-template-columns: 1fr; } }

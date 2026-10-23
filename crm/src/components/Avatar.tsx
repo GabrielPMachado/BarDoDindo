@@ -9,7 +9,7 @@ export function Avatar({ nome, foto, className }: { nome: string; foto?: string 
  * Reduz a imagem (JPEG) antes de salvar. `quadrado`: recorta no centro (foto de perfil);
  * sem recorte, o lado maior fica com `lado` px e a proporção é mantida (fotos de produtos, materiais…).
  */
-export function reduzirFoto(arquivo: File, lado = 512, quadrado = true): Promise<string> {
+export function reduzirFoto(arquivo: Blob, lado = 512, quadrado = true): Promise<string> {
   return new Promise((resolve, reject) => {
     if (!arquivo.type.startsWith('image/')) return reject(new Error('Escolha um arquivo de imagem.'));
     const url = URL.createObjectURL(arquivo);
@@ -25,6 +25,19 @@ export function reduzirFoto(arquivo: File, lado = 512, quadrado = true): Promise
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Não foi possível ler a imagem.')); };
     img.src = url;
   });
+}
+
+/**
+ * Foto de cadastro no maior tamanho que cabe no registro do Firestore sem pesar a lista.
+ * `grande` (mídias e artes): até 1600 px; as demais, até 1280 px.
+ */
+export async function fotoNoTamanho(arquivo: Blob, grande?: boolean) {
+  const [lados, limite] = grande ? [[1600, 1280, 1024, 800, 640], 390_000] : [[1280, 1024, 800, 640], 200_000];
+  for (const lado of lados) {
+    const foto = await reduzirFoto(arquivo, lado, false);
+    if (foto.length <= limite || lado === 640) return foto;
+  }
+  return reduzirFoto(arquivo, 640, false);
 }
 
 /**
