@@ -43,6 +43,7 @@
   .hero h1 { margin: 0; font: 700 30px/1.15 var(--serif); }
   .hero h1 span { color: var(--brand-light); }
   .hero p { margin: 0; color: var(--muted); }
+  .btn--caixa-alta { text-transform: uppercase; letter-spacing: .06em; }
   .hero p strong { color: var(--text); font-weight: 700; }
   .proof { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 13px; color: var(--muted); }
   .proof__dots { display: flex; }
@@ -204,9 +205,9 @@
         <input class="input" id="senha" type="password" autocomplete="new-password" minlength="6" maxlength="100" placeholder="Mínimo de 6 caracteres" required />
         <button type="button" data-toggle="senha">Mostrar</button>
       </div>
-      <label class="check"><input type="checkbox" id="aceite" /> <span>Tenho 18 anos ou mais e concordo que o @bardodindo utilize as informações prestadas para o programa de afilhados e para ficar por dentro das novidades, recebendo informações e novidades por e-mail e/ou telefone.</span></label>
+      <label class="check"><input type="checkbox" id="aceite" /> <span>Tenho 18 anos ou mais e concordo que o @bardodindo utilize as informações prestadas para o programa de afilhados além de ficar por dentro das novidades, recebendo informações e novidades por e-mail e/ou telefone.</span></label>
       <p class="error" id="erro-cadastro" role="alert"></p>
-      <button class="btn btn--brand" id="btn-cadastro" type="submit">Gerar número de afilhado</button>
+      <button class="btn btn--brand btn--caixa-alta" id="btn-cadastro" type="submit">Gerar número de afilhado</button>
     </form>
     <button class="link" id="ir-login" type="button" style="width:100%;margin-top:4px">Já garanti meu número</button>
 
