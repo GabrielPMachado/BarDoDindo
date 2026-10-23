@@ -1,10 +1,13 @@
 // Apaga os canais de prévia do Firebase Hosting (pr<número>-...) de PRs que já foram fechados ou mergeados.
 // O plano grátis tem limite de canais; sem isso, a prévia de um PR novo falha com "channel quota reached".
 // Nunca toca no canal "live" (o site no ar). Uso: node scripts/limpar-previas.mjs <PRs abertos separados por espaço>
+// Com --todas, apaga todos os canais menos o live (inclusive a prévia temporária e as de PRs abertos).
 import { execFileSync } from 'node:child_process';
 
 const PROJETO = 'bardo-c0878';
-const abertos = new Set(process.argv.slice(2).join(' ').split(/\s+/).filter(Boolean));
+const args = process.argv.slice(2).join(' ').split(/\s+/).filter(Boolean);
+const todas = args.includes('--todas');
+const abertos = new Set(args.filter((a) => a !== '--todas'));
 const firebase = (...args) => execFileSync('npx', ['-y', 'firebase-tools@15', ...args, '--project', PROJETO], { encoding: 'utf8' });
 
 const lista = JSON.parse(firebase('hosting:channel:list', '--json'));
@@ -12,8 +15,9 @@ const canais = (lista.result?.channels ?? lista.result ?? []).map((c) => c.name.
 let apagados = 0;
 for (const id of canais) {
   const pr = /^pr(\d+)-/.exec(id)?.[1];
-  if (id === 'live' || !pr || abertos.has(pr)) continue;
-  console.log(`Apagando a prévia ${id} (PR #${pr} fechado)`);
+  if (id === 'live') continue;
+  if (!todas && (!pr || abertos.has(pr))) continue;
+  console.log(`Apagando a prévia ${id}${pr ? ` (PR #${pr})` : ''}`);
   firebase('hosting:channel:delete', id, '--force');
   apagados++;
 }
