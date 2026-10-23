@@ -1,0 +1,32 @@
+# Apaga, sob demanda, as prévias do Firebase Hosting. O canal live (o site no ar) nunca é tocado.
+# Rodar em Actions > "Limpar prévias" > Run workflow.
+
+name: Limpar prévias
+on:
+  workflow_dispatch:
+    inputs:
+      todas:
+        description: 'Apagar todas as prévias (também a temporária e as de PRs abertos)'
+        type: boolean
+        default: true
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  limpar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Apagar prévias
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BARDO_C0878 }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/conta.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/conta.json"
+          abertos=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 100 --json number --jq '.[].number') || exit 1
+          node scripts/limpar-previas.mjs $abertos ${{ inputs.todas && '--todas' || '' }}
+          npx -y firebase-tools@15 hosting:channel:list --project bardo-c0878
