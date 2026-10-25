@@ -10,7 +10,7 @@ export function efeitoDe(nome: string): Efeito | null {
   return null;
 }
 
-const DURACAO: Record<Efeito, number> = { ps5: 3600, karaoke: 3800 };
+const DURACAO: Record<Efeito, number> = { ps5: 5200, karaoke: 4400 };
 
 /** Números fixos (sem Math.random no render) para espalhar partículas e notas. */
 const espalhar = (n: number, semente: number) =>
@@ -35,8 +35,8 @@ export function EfeitoReserva({ efeito, nome, foto, onFim }: { efeito: Efeito; n
   // direto no body: a tela tem animação com transform, que prenderia o position: fixed à coluna do app
   return createPortal(
     <div className={`efeito efeito--${efeito}`} role="dialog" aria-modal="true" aria-label={`${nome} reservado`} onClick={onFim}>
-      {efeito === 'ps5' ? <CenaPS5 nome={nome} foto={foto} /> : <CenaKaraoke nome={nome} foto={foto} />}
-      <span className="efeito__pular">Toque para continuar</span>
+      {efeito === 'ps5' ? <CenaPS5 nome={nome} /> : <CenaKaraoke nome={nome} foto={foto} />}
+      <span className="efeito__pular">Toque para fechar</span>
     </div>,
     document.body,
   );
@@ -54,29 +54,68 @@ const SIMBOLOS = [
   { id: 'qua', cor: '#ff7ad9', d: 'M16 16 H84 V84 H16 Z' },
 ];
 
-function CenaPS5({ nome, foto }: { nome: string; foto?: string }) {
+function CenaPS5({ nome }: { nome: string }) {
   const px = espalhar(28, 1.7), py = espalhar(28, 3.1), pd = espalhar(28, 5.3);
   return (
     <div className="ps5">
-      <div className="ps5__luz" />
-      <div className="ps5__anel" />
-      <div className="ps5__anel ps5__anel--2" />
-      <div className="ps5__particulas" aria-hidden>
+      {/* camada de fundo: luz, anéis e partículas ficam sempre atrás dos textos */}
+      <div className="efeito__fundo" aria-hidden>
+        <div className="ps5__luz" />
+        <div className="ps5__anel" />
+        <div className="ps5__anel ps5__anel--2" />
         {px.map((x, i) => (
-          <i key={i} style={{ left: `${x * 100}%`, top: `${40 + py[i] * 60}%`, animationDelay: `${pd[i] * 1.6}s`, '--tam': `${2 + pd[i] * 4}px` } as CSSProperties} />
+          <i key={i} className="ps5__particula" style={{ left: `${x * 100}%`, top: `${30 + py[i] * 70}%`, animationDelay: `${pd[i] * 1.6}s`, '--tam': `${2 + pd[i] * 4}px` } as CSSProperties} />
         ))}
       </div>
-      <div className="ps5__simbolos" aria-hidden>
-        {SIMBOLOS.map((s, i) => (
-          <svg key={s.id} viewBox="0 0 100 100" className={`ps5__simbolo ps5__simbolo--${s.id}`} style={{ '--cor': s.cor, '--i': i } as CSSProperties}>
-            <path d={s.d} pathLength={1} />
-          </svg>
-        ))}
-      </div>
-      <div className="ps5__miolo">
-        <Foto nome={nome} foto={foto} />
+      <div className="efeito__miolo ps5__miolo">
+        <div className="ps5__simbolos" aria-hidden>
+          {SIMBOLOS.map((s, i) => (
+            <svg key={s.id} viewBox="0 0 100 100" className="ps5__simbolo" style={{ '--cor': s.cor, '--i': i } as CSSProperties}>
+              <path d={s.d} pathLength={1} />
+            </svg>
+          ))}
+        </div>
+        <Console3D />
         <strong className="ps5__titulo">PLAYER 1 READY</strong>
         <span className="ps5__sub">{nome} reservado na sua mesa. Prepare o controle!</span>
+      </div>
+    </div>
+  );
+}
+
+/** Faces de uma caixa 3D (largura × altura × profundidade, em px), centrada no ponto de origem. */
+function Caixa({ l, a, p, x = 0, y = 0, classe }: { l: number; a: number; p: number; x?: number; y?: number; classe: string }) {
+  const faces: [string, number, number, string][] = [
+    ['frente', l, a, `translateZ(${p / 2}px)`],
+    ['tras', l, a, `rotateY(180deg) translateZ(${p / 2}px)`],
+    ['lado', p, a, `rotateY(90deg) translateZ(${l / 2}px)`],
+    ['lado', p, a, `rotateY(-90deg) translateZ(${l / 2}px)`],
+    ['topo', l, p, `rotateX(90deg) translateZ(${a / 2}px)`],
+    ['topo', l, p, `rotateX(-90deg) translateZ(${a / 2}px)`],
+  ];
+  return (
+    <div className={`c3d__caixa ${classe}`} style={{ transform: `translate3d(${x}px, ${y}px, 0)` }}>
+      {faces.map(([f, w, h, t], i) => (
+        <div key={i} className={`c3d__face c3d__face--${f}`} style={{ width: w, height: h, margin: `${-h / 2}px 0 0 ${-w / 2}px`, transform: t }} />
+      ))}
+    </div>
+  );
+}
+
+/** Console branco e preto girando em 3D (só CSS): o miolo preto com a luz azul e as duas tampas brancas curvas. */
+function Console3D() {
+  return (
+    <div className="c3d" aria-hidden>
+      <div className="c3d__chao" />
+      <div className="c3d__giro">
+        <Caixa l={22} a={168} p={104} classe="c3d__miolo" />
+        {/* tampas brancas: duas placas paralelas com o recorte em asa de cada lado */}
+        {[-15, -12, 12, 15].map((x) => (
+          // as tampas abrem um pouco para fora no alto, como no console de verdade
+          <div key={x} className="c3d__tampa" style={{ transform: `translateX(${x}px) rotateZ(${x < 0 ? -3 : 3}deg) rotateY(90deg)` }} />
+        ))}
+        <div className="c3d__led" />
+        <div className="c3d__base" />
       </div>
     </div>
   );
@@ -86,16 +125,20 @@ function CenaKaraoke({ nome, foto }: { nome: string; foto?: string }) {
   const nx = espalhar(16, 2.3), nd = espalhar(16, 4.7), barras = espalhar(18, 6.1);
   return (
     <div className="kara">
-      <div className="kara__holofote kara__holofote--esq" />
-      <div className="kara__holofote kara__holofote--dir" />
-      <div className="kara__notas" aria-hidden>
+      <div className="efeito__fundo" aria-hidden>
+        <div className="kara__holofote kara__holofote--esq" />
+        <div className="kara__holofote kara__holofote--dir" />
+        {/* as notas sobem pelas laterais, longe do título */}
         {nx.map((x, i) => (
-          <i key={i} style={{ left: `${6 + x * 88}%`, animationDelay: `${0.4 + nd[i] * 2}s`, '--giro': `${(nd[i] - 0.5) * 60}deg` } as CSSProperties}>
+          <i key={i} className="kara__nota" style={{ left: `${i % 2 ? 76 + x * 20 : 4 + x * 20}%`, animationDelay: `${0.4 + nd[i] * 2}s`, '--giro': `${(nd[i] - 0.5) * 60}deg` } as CSSProperties}>
             {i % 3 === 0 ? '♫' : i % 3 === 1 ? '♪' : '♬'}
           </i>
         ))}
+        <div className="kara__eq">
+          {barras.map((b, i) => <i key={i} style={{ animationDelay: `${b * -0.9}s`, animationDuration: `${0.45 + b * 0.5}s` }} />)}
+        </div>
       </div>
-      <div className="kara__miolo">
+      <div className="efeito__miolo kara__miolo">
         <svg viewBox="0 0 120 200" className="kara__mic" aria-hidden>
           <defs>
             <linearGradient id="kara-grade" x1="0" y1="0" x2="1" y2="1">
@@ -110,9 +153,6 @@ function CenaKaraoke({ nome, foto }: { nome: string; foto?: string }) {
         <Foto nome={nome} foto={foto} />
         <strong className="kara__titulo">Solta a voz!</strong>
         <span className="kara__sub">{nome} reservado. O palco é seu.</span>
-      </div>
-      <div className="kara__eq" aria-hidden>
-        {barras.map((b, i) => <i key={i} style={{ animationDelay: `${b * -0.9}s`, animationDuration: `${0.45 + b * 0.5}s` }} />)}
       </div>
     </div>
   );
