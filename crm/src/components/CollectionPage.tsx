@@ -669,6 +669,7 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
         for (const extra of Object.keys(f.fill ?? {})) if (!def.fields.some((x) => x.key === extra)) payload[extra] = data[extra] ?? '';
       }
       if (def.comFoto) payload.foto = data.foto ?? '';
+      if (def.fotoJunto) payload.fotoJunto = data.fotoJunto ?? '';
       if (def.compra && !row) {
         payload.itens = itensValidos.map(({ chave: _c, lido, ...i }) => ({ ...i, ...(lido ? { descricaoNota: lido } : {}) }));
         payload.valor = totalItens(itensValidos);
@@ -721,6 +722,12 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
       <form id="record-form" className="form-grid" onSubmit={submit}>
         {def.comFoto && (
           <FotoCampo valor={typeof data.foto === 'string' ? data.foto : ''} disabled={!canEdit} grande={def.fotoGrande} titulo={String(data[def.fields[0].key] ?? '')} onChange={(foto) => setData((d) => ({ ...d, foto }))} />
+        )}
+        {def.fotoJunto && (
+          <FotoCampo
+            rotulo={def.fotoJunto} dica="Categoria Reserva: no app, troca a foto quando o afilhado escolhe outro item junto (ex.: o PS5 com o karaokê ao lado)."
+            valor={typeof data.fotoJunto === 'string' ? data.fotoJunto : ''} disabled={!canEdit} titulo={String(data[def.fields[0].key] ?? '')} onChange={(fotoJunto) => setData((d) => ({ ...d, fotoJunto }))}
+          />
         )}
         {(def.iaProduto || def.fotoPadrao) && canEdit && <GerarFotoIA data={data} padrao={def.fotoPadrao ?? 'produto'} onUsar={(foto) => setData((d) => ({ ...d, foto }))} />}
         {def.fichaPrimeiro && fichaCampo}
@@ -775,7 +782,7 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
 }
 
 /** Foto do registro: escolher (a imagem é reduzida antes de salvar), trocar ou remover. */
-function FotoCampo({ valor, disabled, grande, titulo, onChange }: { valor: string; disabled: boolean; grande?: boolean; titulo?: string; onChange: (foto: string) => void }) {
+function FotoCampo({ valor, disabled, grande, titulo, rotulo = 'Foto', dica, onChange }: { valor: string; disabled: boolean; grande?: boolean; titulo?: string; rotulo?: string; dica?: string; onChange: (foto: string) => void }) {
   const [erro, setErro] = useState<string | null>(null);
   const [aberta, setAberta] = useState(false);
   const escolher = async (arquivo?: File) => {
@@ -789,7 +796,8 @@ function FotoCampo({ valor, disabled, grande, titulo, onChange }: { valor: strin
   };
   return (
     <div className="form-field form-field--wide foto-campo">
-      <label>Foto</label>
+      <label>{rotulo}</label>
+      {dica && <span className="muted small">{dica}</span>}
       <div className="foto-campo__linha">
         <div className="foto-campo__previa">
           {valor ? <button type="button" className="thumb-btn" onClick={() => setAberta(true)} title="Ver maior"><img src={valor} alt="Foto do registro" /></button> : <ImageOff size={22} />}

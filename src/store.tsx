@@ -62,6 +62,8 @@ export interface Reservavel {
   nome: string;
   descricao: string;
   foto: string;
+  /** A mesma cena com os outros itens de reserva à vista. */
+  fotoJunto?: string;
 }
 
 export interface Consumption {

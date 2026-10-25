@@ -58,8 +58,6 @@ export default function Reservas({ demo = false }: { demo?: boolean }) {
   // no PC, o PS5 do cartão também gira com o mouse em cima (no celular, só quando está escolhido)
   const [emCima, setEmCima] = useState<string | null>(null);
   const comMouse = useMemo(() => typeof window !== 'undefined' && window.matchMedia?.('(hover: hover) and (pointer: fine)').matches, []);
-  // efeitos dos itens escolhidos, para cada cartão mostrar o vizinho do salão
-  const vizinhos = useMemo(() => [...new Set(reservaveis.filter((x) => itens.includes(x.id)).map((x) => efeitoDe(x.nome)).filter((e): e is Efeito => !!e))], [reservaveis, itens]);
   const alternar = (x: Reservavel) => {
     const marcado = itens.includes(x.id);
     setItens((v) => (marcado ? v.filter((id) => id !== x.id) : [...v, x.id]));
@@ -196,26 +194,19 @@ export default function Reservas({ demo = false }: { demo?: boolean }) {
                 {reservaveis.map((x) => {
                   const ativo = itens.includes(x.id);
                   const ef = efeitoDe(x.nome);
+                  const junto = !!x.fotoJunto && itens.some((id) => id !== x.id);
                   return (
                     <button
                       type="button" key={x.id} aria-pressed={ativo} className={`extra ${ef ? `extra--${ef}` : ''} ${ativo ? 'is-active' : ''}`} onClick={() => alternar(x)}
                       onMouseEnter={comMouse ? () => setEmCima(x.id) : undefined} onMouseLeave={comMouse ? () => setEmCima((v) => (v === x.id ? null : v)) : undefined}
                     >
                       {x.foto ? <img className="extra__foto" src={x.foto} alt="" /> : <span className="extra__foto extra__foto--vazia"><Gamepad2 size={30} /></span>}
-                      {/* o modelo 3D do item gira devagar sobre a foto quando está escolhido ou com o mouse em cima (fora da animação de tela cheia) */}
-                      {ef && (ativo || emCima === x.id) && !efeito && (
+                      {/* mesmo salão: com outro item escolhido junto, a foto troca pela versão em que ele aparece ao lado (ex.: o PS5 no canto do karaokê) */}
+                      {x.fotoJunto && <img className={`extra__foto extra__foto--junto ${junto ? 'is-on' : ''}`} src={x.fotoJunto} alt="" />}
+                      {/* o modelo 3D do item gira sobre a foto quando está escolhido ou com o mouse em cima; com a foto "junto" à vista, só com o mouse */}
+                      {ef && (emCima === x.id || (ativo && !junto)) && !efeito && (
                         <span className={`extra__3d extra__3d--${ef}`}>
                           {ef === 'ps5' ? <Ps5Realista velocidade={0.7} classe="extra__3d-tela" /> : <Mic3D velocidade={0.9} classe="extra__3d-tela" />}
-                        </span>
-                      )}
-                      {/* mesmo salão: o PS5 escolhido aparece no canto do karaokê (à esquerda do palco) e o karaokê escolhido aparece no canto gamer (à direita) */}
-                      {ef && !efeito && vizinhos.some((v) => v !== ef) && (
-                        <span className="extra__palco">
-                          {vizinhos.filter((v) => v !== ef).map((v) => (
-                            <span key={v} className={`extra__vizinho extra__vizinho--${v}`}>
-                              {v === 'ps5' ? <Ps5Realista velocidade={0.5} classe="extra__3d-tela" /> : <Mic3D velocidade={0.6} classe="extra__3d-tela" />}
-                            </span>
-                          ))}
                         </span>
                       )}
                       <span className="extra__check"><Check size={16} strokeWidth={3} /></span>
