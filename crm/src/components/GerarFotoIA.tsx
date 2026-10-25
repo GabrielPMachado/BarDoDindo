@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Check, Copy, Download, ExternalLink, ImageOff, Sparkles, Upload } from 'lucide-react';
-import { GEMINI_URL, MODELOS, promptDaFoto, promptDaFotoEstoque, promptDaFotoPatrimonio, type PadraoFoto } from '../lib/iaFoto';
+import { cenarioDoBem, GEMINI_URL, MODELOS, promptDaFoto, promptDaFotoEstoque, promptDaFotoPatrimonio, type PadraoFoto } from '../lib/iaFoto';
 import { fotoNoTamanho } from './Avatar';
 import { notify } from './ui';
 
@@ -40,7 +40,7 @@ export function GerarFotoIA({ data, onUsar, padrao = 'produto' }: { data: Record
   const prompt = () => padrao === 'estoque'
     ? promptDaFotoEstoque({ item: nome, categoria: String(data.categoria ?? ''), unidade: String(data.unidade ?? ''), conteudo: data.conteudo, conteudoUnidade: String(data.conteudoUnidade ?? '') })
     : padrao === 'patrimonio'
-      ? promptDaFotoPatrimonio({ nome, categoria: String(data.categoria ?? ''), descricao: String(data.descricaoReserva ?? '') })
+      ? promptDaFotoPatrimonio({ nome, categoria: String(data.categoria ?? ''), descricao: String(data.descricaoReserva ?? ''), cenario: String(data.cenarioFoto ?? '') })
       : promptDaFoto({ nome, resumo: String(data.resumo ?? ''), ingredientes: String(data.ingredientes ?? '') });
 
   /**
@@ -72,6 +72,9 @@ export function GerarFotoIA({ data, onUsar, padrao = 'produto' }: { data: Record
           <div>
             <strong><Sparkles size={15} /> Foto no padrão do Dindo</strong>
             <p className="muted small">Um toque copia o pedido deste {oQue}, baixa a foto modelo{modelo.cenario ? ` (${modelo.cenario})` : ''} e abre o Gemini (grátis). Depois é só enviar a foto pronta aqui.</p>
+            {padrao === 'patrimonio' && nome && (
+              <p className="muted small">Cenário: <b>{data.cenarioFoto && data.cenarioFoto !== 'Automático' ? String(data.cenarioFoto) : `${cenarioDoBem(nome, String(data.categoria ?? ''))} (automático)`}</b></p>
+            )}
           </div>
           <button type="button" className="btn btn--primary" onClick={criarNoGemini}><Sparkles size={16} /> Criar no Gemini</button>
         </div>
