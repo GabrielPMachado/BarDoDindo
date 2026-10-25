@@ -98,21 +98,7 @@ export function Ps5Realista({ velocidade, classe = 'ps5-real' }: { velocidade?: 
   return <canvas ref={tela} className={classe} aria-hidden />;
 }
 
-/** Microfone de karaokê em 3D (three.js) para o cartão; sem WebGL, cai no microfone desenhado. */
-export function Mic3D({ velocidade, classe }: { velocidade?: number; classe?: string }) {
-  const tela = useRef<HTMLCanvasElement>(null);
-  const [semWebGL, setSemWebGL] = useState(false);
-  useEffect(() => {
-    let cena: { parar: () => void } | null = null, ativo = true;
-    import('./micCena')
-      .then(({ montarMic }) => { if (ativo && tela.current) cena = montarMic(tela.current, { velocidade }); })
-      .catch(() => ativo && setSemWebGL(true));
-    return () => { ativo = false; cena?.parar(); };
-  }, [velocidade]);
-  if (semWebGL) return <MicDesenhado />;
-  return <canvas ref={tela} className={classe} aria-hidden />;
-}
-
+/** Microfone desenhado da animação do karaokê. */
 function MicDesenhado() {
   return (
     <svg viewBox="0 0 120 200" className="kara__mic" aria-hidden>
