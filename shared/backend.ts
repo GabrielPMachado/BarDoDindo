@@ -622,6 +622,11 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       }))
       .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
   });
+  rota('GET', '/public/reservaveis', async () =>
+    (await colecao('reservaveis'))
+      .map((r) => ({ id: r.id, nome: String(r.nome ?? ''), descricao: String(r.descricao ?? ''), foto: typeof r.foto === 'string' ? r.foto : '' }))
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
+  );
   const recompensasAtivas = () => lista('recompensas@ativas', query(collection(db, 'recompensas'), where('status', '==', 'Ativa')));
   rota('GET', '/public/recompensas', async () =>
     (await recompensasAtivas())
@@ -761,11 +766,17 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     if (dia.getTime() < Date.now() + cfg.antecedenciaMinutos * 60000) fail(400, 'Este horário já passou ou está muito próximo.');
     if (!cfg.ambientes.includes(ambiente)) fail(400, 'Ambiente indisponível.');
     if (!(pessoas >= 1 && pessoas <= 50)) fail(400, 'Número de pessoas inválido.');
+    // PS5, karaokê e outros bens da categoria Reserva pedidos junto com a mesa (o bar confirma tudo junto)
+    const pedidos = Array.isArray(b.itens) ? [...new Set(b.itens.map((x) => str(x, 40)))].slice(0, 10) : [];
+    const disponiveis = pedidos.length ? await colecao('reservaveis') : [];
+    const itens = pedidos.map((id) => disponiveis.find((x) => x.id === id) ?? fail(400, 'Um dos itens escolhidos não está mais disponível para reserva.'))
+      .map((x) => ({ id: x.id, nome: String(x.nome ?? '') }));
     const ref = doc(collection(db, 'reservas'));
     const t = now();
     const reserva = {
       clienteId: c.numero, clienteUid: uid, clienteNome: c.nome, clienteTelefone: c.telefone, data, hora, pessoas, ambiente,
       observacoes: str(b.observacoes, 300), status: 'Pendente', origem: 'Aplicativo', criadoEm: t, atualizadoEm: t,
+      ...(itens.length ? { itens, extras: itens.map((x) => x.nome).join(', ') } : {}),
     };
     const lote = writeBatch(db);
     lote.set(ref, reserva);
@@ -1217,7 +1228,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     if (!ctx.funcao?.sistema) fail(403, 'Só a Presidência pode zerar o sistema.');
     if (b.confirmacao !== 'ZERAR TUDO') fail(400, 'Para zerar, confirme com "ZERAR TUDO".');
     const todos = async (...caminho: string[]) => (await getDocs(collection(db, caminho.join('/')))).docs.map((d) => d.ref);
-    const cols = [...Object.keys(COLLECTIONS).filter((c) => c !== 'funcoes'), 'clientes', 'saldos', 'cpfs', 'cardapio', 'ref_colaboradores', 'ref_fornecedores', 'config', 'segredos', 'opcoes'];
+    const cols = [...Object.keys(COLLECTIONS).filter((c) => c !== 'funcoes'), 'clientes', 'saldos', 'cpfs', 'cardapio', 'reservaveis', 'ref_colaboradores', 'ref_fornecedores', 'config', 'segredos', 'opcoes'];
     const refs: DocumentReference[] = [];
     for (const c of cols) refs.push(...(await todos(c)));
     for (const a of new Set([...AREAS, ...MODULOS])) refs.push(...(await todos('atividades', a, 'itens')));
@@ -1803,11 +1814,22 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     };
   }
   const noCardapio = (d: Dados) => d.status === 'Ativo' && d.noCardapio !== 'Não';
+  /** Bens do Patrimônio na categoria Reserva (PS5, karaokê…) que o afilhado pode pedir junto com a mesa; fora de uso não aparecem. */
+  const reservavel = (d: Dados) => d.categoria === 'Reserva' && !['Manutenção', 'Baixado'].includes(String(d.estado ?? ''));
+  const itemReservavel = (d: Dados) => ({
+    nome: String(d.nome ?? '').slice(0, 120), descricao: String(d.descricaoReserva ?? '').trim().slice(0, 300),
+    foto: typeof d.foto === 'string' && d.foto.startsWith('data:image/') ? d.foto : '',
+  });
   /** Cópias só com o que pode ser visto por mais gente: cardápio (público) e nomes para vincular registros (equipe). */
   function espelhar(lote: WriteBatch, col: string, id: string, d: Dados | null) {
     if (col === 'produtos') {
       const ref = doc(db, 'cardapio', id);
       if (d && noCardapio(d)) lote.set(ref, itemDoCardapio(d));
+      else lote.delete(ref);
+    }
+    if (col === 'patrimonio') {
+      const ref = doc(db, 'reservaveis', id);
+      if (d && reservavel(d)) lote.set(ref, itemReservavel(d));
       else lote.delete(ref);
     }
     if (col === 'colaboradores') {

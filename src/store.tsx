@@ -52,6 +52,16 @@ export interface Reservation {
   ambiente: string;
   observacoes?: string;
   status: ReservaStatus;
+  /** PS5, karaokê e outros itens do bar pedidos junto com a mesa. */
+  itens?: { id: string; nome: string }[];
+}
+
+/** Item do bar que o afilhado pode reservar junto com a mesa (bens do Patrimônio na categoria Reserva). */
+export interface Reservavel {
+  id: string;
+  nome: string;
+  descricao: string;
+  foto: string;
 }
 
 export interface Consumption {
@@ -101,7 +111,7 @@ interface Store {
   cadastro: (dados: { nome: string; email: string; telefone: string; senha: string; cpf: string; nascimento: string; aceite: boolean; via?: string }) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
-  criarReserva: (r: { data: string; hora: string; pessoas: number; ambiente: string; observacoes: string }) => Promise<Reservation>;
+  criarReserva: (r: { data: string; hora: string; pessoas: number; ambiente: string; observacoes: string; itens: string[] }) => Promise<Reservation>;
   cancelarReserva: (id: string) => Promise<void>;
   resgatar: (recompensaId: string) => Promise<Redemption>;
   atualizarPerfil: (dados: { nome?: string; telefone?: string; foto?: string | null; cpf?: string; nascimento?: string; respostas?: Record<string, string> }) => Promise<void>;

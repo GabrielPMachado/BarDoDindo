@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Check, Copy, Download, ExternalLink, ImageOff, Sparkles, Upload } from 'lucide-react';
-import { GEMINI_URL, MODELOS, promptDaFoto, promptDaFotoEstoque, type PadraoFoto } from '../lib/iaFoto';
+import { GEMINI_URL, MODELOS, promptDaFoto, promptDaFotoEstoque, promptDaFotoPatrimonio, type PadraoFoto } from '../lib/iaFoto';
 import { fotoNoTamanho } from './Avatar';
 import { notify } from './ui';
 
@@ -39,14 +39,16 @@ export function GerarFotoIA({ data, onUsar, padrao = 'produto' }: { data: Record
   const nome = String((padrao === 'estoque' ? data.item : data.nome) ?? '').trim();
   const prompt = () => padrao === 'estoque'
     ? promptDaFotoEstoque({ item: nome, categoria: String(data.categoria ?? ''), unidade: String(data.unidade ?? ''), conteudo: data.conteudo, conteudoUnidade: String(data.conteudoUnidade ?? '') })
-    : promptDaFoto({ nome, resumo: String(data.resumo ?? ''), ingredientes: String(data.ingredientes ?? '') });
+    : padrao === 'patrimonio'
+      ? promptDaFotoPatrimonio({ nome, categoria: String(data.categoria ?? ''), descricao: String(data.descricaoReserva ?? '') })
+      : promptDaFoto({ nome, resumo: String(data.resumo ?? ''), ingredientes: String(data.ingredientes ?? '') });
 
   /**
    * Um toque faz tudo: copia o pedido, baixa a foto modelo (e a foto atual, como referência) e abre o Gemini.
    * A cópia começa antes de abrir a aba: depois que o Gemini abre, a página perde o foco e o navegador não deixa copiar.
    */
   const criarNoGemini = () => {
-    if (!nome) { notify(padrao === 'estoque' ? 'Informe o nome do item antes.' : 'Informe o nome do produto antes.', 'error'); return; }
+    if (!nome) { notify(padrao === 'estoque' ? 'Informe o nome do item antes.' : padrao === 'patrimonio' ? 'Informe o nome do bem antes.' : 'Informe o nome do produto antes.', 'error'); return; }
     const copiou = copiar(prompt());
     baixarModelo();
     if (fotoAtual) baixar(fotoAtual, `referencia-${nomeArquivo(nome)}.jpg`);
@@ -69,7 +71,7 @@ export function GerarFotoIA({ data, onUsar, padrao = 'produto' }: { data: Record
         <div className="gerar-foto__chamada">
           <div>
             <strong><Sparkles size={15} /> Foto no padrão do Dindo</strong>
-            <p className="muted small">Um toque copia o pedido deste {oQue}, baixa a foto modelo{padrao === 'estoque' ? ' (o depósito com a lousa do Dindo)' : ''} e abre o Gemini (grátis). Depois é só enviar a foto pronta aqui.</p>
+            <p className="muted small">Um toque copia o pedido deste {oQue}, baixa a foto modelo{modelo.cenario ? ` (${modelo.cenario})` : ''} e abre o Gemini (grátis). Depois é só enviar a foto pronta aqui.</p>
           </div>
           <button type="button" className="btn btn--primary" onClick={criarNoGemini}><Sparkles size={16} /> Criar no Gemini</button>
         </div>

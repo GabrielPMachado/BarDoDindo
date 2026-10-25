@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CalendarCheck, CalendarDays, Minus, Plus, Trash2 } from 'lucide-react';
+import { CalendarCheck, CalendarDays, Check, Gamepad2, Minus, Plus, Trash2 } from 'lucide-react';
+import { api } from '../api';
+import { EfeitoReserva, efeitoDe, type Efeito } from '../components/EfeitoReserva';
 import { confirmar, Empty, PageHeader, ReservationCard, SectionHeader, Toast } from '../components/ui';
-import { dateParts, isoDate, parseDate, todayISO, upcoming, useMe, useStore, type Reservation } from '../store';
+import { dateParts, isoDate, parseDate, todayISO, upcoming, useMe, useStore, type Reservation, type Reservavel } from '../store';
 
 export default function Reservas() {
   const me = useMe();
@@ -30,6 +32,20 @@ export default function Reservas() {
   const [confirm, setConfirm] = useState<Reservation | null>(null);
   const [toast, setToast] = useState<{ msg: string; tone: 'ok' | 'error' } | null>(null);
   const clearToast = useCallback(() => setToast(null), []);
+  // PS5, karaokê e outros itens do bar: só esta tela busca (o app não carrega isso a cada atualização)
+  const [reservaveis, setReservaveis] = useState<Reservavel[]>([]);
+  const [itens, setItens] = useState<string[]>([]);
+  const [efeito, setEfeito] = useState<{ efeito: Efeito; item: Reservavel } | null>(null);
+  const fimDoEfeito = useCallback(() => setEfeito(null), []);
+  useEffect(() => {
+    api<Reservavel[]>('/public/reservaveis').then(setReservaveis).catch(() => setReservaveis([]));
+  }, []);
+  const alternar = (x: Reservavel) => {
+    const marcado = itens.includes(x.id);
+    setItens((v) => (marcado ? v.filter((id) => id !== x.id) : [...v, x.id]));
+    const ef = efeitoDe(x.nome);
+    if (!marcado && ef) setEfeito({ efeito: ef, item: x });
+  };
 
   const timeDisabled = useCallback(
     (d: string, t: string) => {
@@ -61,9 +77,10 @@ export default function Reservas() {
     if (!canSubmit) return;
     setBusy(true);
     try {
-      const r = await criarReserva({ data: date, hora: time, pessoas: people, ambiente: area, observacoes: notes.trim() });
+      const r = await criarReserva({ data: date, hora: time, pessoas: people, ambiente: area, observacoes: notes.trim(), itens: itens.filter((id) => reservaveis.some((x) => x.id === id)) });
       setConfirm(r);
       setNotes('');
+      setItens([]);
     } catch (err) {
       setToast({ msg: err instanceof Error ? err.message : 'Não foi possível reservar.', tone: 'error' });
     } finally {
@@ -151,6 +168,28 @@ export default function Reservas() {
             </>
           )}
 
+          {reservaveis.length > 0 && (
+            <>
+              <label className="label">Diversão na mesa (opcional)</label>
+              <div className="extras" role="group" aria-label="Itens para reservar junto">
+                {reservaveis.map((x) => {
+                  const ativo = itens.includes(x.id);
+                  const ef = efeitoDe(x.nome);
+                  return (
+                    <button type="button" key={x.id} aria-pressed={ativo} className={`extra ${ef ? `extra--${ef}` : ''} ${ativo ? 'is-active' : ''}`} onClick={() => alternar(x)}>
+                      {x.foto ? <img className="extra__foto" src={x.foto} alt="" /> : <span className="extra__foto extra__foto--vazia"><Gamepad2 size={30} /></span>}
+                      <span className="extra__check"><Check size={16} strokeWidth={3} /></span>
+                      <span className="extra__texto">
+                        <strong>{x.nome}</strong>
+                        {x.descricao && <span>{x.descricao}</span>}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
           <label className="label" htmlFor="notes">Observações (opcional)</label>
           <textarea
             id="notes"
@@ -205,12 +244,14 @@ export default function Reservas() {
               {confirm.hora}
               <br />
               {confirm.pessoas} {confirm.pessoas === 1 ? 'pessoa' : 'pessoas'} · {confirm.ambiente}
+              {!!confirm.itens?.length && <><br />Com {confirm.itens.map((x) => x.nome).join(', ')}</>}
             </p>
             <p className="small muted">Você será avisado aqui assim que o bar confirmar a reserva.</p>
             <button className="btn btn--primary" onClick={() => setConfirm(null)}>Entendido</button>
           </div>
         </div>
       )}
+      {efeito && <EfeitoReserva efeito={efeito.efeito} nome={efeito.item.nome} foto={efeito.item.foto} onFim={fimDoEfeito} />}
       <Toast msg={toast?.msg ?? null} tone={toast?.tone} onDone={clearToast} />
     </div>
   );
