@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarCheck, CalendarDays, Check, Gamepad2, Minus, Plus, Trash2 } from 'lucide-react';
 import { api } from '../api';
-import { EfeitoReserva, efeitoDe, type Efeito } from '../components/EfeitoReserva';
 import { confirmar, Empty, PageHeader, ReservationCard, SectionHeader, Toast } from '../components/ui';
 import { dateParts, isoDate, parseDate, todayISO, upcoming, useStore, type Reservation, type Reservavel } from '../store';
+
+/** Itens com cor própria no cartão (borda neon e faixa): azul no PS5, rosa no karaokê. */
+const corDe = (nome: string) => (/\bps\s?5\b|playstation/i.test(nome) ? 'ps5' : /karaok/i.test(nome) ? 'karaoke' : null);
 
 /** Itens de exemplo da demonstração, quando o bar ainda não pôs nada na categoria Reserva. */
 const EXEMPLOS: Reservavel[] = [
@@ -48,8 +50,6 @@ export default function Reservas({ demo = false }: { demo?: boolean }) {
   // PS5, karaokê e outros itens do bar: só esta tela busca (o app não carrega isso a cada atualização)
   const [reservaveis, setReservaveis] = useState<Reservavel[]>([]);
   const [itens, setItens] = useState<string[]>([]);
-  const [efeito, setEfeito] = useState<{ efeito: Efeito; item: Reservavel } | null>(null);
-  const fimDoEfeito = useCallback(() => setEfeito(null), []);
   useEffect(() => {
     api<Reservavel[]>('/public/reservaveis')
       .then((l) => setReservaveis(demo && !l.length ? EXEMPLOS : l))
@@ -61,8 +61,6 @@ export default function Reservas({ demo = false }: { demo?: boolean }) {
     const marcado = itens.includes(x.id);
     setFaixa((f) => ({ id: x.id, n: (f?.n ?? 0) + 1 }));
     setItens((v) => (marcado ? v.filter((id) => id !== x.id) : [...v, x.id]));
-    const ef = efeitoDe(x.nome);
-    if (!marcado && ef) setEfeito({ efeito: ef, item: x });
   };
 
   const timeDisabled = useCallback(
@@ -193,7 +191,7 @@ export default function Reservas({ demo = false }: { demo?: boolean }) {
               <div className="extras" role="group" aria-label="Itens para reservar junto">
                 {reservaveis.map((x) => {
                   const ativo = itens.includes(x.id);
-                  const ef = efeitoDe(x.nome);
+                  const ef = corDe(x.nome);
                   const junto = !!x.fotoJunto && itens.some((id) => id !== x.id);
                   return (
                     <button
@@ -202,8 +200,7 @@ export default function Reservas({ demo = false }: { demo?: boolean }) {
                       {x.foto ? <img className="extra__foto" src={x.foto} alt="" /> : <span className="extra__foto extra__foto--vazia"><Gamepad2 size={30} /></span>}
                       {/* mesmo salão: com outro item escolhido junto, a foto troca pela versão em que ele aparece ao lado (ex.: o PS5 no canto do karaokê) */}
                       {x.fotoJunto && <img className={`extra__foto extra__foto--junto ${junto ? 'is-on' : ''}`} src={x.fotoJunto} alt="" />}
-                      {/* com a animação de tela cheia aberta, a faixa espera ela fechar para passar */}
-                      {faixa?.id === x.id && !efeito && <span key={faixa.n} className={`extra__faixa ${ativo ? '' : 'extra__faixa--sai'}`} aria-hidden />}
+                      {faixa?.id === x.id && <span key={faixa.n} className={`extra__faixa ${ativo ? '' : 'extra__faixa--sai'}`} aria-hidden />}
                       <span className="extra__check"><Check size={16} strokeWidth={3} /></span>
                       <span className="extra__texto">
                         <strong>{x.nome}</strong>
@@ -277,7 +274,6 @@ export default function Reservas({ demo = false }: { demo?: boolean }) {
           </div>
         </div>
       )}
-      {efeito && <EfeitoReserva efeito={efeito.efeito} nome={efeito.item.nome} foto={efeito.item.foto} onFim={fimDoEfeito} />}
       <Toast msg={toast?.msg ?? null} tone={toast?.tone} onDone={clearToast} />
     </div>
   );
