@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarCheck, CalendarDays, Check, Gamepad2, Minus, Plus, Trash2 } from 'lucide-react';
 import { api } from '../api';
-import { EfeitoReserva, efeitoDe, Mic3D, Ps5Realista, type Efeito } from '../components/EfeitoReserva';
+import { EfeitoReserva, efeitoDe, type Efeito } from '../components/EfeitoReserva';
 import { confirmar, Empty, PageHeader, ReservationCard, SectionHeader, Toast } from '../components/ui';
 import { dateParts, isoDate, parseDate, todayISO, upcoming, useStore, type Reservation, type Reservavel } from '../store';
 
@@ -55,11 +55,11 @@ export default function Reservas({ demo = false }: { demo?: boolean }) {
       .then((l) => setReservaveis(demo && !l.length ? EXEMPLOS : l))
       .catch(() => setReservaveis(demo ? EXEMPLOS : []));
   }, [demo]);
-  // no PC, o PS5 do cartão também gira com o mouse em cima (no celular, só quando está escolhido)
-  const [emCima, setEmCima] = useState<string | null>(null);
-  const comMouse = useMemo(() => typeof window !== 'undefined' && window.matchMedia?.('(hover: hover) and (pointer: fine)').matches, []);
+  // faixa de brilho que passa uma vez pelo cartão ao marcar e ao desmarcar (o número muda a cada toque e reinicia a animação)
+  const [faixa, setFaixa] = useState<{ id: string; n: number } | null>(null);
   const alternar = (x: Reservavel) => {
     const marcado = itens.includes(x.id);
+    setFaixa((f) => ({ id: x.id, n: (f?.n ?? 0) + 1 }));
     setItens((v) => (marcado ? v.filter((id) => id !== x.id) : [...v, x.id]));
     const ef = efeitoDe(x.nome);
     if (!marcado && ef) setEfeito({ efeito: ef, item: x });
@@ -198,17 +198,12 @@ export default function Reservas({ demo = false }: { demo?: boolean }) {
                   return (
                     <button
                       type="button" key={x.id} aria-pressed={ativo} className={`extra ${ef ? `extra--${ef}` : ''} ${ativo ? 'is-active' : ''}`} onClick={() => alternar(x)}
-                      onMouseEnter={comMouse ? () => setEmCima(x.id) : undefined} onMouseLeave={comMouse ? () => setEmCima((v) => (v === x.id ? null : v)) : undefined}
                     >
                       {x.foto ? <img className="extra__foto" src={x.foto} alt="" /> : <span className="extra__foto extra__foto--vazia"><Gamepad2 size={30} /></span>}
                       {/* mesmo salão: com outro item escolhido junto, a foto troca pela versão em que ele aparece ao lado (ex.: o PS5 no canto do karaokê) */}
                       {x.fotoJunto && <img className={`extra__foto extra__foto--junto ${junto ? 'is-on' : ''}`} src={x.fotoJunto} alt="" />}
-                      {/* o modelo 3D do item gira sobre a foto quando está escolhido ou com o mouse em cima; com a foto "junto" à vista, só com o mouse */}
-                      {ef && (emCima === x.id || (ativo && !junto)) && !efeito && (
-                        <span className={`extra__3d extra__3d--${ef}`}>
-                          {ef === 'ps5' ? <Ps5Realista velocidade={0.7} classe="extra__3d-tela" /> : <Mic3D velocidade={0.9} classe="extra__3d-tela" />}
-                        </span>
-                      )}
+                      {/* com a animação de tela cheia aberta, a faixa espera ela fechar para passar */}
+                      {faixa?.id === x.id && !efeito && <span key={faixa.n} className={`extra__faixa ${ativo ? '' : 'extra__faixa--sai'}`} aria-hidden />}
                       <span className="extra__check"><Check size={16} strokeWidth={3} /></span>
                       <span className="extra__texto">
                         <strong>{x.nome}</strong>
