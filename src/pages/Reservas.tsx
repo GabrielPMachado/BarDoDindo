@@ -3,11 +3,24 @@ import { CalendarCheck, CalendarDays, Check, Gamepad2, Minus, Plus, Trash2 } fro
 import { api } from '../api';
 import { EfeitoReserva, efeitoDe, type Efeito } from '../components/EfeitoReserva';
 import { confirmar, Empty, PageHeader, ReservationCard, SectionHeader, Toast } from '../components/ui';
-import { dateParts, isoDate, parseDate, todayISO, upcoming, useMe, useStore, type Reservation, type Reservavel } from '../store';
+import { dateParts, isoDate, parseDate, todayISO, upcoming, useStore, type Reservation, type Reservavel } from '../store';
 
-export default function Reservas() {
-  const me = useMe();
-  const { config, criarReserva, cancelarReserva } = useStore();
+/** Itens de exemplo da demonstração, quando o bar ainda não pôs nada na categoria Reserva. */
+const EXEMPLOS: Reservavel[] = [
+  { id: 'demo-ps5', nome: 'PlayStation 5', descricao: 'Dois controles e os jogos da casa.', foto: '' },
+  { id: 'demo-karaoke', nome: 'Karaokê', descricao: 'Microfones e milhares de músicas.', foto: '' },
+];
+
+/** `demo`: abre sem login e não grava nada (a reserva só aparece na tela). */
+export default function Reservas({ demo = false }: { demo?: boolean }) {
+  const store = useStore();
+  // fora da demonstração a tela só abre com sessão (o Shell garante)
+  const me = { reservas: demo ? [] : store.me?.reservas ?? [] };
+  const { config, cancelarReserva } = store;
+  const criarReserva: typeof store.criarReserva = demo
+    ? async (r) => ({ id: 'demo', data: r.data, hora: r.hora, pessoas: r.pessoas, ambiente: r.ambiente, status: 'Pendente',
+      itens: r.itens.map((id) => ({ id, nome: reservaveis.find((x) => x.id === id)?.nome ?? '' })) })
+    : store.criarReserva;
   const horarios = config?.horarios ?? [];
   const ambientes = config?.ambientes ?? [];
   const antecedencia = config?.antecedenciaMinutos ?? 30;
@@ -38,8 +51,10 @@ export default function Reservas() {
   const [efeito, setEfeito] = useState<{ efeito: Efeito; item: Reservavel } | null>(null);
   const fimDoEfeito = useCallback(() => setEfeito(null), []);
   useEffect(() => {
-    api<Reservavel[]>('/public/reservaveis').then(setReservaveis).catch(() => setReservaveis([]));
-  }, []);
+    api<Reservavel[]>('/public/reservaveis')
+      .then((l) => setReservaveis(demo && !l.length ? EXEMPLOS : l))
+      .catch(() => setReservaveis(demo ? EXEMPLOS : []));
+  }, [demo]);
   const alternar = (x: Reservavel) => {
     const marcado = itens.includes(x.id);
     setItens((v) => (marcado ? v.filter((id) => id !== x.id) : [...v, x.id]));
@@ -109,6 +124,7 @@ export default function Reservas() {
   return (
     <div className="page">
       <PageHeader title="Fazer reserva" subtitle="Garanta sua mesa no Dindo" />
+      {demo && <p className="demo-aviso">Demonstração: nada do que você escolher aqui é gravado.</p>}
 
       {semConfig ? (
         <Empty icon={<CalendarDays />}>As reservas pelo aplicativo estão temporariamente indisponíveis.</Empty>
@@ -208,8 +224,8 @@ export default function Reservas() {
         </form>
       )}
 
-      <SectionHeader title="Minhas próximas reservas" />
-      {next.length ? (
+      {!demo && <SectionHeader title="Minhas próximas reservas" />}
+      {demo ? null : next.length ? (
         <div className="stack">
           {next.map((r) => (
             <ReservationCard
@@ -246,7 +262,7 @@ export default function Reservas() {
               {confirm.pessoas} {confirm.pessoas === 1 ? 'pessoa' : 'pessoas'} · {confirm.ambiente}
               {!!confirm.itens?.length && <><br />Com {confirm.itens.map((x) => x.nome).join(', ')}</>}
             </p>
-            <p className="small muted">Você será avisado aqui assim que o bar confirmar a reserva.</p>
+            <p className="small muted">{demo ? 'Demonstração: esta reserva não foi gravada.' : 'Você será avisado aqui assim que o bar confirmar a reserva.'}</p>
             <button className="btn btn--primary" onClick={() => setConfirm(null)}>Entendido</button>
           </div>
         </div>
