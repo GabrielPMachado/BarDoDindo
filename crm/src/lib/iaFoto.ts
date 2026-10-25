@@ -11,12 +11,29 @@ import { chaveDaIA } from './iaNota';
 export const FOTO_MODELO_URL = modeloUrl;
 export const GEMINI_URL = 'https://gemini.google.com/app';
 
-/** Padrões de foto: drinks na mesa do bar; itens do Estoque na bancada do depósito, com a lousa do Dindo ao fundo. */
-export type PadraoFoto = 'produto' | 'estoque';
-export const MODELOS: Record<PadraoFoto, { url: string; arquivo: string; oQue: string }> = {
+/**
+ * Padrões de foto: drinks na mesa do bar; itens do Estoque na bancada do depósito, com a lousa do Dindo ao fundo;
+ * bens do Patrimônio no salão (a mesma foto do bar como referência do ambiente, num plano mais aberto).
+ */
+export type PadraoFoto = 'produto' | 'estoque' | 'patrimonio';
+export const MODELOS: Record<PadraoFoto, { url: string; arquivo: string; oQue: string; cenario?: string }> = {
   produto: { url: modeloUrl, arquivo: 'foto-modelo-bar-do-dindo.jpg', oQue: 'drink' },
-  estoque: { url: modeloEstoqueUrl, arquivo: 'foto-modelo-estoque-bar-do-dindo.jpg', oQue: 'item' },
+  estoque: { url: modeloEstoqueUrl, arquivo: 'foto-modelo-estoque-bar-do-dindo.jpg', oQue: 'item', cenario: 'o depósito com a lousa do Dindo' },
+  patrimonio: { url: modeloUrl, arquivo: 'foto-modelo-salao-bar-do-dindo.jpg', oQue: 'bem', cenario: 'o salão com a placa do Dindo' },
 };
+
+/** Pedido para a foto de um bem do Patrimônio, no salão do bar: o bem no centro, com a parede de tijolos e a placa do Dindo ao fundo. */
+export function promptDaFotoPatrimonio(p: { nome: string; categoria?: string; descricao?: string }) {
+  const bem = [p.nome.trim(), p.categoria && p.categoria !== 'Outro' ? `categoria: ${p.categoria}` : '', p.descricao?.trim()].filter(Boolean).join('. ');
+  const diversao = p.categoria === 'Reserva' || /ps ?\d|playstation|xbox|nintendo|videogame|karaok|sinuca|pebolim|dardo|jogo/i.test(p.nome);
+  return `Use a imagem anexada como referência do ambiente do Bar do Dindo e crie uma nova foto no MESMO salão, com o mesmo estilo, iluminação quente e cores: a parede de tijolos aparentes com a placa redonda de madeira do Bar do Dindo à direita (idêntica, sem alterar o logo nem as letras "BAR DO DINDO · DRINKS E CHOPP · NOVA OLARIA"), a luminária pendente acesa, as plantas e as prateleiras com garrafas desfocadas à esquerda.
+
+Abra o enquadramento para mostrar um canto do salão, com piso de madeira escura, e tire o drink e a mesa do primeiro plano. No centro da cena, em destaque, coloque este bem do bar: ${bem}. Mostre o produto real e reconhecível (marca, formato e cores), inteiro, de frente ou levemente de lado, no tamanho real em relação ao ambiente: o que é pequeno fica sobre um aparador ou mesa de madeira; o que é grande fica apoiado no piso.${diversao ? `
+
+É um item que os clientes reservam para se divertir: mostre-o montado e pronto para usar (por exemplo, o videogame com os controles à frente e a TV ligada numa tela de jogo; o karaokê com o microfone, a caixa de som e a tela com uma letra de música), com um leve brilho colorido de luz de festa no ambiente, sem perder a luz quente do bar.` : ''}
+
+Fotografia realista, foco nítido no bem e fundo levemente desfocado. Não adicione textos, pessoas nem mãos. Mantenha o formato horizontal 4:3.`;
+}
 
 /** Pedido para a foto de um item do Estoque, no padrão do depósito (a garrafa sobre a bancada, com a lousa do Dindo). */
 export function promptDaFotoEstoque(p: { item: string; categoria?: string; unidade?: string; conteudo?: unknown; conteudoUnidade?: string }, comReferencia = false) {

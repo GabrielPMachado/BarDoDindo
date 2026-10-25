@@ -241,6 +241,11 @@ service cloud.firestore {
       allow read: if true;
       allow write: if podeEmAlgum(['produtos', 'fichas'], 'criar') || podeEmAlgum(['produtos', 'fichas'], 'editar') || podeEmAlgum(['produtos', 'fichas'], 'excluir');
     }
+    // bens do Patrimônio na categoria Reserva (PS5, karaokê…), que o afilhado escolhe ao reservar
+    match /reservaveis/{id} {
+      allow read: if true;
+      allow write: if podeColecao('patrimonio', 'criar') || podeColecao('patrimonio', 'editar') || podeColecao('patrimonio', 'excluir');
+    }
     // nomes para vincular registros, visíveis a toda a equipe (sem salários nem contatos)
     match /ref_colaboradores/{id} {
       allow read: if daEquipe();

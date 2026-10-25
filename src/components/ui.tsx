@@ -225,6 +225,7 @@ export function ReservationCard({ r, action }: { r: Reservation; action?: ReactN
         <div className="res-card__time">{r.hora}</div>
         <div className="muted">Mesa para {r.pessoas} {r.pessoas === 1 ? 'pessoa' : 'pessoas'}</div>
         <div className="muted small">{r.ambiente}</div>
+        {!!r.itens?.length && <div className="res-card__extras">Com {r.itens.map((x) => x.nome).join(', ')}</div>}
         <div className={`status status--${st.tone}`}><Icon size={18} /> {st.label}</div>
       </div>
       <div className="res-card__art" aria-hidden={!action}>

@@ -78,6 +78,8 @@ await negado('afilhado acrescenta opção às listas do CRM', () => setDoc(doc(d
 await negado('refazer o primeiro acesso', () => setDoc(doc(db, 'meta/setup'), { feitoEm: 'x' }));
 await negado('alterar o contador de afilhados', () => updateDoc(doc(db, 'meta/contadores'), { clientes: increment(1) }));
 await negado('gravar no cardápio', () => setDoc(doc(db, 'cardapio/x'), { nome: 'x', preco: 0 }));
+await permitido('ver os itens para reservar (PS5, karaokê)', () => getDocs(collection(db, 'reservaveis')));
+await negado('gravar nos itens para reservar', () => setDoc(doc(db, 'reservaveis/x'), { nome: 'PS5', descricao: '', foto: '' }));
 await negado('ver atualizações da equipe', () => getDocs(collection(db, 'atividades', 'cfg', 'itens')));
 await negado('apagar o próprio cadastro de afilhado', () => deleteDoc(doc(db, 'clientes', uid)));
 await negado('apagar o registro do primeiro acesso', () => deleteDoc(doc(db, 'meta/setup')));
@@ -241,7 +243,14 @@ if (senhaModular) {
   await negado('Resultado (DRE) não lança receita', () => addDoc(collection(db, 'receitas'), { descricao: 'x', valor: 1, data: '2026-10-01' }));
   await negado('ver colaboradores', () => getDocs(collection(db, 'colaboradores')));
   await permitido('ver o Patrimônio (módulo com "ver")', () => getDocs(collection(db, 'patrimonio')));
-  await negado('cadastrar bem no Patrimônio (o módulo só tem "ver")', () => addDoc(collection(db, 'patrimonio'), { nome: 'x', categoria: 'Mobiliário' }));
+  await negado('cadastrar bem no Patrimônio (o módulo não tem "criar")', () => addDoc(collection(db, 'patrimonio'), { nome: 'x', categoria: 'Mobiliário' }));
+  await permitido('Patrimônio com "editar" publica o bem da categoria Reserva no app', () => setDoc(doc(db, 'reservaveis/ps5'), { nome: 'PS5', descricao: '', foto: '' }));
+  await negado('Reservas não publica item para reservar (é do Patrimônio)', async () => {
+    await signOut(auth);
+    await signInWithEmailAndPassword(auth, 'atendente@teste.local', senhaAtendente);
+    try { return await setDoc(doc(db, 'reservaveis/karaoke'), { nome: 'Karaokê', descricao: '', foto: '' }); }
+    finally { await signOut(auth); await signInWithEmailAndPassword(auth, 'modular@teste.local', senhaModular); }
+  });
   await permitido('ver os Arquivos da empresa (módulo com "ver")', () => getDocs(collection(db, 'arquivos')));
   await permitido('cadastrar documento nos Arquivos', () => addDoc(collection(db, 'arquivos'), { titulo: 'Contrato social', tipo: 'Contrato social', data: '2026-01-10', status: 'Vigente' }));
   await negado('excluir documento dos Arquivos (o módulo não tem "excluir")', () => deleteDoc(doc(db, 'arquivos', 'qualquer')));

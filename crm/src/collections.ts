@@ -93,8 +93,8 @@ export interface CollectionDef {
   porLocal?: boolean;
   /** No cadastro do fornecedor, mostra os itens que temos dele (Estoque, Materiais e Tabela de preços). */
   itensDoFornecedor?: boolean;
-  /** Botão "Foto no padrão do Dindo" (Gemini) para itens do Estoque, com o depósito como cenário. */
-  fotoPadrao?: 'estoque';
+  /** Botão "Foto no padrão do Dindo" (Gemini): itens do Estoque no depósito; bens do Patrimônio no salão do bar. */
+  fotoPadrao?: 'estoque' | 'patrimonio';
   /** Foto guardada em tamanho maior (mídias e artes), para ver ampliada. */
   fotoGrande?: boolean;
   /** Botão "Preencher com IA" (descrição, ingredientes e perfil da bebida) no cadastro do produto. */
@@ -323,13 +323,13 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     ],
   },
   patrimonio: {
-    id: 'patrimonio', anexos: 'Notas fiscais, garantias e laudos', comFoto: true, area: 'patrimonio', title: 'Patrimônio', singular: 'bem',
-    description: 'Bens do bar (móveis, equipamentos, eletrônicos, instalações), com número de patrimônio, valor de aquisição e depreciação.',
+    id: 'patrimonio', anexos: 'Notas fiscais, garantias e laudos', comFoto: true, fotoPadrao: 'patrimonio', area: 'patrimonio', title: 'Patrimônio', singular: 'bem',
+    description: 'Bens do bar (móveis, equipamentos, eletrônicos, instalações), com número de patrimônio, valor de aquisição e depreciação. Os da categoria Reserva aparecem para o afilhado escolher ao fazer a reserva no app.',
     filterKey: 'categoria', filtros: ['local', 'estado'], sortKey: 'nome',
     fields: [
       { key: 'nome', label: 'Bem', type: 'text', required: true, wide: true, placeholder: 'Ex.: Freezer horizontal, Mesa de madeira, Chopeira' },
       { key: 'plaqueta', label: 'Nº de patrimônio', type: 'text', placeholder: 'Ex.: PAT-0001' },
-      { key: 'categoria', label: 'Categoria', type: 'select', options: ['Equipamento', 'Mobiliário', 'Eletrônico', 'Utensílio', 'Decoração', 'Instalação / benfeitoria', 'Veículo', 'Outro'], required: true },
+      { key: 'categoria', label: 'Categoria', type: 'select', options: ['Equipamento', 'Mobiliário', 'Eletrônico', 'Utensílio', 'Decoração', 'Instalação / benfeitoria', 'Veículo', 'Reserva', 'Outro'], required: true },
       { key: 'quantidade', label: 'Quantidade', type: 'number', default: 1, min: 1, max: 100_000 },
       { key: 'valor', label: 'Valor unitário de aquisição', type: 'money', max: 10_000_000, formOnly: true },
       { key: 'aquisicao', label: 'Data de aquisição', type: 'date' },
@@ -337,6 +337,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'estado', label: 'Estado', type: 'select', options: ['Novo', 'Bom', 'Regular', 'Manutenção', 'Baixado'], default: 'Bom' },
       { key: 'local', label: 'Local', type: 'select', options: ['Salão', 'Bar', 'Cozinha', 'Depósito', 'Escritório', 'Área externa'], formOnly: true },
       { key: 'fornecedor', label: 'Fornecedor', type: 'ref', ref: 'fornecedores', refKey: 'fornecedorId', livre: true, formOnly: true },
+      { key: 'descricaoReserva', label: 'Descrição no app (categoria Reserva)', type: 'textarea', formOnly: true, wide: true, placeholder: 'Ex.: Dois controles e os jogos de futebol e corrida. Aparece para o afilhado ao reservar.' },
       { key: 'observacoes', label: 'Observações', type: 'textarea', formOnly: true, wide: true },
     ],
     computed: [
@@ -667,6 +668,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'pessoas', label: 'Pessoas', type: 'number', required: true, default: 2, min: 1, max: 50 },
       { key: 'ambiente', label: 'Ambiente', type: 'text' },
       { key: 'mesa', label: 'Mesa', type: 'number', min: 1, max: 999 },
+      { key: 'extras', label: 'Reservou junto', type: 'text', placeholder: 'Ex.: PS5, Karaokê' },
       { key: 'origem', label: 'Origem', type: 'select', options: ['Aplicativo', 'Telefone', 'WhatsApp', 'Presencial'], default: 'Telefone', formOnly: true },
       { key: 'status', label: 'Status', type: 'select', options: ['Pendente', 'Confirmada', 'Recusada', 'Concluída', 'Não compareceu', 'Cancelada', 'Cancelada pelo cliente'], default: 'Confirmada' },
       { key: 'observacoes', label: 'Observações', type: 'textarea', wide: true, formOnly: true },
