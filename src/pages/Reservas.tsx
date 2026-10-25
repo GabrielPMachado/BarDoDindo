@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarCheck, CalendarDays, Check, Gamepad2, Minus, Plus, Trash2 } from 'lucide-react';
 import { api } from '../api';
-import { EfeitoReserva, efeitoDe, Ps5Realista, type Efeito } from '../components/EfeitoReserva';
+import { EfeitoReserva, efeitoDe, Mic3D, Ps5Realista, type Efeito } from '../components/EfeitoReserva';
 import { confirmar, Empty, PageHeader, ReservationCard, SectionHeader, Toast } from '../components/ui';
 import { dateParts, isoDate, parseDate, todayISO, upcoming, useStore, type Reservation, type Reservavel } from '../store';
 
@@ -58,6 +58,8 @@ export default function Reservas({ demo = false }: { demo?: boolean }) {
   // no PC, o PS5 do cartão também gira com o mouse em cima (no celular, só quando está escolhido)
   const [emCima, setEmCima] = useState<string | null>(null);
   const comMouse = useMemo(() => typeof window !== 'undefined' && window.matchMedia?.('(hover: hover) and (pointer: fine)').matches, []);
+  // efeitos dos itens escolhidos, para cada cartão mostrar o vizinho do salão
+  const vizinhos = useMemo(() => [...new Set(reservaveis.filter((x) => itens.includes(x.id)).map((x) => efeitoDe(x.nome)).filter((e): e is Efeito => !!e))], [reservaveis, itens]);
   const alternar = (x: Reservavel) => {
     const marcado = itens.includes(x.id);
     setItens((v) => (marcado ? v.filter((id) => id !== x.id) : [...v, x.id]));
@@ -200,9 +202,21 @@ export default function Reservas({ demo = false }: { demo?: boolean }) {
                       onMouseEnter={comMouse ? () => setEmCima(x.id) : undefined} onMouseLeave={comMouse ? () => setEmCima((v) => (v === x.id ? null : v)) : undefined}
                     >
                       {x.foto ? <img className="extra__foto" src={x.foto} alt="" /> : <span className="extra__foto extra__foto--vazia"><Gamepad2 size={30} /></span>}
-                      {/* o PS5 3D gira devagar sobre a foto quando o item está escolhido ou com o mouse em cima (fora da animação de tela cheia) */}
-                      {ef === 'ps5' && (ativo || emCima === x.id) && !efeito && (
-                        <span className="extra__3d"><Ps5Realista velocidade={0.7} classe="extra__3d-tela" /></span>
+                      {/* o modelo 3D do item gira devagar sobre a foto quando está escolhido ou com o mouse em cima (fora da animação de tela cheia) */}
+                      {ef && (ativo || emCima === x.id) && !efeito && (
+                        <span className={`extra__3d extra__3d--${ef}`}>
+                          {ef === 'ps5' ? <Ps5Realista velocidade={0.7} classe="extra__3d-tela" /> : <Mic3D velocidade={0.9} classe="extra__3d-tela" />}
+                        </span>
+                      )}
+                      {/* mesmo salão: o PS5 escolhido aparece no canto do karaokê (à esquerda do palco) e o karaokê escolhido aparece no canto gamer (à direita) */}
+                      {ef && !efeito && vizinhos.some((v) => v !== ef) && (
+                        <span className="extra__palco">
+                          {vizinhos.filter((v) => v !== ef).map((v) => (
+                            <span key={v} className={`extra__vizinho extra__vizinho--${v}`}>
+                              {v === 'ps5' ? <Ps5Realista velocidade={0.5} classe="extra__3d-tela" /> : <Mic3D velocidade={0.6} classe="extra__3d-tela" />}
+                            </span>
+                          ))}
+                        </span>
                       )}
                       <span className="extra__check"><Check size={16} strokeWidth={3} /></span>
                       <span className="extra__texto">
