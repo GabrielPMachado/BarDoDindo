@@ -43,6 +43,15 @@ function Shell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
+  // demonstração da tela de reserva: abre sem login e não grava nada (para testar o PS5, o karaokê e as animações)
+  if (pathname === '/demo/reservas') {
+    return (
+      <div className="app">
+        <main><Reservas demo /></main>
+      </div>
+    );
+  }
+
   if (!ready) {
     return (
       <div className="app app--center">
@@ -99,7 +108,8 @@ const testeDoApp = (() => {
   }
 })();
 const redirecionar = !APP_LIBERADO && !testeDoApp && !Capacitor.isNativePlatform() && !import.meta.env.DEV
-  && !location.pathname.startsWith('/afilhado'); // nunca em laço, se o servidor errar a rota
+  && !location.pathname.startsWith('/afilhado') // nunca em laço, se o servidor errar a rota
+  && !location.hash.startsWith('#/demo/'); // demonstrações abrem sem login e não gravam nada
 if (redirecionar) location.replace('/afilhado');
 
 // HashRouter funciona igual na web e dentro do Capacitor (Android/iOS)
