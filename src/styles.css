@@ -877,7 +877,10 @@ button.menu-row:active { background: var(--surface-2); }
 @keyframes ps5Titulo { from { opacity: 0; transform: scale(1.35); filter: blur(8px); } }
 .ps5__sub { color: #dbe9ff; animation: fadein .6s ease 2.1s both; }
 
-/* console 3D (só CSS): sobe girando e continua girando */
+/* PS5 3D (three.js): sobe e gira; o canvas tem fundo transparente */
+.ps5-real { display: block; width: min(78vw, 300px); height: clamp(220px, 40vh, 360px); flex-shrink: 1; min-height: 160px;
+  filter: drop-shadow(0 20px 30px #000a); animation: c3dEntra 1.1s cubic-bezier(.2, 1.2, .3, 1) .6s both; }
+/* console 3D (só CSS, quando não há WebGL): sobe girando e continua girando */
 .c3d { position: relative; width: 200px; height: clamp(170px, 30vh, 240px); perspective: 900px; flex-shrink: 0;
   animation: c3dEntra 1.1s cubic-bezier(.2, 1.2, .3, 1) .7s both; }
 @keyframes c3dEntra { from { opacity: 0; transform: translateY(60px) scale(.4); } }
