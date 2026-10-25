@@ -95,6 +95,8 @@ export interface CollectionDef {
   itensDoFornecedor?: boolean;
   /** Botão "Foto no padrão do Dindo" (Gemini): itens do Estoque no depósito; bens do Patrimônio no salão do bar. */
   fotoPadrao?: 'estoque' | 'patrimonio';
+  /** Segunda foto opcional (rótulo do campo), guardada em `fotoJunto`. */
+  fotoJunto?: string;
   /** Foto guardada em tamanho maior (mídias e artes), para ver ampliada. */
   fotoGrande?: boolean;
   /** Botão "Preencher com IA" (descrição, ingredientes e perfil da bebida) no cadastro do produto. */
@@ -323,7 +325,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     ],
   },
   patrimonio: {
-    id: 'patrimonio', anexos: 'Notas fiscais, garantias e laudos', comFoto: true, fotoPadrao: 'patrimonio', area: 'patrimonio', title: 'Patrimônio', singular: 'bem',
+    id: 'patrimonio', anexos: 'Notas fiscais, garantias e laudos', comFoto: true, fotoPadrao: 'patrimonio', fotoJunto: 'Foto com os outros itens de reserva', area: 'patrimonio', title: 'Patrimônio', singular: 'bem',
     description: 'Bens do bar (móveis, equipamentos, eletrônicos, instalações), com número de patrimônio, valor de aquisição e depreciação. Os da categoria Reserva aparecem para o afilhado escolher ao fazer a reserva no app.',
     filterKey: 'categoria', filtros: ['local', 'estado'], sortKey: 'nome',
     fields: [

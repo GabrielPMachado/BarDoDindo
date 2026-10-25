@@ -282,7 +282,7 @@ function validarRegistro(data: unknown): Dados {
     if (typeof v === 'number' && (!Number.isFinite(v) || Math.abs(v) > 1e12)) fail(400, `Valor numérico inválido em "${k}".`);
     if (typeof v === 'number' && v < 0) fail(400, `O campo "${k}" não aceita valores negativos.`);
     // foto do registro: imagem já reduzida no navegador (data URL), com limite de tamanho
-    if (k === 'foto' && typeof v === 'string' && v) {
+    if ((k === 'foto' || k === 'fotoJunto') && typeof v === 'string' && v) {
       if (!/^data:image\/(jpeg|png|webp);base64,/.test(v)) fail(400, 'Imagem inválida.');
       if (v.length > 400_000) fail(413, 'Imagem muito grande.');
       continue;
@@ -573,7 +573,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   /* ---------- histórico detalhado ---------- */
   // campos que não entram no histórico: controle interno, ou grandes demais (foto, PDFs) — esses não voltam ao desfazer
   const SEM_HISTORICO = ['atualizadoEm', 'id'];
-  const NAO_VOLTAM = ['foto', 'anexos', 'anexosNovos'];
+  const NAO_VOLTAM = ['foto', 'fotoJunto', 'anexos', 'anexosNovos'];
   /** Valores de um registro para o histórico: tira o que é grande demais e anota o que ficou de fora. */
   function paraHistorico(d: Dados, chaves?: string[]) {
     const valores: Dados = {}, omitidos: string[] = [];
@@ -624,7 +624,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   });
   rota('GET', '/public/reservaveis', async () =>
     (await colecao('reservaveis'))
-      .map((r) => ({ id: r.id, nome: String(r.nome ?? ''), descricao: String(r.descricao ?? ''), foto: typeof r.foto === 'string' ? r.foto : '' }))
+      .map((r) => ({ id: r.id, nome: String(r.nome ?? ''), descricao: String(r.descricao ?? ''), foto: typeof r.foto === 'string' ? r.foto : '',
+        fotoJunto: typeof r.fotoJunto === 'string' ? r.fotoJunto : '' }))
       .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
   );
   const recompensasAtivas = () => lista('recompensas@ativas', query(collection(db, 'recompensas'), where('status', '==', 'Ativa')));
@@ -1819,6 +1820,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   const itemReservavel = (d: Dados) => ({
     nome: String(d.nome ?? '').slice(0, 120), descricao: String(d.descricaoReserva ?? '').trim().slice(0, 300),
     foto: typeof d.foto === 'string' && d.foto.startsWith('data:image/') ? d.foto : '',
+    // a mesma cena com os outros itens de reserva à vista (o app troca quando o afilhado escolhe mais de um)
+    fotoJunto: typeof d.fotoJunto === 'string' && d.fotoJunto.startsWith('data:image/') ? d.fotoJunto : '',
   });
   /** Cópias só com o que pode ser visto por mais gente: cardápio (público) e nomes para vincular registros (equipe). */
   function espelhar(lote: WriteBatch, col: string, id: string, d: Dados | null) {
