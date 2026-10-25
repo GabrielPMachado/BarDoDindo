@@ -19,20 +19,68 @@ export type PadraoFoto = 'produto' | 'estoque' | 'patrimonio';
 export const MODELOS: Record<PadraoFoto, { url: string; arquivo: string; oQue: string; cenario?: string }> = {
   produto: { url: modeloUrl, arquivo: 'foto-modelo-bar-do-dindo.jpg', oQue: 'drink' },
   estoque: { url: modeloEstoqueUrl, arquivo: 'foto-modelo-estoque-bar-do-dindo.jpg', oQue: 'item', cenario: 'o depósito com a lousa do Dindo' },
-  patrimonio: { url: modeloUrl, arquivo: 'foto-modelo-salao-bar-do-dindo.jpg', oQue: 'bem', cenario: 'o salão com a placa do Dindo' },
+  patrimonio: { url: modeloUrl, arquivo: 'foto-modelo-salao-bar-do-dindo.jpg', oQue: 'bem', cenario: 'o bar do Dindo, como referência de estilo' },
 };
 
-/** Pedido para a foto de um bem do Patrimônio, no salão do bar: o bem no centro, com a parede de tijolos e a placa do Dindo ao fundo. */
-export function promptDaFotoPatrimonio(p: { nome: string; categoria?: string; descricao?: string }) {
+/** Cantos do salão usados como cenário das fotos do Patrimônio; "Automático" escolhe pelo nome e pela categoria do bem. */
+export const CENARIOS_PATRIMONIO = ['Automático', 'Canto gamer', 'Palco', 'Atrás do balcão', 'Salão de mesas', 'Cozinha', 'Área externa'] as const;
+export type CenarioPatrimonio = Exclude<(typeof CENARIOS_PATRIMONIO)[number], 'Automático'>;
+
+const PLACA = 'a placa redonda de madeira do Bar do Dindo (idêntica à da imagem anexada, sem alterar o logo nem as letras "BAR DO DINDO · DRINKS E CHOPP · NOVA OLARIA")';
+
+/** Como é cada canto e onde o bem fica nele. */
+const CENAS: Record<CenarioPatrimonio, { lugar: string; posicao: string }> = {
+  'Canto gamer': {
+    lugar: `um canto de jogos dentro do salão: parede de tijolos aparentes com uma TV grande presa na parede, faixa de LED azul e roxa suave atrás da TV, sofá de couro marrom, mesinha de centro de madeira e tapete. ${PLACA} fica na parede, ao lado da TV, um pouco desfocada`,
+    posicao: 'O bem fica ligado e pronto para jogar: em pé sobre um rack baixo de madeira embaixo da TV, com a TV mostrando uma tela de jogo colorida e os controles sobre a mesinha de centro',
+  },
+  Palco: {
+    lugar: `um pequeno palco de madeira num canto do salão, com cortina de veludo vinho ao fundo, refletores coloridos no alto e luz de festa rosa e azul. ${PLACA} fica na parede de tijolos ao lado do palco`,
+    posicao: 'O bem fica montado em cima do palco, pronto para usar (por exemplo, o karaokê com o pedestal de microfone na frente, as caixas de som dos lados e a tela mostrando a letra de uma música)',
+  },
+  'Atrás do balcão': {
+    lugar: `a área atrás do balcão de madeira do bar, com as prateleiras de garrafas iluminadas, a parede de tijolos e ${PLACA} na parede`,
+    posicao: 'O bem fica onde ficaria num bar de verdade: os grandes encostados na parede atrás do balcão; os pequenos sobre a bancada',
+  },
+  'Salão de mesas': {
+    lugar: `o salão de mesas do bar: piso de madeira escura, outras mesas e cadeiras de madeira desfocadas ao fundo, luminárias pendentes acesas, plantas e ${PLACA} na parede de tijolos`,
+    posicao: 'O bem fica no salão, no lugar natural dele (móveis arrumados no piso; objetos menores sobre uma mesa)',
+  },
+  Cozinha: {
+    lugar: 'a cozinha profissional do bar: bancadas e paredes de inox, azulejos claros, coifa, utensílios pendurados e luz branca limpa',
+    posicao: 'O bem fica instalado no lugar dele na cozinha, como em uso no dia a dia',
+  },
+  'Área externa': {
+    lugar: `a área externa do bar à noite: deck de madeira, varal de lâmpadas acesas, plantas em vasos e ${PLACA} na fachada`,
+    posicao: 'O bem fica na área externa, no lugar natural dele',
+  },
+};
+
+/** Canto do salão de cada bem, pelo nome e pela categoria (quando o cadastro está em "Automático"). */
+export function cenarioDoBem(nome: string, categoria = ''): CenarioPatrimonio {
+  const n = nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  if (/\bps ?\d|playstation|xbox|nintendo|switch|videogame|video game|console|fliperama|arcade/.test(n)) return 'Canto gamer';
+  if (/karaok|microfone|caixa de som|mesa de som|amplificador|violao|guitarra|bateria|teclado musical|palco|refletor/.test(n)) return 'Palco';
+  if (/fogao|forno|fritadeira|chapa|coifa|liquidificador|processador|panela|exaustor|lava.?lou/.test(n)) return 'Cozinha';
+  if (/freezer|geladeira|refrigerador|chopeira|cervejeira|maquina de gelo|cafeteira|maquina de cafe|caixa registradora|pdv|balcao|adega|copo|taca/.test(n)) return 'Atrás do balcão';
+  if (/ombrelone|guarda.?sol|deck|toldo|varal de luz/.test(n)) return 'Área externa';
+  if (/sinuca|pebolim|dardo|ping.?pong|tenis de mesa/.test(n)) return 'Salão de mesas';
+  if (categoria === 'Mobiliário' || categoria === 'Decoração') return 'Salão de mesas';
+  if (categoria === 'Reserva' || categoria === 'Eletrônico') return 'Canto gamer';
+  return 'Atrás do balcão';
+}
+
+/** Pedido para a foto de um bem do Patrimônio, no canto do salão que combina com ele, no estilo do Bar do Dindo. */
+export function promptDaFotoPatrimonio(p: { nome: string; categoria?: string; descricao?: string; cenario?: string }) {
   const bem = [p.nome.trim(), p.categoria && p.categoria !== 'Outro' ? `categoria: ${p.categoria}` : '', p.descricao?.trim()].filter(Boolean).join('. ');
-  const diversao = p.categoria === 'Reserva' || /ps ?\d|playstation|xbox|nintendo|videogame|karaok|sinuca|pebolim|dardo|jogo/i.test(p.nome);
-  return `Use a imagem anexada como referência do ambiente do Bar do Dindo e crie uma nova foto no MESMO salão, com o mesmo estilo, iluminação quente e cores: a parede de tijolos aparentes com a placa redonda de madeira do Bar do Dindo à direita (idêntica, sem alterar o logo nem as letras "BAR DO DINDO · DRINKS E CHOPP · NOVA OLARIA"), a luminária pendente acesa, as plantas e as prateleiras com garrafas desfocadas à esquerda.
+  const escolhido = (CENARIOS_PATRIMONIO as readonly string[]).includes(p.cenario ?? '') && p.cenario !== 'Automático'
+    ? p.cenario as CenarioPatrimonio : cenarioDoBem(p.nome, p.categoria);
+  const cena = CENAS[escolhido];
+  return `Use a imagem anexada como referência do estilo do Bar do Dindo (madeira escura, tijolos aparentes, luz quente, plantas e a placa redonda) e crie uma foto nova, como se fosse tirada dentro do mesmo bar, em ${cena.lugar}.
 
-Abra o enquadramento para mostrar um canto do salão, com piso de madeira escura, e tire o drink e a mesa do primeiro plano. No centro da cena, em destaque, coloque este bem do bar: ${bem}. Mostre o produto real e reconhecível (marca, formato e cores), inteiro, de frente ou levemente de lado, no tamanho real em relação ao ambiente: o que é pequeno fica sobre um aparador ou mesa de madeira; o que é grande fica apoiado no piso.${diversao ? `
+No centro da cena, em destaque, coloque este bem do bar: ${bem}. Mostre o produto real e reconhecível (marca, formato e cores), inteiro e no tamanho real em relação ao ambiente. ${cena.posicao}. Nada de móveis soltos ou improvisados só para apoiar o bem: tudo deve parecer montado de verdade no bar.
 
-É um item que os clientes reservam para se divertir: mostre-o montado e pronto para usar (por exemplo, o videogame com os controles à frente e a TV ligada numa tela de jogo; o karaokê com o microfone, a caixa de som e a tela com uma letra de música), com um leve brilho colorido de luz de festa no ambiente, sem perder a luz quente do bar.` : ''}
-
-Fotografia realista, foco nítido no bem e fundo levemente desfocado. Não adicione textos, pessoas nem mãos. Mantenha o formato horizontal 4:3.`;
+Fotografia realista, com foco nítido no bem e fundo levemente desfocado. Não adicione textos (além da placa), pessoas nem mãos. Mantenha o formato horizontal 4:3.`;
 }
 
 /** Pedido para a foto de um item do Estoque, no padrão do depósito (a garrafa sobre a bancada, com a lousa do Dindo). */

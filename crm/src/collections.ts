@@ -337,6 +337,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'estado', label: 'Estado', type: 'select', options: ['Novo', 'Bom', 'Regular', 'Manutenção', 'Baixado'], default: 'Bom' },
       { key: 'local', label: 'Local', type: 'select', options: ['Salão', 'Bar', 'Cozinha', 'Depósito', 'Escritório', 'Área externa'], formOnly: true },
       { key: 'fornecedor', label: 'Fornecedor', type: 'ref', ref: 'fornecedores', refKey: 'fornecedorId', livre: true, formOnly: true },
+      { key: 'cenarioFoto', label: 'Cenário da foto', type: 'select', options: ['Automático', 'Canto gamer', 'Palco', 'Atrás do balcão', 'Salão de mesas', 'Cozinha', 'Área externa'], default: 'Automático', formOnly: true },
       { key: 'descricaoReserva', label: 'Descrição no app (categoria Reserva)', type: 'textarea', formOnly: true, wide: true, placeholder: 'Ex.: Dois controles e os jogos de futebol e corrida. Aparece para o afilhado ao reservar.' },
       { key: 'observacoes', label: 'Observações', type: 'textarea', formOnly: true, wide: true },
     ],
