@@ -5,6 +5,7 @@
  */
 import modeloUrl from '../assets/foto-modelo-dindo.jpg';
 import modeloEstoqueUrl from '../assets/foto-modelo-estoque.jpg';
+import modeloSalaoUrl from '../assets/foto-modelo-salao.jpg';
 import { fotoNoTamanho } from '../components/Avatar';
 import { chaveDaIA } from './iaNota';
 
@@ -13,45 +14,51 @@ export const GEMINI_URL = 'https://gemini.google.com/app';
 
 /**
  * Padrões de foto: drinks na mesa do bar; itens do Estoque na bancada do depósito, com a lousa do Dindo ao fundo;
- * bens do Patrimônio no salão (a mesma foto do bar como referência do ambiente, num plano mais aberto).
+ * bens do Patrimônio no salão (a foto do canto gamer é a planta fixa do salão; cada canto continua a partir dela).
  */
 export type PadraoFoto = 'produto' | 'estoque' | 'patrimonio';
 export const MODELOS: Record<PadraoFoto, { url: string; arquivo: string; oQue: string; cenario?: string }> = {
   produto: { url: modeloUrl, arquivo: 'foto-modelo-bar-do-dindo.jpg', oQue: 'drink' },
   estoque: { url: modeloEstoqueUrl, arquivo: 'foto-modelo-estoque-bar-do-dindo.jpg', oQue: 'item', cenario: 'o depósito com a lousa do Dindo' },
-  patrimonio: { url: modeloUrl, arquivo: 'foto-modelo-salao-bar-do-dindo.jpg', oQue: 'bem', cenario: 'o bar do Dindo, como referência de estilo' },
+  patrimonio: { url: modeloSalaoUrl, arquivo: 'foto-modelo-salao-bar-do-dindo.jpg', oQue: 'bem', cenario: 'o salão do Dindo com o canto gamer' },
 };
 
 /** Cantos do salão usados como cenário das fotos do Patrimônio; "Automático" escolhe pelo nome e pela categoria do bem. */
 export const CENARIOS_PATRIMONIO = ['Automático', 'Canto gamer', 'Palco', 'Atrás do balcão', 'Salão de mesas', 'Cozinha', 'Área externa'] as const;
 export type CenarioPatrimonio = Exclude<(typeof CENARIOS_PATRIMONIO)[number], 'Automático'>;
 
-const PLACA = 'a placa redonda de madeira do Bar do Dindo (idêntica à da imagem anexada, sem alterar o logo nem as letras "BAR DO DINDO · DRINKS E CHOPP · NOVA OLARIA")';
+const PLACA = 'a placa redonda de madeira do Bar do Dindo (idêntica à da foto anexada, sem alterar o logo nem as letras "BAR DO DINDO · DRINKS E CHOPP · NOVA OLARIA")';
 
-/** Como é cada canto e onde o bem fica nele. */
-const CENAS: Record<CenarioPatrimonio, { lugar: string; posicao: string }> = {
+/**
+ * Mapa fixo do salão, a partir da foto modelo (o canto gamer): toda foto é o mesmo salão com a câmera virada para um canto,
+ * e cada cena deixa à vista um pedaço do canto vizinho, para as fotos "continuarem" umas nas outras.
+ */
+const SALAO = `o salão do Bar do Dindo da foto anexada: piso de tábuas de madeira, paredes de tijolos aparentes, luminárias pendentes de cobre com lâmpadas acesas, plantas penduradas e luz quente de fim de tarde. A planta do salão é sempre esta: olhando como na foto anexada, o balcão de madeira com as prateleiras de garrafas fica à esquerda; na parede de tijolos do fundo ficam ${PLACA}, a TV com LED roxo e o rack do canto gamer com o PS5 branco em pé, com o sofá Chesterfield de couro marrom, a mesinha de centro e o tapete na frente; à direita, a mesma parede de tijolos continua e vira o canto do palco de madeira com cortina de veludo vinho e o karaokê montado (tela com a letra, pedestal de microfone e caixas de som); atrás de quem olha ficam as mesas do salão e a porta para o deck externo; a cozinha fica atrás do balcão`;
+
+/** Para onde a câmera vira em cada canto, o que do canto vizinho aparece na borda e onde o bem fica. */
+const CENAS: Record<CenarioPatrimonio, { camera: string; posicao: string }> = {
   'Canto gamer': {
-    lugar: `um canto de jogos dentro do salão: parede de tijolos aparentes com uma TV grande presa na parede, faixa de LED azul e roxa suave atrás da TV, sofá de couro marrom, mesinha de centro de madeira e tapete. ${PLACA} fica na parede, ao lado da TV, um pouco desfocada`,
-    posicao: 'O bem fica ligado e pronto para jogar: em pé sobre um rack baixo de madeira embaixo da TV, com a TV mostrando uma tela de jogo colorida e os controles sobre a mesinha de centro',
+    camera: 'Mantenha o mesmo ângulo e os mesmos objetos da foto anexada (balcão à esquerda, placa, TV, rack, sofá, mesinha e tapete), abrindo só um pouco o enquadramento para a direita: na borda direita aparece o começo do palco de madeira com a cortina vinho e o karaokê montado (pedestal de microfone e uma caixa de som), um pouco desfocado, para a foto continuar no canto do palco',
+    posicao: 'O bem fica ligado e pronto para jogar: no lugar do console, em pé sobre o rack embaixo da TV, com a TV mostrando uma tela de jogo colorida e os controles sobre a mesinha de centro',
   },
   Palco: {
-    lugar: `um pequeno palco de madeira num canto do salão, com cortina de veludo vinho ao fundo, refletores coloridos no alto e luz de festa rosa e azul. ${PLACA} fica na parede de tijolos ao lado do palco`,
+    camera: 'Gire a câmera um pouco para a DIREITA da foto anexada: a mesma parede de tijolos continua e mostra o palco de madeira baixo no canto, com cortina de veludo vinho e refletores coloridos no alto. Para a cena continuar o salão, deixe à vista na borda esquerda o fim do rack com o PS5 branco em pé e um pedaço da TV com LED roxo do canto gamer, um pouco desfocados, com o mesmo piso, tapete e luminárias',
     posicao: 'O bem fica montado em cima do palco, pronto para usar (por exemplo, o karaokê com o pedestal de microfone na frente, as caixas de som dos lados e a tela mostrando a letra de uma música)',
   },
   'Atrás do balcão': {
-    lugar: `a área atrás do balcão de madeira do bar, com as prateleiras de garrafas iluminadas, a parede de tijolos e ${PLACA} na parede`,
+    camera: 'Gire a câmera para a ESQUERDA da foto anexada, de frente para o balcão de madeira e as prateleiras de garrafas iluminadas, com as plantas penduradas. Para a cena continuar o salão, deixe à vista na borda direita o braço do sofá Chesterfield e um pedaço da parede de tijolos com a placa',
     posicao: 'O bem fica onde ficaria num bar de verdade: os grandes encostados na parede atrás do balcão; os pequenos sobre a bancada',
   },
   'Salão de mesas': {
-    lugar: `o salão de mesas do bar: piso de madeira escura, outras mesas e cadeiras de madeira desfocadas ao fundo, luminárias pendentes acesas, plantas e ${PLACA} na parede de tijolos`,
+    camera: 'Vire a câmera para o lado oposto ao da foto anexada, para as mesas e cadeiras de madeira do salão, com as mesmas luminárias pendentes e o mesmo piso. Para a cena continuar o salão, deixe à vista ao fundo, desfocados, o balcão de um lado e o encosto do sofá Chesterfield do outro',
     posicao: 'O bem fica no salão, no lugar natural dele (móveis arrumados no piso; objetos menores sobre uma mesa)',
   },
   Cozinha: {
-    lugar: 'a cozinha profissional do bar: bancadas e paredes de inox, azulejos claros, coifa, utensílios pendurados e luz branca limpa',
+    camera: 'Mostre a cozinha que fica atrás do balcão: bancadas e paredes de inox, azulejos claros, coifa e utensílios pendurados. Para a cena continuar o salão, deixe à vista, pela porta aberta ao fundo, um pedaço do balcão de madeira e das prateleiras de garrafas com a luz quente do salão',
     posicao: 'O bem fica instalado no lugar dele na cozinha, como em uso no dia a dia',
   },
   'Área externa': {
-    lugar: `a área externa do bar à noite: deck de madeira, varal de lâmpadas acesas, plantas em vasos e ${PLACA} na fachada`,
+    camera: 'Mostre o deck de madeira do lado de fora, à noite, com varal de lâmpadas acesas e plantas em vasos. Para a cena continuar o salão, deixe à vista ao fundo, pela porta e pelas janelas, o salão iluminado com os tijolos, as luminárias pendentes e a placa',
     posicao: 'O bem fica na área externa, no lugar natural dele',
   },
 };
@@ -76,7 +83,9 @@ export function promptDaFotoPatrimonio(p: { nome: string; categoria?: string; de
   const escolhido = (CENARIOS_PATRIMONIO as readonly string[]).includes(p.cenario ?? '') && p.cenario !== 'Automático'
     ? p.cenario as CenarioPatrimonio : cenarioDoBem(p.nome, p.categoria);
   const cena = CENAS[escolhido];
-  return `Use a imagem anexada como referência do estilo do Bar do Dindo (madeira escura, tijolos aparentes, luz quente, plantas e a placa redonda) e crie uma foto nova, como se fosse tirada dentro do mesmo bar, em ${cena.lugar}.
+  return `A foto anexada é ${SALAO}.
+
+Crie uma foto nova DENTRO DESTE MESMO SALÃO, como se fosse tirada pela mesma pessoa, com a mesma câmera, no mesmo dia: mesmos tijolos, piso, luminárias, plantas, cores e luz. ${cena.camera}. Não invente outro bar nem mude a decoração: quem olhar as fotos lado a lado tem que reconhecer o mesmo lugar.
 
 No centro da cena, em destaque, coloque este bem do bar: ${bem}. Mostre o produto real e reconhecível (marca, formato e cores), inteiro e no tamanho real em relação ao ambiente. ${cena.posicao}. Nada de móveis soltos ou improvisados só para apoiar o bem: tudo deve parecer montado de verdade no bar.
 
