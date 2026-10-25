@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarCheck, CalendarDays, Check, Gamepad2, Minus, Plus, Trash2 } from 'lucide-react';
 import { api } from '../api';
-import { EfeitoReserva, efeitoDe, type Efeito } from '../components/EfeitoReserva';
+import { EfeitoReserva, efeitoDe, Ps5Realista, type Efeito } from '../components/EfeitoReserva';
 import { confirmar, Empty, PageHeader, ReservationCard, SectionHeader, Toast } from '../components/ui';
 import { dateParts, isoDate, parseDate, todayISO, upcoming, useStore, type Reservation, type Reservavel } from '../store';
 
@@ -55,6 +55,9 @@ export default function Reservas({ demo = false }: { demo?: boolean }) {
       .then((l) => setReservaveis(demo && !l.length ? EXEMPLOS : l))
       .catch(() => setReservaveis(demo ? EXEMPLOS : []));
   }, [demo]);
+  // no PC, o PS5 do cartão também gira com o mouse em cima (no celular, só quando está escolhido)
+  const [emCima, setEmCima] = useState<string | null>(null);
+  const comMouse = useMemo(() => typeof window !== 'undefined' && window.matchMedia?.('(hover: hover) and (pointer: fine)').matches, []);
   const alternar = (x: Reservavel) => {
     const marcado = itens.includes(x.id);
     setItens((v) => (marcado ? v.filter((id) => id !== x.id) : [...v, x.id]));
@@ -192,8 +195,15 @@ export default function Reservas({ demo = false }: { demo?: boolean }) {
                   const ativo = itens.includes(x.id);
                   const ef = efeitoDe(x.nome);
                   return (
-                    <button type="button" key={x.id} aria-pressed={ativo} className={`extra ${ef ? `extra--${ef}` : ''} ${ativo ? 'is-active' : ''}`} onClick={() => alternar(x)}>
+                    <button
+                      type="button" key={x.id} aria-pressed={ativo} className={`extra ${ef ? `extra--${ef}` : ''} ${ativo ? 'is-active' : ''}`} onClick={() => alternar(x)}
+                      onMouseEnter={comMouse ? () => setEmCima(x.id) : undefined} onMouseLeave={comMouse ? () => setEmCima((v) => (v === x.id ? null : v)) : undefined}
+                    >
                       {x.foto ? <img className="extra__foto" src={x.foto} alt="" /> : <span className="extra__foto extra__foto--vazia"><Gamepad2 size={30} /></span>}
+                      {/* o PS5 3D gira devagar sobre a foto quando o item está escolhido ou com o mouse em cima (fora da animação de tela cheia) */}
+                      {ef === 'ps5' && (ativo || emCima === x.id) && !efeito && (
+                        <span className="extra__3d"><Ps5Realista velocidade={0.7} classe="extra__3d-tela" /></span>
+                      )}
                       <span className="extra__check"><Check size={16} strokeWidth={3} /></span>
                       <span className="extra__texto">
                         <strong>{x.nome}</strong>

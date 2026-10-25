@@ -84,18 +84,18 @@ function CenaPS5({ nome }: { nome: string }) {
 }
 
 /** PS5 em 3D de verdade (three.js, medidas oficiais da Sony); sem WebGL, cai no console desenhado em CSS. */
-function Ps5Realista() {
+export function Ps5Realista({ velocidade, classe = 'ps5-real' }: { velocidade?: number; classe?: string }) {
   const tela = useRef<HTMLCanvasElement>(null);
   const [semWebGL, setSemWebGL] = useState(false);
   useEffect(() => {
     let cena: { parar: () => void } | null = null, ativo = true;
     import('./ps5Cena')
-      .then(({ montarPS5 }) => { if (ativo && tela.current) cena = montarPS5(tela.current); })
+      .then(({ montarPS5 }) => { if (ativo && tela.current) cena = montarPS5(tela.current, { velocidade }); })
       .catch(() => ativo && setSemWebGL(true));
     return () => { ativo = false; cena?.parar(); };
-  }, []);
+  }, [velocidade]);
   if (semWebGL) return <Console3D />;
-  return <canvas ref={tela} className="ps5-real" aria-hidden />;
+  return <canvas ref={tela} className={classe} aria-hidden />;
 }
 
 /** Faces de uma caixa 3D (largura × altura × profundidade, em px), centrada no ponto de origem. */

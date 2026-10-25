@@ -56,7 +56,8 @@ function tampa(lado: 1 | -1) {
 
 export interface CenaPS5 { parar: () => void }
 
-export function montarPS5(canvas: HTMLCanvasElement): CenaPS5 {
+/** `velocidade`: voltas por segundo em radianos (1,6 na tela cheia; menor no cartão da reserva). */
+export function montarPS5(canvas: HTMLCanvasElement, { velocidade = 1.6 } = {}): CenaPS5 {
   const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'low-power' });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
   renderer.outputColorSpace = SRGBColorSpace;
@@ -138,7 +139,7 @@ export function montarPS5(canvas: HTMLCanvasElement): CenaPS5 {
   const inicio = performance.now();
   const desenhar = (agora: number) => {
     const t = (agora - inicio) / 1000;
-    console5.rotation.y = t * 1.6 - 0.6; // uma volta a cada ~4 s
+    console5.rotation.y = t * velocidade - 0.6; // 1,6 = uma volta a cada ~4 s
     console5.position.y = Math.sin(t * 2) * 6;
     renderer.render(cena, camera);
     quadro = requestAnimationFrame(desenhar);
