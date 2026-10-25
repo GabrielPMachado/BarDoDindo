@@ -98,6 +98,37 @@ export function Ps5Realista({ velocidade, classe = 'ps5-real' }: { velocidade?: 
   return <canvas ref={tela} className={classe} aria-hidden />;
 }
 
+/** Microfone de karaokê em 3D (three.js) para o cartão; sem WebGL, cai no microfone desenhado. */
+export function Mic3D({ velocidade, classe }: { velocidade?: number; classe?: string }) {
+  const tela = useRef<HTMLCanvasElement>(null);
+  const [semWebGL, setSemWebGL] = useState(false);
+  useEffect(() => {
+    let cena: { parar: () => void } | null = null, ativo = true;
+    import('./micCena')
+      .then(({ montarMic }) => { if (ativo && tela.current) cena = montarMic(tela.current, { velocidade }); })
+      .catch(() => ativo && setSemWebGL(true));
+    return () => { ativo = false; cena?.parar(); };
+  }, [velocidade]);
+  if (semWebGL) return <MicDesenhado />;
+  return <canvas ref={tela} className={classe} aria-hidden />;
+}
+
+function MicDesenhado() {
+  return (
+    <svg viewBox="0 0 120 200" className="kara__mic" aria-hidden>
+      <defs>
+        <linearGradient id="kara-grade" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#ff5fd2" />
+          <stop offset="1" stopColor="#46e6ff" />
+        </linearGradient>
+      </defs>
+      <rect x="30" y="8" width="60" height="86" rx="30" />
+      <path d="M38 34 H82 M36 52 H84 M38 70 H82" className="kara__grade" />
+      <path d="M18 70 Q18 122 60 122 Q102 122 102 70 M60 122 V170 M34 176 H86" />
+    </svg>
+  );
+}
+
 /** Faces de uma caixa 3D (largura × altura × profundidade, em px), centrada no ponto de origem. */
 function Caixa({ l, a, p, x = 0, y = 0, classe }: { l: number; a: number; p: number; x?: number; y?: number; classe: string }) {
   const faces: [string, number, number, string][] = [
@@ -154,17 +185,7 @@ function CenaKaraoke({ nome, foto }: { nome: string; foto?: string }) {
         </div>
       </div>
       <div className="efeito__miolo kara__miolo">
-        <svg viewBox="0 0 120 200" className="kara__mic" aria-hidden>
-          <defs>
-            <linearGradient id="kara-grade" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stopColor="#ff5fd2" />
-              <stop offset="1" stopColor="#46e6ff" />
-            </linearGradient>
-          </defs>
-          <rect x="30" y="8" width="60" height="86" rx="30" />
-          <path d="M38 34 H82 M36 52 H84 M38 70 H82" className="kara__grade" />
-          <path d="M18 70 Q18 122 60 122 Q102 122 102 70 M60 122 V170 M34 176 H86" />
-        </svg>
+<MicDesenhado />
         <Foto nome={nome} foto={foto} />
         <strong className="kara__titulo">Solta a voz!</strong>
         <span className="kara__sub">{nome} reservado. O palco é seu.</span>

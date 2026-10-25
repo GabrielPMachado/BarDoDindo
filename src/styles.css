@@ -830,7 +830,14 @@ button.menu-row:active { background: var(--surface-2); }
 .extra--karaoke.is-active .extra__check { background: #ff5fd2; border-color: #ff5fd2; color: #1a0016; }
 .extra__3d { position: absolute; left: 0; right: 0; top: 0; aspect-ratio: 4 / 3; pointer-events: none;
   background: radial-gradient(80% 80% at 50% 45%, #1747b8ee 0%, #071a52f2 55%, #01040ff5 100%); animation: fadein .3s ease; }
+.extra__3d--karaoke { background: radial-gradient(80% 80% at 50% 45%, #7a1a6cee 0%, #2a0a3af2 55%, #07020ff5 100%); }
 .extra__3d-tela { display: block; width: 100%; height: 100%; }
+.extra__vizinho { position: absolute; bottom: 4%; width: 36%; aspect-ratio: 3 / 4; pointer-events: none; animation: vizinho-entra .45s cubic-bezier(.2,.9,.3,1.3); }
+.extra__vizinho--ps5 { left: 0; transform-origin: 0 100%; filter: drop-shadow(0 0 10px #2f6bffaa); }
+.extra__vizinho--karaoke { right: 0; transform-origin: 100% 100%; filter: drop-shadow(0 0 10px #ff5fd2aa); }
+/* camada do tamanho da foto (4:3): o 3D do vizinho fica dentro da foto, não em cima do texto */
+.extra__palco { position: absolute; left: 0; right: 0; top: 0; aspect-ratio: 4 / 3; pointer-events: none; }
+@keyframes vizinho-entra { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: scale(1); } }
 .extra__3d .c3d { transform: scale(.42); transform-origin: 50% 20%; margin: 0 auto; }
 .res-card__extras { font-size: 12.5px; color: var(--brand-light); }
 
