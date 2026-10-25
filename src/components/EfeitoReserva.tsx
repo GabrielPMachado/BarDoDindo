@@ -1,4 +1,4 @@
-import { useEffect, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 
 /** Itens com efeito especial ao serem escolhidos na reserva. */
@@ -75,12 +75,27 @@ function CenaPS5({ nome }: { nome: string }) {
             </svg>
           ))}
         </div>
-        <Console3D />
+        <Ps5Realista />
         <strong className="ps5__titulo">PLAYER 1 READY</strong>
         <span className="ps5__sub">{nome} reservado na sua mesa. Prepare o controle!</span>
       </div>
     </div>
   );
+}
+
+/** PS5 em 3D de verdade (three.js, medidas oficiais da Sony); sem WebGL, cai no console desenhado em CSS. */
+function Ps5Realista() {
+  const tela = useRef<HTMLCanvasElement>(null);
+  const [semWebGL, setSemWebGL] = useState(false);
+  useEffect(() => {
+    let cena: { parar: () => void } | null = null, ativo = true;
+    import('./ps5Cena')
+      .then(({ montarPS5 }) => { if (ativo && tela.current) cena = montarPS5(tela.current); })
+      .catch(() => ativo && setSemWebGL(true));
+    return () => { ativo = false; cena?.parar(); };
+  }, []);
+  if (semWebGL) return <Console3D />;
+  return <canvas ref={tela} className="ps5-real" aria-hidden />;
 }
 
 /** Faces de uma caixa 3D (largura × altura × profundidade, em px), centrada no ponto de origem. */
