@@ -200,6 +200,8 @@ export default function Reservas({ demo = false }: { demo?: boolean }) {
                       {x.foto ? <img className="extra__foto" src={x.foto} alt="" /> : <span className="extra__foto extra__foto--vazia"><Gamepad2 size={30} /></span>}
                       {/* mesmo salão: com outro item escolhido junto, a foto troca pela versão em que ele aparece ao lado (ex.: o PS5 no canto do karaokê) */}
                       {x.fotoJunto && <img className={`extra__foto extra__foto--junto ${junto ? 'is-on' : ''}`} src={x.fotoJunto} alt="" />}
+                      {/* escolhido: a luz neon dá voltas pela borda do cartão */}
+                      {ativo && <span className="extra__neon" aria-hidden />}
                       {faixa?.id === x.id && <span key={faixa.n} className={`extra__faixa ${ativo ? '' : 'extra__faixa--sai'}`} aria-hidden />}
                       <span className="extra__check"><Check size={16} strokeWidth={3} /></span>
                       <span className="extra__texto">

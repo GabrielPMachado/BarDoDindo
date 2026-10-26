@@ -825,15 +825,25 @@ button.menu-row:active { background: var(--surface-2); }
 .extra { --neon: var(--brand); --neon-forte: #ffb08a; }
 .extra--ps5 { --neon: #2f8bff; --neon-forte: #9fd0ff; }
 .extra--karaoke { --neon: #ff3fc8; --neon-forte: #ffb3ee; }
-/* escolhido: borda neon (miolo claro, brilho da cor por dentro e por fora), que acende piscando uma vez */
+/* escolhido: borda neon acesa, com brilho da cor por dentro e por fora */
 .extra.is-active {
   border-color: var(--neon-forte);
   box-shadow: 0 0 0 1px var(--neon), 0 0 8px var(--neon), 0 0 22px var(--neon), inset 0 0 10px color-mix(in srgb, var(--neon) 55%, transparent);
-  animation: neon-acende .5s steps(1, end);
 }
 .extra.is-active .extra__check { background: var(--neon); border-color: var(--neon-forte); color: #fff; box-shadow: 0 0 10px var(--neon); }
-@keyframes neon-acende { 0% { box-shadow: none; } 20% { box-shadow: 0 0 0 1px var(--neon), 0 0 22px var(--neon); } 40% { box-shadow: none; } 60% { box-shadow: 0 0 0 1px var(--neon), 0 0 8px var(--neon); } }
-@media (prefers-reduced-motion: reduce) { .extra.is-active { animation: none; } }
+/* a luz dá voltas pela borda: um leque de cor girando, recortado só na moldura */
+@property --giro { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+.extra__neon {
+  position: absolute; inset: 0; border-radius: inherit; padding: 2.5px; pointer-events: none;
+  background: conic-gradient(from var(--giro), transparent 0 52%, color-mix(in srgb, var(--neon) 70%, transparent) 70%, #fff 80%, color-mix(in srgb, var(--neon) 70%, transparent) 90%, transparent 100%);
+  filter: drop-shadow(0 0 5px var(--neon));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: neon-gira 2.4s linear infinite;
+}
+@keyframes neon-gira { to { --giro: 360deg; } }
+@media (prefers-reduced-motion: reduce) { .extra__neon { display: none; } }
 .extra__foto--junto { position: absolute; left: 0; top: 0; opacity: 0; transition: opacity .6s ease; pointer-events: none; }
 .extra__foto--junto.is-on { opacity: 1; }
 .extra__faixa {
