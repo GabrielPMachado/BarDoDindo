@@ -4,7 +4,7 @@ import { api } from '../api';
 import { confirmar, Empty, PageHeader, ReservationCard, SectionHeader, Toast } from '../components/ui';
 import { dateParts, isoDate, parseDate, todayISO, upcoming, useStore, type Reservation, type Reservavel } from '../store';
 
-/** Itens com cor própria no cartão (borda neon e faixa): azul no PS5, rosa no karaokê. */
+/** Itens com cor própria no cartão (borda neon e faixa): verde-água no PS5, âmbar no karaokê. */
 const corDe = (nome: string) => (/\bps\s?5\b|playstation/i.test(nome) ? 'ps5' : /karaok/i.test(nome) ? 'karaoke' : null);
 
 /** Itens de exemplo da demonstração, quando o bar ainda não pôs nada na categoria Reserva. */
