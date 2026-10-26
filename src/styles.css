@@ -823,8 +823,9 @@ button.menu-row:active { background: var(--surface-2); }
   display: grid; place-items: center; background: #000a; border: 1.5px solid #fff6; color: transparent; transition: .2s;
 }
 .extra { --neon: var(--brand); --neon-forte: #ffb08a; }
-.extra--ps5 { --neon: #2f8bff; --neon-forte: #9fd0ff; }
-.extra--karaoke { --neon: #ff3fc8; --neon-forte: #ffb3ee; }
+/* cores neutras, sem cara de "menino e menina": verde-água no PS5, âmbar no karaokê */
+.extra--ps5 { --neon: #14b8a0; --neon-forte: #8ff0dc; }
+.extra--karaoke { --neon: #f0a020; --neon-forte: #ffd98a; }
 /* escolhido: borda neon acesa, com brilho da cor por dentro e por fora */
 .extra.is-active {
   border-color: var(--neon-forte);
@@ -854,8 +855,8 @@ button.menu-row:active { background: var(--surface-2); }
   background: linear-gradient(100deg, transparent 0%, #ffffff00 20%, #ffffff8c 50%, #ffffff00 80%, transparent 100%);
   transform: translateX(-120%) skewX(-18deg); animation: faixa-passa .75s cubic-bezier(.4,0,.2,1) forwards;
 }
-.extra--ps5 .extra__faixa::before { background: linear-gradient(100deg, transparent 0%, #5ab0ff00 20%, #9fd0ffb3 50%, #5ab0ff00 80%, transparent 100%); }
-.extra--karaoke .extra__faixa::before { background: linear-gradient(100deg, transparent 0%, #ff5fd200 20%, #ffa6e8b3 50%, #ff5fd200 80%, transparent 100%); }
+.extra--ps5 .extra__faixa::before { background: linear-gradient(100deg, transparent 0%, #3fd6bc00 20%, #8ff0dcb3 50%, #3fd6bc00 80%, transparent 100%); }
+.extra--karaoke .extra__faixa::before { background: linear-gradient(100deg, transparent 0%, #ffbf4d00 20%, #ffd98ab3 50%, #ffbf4d00 80%, transparent 100%); }
 /* ao desmarcar, a faixa volta no sentido contrário e mais apagada */
 .extra__faixa--sai::before { opacity: .55; animation-name: faixa-volta; }
 @keyframes faixa-passa { to { transform: translateX(340%) skewX(-18deg); } }
