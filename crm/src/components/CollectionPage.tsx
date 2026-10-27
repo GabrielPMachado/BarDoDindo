@@ -31,7 +31,7 @@ import { SeletorVisao, VisaoCalendario, VisaoCartoes, VisaoQuadro, campoDoQuadro
 import { CompraItens, itemVazio, totalItens, type ItemCompra } from './CompraItens';
 import { camposDosLocais, locaisDe, locaisNoFormulario } from '../lib/locais';
 import { calcularFicha, fichaDe, type Ficha } from '../lib/ficha';
-import { conferirTamanhos, novoTamanho, salvarTamanhos, TAMANHOS_SUGERIDOS, TamanhosCampo, tamanhosDoItem, type TamanhoRascunho } from './Tamanhos';
+import { conferirTamanhos, novoTamanho, rascunhoDe, salvarTamanhos, TAMANHOS_SUGERIDOS, TamanhosCampo, tamanhosDoItem, type TamanhoRascunho } from './Tamanhos';
 
 const PAGE = 50;
 /** Lista agrupada (tabela): linhas mostradas por grupo antes do "Ver mais". */
@@ -654,8 +654,7 @@ function RecordForm({ def, row, rows = [], canEdit, defaults, onClose, onSave, o
   // tamanhos do item principal (ex.: chopp de 300 ml, 500 ml e 1 litro): cada um é um produto, com preço e ficha próprios
   const comTamanhos = !!def.tamanhos && temTamanhos(data);
   const salvosTamanhos = useMemo(() => (def.tamanhos && row ? tamanhosDoItem(rows, row.id) : []), [def.tamanhos, row, rows]);
-  const [tamanhos, setTamanhos] = useState<TamanhoRascunho[]>(() =>
-    salvosTamanhos.map((r) => ({ ...novoTamanho(String(r.tamanho ?? '')), id: r.id, preco: Number(r.preco) || '' })));
+  const [tamanhos, setTamanhos] = useState<TamanhoRascunho[]>(() => salvosTamanhos.map(rascunhoDe));
   const marcarTamanhos = (v: unknown) => {
     if (v === 'Sim' && !tamanhos.length) setTamanhos(TAMANHOS_SUGERIDOS.map((t) => novoTamanho(t)));
   };
@@ -811,7 +810,7 @@ function RecordForm({ def, row, rows = [], canEdit, defaults, onClose, onSave, o
             </div>
           </Fragment>
         ))}
-        {comTamanhos && <TamanhosCampo itens={tamanhos} salvos={salvosTamanhos} disabled={!canEdit} onChange={setTamanhos} onAbrir={onAbrir} />}
+        {comTamanhos && <TamanhosCampo itens={tamanhos} salvos={salvosTamanhos} nome={String(data.nome ?? '')} disabled={!canEdit} onChange={setTamanhos} onAbrir={onAbrir} />}
         {def.fichaTecnica && !def.fichaPrimeiro && fichaCampo}
         {def.compra && (
           <CompraItens
