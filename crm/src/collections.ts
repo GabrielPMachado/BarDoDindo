@@ -107,8 +107,8 @@ export interface CollectionDef {
   fichaPrimeiro?: boolean;
   /** Produtos: um item principal (ex.: chopp) agrupa tamanhos; cada tamanho é um produto próprio, com preço e ficha técnica. */
   tamanhos?: boolean;
-  /** Registros que não aparecem na lista (continuam nos indicadores). */
-  ocultarNaLista?: (r: Row) => boolean;
+  /** Registros que não aparecem na lista (continuam nos indicadores); recebe os filtros extras escolhidos. */
+  ocultarNaLista?: (r: Row, filtros: Record<string, string>) => boolean;
   /** Como um registro deste módulo vira despesa no DRE: pré-preenche a tela "Lançar despesa" (a pessoa confere antes de lançar). */
   despesa?: (r: Row) => DespesaSugerida;
 }
@@ -600,10 +600,11 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   },
   produtos: {
     id: 'produtos', comFoto: true, fichaTecnica: true, iaProduto: true, tamanhos: true, area: 'produtos', title: 'Produtos e cardápio', singular: 'produto',
-    // os tamanhos ficam dentro do item principal (e cada um conta como um produto nos indicadores)
-    ocultarNaLista: (r) => !!r.pai,
+    // os tamanhos ficam dentro do item principal (e cada um conta como um produto nos indicadores);
+    // filtrando por tamanho, a lista mostra os tamanhos (ex.: todos os de 500 ml) no lugar dos itens
+    ocultarNaLista: (r, f) => (f.tamanho ? temTamanhos(r) : !!r.pai),
     description: 'Produtos marcados como "No cardápio" e ativos aparecem no aplicativo dos clientes.',
-    filterKey: 'categoria', filtros: ['status', 'noCardapio', 'destaque'], sortKey: 'nome',
+    filterKey: 'categoria', filtros: ['tamanho', 'status', 'noCardapio', 'destaque'], sortKey: 'nome',
     fields: [
       { key: 'nome', label: 'Produto', type: 'text', required: true, wide: true },
       { key: 'categoria', label: 'Categoria', type: 'select', options: ['Cervejas', 'Chopes', 'Drinks', 'Destilados', 'Vinhos', 'Petiscos', 'Porções', 'Pratos', 'Sobremesas', 'Sem álcool'], required: true },
@@ -1101,7 +1102,6 @@ COLLECTIONS.fichas = {
   fields: COLLECTIONS.produtos.fields.map((f) => (['nome', 'categoria', 'preco'].includes(f.key) ? f : { ...f, formOnly: true })),
   // cada tamanho tem a sua ficha; o item principal que os agrupa não tem receita
   ocultarNaLista: (r) => temTamanhos(r),
-  filtros: [...(COLLECTIONS.produtos.filtros ?? []), 'tamanho'],
   computed: [
     { label: 'Insumos', format: 'number', get: (r) => fichaDe(r.ficha).itens.length || null },
     { label: 'Custo por porção', format: 'money', get: (r) => cmvDe(r)?.porcao ?? (n(r.custo) || null) },
