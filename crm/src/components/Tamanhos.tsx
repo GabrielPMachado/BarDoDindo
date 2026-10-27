@@ -1,27 +1,30 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
-import { ChevronDown, ClipboardList, ExternalLink, Plus, Trash2 } from 'lucide-react';
+import { Camera, ChevronDown, ClipboardList, ExternalLink, Plus, Trash2 } from 'lucide-react';
 import { numberSpec, type Field } from '../collections';
 import { api } from '../lib/api';
 import type { Row } from '../lib/data';
 import { calcularFicha, fichaDe, type Ficha } from '../lib/ficha';
 import { pct } from '../lib/format';
+import { fotoNoTamanho } from './Avatar';
 import { FichaTecnica } from './FichaTecnica';
-import { NumberInput } from './ui';
+import { notify, NumberInput } from './ui';
 
 /** Um tamanho no formulário do item principal; `id` é o produto do tamanho já salvo. */
-export interface TamanhoRascunho { chave: string; id?: string; tamanho: string; preco: number | ''; ficha: Ficha }
+export interface TamanhoRascunho { chave: string; id?: string; tamanho: string; preco: number | ''; ficha: Ficha; foto: string }
 
 /** Sugestão ao marcar "Vendido em tamanhos" (dá para trocar os nomes, tirar ou incluir outros). */
 export const TAMANHOS_SUGERIDOS = ['300 ml', '500 ml', '1 litro'];
 
-/** Do item principal, o que cada tamanho herda (o tamanho tem só nome, preço, pontos e ficha próprios). */
-const HERDADOS = ['categoria', 'status', 'noCardapio', 'destaque', 'resumo', 'descricao', 'ingredientes', 'teor', 'docura', 'amargor', 'acidez', 'intensidade', 'notas', 'foto'];
+/** Do item principal, o que cada tamanho herda (o tamanho tem nome, preço, pontos, foto e ficha próprios). */
+const HERDADOS = ['categoria', 'status', 'noCardapio', 'destaque', 'resumo', 'descricao', 'ingredientes', 'teor', 'docura', 'amargor', 'acidez', 'intensidade', 'notas'];
 
 const PRECO: Field = { key: 'preco', label: 'Preço', type: 'money', min: 0.01, max: 100_000 };
 let seq = 0;
-export const novoTamanho = (tamanho = ''): TamanhoRascunho => ({ chave: `t${++seq}`, tamanho, preco: '', ficha: fichaDe(null) });
+export const novoTamanho = (tamanho = '', foto = ''): TamanhoRascunho => ({ chave: `t${++seq}`, tamanho, preco: '', ficha: fichaDe(null), foto });
+/** O item principal não tem foto própria: mostra a do primeiro tamanho que tiver (do menor para o maior). */
+export const fotoDosTamanhos = (tamanhos: Row[]) => String(tamanhos.find((t) => typeof t.foto === 'string' && t.foto)?.foto ?? '');
 /** O tamanho já salvo, como linha do formulário do item principal. */
-export const rascunhoDe = (r: Row): TamanhoRascunho => ({ ...novoTamanho(String(r.tamanho ?? '')), id: r.id, preco: Number(r.preco) || '', ficha: fichaDe(r.ficha) });
+export const rascunhoDe = (r: Row): TamanhoRascunho => ({ ...novoTamanho(String(r.tamanho ?? ''), typeof r.foto === 'string' ? r.foto : ''), id: r.id, preco: Number(r.preco) || '', ficha: fichaDe(r.ficha) });
 const temReceita = (f: Ficha) => f.itens.length > 0 || f.fixos.length > 0;
 /** Com a ficha preenchida, o custo do tamanho é o custo por porção calculado nela. */
 const custoDaFicha = (f: Ficha, preco: number) => (temReceita(f) ? { custo: calcularFicha(f, preco).custoPorcao } : {});
@@ -49,8 +52,8 @@ export function conferirTamanhos(itens: TamanhoRascunho[]): string | null {
 
 /**
  * Grava os tamanhos do item principal: cada um é um produto (aparece no cardápio e tem a sua ficha técnica).
- * Os novos herdam os dados do item; nos que já existem, o que veio do item acompanha a mudança, e o que foi
- * mudado só no tamanho (ex.: outra foto) fica como está.
+ * Os novos herdam os textos do item; nos que já existem, o que veio do item acompanha a mudança, e o que foi
+ * mudado só no tamanho fica como está. A foto é de cada tamanho (o item mostra a de um deles).
  */
 export async function salvarTamanhos(paiId: string, antes: Row | null, depois: Record<string, unknown>, itens: TamanhoRascunho[], salvos: Row[]) {
   const ficam = new Set(itens.map((t) => t.id).filter(Boolean));
@@ -60,7 +63,7 @@ export async function salvarTamanhos(paiId: string, antes: Row | null, depois: R
     const atual = t.id ? salvos.find((r) => r.id === t.id) : undefined;
     if (!atual) {
       const herdado = Object.fromEntries(HERDADOS.map((k) => [k, depois[k] ?? '']));
-      await api('/crm/c/produtos', { method: 'POST', body: { ...herdado, nome: nomeDoTamanho(depois.nome, tamanho), tamanho, preco, pai: paiId, ficha: t.ficha, ...custoDaFicha(t.ficha, preco) } });
+      await api('/crm/c/produtos', { method: 'POST', body: { ...herdado, nome: nomeDoTamanho(depois.nome, tamanho), tamanho, preco, pai: paiId, foto: t.foto, ficha: t.ficha, ...custoDaFicha(t.ficha, preco) } });
       continue;
     }
     const patch: Record<string, unknown> = {};
@@ -75,6 +78,7 @@ export async function salvarTamanhos(paiId: string, antes: Row | null, depois: R
     }
     if (tamanho !== atual.tamanho) patch.tamanho = tamanho;
     if (preco !== Number(atual.preco)) patch.preco = preco;
+    if (t.foto !== (atual.foto ?? '')) patch.foto = t.foto;
     // ficha técnica editada aqui mesmo, no item principal
     if (JSON.stringify(t.ficha) !== JSON.stringify(fichaDe(atual.ficha)) || patch.preco !== undefined) {
       patch.ficha = t.ficha;
@@ -108,6 +112,10 @@ export function TamanhosCampo({ itens, salvos, nome, disabled, onChange, onAbrir
   const [abertas, setAbertas] = useState<Set<string>>(() => new Set());
   const alternar = (chave: string) => setAbertas((x) => { const n = new Set(x); if (n.has(chave)) n.delete(chave); else n.add(chave); return n; });
   const mudar = (chave: string, patch: Partial<TamanhoRascunho>) => onChange((lista) => lista.map((t) => (t.chave === chave ? { ...t, ...patch } : t)));
+  const escolherFoto = async (chave: string, arquivo?: File) => {
+    if (!arquivo) return;
+    try { mudar(chave, { foto: await fotoNoTamanho(arquivo) }); } catch (e) { notify(e instanceof Error ? e.message : 'Não foi possível ler a imagem.', 'error'); }
+  };
   const resumoFicha = (t: TamanhoRascunho) => {
     if (!temReceita(t.ficha)) return 'Sem ficha técnica';
     const c = calcularFicha(t.ficha, Number(t.preco) || 0);
@@ -117,13 +125,17 @@ export function TamanhosCampo({ itens, salvos, nome, disabled, onChange, onAbrir
   return (
     <div className="form-field form-field--wide tamanhos">
       <label>Tamanhos</label>
-      <span className="muted small">Cada tamanho aparece como um item no cardápio do app, conta como um produto e tem a sua própria ficha técnica, que você monta aqui mesmo.</span>
+      <span className="muted small">Cada tamanho aparece como um item no cardápio do app, conta como um produto e tem a sua própria foto e ficha técnica, que você monta aqui mesmo. O item usa a foto do primeiro tamanho que tiver.</span>
       <ul>
         {itens.map((t, k) => {
           const salvo = t.id ? salvos.find((r) => r.id === t.id) : undefined;
           const aberta = abertas.has(t.chave);
           return (
             <li key={t.chave} className={aberta ? 'is-aberto' : ''}>
+              <label className={`tamanhos__foto ${disabled ? 'is-off' : ''}`} title={disabled ? t.tamanho : t.foto ? 'Trocar a foto deste tamanho' : 'Escolher a foto deste tamanho'}>
+                {t.foto ? <img src={t.foto} alt={`Foto de ${t.tamanho}`} /> : <Camera size={16} />}
+                {!disabled && <input type="file" accept="image/*" hidden onChange={(e) => { void escolherFoto(t.chave, e.target.files?.[0]); e.target.value = ''; }} />}
+              </label>
               <input
                 className="input tamanhos__nome" value={t.tamanho} disabled={disabled} placeholder="Ex.: 300 ml" aria-label={`Tamanho ${k + 1}`}
                 onChange={(e) => mudar(t.chave, { tamanho: e.target.value })}
