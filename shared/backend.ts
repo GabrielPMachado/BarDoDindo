@@ -167,6 +167,8 @@ function pontosProprios(p: Dados) {
   return p.pontuacaoPersonalizada === 'Sim' && p.pontos !== undefined && p.pontos !== null && p.pontos !== '' && Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
 }
 /** Pontos que cada unidade do produto dá ao afilhado: os personalizados do produto ou os da tabela pelo preço. */
+/** Produto que só agrupa tamanhos (ex.: chopp de 300 ml, 500 ml e 1 litro): não é vendido; cada tamanho é um produto. */
+const agrupaTamanhos = (p: Dados) => p.comTamanhos === 'Sim' && !p.pai;
 function pontosDoProduto(p: Dados, t: TabelaPontos) {
   return pontosProprios(p) ?? pontosPelaTabela(Number(p.preco) || 0, t);
 }
@@ -1349,7 +1351,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     requireAnyAccess(await requireUsuario(), ['consumos', 'comandas', 'produtos'], 'ver');
     const [produtos, cfg] = await Promise.all([colecao('produtos'), getConfig()]);
     return produtos
-      .filter((p) => p.status !== 'Inativo')
+      .filter((p) => p.status !== 'Inativo' && !agrupaTamanhos(p))
       .map((p) => ({ id: p.id, nome: p.nome, categoria: p.categoria, preco: Number(p.preco) || 0, pontos: pontosDoProduto(p, cfg), foto: p.foto || undefined }))
       .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
   });
@@ -1475,6 +1477,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       const p = produtos.find((x) => x.id === str(i.produtoId, 40));
       const quantidade = Math.floor(Number(i.quantidade));
       if (!p) return fail(400, 'Produto não encontrado.');
+      if (agrupaTamanhos(p)) return fail(400, `Escolha o tamanho de "${p.nome}".`);
       if (!(quantidade >= 1 && quantidade <= 999)) fail(400, 'Quantidade inválida.');
       const preco = Number(p.preco) || 0;
       return { produtoId: p.id, nome: p.nome, quantidade, preco, total: centavos(preco * quantidade), pontos: pontosDoProduto(p, cfg) };
@@ -1814,7 +1817,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       ingredientes: String(d.ingredientes ?? '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 20),
     };
   }
-  const noCardapio = (d: Dados) => d.status === 'Ativo' && d.noCardapio !== 'Não';
+  // o item com tamanhos (ex.: chopp) só agrupa: quem vai para o cardápio é cada tamanho
+  const noCardapio = (d: Dados) => d.status === 'Ativo' && d.noCardapio !== 'Não' && !agrupaTamanhos(d);
   /** Bens do Patrimônio na categoria Reserva (PS5, karaokê…) que o afilhado pode pedir junto com a mesa; fora de uso não aparecem. */
   const reservavel = (d: Dados) => d.categoria === 'Reserva' && !['Manutenção', 'Baixado'].includes(String(d.estado ?? ''));
   const itemReservavel = (d: Dados) => ({
