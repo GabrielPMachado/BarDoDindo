@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState, type DragEvent, type ReactNode, Fragmen
 import { ArrowDown, ArrowLeftRight, ArrowUp, Camera, ChevronDown, ChevronRight, Download, FileSpreadsheet, FileText, Globe, ImageOff, Maximize2, Paperclip, Pencil, Plus, Receipt, Search, Sheet, ShoppingCart, Sparkles, Trash2, X } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { findModule } from '../modules';
-import { numberSpec, STATUS_KEYS, termos, toneOf, vinculosDe, type CollectionDef, type Computed, type Field } from '../collections';
+import { numberSpec, STATUS_KEYS, temTamanhos, termos, toneOf, vinculosDe, type CollectionDef, type Computed, type Field } from '../collections';
 import { maskCnpj, maskPhone } from '../lib/masks';
 import { useCollection, type Row } from '../lib/data';
 import { brl, dateBR, num, pct } from '../lib/format';
@@ -31,6 +31,7 @@ import { SeletorVisao, VisaoCalendario, VisaoCartoes, VisaoQuadro, campoDoQuadro
 import { CompraItens, itemVazio, totalItens, type ItemCompra } from './CompraItens';
 import { camposDosLocais, locaisDe, locaisNoFormulario } from '../lib/locais';
 import { calcularFicha, fichaDe, type Ficha } from '../lib/ficha';
+import { conferirTamanhos, fotoDosTamanhos, novoTamanho, rascunhoDe, salvarTamanhos, tirarTamanho, TAMANHOS_SUGERIDOS, TamanhosCampo, tamanhosDoItem, type TamanhoRascunho } from './Tamanhos';
 
 const PAGE = 50;
 /** Lista agrupada (tabela): linhas mostradas por grupo antes do "Ver mais". */
@@ -55,6 +56,14 @@ function formatField(f: Field, v: unknown): ReactNode {
     case 'select': return STATUS_KEYS.includes(f.key) ? <Badge tone={toneOf(v)}>{String(v)}</Badge> : String(v);
     default: return String(v);
   }
+}
+
+/** Item com tamanhos: de quanto a quanto vai o valor nos tamanhos (ex.: "R$ 9,00 a R$ 25,00"). */
+function faixaDosTamanhos(f: Field, r: Row): ReactNode {
+  const valores = (Array.isArray(r._tamanhos) ? (r._tamanhos as Row[]) : []).map((t) => Number(t[f.key])).filter((v) => v > 0);
+  if (f.type !== 'money' || !valores.length) return <span className="muted">—</span>;
+  const [min, max] = [Math.min(...valores), Math.max(...valores)];
+  return min === max ? brl(min) : `${brl(min)} a ${brl(max)}`;
 }
 
 /** Números à direita; datas, códigos e status sem quebra; textos longos quebram e ficam limitados. */
@@ -100,7 +109,16 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   const padraoPeriodo = PERIODO_PADRAO[def.id];
   const [periodo, setPeriodo] = useState<PeriodoKey>(padraoPeriodo ?? 'tudo');
   const col = useCollection(def.id, true, padraoPeriodo ? desdeDe(periodo) : undefined);
-  const all = filterRows ? col.rows.filter(filterRows) : col.rows;
+  const all = useMemo(() => {
+    const lista = filterRows ? col.rows.filter(filterRows) : col.rows;
+    // item com tamanhos: leva os tamanhos junto, para as colunas calculadas (ex.: "3 tamanhos: 300 ml, 500 ml, 1 litro")
+    // e mostra a foto de um dos tamanhos (o item principal não tem foto própria)
+    return def.tamanhos ? lista.map((r) => {
+      if (!temTamanhos(r)) return r;
+      const tamanhos = tamanhosDoItem(col.rows, r.id);
+      return { ...r, _tamanhos: tamanhos, foto: fotoDosTamanhos(tamanhos) || r.foto };
+    }) : lista;
+  }, [col.rows, filterRows, def.tamanhos]);
 
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('');
@@ -158,6 +176,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
     const term = q.trim().toLowerCase();
     const list = all.filter(
       (r) =>
+        !def.ocultarNaLista?.(r, filtros) &&
         (!filter || r[def.filterKey!] === filter) &&
         Object.entries(filtros).every(([k, v]) => !v || valoresDoCampo(r, def.fields.find((f) => f.key === k) ?? { key: k }).some((x) => chaveFiltro(x) === v)) &&
         (!term || def.fields.some((f) => valoresDoCampo(r, f).some((x) => x.toLowerCase().includes(term)))),
@@ -493,7 +512,10 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
                           : <span className="thumb thumb--vazio"><ImageOff size={14} /></span>}
                       </td>
                     )}
-                    {tableFields.map((f, fi) => canEdit && editavelNaTabela(def, f) ? (
+                    {tableFields.map((f, fi) => f.mostrarSe && !f.mostrarSe(r) ? (
+                      // campo que não se aplica ao registro (ex.: preço do item com tamanhos): mostra a faixa dos tamanhos
+                      <td key={f.key} data-label={f.label} className={cellClass(f)}>{faixaDosTamanhos(f, r)}</td>
+                    ) : canEdit && editavelNaTabela(def, f) ? (
                       <td key={f.key} data-label={f.label} className={`${cellClass(f)} ${fi === 0 ? 'col-titulo' : ''}`} onClick={(e) => e.stopPropagation()}>
                         <CelulaRapida def={def} field={f} row={r} onSalvar={(dados) => col.update(r.id, dados)}>{formatField(f, r[f.key])}</CelulaRapida>
                       </td>
@@ -580,14 +602,27 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
 
       {editing && (
         <RecordForm
+          key={editing === 'new' ? 'novo' : editing.id}
           def={def}
           row={editing === 'new' ? null : editing}
+          rows={col.rows}
+          // dos tamanhos para o item principal e de volta (cada tamanho abre com a sua ficha técnica)
+          onAbrir={(r) => setEditing(r)}
           // registro novo depende de "Criar"; um existente, de "Editar"
           canEdit={editing === 'new' ? canCreate : canEdit}
           defaults={newDefaults}
           onClose={() => setEditing(null)}
-          onSave={async (data) => {
-            if (editing === 'new') {
+          onSave={async ({ _tamanhos, ...data }) => {
+            if (Array.isArray(_tamanhos)) {
+              // item com tamanhos: grava o item e cada tamanho (um produto cada) e recarrega a lista uma vez só
+              const antes = editing === 'new' ? null : editing;
+              const salvo = antes ? await api<Row>(`/crm/c/${def.id}/${antes.id}`, { method: 'PUT', body: data }) : await api<Row>(`/crm/c/${def.id}`, { method: 'POST', body: data });
+              try {
+                await salvarTamanhos(antes?.id ?? salvo.id, antes, data, _tamanhos as TamanhoRascunho[], antes ? tamanhosDoItem(col.rows, antes.id) : []);
+              } finally {
+                await col.reload();
+              }
+            } else if (editing === 'new') {
               const novo = await col.add(data);
               // nota de compra: já abre "Lançar despesa" preenchida (dá para fechar e lançar depois)
               if (def.lancarAoCriar && def.despesa && canEdit) setLancando(novo as Row);
@@ -598,6 +633,9 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
           onDelete={
             editing !== 'new' && canDelete
               ? async () => {
+                  // excluir o item principal exclui também os seus tamanhos
+                  // (os que eram produtos antes de virar tamanho voltam a ficar soltos, não são apagados)
+                  if (def.tamanhos) for (const t of tamanhosDoItem(col.rows, editing.id)) await tirarTamanho(t);
                   await col.remove(editing.id);
                   notify('Registro excluído');
                   setEditing(null);
@@ -610,9 +648,10 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   );
 }
 
-function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: {
-  def: CollectionDef; row: Row | null; canEdit: boolean; defaults?: Record<string, unknown>;
+function RecordForm({ def, row, rows = [], canEdit, defaults, onClose, onSave, onDelete, onAbrir }: {
+  def: CollectionDef; row: Row | null; rows?: Row[]; canEdit: boolean; defaults?: Record<string, unknown>;
   onClose: () => void; onSave: (d: Record<string, unknown>) => Promise<void>; onDelete?: () => Promise<void>;
+  onAbrir?: (r: Row) => void;
 }) {
   const [data, setData] = useState<Record<string, unknown>>(() => {
     if (row) return { ...row };
@@ -623,6 +662,18 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [anexosNovos, setAnexosNovos] = useState<AnexoNovo[]>([]);
+  const visivel = (f: Field) => !f.mostrarSe || f.mostrarSe(data);
+  // tamanhos do item principal (ex.: chopp de 300 ml, 500 ml e 1 litro): cada um é um produto, com preço e ficha próprios
+  const comTamanhos = !!def.tamanhos && temTamanhos(data);
+  const salvosTamanhos = useMemo(() => (def.tamanhos && row ? tamanhosDoItem(rows, row.id) : []), [def.tamanhos, row, rows]);
+  const [tamanhos, setTamanhos] = useState<TamanhoRascunho[]>(() => salvosTamanhos.map(rascunhoDe));
+  const marcarTamanhos = (v: unknown) => {
+    // um produto que já tinha foto e passa a ter tamanhos: a foto vai para os tamanhos
+    if (v === 'Sim' && !tamanhos.length) setTamanhos(TAMANHOS_SUGERIDOS.map((t) => novoTamanho(t, typeof data.foto === 'string' ? data.foto : '')));
+  };
+  // produtos soltos (nem tamanho de outro item, nem item com tamanhos) que podem virar tamanho deste
+  const avulsos = useMemo(() => (def.tamanhos ? rows.filter((r) => !r.pai && !temTamanhos(r) && r.id !== row?.id) : []), [def.tamanhos, rows, row]);
+  const pai = def.tamanhos && typeof data.pai === 'string' ? rows.find((r) => r.id === data.pai) : undefined;
   // itens da nota de compra (só se editam numa nota nova; numa lançada, só aparecem)
   const [itensCompra, setItensCompra] = useState<ItemCompra[]>(() =>
     !def.compra ? [] : row && Array.isArray(row.itens)
@@ -642,11 +693,16 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
       const semQtd = itensValidos.find((i) => !(Number(i.quantidade) > 0));
       if (semQtd) return setError(`Informe a quantidade de "${semQtd.nome}".`);
     }
-    const missing = def.fields.find((f) => f.required && (data[f.key] === undefined || data[f.key] === ''));
+    const missing = def.fields.find((f) => f.required && visivel(f) && (data[f.key] === undefined || data[f.key] === ''));
     if (missing) return setError(`Preencha o campo "${missing.label}".`);
     const semVinculo = def.fields.find((f) => f.type === 'ref' && !f.livre && data[f.key] && (data[f.refKey!] === undefined || data[f.refKey!] === null || data[f.refKey!] === ''));
     if (semVinculo) return setError(`Selecione "${semVinculo.label}" na lista.`);
+    if (comTamanhos) {
+      const msg = conferirTamanhos(tamanhos);
+      if (msg) return setError(msg);
+    }
     for (const f of def.fields) {
+      if (!visivel(f)) continue;
       if (['number', 'money', 'percent'].includes(f.type)) {
         const msg = checkRange(f.label, data[f.key], numberSpec(f));
         if (msg) return setError(msg);
@@ -658,7 +714,7 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
         return setError('O CNPJ deve ter 14 dígitos.');
       }
     }
-    if (def.fichaTecnica) {
+    if (def.fichaTecnica && !comTamanhos) {
       const itens = fichaDe(data.ficha).itens;
       const vazio = itens.findIndex((i) => !String(i.insumo ?? '').trim());
       if (vazio >= 0) return setError(`Ficha técnica: informe o insumo da linha ${vazio + 1}.`);
@@ -670,7 +726,8 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
     try {
       const payload: Record<string, unknown> = {};
       for (const f of def.fields) {
-        payload[f.key] = data[f.key] ?? '';
+        // campo que não se aplica a este registro (ex.: preço do item com tamanhos) fica vazio
+        payload[f.key] = visivel(f) ? data[f.key] ?? '' : '';
         if (f.refKey) payload[f.refKey] = data[f.refKey] ?? null;
         if (f.outros) {
           // vários vínculos: sem os vazios e sem repetir; se o principal ficou vazio, o seguinte assume
@@ -687,7 +744,7 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
         }
         for (const extra of Object.keys(f.fill ?? {})) if (!def.fields.some((x) => x.key === extra)) payload[extra] = data[extra] ?? '';
       }
-      if (def.comFoto) payload.foto = data.foto ?? '';
+      if (def.comFoto) payload.foto = comTamanhos ? '' : data.foto ?? '';
       if (def.fotoJunto) payload.fotoJunto = data.fotoJunto ?? '';
       if (def.compra && !row) {
         payload.itens = itensValidos.map(({ chave: _c, lido, ...i }) => ({ ...i, ...(lido ? { descricaoNota: lido } : {}) }));
@@ -695,7 +752,8 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
       }
       if (def.compra && row) delete payload.valor;
       if (def.porLocal) Object.assign(payload, camposDosLocais(locaisDe(data), def.fields.some((f) => f.key === 'local')));
-      if (def.fichaTecnica) payload.ficha = fichaDe(data.ficha);
+      if (def.fichaTecnica) payload.ficha = fichaDe(comTamanhos ? null : data.ficha);
+      if (comTamanhos) payload._tamanhos = tamanhos;
       if (def.anexos) {
         // a lista dos que ficam (os removidos são apagados ao salvar) e os PDFs novos
         payload.anexos = anexosDe(data.anexos).map((a) => a.id);
@@ -710,7 +768,7 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
   };
 
   // na tela "Fichas técnicas" a receita vem antes dos dados do produto; em "Produtos", depois
-  const fichaCampo = def.fichaTecnica && (
+  const fichaCampo = def.fichaTecnica && !comTamanhos && (
     <FichaTecnica
       ficha={fichaDe(data.ficha)} preco={Number(data.preco) || 0} nome={String(data.nome ?? '')} disabled={!canEdit}
       preMarcar={!row && def.fichaPrimeiro}
@@ -739,7 +797,7 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
       }
     >
       <form id="record-form" className="form-grid" onSubmit={submit}>
-        {def.comFoto && (
+        {def.comFoto && !comTamanhos && (
           <FotoCampo valor={typeof data.foto === 'string' ? data.foto : ''} disabled={!canEdit} grande={def.fotoGrande} titulo={String(data[def.fields[0].key] ?? '')} onChange={(foto) => setData((d) => ({ ...d, foto }))} />
         )}
         {def.fotoJunto && (
@@ -748,9 +806,15 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
             valor={typeof data.fotoJunto === 'string' ? data.fotoJunto : ''} disabled={!canEdit} titulo={String(data[def.fields[0].key] ?? '')} onChange={(fotoJunto) => setData((d) => ({ ...d, fotoJunto }))}
           />
         )}
-        {(def.iaProduto || def.fotoPadrao) && canEdit && <GerarFotoIA data={data} padrao={def.fotoPadrao ?? 'produto'} onUsar={(foto) => setData((d) => ({ ...d, foto }))} />}
+        {(def.iaProduto || def.fotoPadrao) && canEdit && !comTamanhos && <GerarFotoIA data={data} padrao={def.fotoPadrao ?? 'produto'} onUsar={(foto) => setData((d) => ({ ...d, foto }))} />}
+        {pai && (
+          <p className="tamanho-de form-field--wide">
+            <span>Tamanho de <b>{String(pai.nome ?? '')}</b>: o nome, a categoria e os textos do cardápio acompanham o item principal.</span>
+            {onAbrir && <button type="button" className="btn btn--ghost btn--sm" onClick={() => onAbrir(pai)}>Ver todos os tamanhos <ChevronRight size={13} /></button>}
+          </p>
+        )}
         {def.fichaPrimeiro && fichaCampo}
-        {def.fields.map((f) => (def.porLocal && f.key === 'local') || (def.compra && f.key === 'valor') ? null : def.porLocal && f.key === 'quantidade' ? (
+        {def.fields.map((f) => (def.porLocal && f.key === 'local') || (def.compra && f.key === 'valor') || !visivel(f) ? null : def.porLocal && f.key === 'quantidade' ? (
           <LocaisCampo
             key="locais" locais={locaisNoFormulario(data)} unidade={typeof data.unidade === 'string' ? data.unidade : undefined} disabled={!canEdit}
             onChange={(l) => setData((d) => ({ ...d, ...camposDosLocais(l, def.fields.some((x) => x.key === 'local')) }))}
@@ -774,11 +838,12 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
                 // campo travado pela caixinha: fica vazio (o valor guardado não vale enquanto ela estiver desmarcada)
                 f.ativadoPor && data[f.ativadoPor] !== 'Sim'
                   ? <FieldInput field={f} value="" disabled onChange={() => undefined} />
-                  : <FieldInput field={f} value={data[f.key]} disabled={!canEdit} lista={listaDe(def.id, f.key)} onChange={(v) => setData((d) => ({ ...d, [f.key]: v }))} />
+                  : <FieldInput field={f} value={data[f.key]} disabled={!canEdit} lista={listaDe(def.id, f.key)} onChange={(v) => { setData((d) => ({ ...d, [f.key]: v })); if (f.key === 'comTamanhos') marcarTamanhos(v); }} />
               )}
             </div>
           </Fragment>
         ))}
+        {comTamanhos && <TamanhosCampo itens={tamanhos} salvos={salvosTamanhos} avulsos={avulsos} nome={String(data.nome ?? '')} disabled={!canEdit} onChange={setTamanhos} onAbrir={onAbrir} />}
         {def.fichaTecnica && !def.fichaPrimeiro && fichaCampo}
         {def.compra && (
           <CompraItens

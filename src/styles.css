@@ -293,6 +293,9 @@ main { padding: 0 16px calc(var(--nav-h) + var(--safe-bottom) + 40px); }
 }
 .chip.is-active { background: linear-gradient(135deg, var(--brand-light), var(--brand)); border-color: transparent; color: var(--on-brand); font-weight: 600; }
 .chip:disabled { opacity: .35; }
+/* filtro por tamanho no cardápio (ex.: chopp de 300 ml, 500 ml, 1 litro): menor e só contornado, para não competir com as categorias */
+.chip--sm { padding: 6px 12px; font-size: 13px; }
+.chips--tamanhos .chip.is-active { background: var(--surface-2); border-color: var(--brand-light); color: var(--brand-light); }
 .day-chip {
   flex-shrink: 0; width: 62px; padding: 8px 0;
   display: flex; flex-direction: column; align-items: center;

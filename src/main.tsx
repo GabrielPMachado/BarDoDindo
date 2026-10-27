@@ -60,6 +60,15 @@ function Shell() {
     );
   }
 
+  // cardápio aberto, sem login: o cardápio já é público (para mostrar a quem ainda não é afilhado)
+  if (pathname === '/demo/cardapio') {
+    return (
+      <div className="app">
+        <main><Cardapio /></main>
+      </div>
+    );
+  }
+
   if (!me) {
     return (
       <div className="app">

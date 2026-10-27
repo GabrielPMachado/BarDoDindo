@@ -139,7 +139,7 @@ function UsuarioForm({ user, funcoes, isSelf, canDelete, onClose }: {
         </div>
         <div className="form-field">
           <label htmlFor="u-email">E-mail de acesso *</label>
-          <input id="u-email" className="input" type="email" required disabled={!!user} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          <input id="u-email" className="input" type="email" autoComplete="off" required disabled={!!user} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
         </div>
         {/* e-mail e senha pertencem à conta da pessoa: depois de criada, só ela troca a senha (pelo menu ou por e-mail) */}
         {user ? (
@@ -155,7 +155,8 @@ function UsuarioForm({ user, funcoes, isSelf, canDelete, onClose }: {
         ) : (
           <div className="form-field">
             <label htmlFor="u-senha">Senha inicial *</label>
-            <input id="u-senha" className="input" type="password" autoComplete="new-password" minLength={8} required value={form.senha} onChange={(e) => setForm({ ...form, senha: e.target.value })} placeholder="Mínimo de 8 caracteres" />
+            {/* campo de texto mascarado: a senha é do funcionário, não de quem está logado, então o navegador não deve oferecer para salvá-la */}
+            <input id="u-senha" className="input input--secreto" type="text" autoComplete="off" spellCheck={false} data-1p-ignore data-lpignore="true" data-form-type="other" minLength={8} required value={form.senha} onChange={(e) => setForm({ ...form, senha: e.target.value })} placeholder="Mínimo de 8 caracteres" />
           </div>
         )}
         <div className="form-field">
@@ -725,7 +726,7 @@ function ChaveIA() {
       <div className="form-grid">
         <div className="form-field">
           <label htmlFor="ia-chave">{configurada ? 'Trocar a chave' : 'Chave da API'}</label>
-          <input id="ia-chave" className="input" type="password" autoComplete="off" placeholder={configurada ? '•••••••• (deixe em branco para manter)' : 'Cole a chave aqui'} value={chave} onChange={(e) => setChave(e.target.value)} />
+          <input id="ia-chave" className="input input--secreto" type="text" autoComplete="off" spellCheck={false} data-1p-ignore data-lpignore="true" data-form-type="other" placeholder={configurada ? '•••••••• (deixe em branco para manter)' : 'Cole a chave aqui'} value={chave} onChange={(e) => setChave(e.target.value)} />
         </div>
         <div className="form-field">
           <label htmlFor="ia-modelo">Modelo (opcional)</label>
