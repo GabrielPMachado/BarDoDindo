@@ -12,6 +12,11 @@ export const firebaseConfig = {
   appId: '1:25992464924:web:1b2a776384133356212dd9',
 };
 
+/** Domínio oficial do bar. Links e QR Codes gerados no endereço antigo do Firebase apontam para ele. */
+export const SITE_OFICIAL = 'https://bardodindo.com.br';
+export const enderecoPublico = () =>
+  /^bardo-c0878\.(web\.app|firebaseapp\.com)$/.test(location.hostname) ? SITE_OFICIAL : location.origin;
+
 /** `VITE_EMULADOR=1` no build aponta para os emuladores locais (`npm run emuladores`). */
 export const EMULADOR = import.meta.env.VITE_EMULADOR === '1';
 export const EMULADOR_AUTH = 'http://127.0.0.1:9099';

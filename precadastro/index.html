@@ -882,7 +882,7 @@ import { INSTAGRAM, LIMITE_TEXTO, alternar, contador, ehOutro, montarResposta } 
   /* ---------- compartilhar e salvar o cartão ---------- */
   $('btn-share').onclick = async () => {
     const texto = `Garanti meu número de afilhado do Bar do Dindo: #${pad(atual.numero)}! Garanta o seu também.`;
-    const url = location.origin + location.pathname;
+    const url = (/^bardo-c0878\.(web\.app|firebaseapp\.com)$/.test(location.hostname) ? 'https://bardodindo.com.br' : location.origin) + location.pathname;
     try {
       if (navigator.share) await navigator.share({ title: 'Bar do Dindo', text: texto, url });
       else {

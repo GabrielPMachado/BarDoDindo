@@ -719,7 +719,7 @@ function ChaveIA() {
       <ol className="ia-chave__passos small muted">
         <li>Abra o Google AI Studio e entre com a conta do bar.</li>
         <li>Toque em <b>Criar chave de API</b> e copie a chave.</li>
-        <li>Recomendado: nas restrições da chave, permita só o site <b>bardo-c0878.web.app</b>.</li>
+        <li>Recomendado: nas restrições da chave, permita só os sites <b>bardodindo.com.br</b>, <b>www.bardodindo.com.br</b> e <b>bardo-c0878.web.app</b>.</li>
         <li>Cole a chave aqui e salve.</li>
       </ol>
       <a className="link small ia-chave__link" href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer"><ExternalLink size={13} /> Abrir o Google AI Studio</a>
