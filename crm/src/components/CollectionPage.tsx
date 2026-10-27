@@ -664,6 +664,8 @@ function RecordForm({ def, row, rows = [], canEdit, defaults, onClose, onSave, o
     // um produto que já tinha foto e passa a ter tamanhos: a foto vai para os tamanhos
     if (v === 'Sim' && !tamanhos.length) setTamanhos(TAMANHOS_SUGERIDOS.map((t) => novoTamanho(t, typeof data.foto === 'string' ? data.foto : '')));
   };
+  // produtos soltos (nem tamanho de outro item, nem item com tamanhos) que podem virar tamanho deste
+  const avulsos = useMemo(() => (def.tamanhos ? rows.filter((r) => !r.pai && !temTamanhos(r) && r.id !== row?.id) : []), [def.tamanhos, rows, row]);
   const pai = def.tamanhos && typeof data.pai === 'string' ? rows.find((r) => r.id === data.pai) : undefined;
   // itens da nota de compra (só se editam numa nota nova; numa lançada, só aparecem)
   const [itensCompra, setItensCompra] = useState<ItemCompra[]>(() =>
@@ -816,7 +818,7 @@ function RecordForm({ def, row, rows = [], canEdit, defaults, onClose, onSave, o
             </div>
           </Fragment>
         ))}
-        {comTamanhos && <TamanhosCampo itens={tamanhos} salvos={salvosTamanhos} nome={String(data.nome ?? '')} disabled={!canEdit} onChange={setTamanhos} onAbrir={onAbrir} />}
+        {comTamanhos && <TamanhosCampo itens={tamanhos} salvos={salvosTamanhos} avulsos={avulsos} nome={String(data.nome ?? '')} disabled={!canEdit} onChange={setTamanhos} onAbrir={onAbrir} />}
         {def.fichaTecnica && !def.fichaPrimeiro && fichaCampo}
         {def.compra && (
           <CompraItens
