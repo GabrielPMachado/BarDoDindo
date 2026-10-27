@@ -107,7 +107,7 @@ function Shell() {
 
 // Antes do lançamento só o pré-cadastro fica aberto: na web, quem abre o app vai para /afilhado.
 // Para liberar o app, troque para true. Para testar o app mesmo assim, abra com ?app=1 (vale até fechar a aba).
-const APP_LIBERADO = false;
+const APP_LIBERADO = true;
 const testeDoApp = (() => {
   try {
     if (new URLSearchParams(location.search).has('app')) sessionStorage.setItem('app-liberado', '1');

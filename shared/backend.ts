@@ -648,7 +648,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     if (!tel) fail(400, 'Informe o celular completo, com DDD.');
     const { cpf, nascimento } = conferirDocumentos(b);
     if (b.aceite !== true) fail(400, 'É preciso aceitar o uso dos dados para participar do programa.');
-    // apagar afilhados (ou zerar o sistema) remove o cadastro; a conta de login continua (só o Admin SDK a apaga): quem volta usa a senha de antes ou "Esqueci minha senha"
+    // apagar afilhados remove o cadastro; a conta de login continua (só o Admin SDK a apaga): quem volta usa a senha de antes ou "Esqueci minha senha"
     const { cred, nova } = await criarConta(email, senha, EMAIL_COM_CONTA);
     const uid = cred.user.uid;
     try {
@@ -1222,40 +1222,6 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     registrar(lote, ctx, 'parametros', 'ajustou a numeração dos afilhados', { alvo: `próximo número: #${pad3(maior + 1)}` });
     await lote.commit();
     return { proximo: maior + 1 };
-  });
-
-  /* CRM: zerar o sistema (só a Presidência). Apaga TODOS os dados, inclusive usuários, funções e parâmetros:
-   * o sistema volta ao "primeiro acesso". As contas de login (Firebase Auth) continuam existindo (só o Admin SDK as apaga):
-   * quem se cadastrar de novo com o mesmo e-mail usa a senha de antes ou "Esqueci minha senha". */
-  rota('POST', '/crm/admin/zerar', async ({ b }) => {
-    const ctx = await requireUsuario();
-    if (!ctx.funcao?.sistema) fail(403, 'Só a Presidência pode zerar o sistema.');
-    if (b.confirmacao !== 'ZERAR TUDO') fail(400, 'Para zerar, confirme com "ZERAR TUDO".');
-    const todos = async (...caminho: string[]) => (await getDocs(collection(db, caminho.join('/')))).docs.map((d) => d.ref);
-    const cols = [...Object.keys(COLLECTIONS).filter((c) => c !== 'funcoes'), 'clientes', 'saldos', 'cpfs', 'cardapio', 'reservaveis', 'ref_colaboradores', 'ref_fornecedores', 'config', 'segredos', 'opcoes'];
-    const refs: DocumentReference[] = [];
-    for (const c of cols) refs.push(...(await todos(c)));
-    for (const a of new Set([...AREAS, ...MODULOS])) refs.push(...(await todos('atividades', a, 'itens')));
-    // PDFs anexados: as partes antes do registro de cada arquivo (as regras consultam o registro ao apagar uma parte)
-    const anexos = await todos('anexos');
-    for (const a of anexos) refs.push(...(await todos('anexos', a.id, 'partes')));
-    refs.push(...anexos);
-    refs.push(doc(db, 'meta', 'contadores'));
-    const usuarios = await todos('usuarios');
-    // preferências de cada usuário (só a própria pessoa lê; a Presidência apaga pela lista de usuários)
-    refs.push(...usuarios.map((r) => doc(db, 'preferencias', r.id)));
-    refs.push(...usuarios.filter((r) => r.id !== ctx.usuario.id));
-    refs.push(...(await todos('funcoes')).filter((r) => r.id !== ctx.funcao?.id && r.id !== ctx.usuario.funcaoId));
-    let n = await apagarEmLotes(refs);
-    // por último, num lote só: o próprio usuário, a função Presidência e o registro do primeiro acesso
-    const fim = writeBatch(db);
-    fim.delete(doc(db, 'usuarios', ctx.usuario.id));
-    fim.delete(doc(db, 'funcoes', ctx.usuario.funcaoId));
-    fim.delete(doc(db, 'meta', 'setup'));
-    await fim.commit();
-    n += 3;
-    await sair();
-    return { apagados: n };
   });
 
   /* CRM: listas para vincular registros (só nome e identificação — sem salários ou dados sensíveis) */
