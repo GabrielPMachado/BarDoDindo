@@ -2,14 +2,14 @@ import { useCallback, useMemo, useState, type DragEvent, type ReactNode, Fragmen
 import { ArrowDown, ArrowLeftRight, ArrowUp, Camera, ChevronDown, ChevronRight, Download, FileSpreadsheet, FileText, Globe, ImageOff, Maximize2, Paperclip, Pencil, Plus, Receipt, Search, Sheet, ShoppingCart, Sparkles, Trash2, X } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { findModule } from '../modules';
-import { numberSpec, STATUS_KEYS, termos, toneOf, type CollectionDef, type Computed, type Field } from '../collections';
+import { numberSpec, STATUS_KEYS, termos, toneOf, vinculosDe, type CollectionDef, type Computed, type Field } from '../collections';
 import { maskCnpj, maskPhone } from '../lib/masks';
 import { useCollection, type Row } from '../lib/data';
 import { brl, dateBR, num, pct } from '../lib/format';
 import { useSession } from '../lib/session';
 import { desdeDe, PERIODO_PADRAO, PERIODOS, type PeriodoKey } from '../lib/periodo';
 import { AsyncButton, Badge, checkRange, EmptyState, ErrorBox, FieldInput, KpiRow, Loading, Modal, PageHead, notify } from './ui';
-import { confirmar, RefPicker } from './pickers';
+import { confirmar, RefPicker, VariosRefPicker } from './pickers';
 import { api } from '../lib/api';
 import { fotoNoTamanho } from './Avatar';
 import { ContextMenu, type MenuPos } from './ContextMenu';
@@ -35,6 +35,12 @@ import { calcularFicha, fichaDe, type Ficha } from '../lib/ficha';
 const PAGE = 50;
 /** Lista agrupada (tabela): linhas mostradas por grupo antes do "Ver mais". */
 const LINHAS_POR_GRUPO = 5;
+
+/** Valores de um campo para busca e filtros: nos vínculos com vários (ex.: fornecedores), todos eles. */
+function valoresDoCampo(r: Row, f: Pick<Field, 'key'> & Partial<Field>): string[] {
+  return f.outros ? vinculosDe(r, f as Field).map((v) => v.nome) : [String(r[f.key] ?? '')];
+}
+const plural = (rotulo: string) => (/[rzs]$/i.test(rotulo) ? `${rotulo}es` : `${rotulo}s`);
 
 function formatField(f: Field, v: unknown): ReactNode {
   if (v === undefined || v === null || v === '') return <span className="muted">—</span>;
@@ -143,7 +149,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
     const f = def.fields.find((x) => x.key === key);
     if (!f) return [];
     const valores = new Map<string, string>();
-    for (const r of all) { const v = String(r[key] ?? '').trim(); if (v && !valores.has(chaveFiltro(v))) valores.set(chaveFiltro(v), v); }
+    for (const r of all) for (const x of valoresDoCampo(r, f)) { const v = x.trim(); if (v && !valores.has(chaveFiltro(v))) valores.set(chaveFiltro(v), v); }
     const opcoes = [...valores].sort((a, b) => a[1].localeCompare(b[1], 'pt-BR', { numeric: true }));
     return opcoes.length > 1 || filtros[key] ? [{ key, label: f.label.replace(/\s*\(.*\)$/, ''), opcoes }] : [];
   }), [def, all, filtros]);
@@ -153,8 +159,8 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
     const list = all.filter(
       (r) =>
         (!filter || r[def.filterKey!] === filter) &&
-        Object.entries(filtros).every(([k, v]) => !v || chaveFiltro(r[k]) === v) &&
-        (!term || def.fields.some((f) => String(r[f.key] ?? '').toLowerCase().includes(term))),
+        Object.entries(filtros).every(([k, v]) => !v || valoresDoCampo(r, def.fields.find((f) => f.key === k) ?? { key: k }).some((x) => chaveFiltro(x) === v)) &&
+        (!term || def.fields.some((f) => valoresDoCampo(r, f).some((x) => x.toLowerCase().includes(term)))),
     );
     const field = def.fields.find((f) => f.key === sort.key);
     const numeric = field && ['number', 'money', 'percent'].includes(field.type);
@@ -666,6 +672,19 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
       for (const f of def.fields) {
         payload[f.key] = data[f.key] ?? '';
         if (f.refKey) payload[f.refKey] = data[f.refKey] ?? null;
+        if (f.outros) {
+          // vários vínculos: sem os vazios e sem repetir; se o principal ficou vazio, o seguinte assume
+          const vistos = new Set<string>();
+          const lista = vinculosDe(data, f).filter((v) => {
+            const chave = v.id ? `#${v.id}` : v.nome.trim().toLowerCase();
+            if (!v.nome.trim() || vistos.has(chave)) return false;
+            vistos.add(chave);
+            return true;
+          });
+          payload[f.key] = lista[0]?.nome.trim() ?? '';
+          payload[f.refKey!] = lista[0]?.id ?? null;
+          payload[f.outros] = lista.slice(1).map((v) => ({ nome: v.nome.trim(), id: v.id ?? null }));
+        }
         for (const extra of Object.keys(f.fill ?? {})) if (!def.fields.some((x) => x.key === extra)) payload[extra] = data[extra] ?? '';
       }
       if (def.comFoto) payload.foto = data.foto ?? '';
@@ -742,9 +761,14 @@ function RecordForm({ def, row, canEdit, defaults, onClose, onSave, onDelete }: 
             {def.iaProduto && canEdit && f.key === 'resumo' && (
               <PreencherProdutoIA data={data} onPreencher={(patch) => setData((d) => ({ ...d, ...patch }))} />
             )}
-            <div className={`form-field ${f.wide || f.type === 'textarea' ? 'form-field--wide' : ''}`}>
-              <label htmlFor={`f-${f.key}`}>{f.label}{f.required && canEdit && <span className="req"> *</span>}</label>
-              {f.type === 'ref' ? (
+            <div className={`form-field ${f.wide || f.type === 'textarea' || f.outros ? 'form-field--wide' : ''}`}>
+              <label htmlFor={`f-${f.key}`}>{f.outros && vinculosDe(data, f).length > 1 ? plural(f.label) : f.label}{f.required && canEdit && <span className="req"> *</span>}</label>
+              {f.outros ? (
+                <VariosRefPicker
+                  id={`f-${f.key}`} field={f} lista={vinculosDe(data, f)} disabled={!canEdit}
+                  onChange={(lista) => setData((d) => ({ ...d, [f.key]: lista[0]?.nome ?? '', [f.refKey!]: lista[0]?.id ?? null, [f.outros!]: lista.slice(1) }))}
+                />
+              ) : f.type === 'ref' ? (
                 <RefPicker id={`f-${f.key}`} field={f} value={data[f.key]} linkedId={data[f.refKey!]} disabled={!canEdit} onChange={(patch) => setData((d) => ({ ...d, ...patch }))} />
               ) : (
                 // campo travado pela caixinha: fica vazio (o valor guardado não vale enquanto ela estiver desmarcada)

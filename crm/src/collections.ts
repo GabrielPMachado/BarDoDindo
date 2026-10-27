@@ -30,12 +30,23 @@ export interface Field {
   refKey?: string;
   /** Permite digitar um nome que não está na lista. */
   livre?: boolean;
+  /** Vínculo que aceita mais de um (ex.: vários fornecedores): o primeiro fica em `key`/`refKey` e os demais nesta chave, como lista de { nome, id }. */
+  outros?: string;
   /** Campo de link (url): vira um botão na linha da tabela ("comprar" = carrinho, "site" = site do fornecedor). */
   acao?: 'comprar' | 'site';
   /** Ao escolher um item, copia outros dados dele (campo do registro → campo do item). */
   fill?: Record<string, string>;
   /** Só fica editável com a caixinha (campo "check") desta chave marcada. */
   ativadoPor?: string;
+}
+
+export interface Vinculo { nome: string; id: string | number | null }
+
+/** Todos os vínculos de um campo que aceita mais de um: o principal primeiro e depois os outros (registros antigos têm só o principal). */
+export function vinculosDe(r: Record<string, unknown>, f: Field): Vinculo[] {
+  const principal: Vinculo = { nome: String(r[f.key] ?? ''), id: (r[f.refKey!] as Vinculo['id']) ?? null };
+  const outros = f.outros && Array.isArray(r[f.outros]) ? (r[f.outros] as Vinculo[]).map((v) => ({ nome: String(v?.nome ?? ''), id: v?.id ?? null })) : [];
+  return [principal, ...outros];
 }
 
 /** Limites efetivos de um campo numérico, com padrões seguros por tipo. */
@@ -277,7 +288,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'quantidade', label: 'Quantidade', type: 'number', required: true, decimals: 3, max: 1_000_000 },
       { key: 'minimo', label: 'Estoque mínimo', type: 'number', decimals: 3, max: 1_000_000 },
       { key: 'custo', label: 'Custo unitário', type: 'money', max: 100_000 },
-      { key: 'fornecedor', label: 'Fornecedor', type: 'ref', ref: 'fornecedores', refKey: 'fornecedorId', livre: true, formOnly: true },
+      { key: 'fornecedor', label: 'Fornecedor', type: 'ref', ref: 'fornecedores', refKey: 'fornecedorId', livre: true, formOnly: true, outros: 'outrosFornecedores' },
       { key: 'link', label: 'Link para compra', type: 'url', formOnly: true, wide: true, acao: 'comprar', placeholder: 'Cole aqui o link do produto na loja' },
       { key: 'validade', label: 'Validade', type: 'date' },
     ],
@@ -313,7 +324,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'estado', label: 'Estado', type: 'select', options: ['Novo', 'Bom', 'Regular', 'Manutenção', 'Descartar'], default: 'Bom' },
       { key: 'valor', label: 'Valor unitário', type: 'money', max: 10_000_000 },
       { key: 'aquisicao', label: 'Aquisição', type: 'date' },
-      { key: 'fornecedor', label: 'Fornecedor', type: 'ref', ref: 'fornecedores', refKey: 'fornecedorId', livre: true, formOnly: true },
+      { key: 'fornecedor', label: 'Fornecedor', type: 'ref', ref: 'fornecedores', refKey: 'fornecedorId', livre: true, formOnly: true, outros: 'outrosFornecedores' },
       { key: 'link', label: 'Link para compra', type: 'url', formOnly: true, wide: true, acao: 'comprar', placeholder: 'Cole aqui o link do produto na loja' },
       { key: 'observacoes', label: 'Observações', type: 'textarea', formOnly: true, wide: true },
     ],
@@ -338,7 +349,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'vidaUtil', label: 'Vida útil (anos)', type: 'number', min: 0, max: 100, formOnly: true, placeholder: 'Ex.: 10 (móveis), 5 (equipamentos)' },
       { key: 'estado', label: 'Estado', type: 'select', options: ['Novo', 'Bom', 'Regular', 'Manutenção', 'Baixado'], default: 'Bom' },
       { key: 'local', label: 'Local', type: 'select', options: ['Salão', 'Bar', 'Cozinha', 'Depósito', 'Escritório', 'Área externa'], formOnly: true },
-      { key: 'fornecedor', label: 'Fornecedor', type: 'ref', ref: 'fornecedores', refKey: 'fornecedorId', livre: true, formOnly: true },
+      { key: 'fornecedor', label: 'Fornecedor', type: 'ref', ref: 'fornecedores', refKey: 'fornecedorId', livre: true, formOnly: true, outros: 'outrosFornecedores' },
       { key: 'cenarioFoto', label: 'Cenário da foto', type: 'select', options: ['Automático', 'Canto gamer', 'Palco', 'Atrás do balcão', 'Salão de mesas', 'Cozinha', 'Área externa'], default: 'Automático', formOnly: true },
       { key: 'descricaoReserva', label: 'Descrição no app (categoria Reserva)', type: 'textarea', formOnly: true, wide: true, placeholder: 'Ex.: Dois controles e os jogos de futebol e corrida. Aparece para o afilhado ao reservar.' },
       { key: 'observacoes', label: 'Observações', type: 'textarea', formOnly: true, wide: true },

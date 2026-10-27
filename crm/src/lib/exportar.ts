@@ -3,7 +3,7 @@
  * data, colunas no formato certo (dinheiro, datas, status coloridos), totais e as fotos dos registros.
  * As bibliotecas (ExcelJS e jsPDF) só são baixadas quando alguém exporta.
  */
-import { STATUS_KEYS, toneOf, type CollectionDef, type Tone } from '../collections';
+import { STATUS_KEYS, toneOf, vinculosDe, type CollectionDef, type Tone } from '../collections';
 import type { Row } from './data';
 import { brl, dateBR, num } from './format';
 import { maskCnpj, maskPhone } from './masks';
@@ -27,8 +27,10 @@ export function colunasDe(def: CollectionDef): Coluna[] {
     const valor = f.type === 'phone' ? (r: Row) => (r[f.key] ? maskPhone(r[f.key]) : '')
       : f.type === 'cnpj' ? (r: Row) => (r[f.key] ? maskCnpj(r[f.key]) : '')
         : f.type === 'time' ? (r: Row) => String(r[f.key] ?? '').slice(0, 5)
-          : (r: Row) => r[f.key];
-    cols.push({ titulo: f.label, tipo, valor });
+          // vínculo com vários (ex.: fornecedores): todos na mesma célula
+          : f.outros ? (r: Row) => vinculosDe(r, f).map((v) => v.nome).filter(Boolean).join(', ')
+            : (r: Row) => r[f.key];
+    cols.push({ titulo: f.outros ? `${f.label}(es)` : f.label, tipo, valor });
   }
   for (const c of def.computed ?? []) {
     const tipo: TipoColuna = c.format === 'money' ? 'dinheiro' : c.format === 'number' ? 'numero' : c.format === 'percent' ? 'percentual' : c.format === 'badge' ? 'status' : 'texto';

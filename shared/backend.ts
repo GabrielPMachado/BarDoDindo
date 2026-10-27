@@ -1969,6 +1969,17 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const principal = Object.entries(l).sort((a, b) => b[1] - a[1])[0]?.[0] ?? local;
     return { locais: l, quantidade, principal };
   }
+  /** O fornecedor da nota entra no item: vira o principal se o item não tem nenhum, ou se soma aos outros fornecedores dele. */
+  function fornecedorDaCompra(cur: Dados, compra: Dados): Dados {
+    const nome = str(compra.fornecedor, 160), id = compra.fornecedorId ?? null;
+    if (!nome) return {};
+    const outros: { nome: string; id: unknown }[] = Array.isArray(cur.outrosFornecedores) ? cur.outrosFornecedores : [];
+    const mesmo = (o: { nome?: unknown; id?: unknown }) => (id && o.id ? o.id === id : String(o.nome ?? '').trim().toLowerCase() === nome.toLowerCase());
+    if (!String(cur.fornecedor ?? '').trim()) return { fornecedor: nome, fornecedorId: id };
+    if (mesmo({ nome: cur.fornecedor, id: cur.fornecedorId })) return cur.fornecedorId || !id ? {} : { fornecedorId: id };
+    if (outros.some(mesmo)) return {};
+    return { outrosFornecedores: [...outros, { nome, id }] };
+  }
   async function aplicarCompra(lote: WriteBatch, ctx: Ctx, compra: Dados, sinal: 1 | -1) {
     const t = now();
     const itens = compra.itens as ItemCompra[];
@@ -1985,8 +1996,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
         if (col === 'materiais') patch.local = principal;
         // a unidade trocada na nota corrige o cadastro (ex.: gin cadastrado em "ml" que é comprado por garrafa)
         if (sinal > 0 && col === 'estoque' && it.unidade && it.unidade !== cur.unidade) patch.unidade = it.unidade;
-        if (sinal > 0 && col === 'estoque') Object.assign(patch, { custo: it.valorUnitario, ...(compra.fornecedor ? { fornecedor: compra.fornecedor, fornecedorId: compra.fornecedorId ?? null } : {}) });
-        if (sinal > 0 && col === 'materiais') Object.assign(patch, { valor: it.valorUnitario, aquisicao: compra.data || '', ...(compra.fornecedor ? { fornecedor: compra.fornecedor, fornecedorId: compra.fornecedorId ?? null } : {}) });
+        if (sinal > 0 && col === 'estoque') Object.assign(patch, { custo: it.valorUnitario, ...fornecedorDaCompra(cur, compra) });
+        if (sinal > 0 && col === 'materiais') Object.assign(patch, { valor: it.valorUnitario, aquisicao: compra.data || '', ...fornecedorDaCompra(cur, compra) });
         lote.update(doc(db, col, cur.id), patch);
         item = { ...cur, ...patch };
       } else {

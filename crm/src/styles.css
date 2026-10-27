@@ -1845,3 +1845,10 @@ button.anexos__nome:hover { text-decoration: underline; }
 .refazer-fotos .spin { animation: girar 1s linear infinite; }
 @keyframes girar { to { transform: rotate(360deg); } }
 @media (max-width: 520px) { .refazer-fotos__lista { grid-template-columns: 1fr; } }
+
+/* vínculo com vários (ex.: mais de um fornecedor no item) */
+.varios { display: flex; flex-direction: column; gap: 6px; }
+.varios__linha { display: flex; gap: 8px; align-items: flex-start; }
+.varios__linha > .picker { flex: 1; min-width: 0; }
+.varios__linha .icon-btn { margin-top: 3px; flex-shrink: 0; }
+.varios__pergunta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 2px 0 0; }
