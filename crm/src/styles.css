@@ -1851,18 +1851,21 @@ button.anexos__nome:hover { text-decoration: underline; }
 /* item com tamanhos (ex.: chopp de 300 ml, 500 ml e 1 litro): cada tamanho com preço e atalho para a ficha técnica */
 .tamanhos { gap: 8px; }
 .tamanhos ul { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); overflow: hidden; }
-.tamanhos li { display: grid; grid-template-columns: minmax(110px, 1fr) minmax(120px, 160px) minmax(0, 1.4fr) auto; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.tamanhos li { display: grid; grid-template-columns: 44px minmax(110px, 1fr) minmax(120px, 160px) minmax(0, 1.4fr) auto; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
 .tamanhos li:last-child { border-bottom: 0; }
 .tamanhos__acoes { display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end; }
 .tamanhos__acoes .btn { white-space: nowrap; }
 .tamanhos__mais { align-self: flex-start; }
+.tamanhos__foto { width: 44px; height: 44px; border-radius: 10px; border: 1px dashed var(--border); background: var(--surface); display: grid; place-items: center; overflow: hidden; color: var(--muted); cursor: pointer; }
+.tamanhos__foto.is-off { cursor: default; }
+.tamanhos__foto img { width: 100%; height: 100%; object-fit: cover; }
 /* ficha técnica do tamanho aberta dentro do item principal */
 .tamanhos__seta { transition: transform .15s; }
 .tamanhos li.is-aberto .tamanhos__seta { transform: rotate(180deg); }
 .tamanhos__ficha-aberta { grid-column: 1 / -1; padding-top: 4px; }
 .tamanhos li.is-aberto { background: var(--surface); }
 @media (max-width: 640px) {
-  .tamanhos li { grid-template-columns: 1fr 1fr; }
+  .tamanhos li { grid-template-columns: 44px 1fr 1fr; }
   .tamanhos__ficha { grid-column: 1 / -1; }
   .tamanhos__acoes { grid-column: 1 / -1; justify-content: space-between; }
 }

@@ -31,7 +31,7 @@ import { SeletorVisao, VisaoCalendario, VisaoCartoes, VisaoQuadro, campoDoQuadro
 import { CompraItens, itemVazio, totalItens, type ItemCompra } from './CompraItens';
 import { camposDosLocais, locaisDe, locaisNoFormulario } from '../lib/locais';
 import { calcularFicha, fichaDe, type Ficha } from '../lib/ficha';
-import { conferirTamanhos, novoTamanho, rascunhoDe, salvarTamanhos, TAMANHOS_SUGERIDOS, TamanhosCampo, tamanhosDoItem, type TamanhoRascunho } from './Tamanhos';
+import { conferirTamanhos, fotoDosTamanhos, novoTamanho, rascunhoDe, salvarTamanhos, TAMANHOS_SUGERIDOS, TamanhosCampo, tamanhosDoItem, type TamanhoRascunho } from './Tamanhos';
 
 const PAGE = 50;
 /** Lista agrupada (tabela): linhas mostradas por grupo antes do "Ver mais". */
@@ -106,7 +106,12 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   const all = useMemo(() => {
     const lista = filterRows ? col.rows.filter(filterRows) : col.rows;
     // item com tamanhos: leva os tamanhos junto, para as colunas calculadas (ex.: "3 tamanhos: 300 ml, 500 ml, 1 litro")
-    return def.tamanhos ? lista.map((r) => (temTamanhos(r) ? { ...r, _tamanhos: tamanhosDoItem(col.rows, r.id) } : r)) : lista;
+    // e mostra a foto de um dos tamanhos (o item principal não tem foto própria)
+    return def.tamanhos ? lista.map((r) => {
+      if (!temTamanhos(r)) return r;
+      const tamanhos = tamanhosDoItem(col.rows, r.id);
+      return { ...r, _tamanhos: tamanhos, foto: fotoDosTamanhos(tamanhos) || r.foto };
+    }) : lista;
   }, [col.rows, filterRows, def.tamanhos]);
 
   const [q, setQ] = useState('');
@@ -656,7 +661,8 @@ function RecordForm({ def, row, rows = [], canEdit, defaults, onClose, onSave, o
   const salvosTamanhos = useMemo(() => (def.tamanhos && row ? tamanhosDoItem(rows, row.id) : []), [def.tamanhos, row, rows]);
   const [tamanhos, setTamanhos] = useState<TamanhoRascunho[]>(() => salvosTamanhos.map(rascunhoDe));
   const marcarTamanhos = (v: unknown) => {
-    if (v === 'Sim' && !tamanhos.length) setTamanhos(TAMANHOS_SUGERIDOS.map((t) => novoTamanho(t)));
+    // um produto que já tinha foto e passa a ter tamanhos: a foto vai para os tamanhos
+    if (v === 'Sim' && !tamanhos.length) setTamanhos(TAMANHOS_SUGERIDOS.map((t) => novoTamanho(t, typeof data.foto === 'string' ? data.foto : '')));
   };
   const pai = def.tamanhos && typeof data.pai === 'string' ? rows.find((r) => r.id === data.pai) : undefined;
   // itens da nota de compra (só se editam numa nota nova; numa lançada, só aparecem)
@@ -716,7 +722,7 @@ function RecordForm({ def, row, rows = [], canEdit, defaults, onClose, onSave, o
         if (f.refKey) payload[f.refKey] = data[f.refKey] ?? null;
         for (const extra of Object.keys(f.fill ?? {})) if (!def.fields.some((x) => x.key === extra)) payload[extra] = data[extra] ?? '';
       }
-      if (def.comFoto) payload.foto = data.foto ?? '';
+      if (def.comFoto) payload.foto = comTamanhos ? '' : data.foto ?? '';
       if (def.fotoJunto) payload.fotoJunto = data.fotoJunto ?? '';
       if (def.compra && !row) {
         payload.itens = itensValidos.map(({ chave: _c, lido, ...i }) => ({ ...i, ...(lido ? { descricaoNota: lido } : {}) }));
@@ -769,7 +775,7 @@ function RecordForm({ def, row, rows = [], canEdit, defaults, onClose, onSave, o
       }
     >
       <form id="record-form" className="form-grid" onSubmit={submit}>
-        {def.comFoto && (
+        {def.comFoto && !comTamanhos && (
           <FotoCampo valor={typeof data.foto === 'string' ? data.foto : ''} disabled={!canEdit} grande={def.fotoGrande} titulo={String(data[def.fields[0].key] ?? '')} onChange={(foto) => setData((d) => ({ ...d, foto }))} />
         )}
         {def.fotoJunto && (
@@ -778,7 +784,7 @@ function RecordForm({ def, row, rows = [], canEdit, defaults, onClose, onSave, o
             valor={typeof data.fotoJunto === 'string' ? data.fotoJunto : ''} disabled={!canEdit} titulo={String(data[def.fields[0].key] ?? '')} onChange={(fotoJunto) => setData((d) => ({ ...d, fotoJunto }))}
           />
         )}
-        {(def.iaProduto || def.fotoPadrao) && canEdit && <GerarFotoIA data={data} padrao={def.fotoPadrao ?? 'produto'} onUsar={(foto) => setData((d) => ({ ...d, foto }))} />}
+        {(def.iaProduto || def.fotoPadrao) && canEdit && !comTamanhos && <GerarFotoIA data={data} padrao={def.fotoPadrao ?? 'produto'} onUsar={(foto) => setData((d) => ({ ...d, foto }))} />}
         {pai && (
           <p className="tamanho-de form-field--wide">
             <span>Tamanho de <b>{String(pai.nome ?? '')}</b>: o nome, a categoria e os textos do cardápio acompanham o item principal.</span>
