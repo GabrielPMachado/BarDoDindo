@@ -55,16 +55,22 @@ export function conferirTamanhos(itens: TamanhoRascunho[]): string | null {
  * Os novos herdam os textos do item; nos que já existem, o que veio do item acompanha a mudança, e o que foi
  * mudado só no tamanho fica como está. A foto é de cada tamanho (o item mostra a de um deles).
  */
+/** Tira o tamanho do item: o criado aqui é excluído; um produto que já existia antes (trazido) volta a ser solto, nunca é apagado. */
+export async function tirarTamanho(r: Row) {
+  if (r.trazido) await api(`/crm/c/produtos/${r.id}`, { method: 'PUT', body: { pai: '', tamanho: '', trazido: '' } });
+  else await api(`/crm/c/produtos/${r.id}`, { method: 'DELETE' });
+}
+
 export async function salvarTamanhos(paiId: string, antes: Row | null, depois: Record<string, unknown>, itens: TamanhoRascunho[], salvos: Row[]) {
   const ficam = new Set(itens.map((t) => t.id).filter(Boolean));
-  for (const r of salvos) if (!ficam.has(r.id)) await api(`/crm/c/produtos/${r.id}`, { method: 'DELETE' });
+  for (const r of salvos) if (!ficam.has(r.id)) await tirarTamanho(r);
   for (const t of itens) {
     const tamanho = t.tamanho.trim(), preco = Number(t.preco);
     const atual = t.id ? salvos.find((r) => r.id === t.id) : undefined;
     if (t.id && !atual) {
       // produto que já existia sozinho e passa a ser tamanho deste item: mantém o cadastro (e o histórico) e ganha o vínculo
       const herdado = Object.fromEntries(HERDADOS.filter((k) => (depois[k] ?? '') !== '').map((k) => [k, depois[k]]));
-      await api(`/crm/c/produtos/${t.id}`, { method: 'PUT', body: { ...herdado, nome: nomeDoTamanho(depois.nome, tamanho), tamanho, preco, pai: paiId, comTamanhos: '', foto: t.foto, ficha: t.ficha, ...custoDaFicha(t.ficha, preco) } });
+      await api(`/crm/c/produtos/${t.id}`, { method: 'PUT', body: { ...herdado, nome: nomeDoTamanho(depois.nome, tamanho), tamanho, preco, pai: paiId, trazido: true, comTamanhos: '', foto: t.foto, ficha: t.ficha, ...custoDaFicha(t.ficha, preco) } });
       continue;
     }
     if (!atual) {
@@ -172,7 +178,7 @@ export function TamanhosCampo({ itens, salvos, avulsos = [], nome, disabled, onC
                   </button>
                 )}
                 {!disabled && (
-                  <button type="button" className="icon-btn" aria-label={`Tirar ${t.tamanho || 'o tamanho'}`} title={salvo ? 'Tirar este tamanho (o produto dele é excluído ao salvar)' : 'Tirar este tamanho'} onClick={() => onChange((lista) => lista.filter((x) => x.chave !== t.chave))}>
+                  <button type="button" className="icon-btn" aria-label={`Tirar ${t.tamanho || 'o tamanho'}`} title={salvo ? (salvo.trazido ? 'Tirar este tamanho (o produto volta a ficar solto ao salvar)' : 'Tirar este tamanho (o produto dele é excluído ao salvar)') : 'Tirar este tamanho'} onClick={() => onChange((lista) => lista.filter((x) => x.chave !== t.chave))}>
                     <Trash2 size={15} />
                   </button>
                 )}

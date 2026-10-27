@@ -31,7 +31,7 @@ import { SeletorVisao, VisaoCalendario, VisaoCartoes, VisaoQuadro, campoDoQuadro
 import { CompraItens, itemVazio, totalItens, type ItemCompra } from './CompraItens';
 import { camposDosLocais, locaisDe, locaisNoFormulario } from '../lib/locais';
 import { calcularFicha, fichaDe, type Ficha } from '../lib/ficha';
-import { conferirTamanhos, fotoDosTamanhos, novoTamanho, rascunhoDe, salvarTamanhos, TAMANHOS_SUGERIDOS, TamanhosCampo, tamanhosDoItem, type TamanhoRascunho } from './Tamanhos';
+import { conferirTamanhos, fotoDosTamanhos, novoTamanho, rascunhoDe, salvarTamanhos, tirarTamanho, TAMANHOS_SUGERIDOS, TamanhosCampo, tamanhosDoItem, type TamanhoRascunho } from './Tamanhos';
 
 const PAGE = 50;
 /** Lista agrupada (tabela): linhas mostradas por grupo antes do "Ver mais". */
@@ -628,7 +628,8 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
             editing !== 'new' && canDelete
               ? async () => {
                   // excluir o item principal exclui também os seus tamanhos
-                  if (def.tamanhos) for (const t of tamanhosDoItem(col.rows, editing.id)) await api(`/crm/c/${def.id}/${t.id}`, { method: 'DELETE' });
+                  // (os que eram produtos antes de virar tamanho voltam a ficar soltos, não são apagados)
+                  if (def.tamanhos) for (const t of tamanhosDoItem(col.rows, editing.id)) await tirarTamanho(t);
                   await col.remove(editing.id);
                   notify('Registro excluído');
                   setEditing(null);
