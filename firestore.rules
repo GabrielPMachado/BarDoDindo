@@ -264,8 +264,19 @@ service cloud.firestore {
     // a ficha técnica (produtos e guarnições) usa os insumos e custos do Estoque; a Tabela de preços escolhe o insumo;
     // a Entrada de notas soma (ou estorna) as quantidades e atualiza o custo dos itens
     match /estoque/{id} {
-      allow read: if podeEmAlgum(['produtos', 'fichas', 'guarnicoes', 'precos', 'compras'], 'ver');
+      // quem vende também lê (baixa pela ficha técnica, abaixo). Numa regra só, com vendeNaFuncao antes: esta leitura já
+      // fica perto do limite de 1000 expressões do Firestore, e outra regra com podeEmAlgum passa dele
+      allow read: if daEquipe() && leEstoque(funcao());
       allow create, update: if podeEmAlgum(['compras'], 'criar') || pode('compras', 'excluir');
+    }
+    // as vendas (Lançar consumo, Comandas) dão baixa nos insumos pela ficha técnica, e corrigir ou estornar a venda devolve:
+    // quem vende só mexe nas quantidades (a leitura está na regra acima; sem ler, a venda segue sem baixa).
+    // Conferência curta, sem a herança completa de acoesEm: "criar" em Lançar consumo (ou na área Atendimento)
+    function leEstoque(f) { return vendeNaFuncao(f) || emAlgum(f, ['produtos', 'fichas', 'guarnicoes', 'precos', 'compras'], 'ver'); }
+    function vendeNaFuncao(f) { return temAcao(f.get('permissoes', {}).get('consumos', f.get('permissoes', {}).get('atd', 'none')), 'criar'); }
+    match /estoque/{id} {
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['quantidade', 'locais', 'atualizadoEm'])
+        && daEquipe() && vendeNaFuncao(funcao());
     }
     // o preparo da ficha técnica escolhe copos e utensílios do cadastro de Materiais; a Entrada de notas soma os materiais
     match /materiais/{id} {

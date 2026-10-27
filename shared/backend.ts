@@ -1492,6 +1492,95 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   function somarNoCaixa(lote: WriteBatch, caixaId: string, forma: string, valor: number, n = 1) {
     lote.update(doc(db, 'caixas', caixaId), { [`vendas.${forma}`]: increment(valor), totalVendas: increment(valor), qtdVendas: increment(n) });
   }
+  /* ---------- baixa do Estoque pelas fichas técnicas ---------- */
+  /** O que uma venda tirou de cada item do Estoque, por local: o estorno devolve exatamente isso. */
+  type BaixaEstoque = { id: string; nome: string; locais: Record<string, number> }[];
+  const arred4 = (v: number) => Math.round(v * 10_000) / 10_000;
+  const FATOR_MEDIDA: Record<string, number> = { ml: 1, L: 1000, g: 1, kg: 1000 };
+  const grupoMedida = (u: string) => (u === 'ml' || u === 'L' ? 'volume' : u === 'g' || u === 'kg' ? 'massa' : null);
+  /** Quanto vale 1 unidade da receita na unidade do Estoque (500 ml de um barril de 50 L = 0,01 un); null: não se converte. */
+  function fatorEstoque(unidade: string, e: Dados): number | null {
+    const un = String(e.unidade || 'un'), g = grupoMedida(unidade);
+    if (g && grupoMedida(un) === g) return FATOR_MEDIDA[unidade] / FATOR_MEDIDA[un];
+    const conteudo = Number(e.conteudo) || 0, medida = String(e.conteudoUnidade ?? '');
+    if (g && conteudo > 0 && grupoMedida(medida) === g) return FATOR_MEDIDA[unidade] / FATOR_MEDIDA[medida] / conteudo;
+    return unidade === un ? 1 : null;
+  }
+  /** Quantidade por local (itens antigos, só com quantidade e local, viram um local só). */
+  function locaisDe(e: Dados): Record<string, number> {
+    const l: Record<string, number> = {};
+    if (e.locais && typeof e.locais === 'object') for (const [k, v] of Object.entries(e.locais)) l[k] = Number(v) || 0;
+    else if (Number(e.quantidade) > 0) l[String(e.local || 'Depósito')] = Number(e.quantidade);
+    return l;
+  }
+  /**
+   * Dá baixa no Estoque pelo que a venda usa (ficha técnica de cada produto) e devolve o que uma baixa anterior tirou.
+   * Cada insumo sai na ordem da ficha (o principal e depois as alternativas): tira o que houver do primeiro e o que faltar
+   * do próximo, sem deixar nenhum negativo. Insumo digitado à mão ou em unidade que não se converte fica de fora.
+   * Só quem pode lançar consumo mexe no Estoque (igual a vendeNaFuncao em firestore.rules); sem isso, ou se a leitura falhar,
+   * a venda segue sem baixa e guarda a baixa anterior.
+   */
+  async function movimentarEstoque(lote: WriteBatch, ctx: Ctx, itens: Dados[], devolver: unknown = []): Promise<BaixaEstoque> {
+    const devolvido = (Array.isArray(devolver) ? devolver : []) as BaixaEstoque;
+    if (!ctx.acoes('consumos').includes('criar')) return devolvido;
+    try {
+      const produtos = await colecao('produtos');
+      const usos: { candidatos: { id: string; nome: string }[]; unidade: string; qtd: number }[] = [];
+      for (const it of itens) {
+        const f = produtos.find((x) => x.id === it.produtoId)?.ficha as Dados | undefined;
+        if (!f || !Array.isArray(f.itens)) continue;
+        const rendimento = Number(f.rendimento) > 0 ? Number(f.rendimento) : 1;
+        for (const l of f.itens as Dados[]) {
+          const qtd = ((Number(l.quantidade) || 0) * (Number(it.quantidade) || 0)) / rendimento;
+          const candidatos = [l, ...(Array.isArray(l.alternativas) ? l.alternativas : [])]
+            .filter((c: Dados) => c?.insumoId).map((c: Dados) => ({ id: String(c.insumoId), nome: String(c.insumo ?? '') }));
+          if (qtd > 0 && candidatos.length) usos.push({ candidatos, unidade: String(l.unidade ?? ''), qtd });
+        }
+      }
+      const ids = [...new Set([...usos.flatMap((u) => u.candidatos.map((c) => c.id)), ...devolvido.map((b) => String(b.id))])];
+      if (!ids.length) return [];
+      const docs = new Map((await Promise.all(ids.map((id) => registro('estoque', id)))).filter((d): d is Dados => !!d).map((d) => [String(d.id), d]));
+      const saldo = new Map([...docs].map(([id, d]) => [id, locaisDe(d)]));
+      // primeiro volta o que a venda tinha tirado (correção ou estorno)
+      for (const b of devolvido) {
+        const l = saldo.get(String(b.id));
+        if (l) for (const [k, v] of Object.entries(b.locais ?? {})) l[k] = arred4((l[k] ?? 0) + (Number(v) || 0));
+      }
+      const tirado = new Map<string, Record<string, number>>();
+      for (const u of usos) {
+        let falta = u.qtd;
+        for (const c of u.candidatos) {
+          const d = docs.get(c.id), fator = d ? fatorEstoque(u.unidade, d) : null;
+          if (!d || !fator) continue;
+          const l = saldo.get(c.id)!;
+          let precisa = falta * fator;
+          // do local com mais quantidade para o com menos
+          for (const k of Object.keys(l).sort((a, b) => l[b] - l[a])) {
+            const t = arred4(Math.min(l[k], precisa));
+            if (t <= 0) continue;
+            l[k] = arred4(l[k] - t);
+            precisa -= t;
+            const r = tirado.get(c.id) ?? {};
+            r[k] = arred4((r[k] ?? 0) + t);
+            tirado.set(c.id, r);
+            if (precisa < 1e-4) break;
+          }
+          falta = Math.max(0, precisa) / fator;
+          if (precisa < 1e-4) break;
+        }
+      }
+      const t = now();
+      for (const [id, l] of saldo) {
+        if (!tirado.has(id) && !devolvido.some((b) => String(b.id) === id)) continue;
+        for (const k of Object.keys(l)) if (!(l[k] > 0)) delete l[k];
+        lote.update(doc(db, 'estoque', id), { locais: l, quantidade: arred4(Object.values(l).reduce((a, x) => a + x, 0)), atualizadoEm: t });
+      }
+      return [...tirado].map(([id, locais]) => ({ id, nome: String(docs.get(id)?.item ?? ''), locais }));
+    } catch (e) {
+      console.warn('Baixa do Estoque não feita:', e);
+      return devolvido;
+    }
+  }
   /** Itens vendidos com o preço e os pontos (por unidade) do cadastro de produtos. */
   async function itensDaVenda(lista: unknown, vazio = false) {
     const [produtos, cfg] = await Promise.all([colecao('produtos'), getConfig()]);
@@ -1513,9 +1602,10 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const data = now();
     const consumoRef = doc(collection(db, 'consumos')), receitaRef = doc(collection(db, 'receitas'));
     const quem = cliente ? `${cliente.nome} (#${String(cliente.numero).padStart(3, '0')})` : nomeAvulso ? `${nomeAvulso} (sem cadastro)` : 'Cliente sem cadastro';
+    const baixaEstoque = await movimentarEstoque(lote, ctx, itens);
     const consumo = {
       clienteId: cliente ? cliente.numero : null, clienteUid: cliente ? cliente.id : null, clienteNome: cliente ? cliente.nome : nomeAvulso || 'Cliente sem cadastro',
-      itens, valor, pontos, formaPagamento: forma, data, receitaId: receitaRef.id, caixaId, ...extra, criadoEm: data, atualizadoEm: data,
+      itens, valor, pontos, formaPagamento: forma, data, receitaId: receitaRef.id, caixaId, ...extra, baixaEstoque, criadoEm: data, atualizadoEm: data,
     };
     lote.set(consumoRef, consumo);
     lote.set(receitaRef, {
@@ -1579,7 +1669,9 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     }
     const t = now();
     const lote = writeBatch(db);
-    lote.update(doc(db, 'consumos', p.id), { itens, valor, pontos, formaPagamento: forma, atualizadoEm: t });
+    // o Estoque recebe de volta o que a venda tinha tirado e dá baixa pelos itens corrigidos
+    const baixaEstoque = await movimentarEstoque(lote, ctx, itens, cur.baixaEstoque);
+    lote.update(doc(db, 'consumos', p.id), { itens, valor, pontos, formaPagamento: forma, baixaEstoque, atualizadoEm: t });
     if (cur.receitaId) lote.update(doc(db, 'receitas', String(cur.receitaId)), { valor, formaPagamento: forma, atualizadoEm: t });
     if (cur.clienteUid && (pontos !== pontosAntes || valor !== valorAntes)) {
       lote.set(doc(db, 'saldos', String(cur.clienteUid)), { acumulados: increment(pontos - pontosAntes), gasto: increment(centavos(valor - valorAntes)) }, { merge: true });
@@ -1791,7 +1883,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       const receitaRef = doc(collection(db, 'receitas'));
       lote.set(receitaRef, {
         data: t.slice(0, 10), descricao: `Comanda ${numComanda(c.numero)} · ${c.nome}${c.mesa ? ` (mesa ${c.mesa})` : ''}`,
-        categoria: 'Vendas no salão', formaPagamento: forma, valor, origem: 'Comanda', comandaId: p.id, caixaId, criadoEm: t, atualizadoEm: t,
+        categoria: 'Vendas no salão', formaPagamento: forma, valor, origem: 'Comanda', comandaId: p.id, caixaId,
+        baixaEstoque: await movimentarEstoque(lote, ctx, itens), criadoEm: t, atualizadoEm: t,
       });
       somarNoCaixa(lote, caixaId, forma, valor);
       patch.receitaId = receitaRef.id;
@@ -2229,6 +2322,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       }
     }
     if (p.col === 'compras' && Array.isArray(cur.itens)) await aplicarCompra(lote, ctx, cur, -1);
+    // a venda estornada devolve ao Estoque o que a ficha técnica tinha tirado
+    if (['consumos', 'receitas'].includes(p.col) && Array.isArray(cur.baixaEstoque) && cur.baixaEstoque.length) await movimentarEstoque(lote, ctx, [], cur.baixaEstoque);
     lote.delete(doc(db, p.col, p.id));
     apagarAnexos(lote, anexosDe(cur));
     espelhar(lote, p.col, p.id, null);
