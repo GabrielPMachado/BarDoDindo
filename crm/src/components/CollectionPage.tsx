@@ -170,7 +170,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
     const term = q.trim().toLowerCase();
     const list = all.filter(
       (r) =>
-        !def.ocultarNaLista?.(r) &&
+        !def.ocultarNaLista?.(r, filtros) &&
         (!filter || r[def.filterKey!] === filter) &&
         Object.entries(filtros).every(([k, v]) => !v || chaveFiltro(r[k]) === v) &&
         (!term || def.fields.some((f) => String(r[f.key] ?? '').toLowerCase().includes(term))),
