@@ -126,7 +126,6 @@ Versões novas também entram sozinhas: o app (service worker) procura atualiza�
 
 - **Excluir afilhado** (Vendas → Clientes): apaga o cadastro, o saldo, os consumos (com as receitas), os vouchers e as reservas do afilhado. Exige permissão de excluir em Vendas e em Atendimento.
 - **Numeração dos afilhados** (Configurações → Parâmetros): mostra o próximo número e, depois de excluir afilhados, ajusta para voltar a seguir o maior número em uso.
-- **Zerar o sistema**: só a função Administrador, pela rota `/crm/admin/zerar` com a confirmação `ZERAR TUDO`. Apaga todas as informações (inclusive usuários, funções e parâmetros) e o sistema volta ao primeiro acesso. As contas de login continuam no Firebase Authentication. Logo depois de zerar, faça o primeiro acesso: até lá, quem abrir o CRM pode se cadastrar como administrador.
 
 ## Permissões
 

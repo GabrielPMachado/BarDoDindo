@@ -9,7 +9,6 @@ import logoUrl from '../../../shared/assets/logo.webp';
  */
 const HASH_USUARIOS = [
   '8459a5cb597bcba799ade928a7c036c99a6131dbb1ee16dd2d52d771c9fdc29d', // Yuri
-  '27a1c899ece87a30fdcbee994ff18975e78e02919dbc37cf82155c1e7edc1d5a', // Gabriel (para testar)
 ];
 /** Hash do código (nascimento do Santi e do Charlie, 4-4). */
 const HASH_CODIGO = 'a2f48973be55a04c232bbcc14541010d7ce03792503d00236728c56ded075a7d';
