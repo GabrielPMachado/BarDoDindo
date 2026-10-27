@@ -31,7 +31,7 @@ import { SeletorVisao, VisaoCalendario, VisaoCartoes, VisaoQuadro, campoDoQuadro
 import { CompraItens, itemVazio, totalItens, type ItemCompra } from './CompraItens';
 import { camposDosLocais, locaisDe, locaisNoFormulario } from '../lib/locais';
 import { calcularFicha, fichaDe, type Ficha } from '../lib/ficha';
-import { conferirTamanhos, fotoDosTamanhos, novoTamanho, rascunhoDe, salvarTamanhos, TAMANHOS_SUGERIDOS, TamanhosCampo, tamanhosDoItem, type TamanhoRascunho } from './Tamanhos';
+import { conferirTamanhos, fotoDosTamanhos, novoTamanho, rascunhoDe, salvarTamanhos, tirarTamanho, TAMANHOS_SUGERIDOS, TamanhosCampo, tamanhosDoItem, type TamanhoRascunho } from './Tamanhos';
 
 const PAGE = 50;
 /** Lista agrupada (tabela): linhas mostradas por grupo antes do "Ver mais". */
@@ -628,7 +628,8 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
             editing !== 'new' && canDelete
               ? async () => {
                   // excluir o item principal exclui também os seus tamanhos
-                  if (def.tamanhos) for (const t of tamanhosDoItem(col.rows, editing.id)) await api(`/crm/c/${def.id}/${t.id}`, { method: 'DELETE' });
+                  // (os que eram produtos antes de virar tamanho voltam a ficar soltos, não são apagados)
+                  if (def.tamanhos) for (const t of tamanhosDoItem(col.rows, editing.id)) await tirarTamanho(t);
                   await col.remove(editing.id);
                   notify('Registro excluído');
                   setEditing(null);
@@ -664,6 +665,8 @@ function RecordForm({ def, row, rows = [], canEdit, defaults, onClose, onSave, o
     // um produto que já tinha foto e passa a ter tamanhos: a foto vai para os tamanhos
     if (v === 'Sim' && !tamanhos.length) setTamanhos(TAMANHOS_SUGERIDOS.map((t) => novoTamanho(t, typeof data.foto === 'string' ? data.foto : '')));
   };
+  // produtos soltos (nem tamanho de outro item, nem item com tamanhos) que podem virar tamanho deste
+  const avulsos = useMemo(() => (def.tamanhos ? rows.filter((r) => !r.pai && !temTamanhos(r) && r.id !== row?.id) : []), [def.tamanhos, rows, row]);
   const pai = def.tamanhos && typeof data.pai === 'string' ? rows.find((r) => r.id === data.pai) : undefined;
   // itens da nota de compra (só se editam numa nota nova; numa lançada, só aparecem)
   const [itensCompra, setItensCompra] = useState<ItemCompra[]>(() =>
@@ -816,7 +819,7 @@ function RecordForm({ def, row, rows = [], canEdit, defaults, onClose, onSave, o
             </div>
           </Fragment>
         ))}
-        {comTamanhos && <TamanhosCampo itens={tamanhos} salvos={salvosTamanhos} nome={String(data.nome ?? '')} disabled={!canEdit} onChange={setTamanhos} onAbrir={onAbrir} />}
+        {comTamanhos && <TamanhosCampo itens={tamanhos} salvos={salvosTamanhos} avulsos={avulsos} nome={String(data.nome ?? '')} disabled={!canEdit} onChange={setTamanhos} onAbrir={onAbrir} />}
         {def.fichaTecnica && !def.fichaPrimeiro && fichaCampo}
         {def.compra && (
           <CompraItens

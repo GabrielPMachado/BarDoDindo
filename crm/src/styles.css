@@ -1855,7 +1855,8 @@ button.anexos__nome:hover { text-decoration: underline; }
 .tamanhos li:last-child { border-bottom: 0; }
 .tamanhos__acoes { display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end; }
 .tamanhos__acoes .btn { white-space: nowrap; }
-.tamanhos__mais { align-self: flex-start; }
+.tamanhos__mais { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.tamanhos__mais select { width: auto; max-width: 100%; }
 .tamanhos__foto { width: 44px; height: 44px; border-radius: 10px; border: 1px dashed var(--border); background: var(--surface); display: grid; place-items: center; overflow: hidden; color: var(--muted); cursor: pointer; }
 .tamanhos__foto.is-off { cursor: default; }
 .tamanhos__foto img { width: 100%; height: 100%; object-fit: cover; }
