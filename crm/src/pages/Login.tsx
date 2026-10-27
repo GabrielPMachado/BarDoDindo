@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { LogIn, ShieldCheck } from 'lucide-react';
 import { Brand } from '../components/Layout';
 import { ErrorBox } from '../components/ui';
+import { api } from '../lib/api';
 import { useSession } from '../lib/session';
 
 export default function Login() {
@@ -9,11 +10,13 @@ export default function Login() {
   const [form, setForm] = useState({ nome: '', email: '', senha: '', confirma: '' });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setAviso(null);
     if (setupPendente && form.senha !== form.confirma) return setError('As senhas não conferem.');
     setBusy(true);
     try {
@@ -21,6 +24,21 @@ export default function Login() {
       else await login(form.email, form.senha);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível entrar.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const esqueci = async () => {
+    setError(null);
+    setAviso(null);
+    if (!form.email.trim()) return setError('Digite o seu e-mail acima para receber o link de nova senha.');
+    setBusy(true);
+    try {
+      await api('/crm/redefinir-senha', { method: 'POST', body: { email: form.email.trim() } });
+      setAviso(`Se ${form.email.trim()} tiver uma conta, chega nele um link para criar uma nova senha. Confira também o spam.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível enviar o link.');
     } finally {
       setBusy(false);
     }
@@ -54,6 +72,10 @@ export default function Login() {
             <p className="muted small">Mínimo de 8 caracteres.</p>
           </>
         )}
+        {!setupPendente && (
+          <button type="button" className="login__esqueci" onClick={esqueci} disabled={busy}>Esqueci minha senha</button>
+        )}
+        {aviso && <p className="login__aviso">{aviso}</p>}
         {(error || serverError) && <ErrorBox>{error ?? serverError}</ErrorBox>}
         <button className="btn btn--primary btn--lg" disabled={busy}>
           {setupPendente ? <><ShieldCheck size={18} /> Criar acesso da Presidência</> : <><LogIn size={18} /> Login</>}

@@ -853,7 +853,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const u = (await getDoc(doc(db, 'usuarios', user.uid))).data();
     if (!u) {
       await sair();
-      return fail(401, 'E-mail ou senha incorretos.');
+      // a senha está certa, mas o e-mail não é de um usuário do CRM (ex.: só afilhado, ou usuário excluído)
+      return fail(403, 'Este e-mail não tem acesso ao Cérebro. Peça à Presidência para cadastrar você como usuário.');
     }
     if (u.status !== 'Ativo') {
       await sair();
@@ -863,6 +864,17 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     lote.update(doc(db, 'usuarios', user.uid), { ultimoAcesso: now() });
     await lote.commit();
     return { token: user.uid };
+  });
+  /* CRM: esqueci a senha. Como no app, não diz se o e-mail tem conta; o link do e-mail cria a nova senha */
+  rota('POST', '/crm/redefinir-senha', async ({ b }) => {
+    const email = str(b.email, 160).toLowerCase();
+    if (!emailOk(email)) fail(400, 'Informe o seu e-mail para receber o link.');
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (e) {
+      if (!['auth/user-not-found', 'auth/invalid-email'].includes(codigo(e))) throw e;
+    }
+    return { ok: true };
   });
   rota('POST', '/crm/logout', async () => { await sair(); return { ok: true }; });
   rota('GET', '/crm/me', async () => {

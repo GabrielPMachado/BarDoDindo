@@ -535,6 +535,10 @@ select.input { appearance: none; padding-right: 30px; background-image: linear-g
 .login__card label { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
 .login__card .input { height: 44px; }
 .login__card .btn { margin-top: 14px; }
+.login__esqueci { align-self: flex-end; padding: 0; background: none; border: 0; color: var(--brand); font-size: 12.5px; cursor: pointer; }
+.login__esqueci:hover { text-decoration: underline; }
+.login__esqueci:disabled { opacity: .6; cursor: default; }
+.login__aviso { font-size: 13px; color: var(--muted); padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: 8px; }
 
 /* ---------- boas-vindas (logo depois de entrar) ---------- */
 .welcome {
