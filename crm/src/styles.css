@@ -946,6 +946,15 @@ button.anexos__nome:hover { text-decoration: underline; }
 .ficha__opcao-nome em { font-style: normal; font-size: 10.5px; color: var(--good); margin-left: 6px; text-transform: uppercase; letter-spacing: .04em; }
 .ficha__opcao-valor { font-weight: 600; }
 .ficha__opcao-valor small { font-weight: 500; margin-left: 4px; }
+/* alternativas de um insumo (ex.: barril de 50 L ou de 30 L), na ordem de preferência */
+.ficha__alts { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ficha__alt { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 8px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); font-size: 13px; max-width: 100%; }
+.ficha__alt-ordem { font-size: 11px; color: var(--brand); }
+.ficha__alt-nome { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ficha__alt .icon-btn { width: 24px; height: 24px; }
+.ficha__alt-novo { display: flex; gap: 6px; align-items: center; flex: 1 1 260px; min-width: 0; max-width: 420px; }
+.ficha__alt-novo .picker { flex: 1; min-width: 0; }
+.ficha__alt-add { padding-left: 6px; }
 .ficha__economia { margin: 0; padding: 8px 12px; border-radius: 8px; background: #4cc27a14; border: 1px solid #4cc27a40; font-size: 13px; }
 /* cadastro rápido de insumo no Estoque */
 .ficha__novo { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px dashed var(--brand); border-radius: 10px; background: var(--surface); }
