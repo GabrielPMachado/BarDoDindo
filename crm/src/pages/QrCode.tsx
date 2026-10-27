@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import { createPortal } from 'react-dom';
 import QRCode from 'qrcode';
 import { Camera, Copy, Download, Printer, QrCode as QrIcon } from 'lucide-react';
 import logoUrl from '../../../shared/assets/logo.webp';
@@ -18,13 +17,13 @@ type Fundo = 'escuro' | 'claro';
 const enderecoEscrito = (url: string) => url.replace(/^https?:\/\//, '').replace(/\?.*$/, '').replace(/\/$/, '');
 
 /** O cartaz em si: usado na prévia da tela e na folha impressa (mede tudo pela largura, então serve para A4 e A5). */
-function Cartaz({ qr, url, fundo }: { qr: RefObject<HTMLCanvasElement | null>; url: string; fundo: Fundo }) {
+function Cartaz({ qr, url, fundo, folha }: { qr: RefObject<HTMLCanvasElement | null>; url: string; fundo: Fundo; folha: RefObject<HTMLDivElement | null> }) {
   return (
-    <div className={`cartaz cartaz--${fundo}`}>
+    <div ref={folha} className={`cartaz cartaz--${fundo}`}>
       <div className="cartaz__moldura">
         <img src={logoUrl} alt="" className="cartaz__logo" />
         <span className="cartaz__eyebrow">Programa de afilhados</span>
-        <h1 className="cartaz__titulo">Afilhie-se</h1>
+        <h1 className="cartaz__titulo">&ldquo;AFILHIE-SE&rdquo;</h1>
         <p className="cartaz__sub">Vire afilhado do Dindo e transforme cada visita em pontos.</p>
         <div className="cartaz__qr"><canvas ref={qr} /></div>
         <p className="cartaz__mira"><Camera aria-hidden="true" /> Aponte a câmera do celular</p>
@@ -66,14 +65,11 @@ export default function QrCodeAfilhados() {
   const [papel, setPapel] = useState<Papel>('A4');
   const [fundo, setFundo] = useState<Fundo>('escuro');
   const url = `${enderecoPublico()}${DESTINOS[destino].caminho}`;
-  const tela = useRef<HTMLCanvasElement>(null);
-  const previa = useRef<HTMLCanvasElement>(null);
-  const folha = useRef<HTMLCanvasElement>(null);
+  const qr = useRef<HTMLCanvasElement>(null);
+  const cartaz = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (tela.current) void desenhar(tela.current, url, 320);
-    if (previa.current) void desenhar(previa.current, url, 600);
-    if (folha.current) void desenhar(folha.current, url, 1200);
+    if (qr.current) void desenhar(qr.current, url, 1200);
   }, [url]);
 
   const baixar = async () => {
@@ -84,15 +80,29 @@ export default function QrCodeAfilhados() {
     a.download = 'qrcode-afilie-se-bar-do-dindo.png';
     a.click();
   };
+  /** Imprime só o cartaz, numa folha à parte (iframe do tamanho do papel, margem zero): sem o Cérebro atrás, sem cabeçalho e rodapé do navegador. */
   const imprimir = () => {
-    // tamanho do papel e margem zero só durante a impressão do cartaz
-    const pagina = document.createElement('style');
-    pagina.textContent = `@page { size: ${papel} portrait; margin: 0; }`;
-    document.head.appendChild(pagina);
-    document.body.classList.add('imprimir-cartaz');
-    const fim = () => { document.body.classList.remove('imprimir-cartaz'); pagina.remove(); removeEventListener('afterprint', fim); };
-    addEventListener('afterprint', fim);
-    print();
+    if (!cartaz.current || !qr.current) return;
+    const copia = cartaz.current.cloneNode(true) as HTMLElement;
+    const img = document.createElement('img');
+    img.src = qr.current.toDataURL('image/png');
+    copia.querySelector('canvas')?.replaceWith(img);
+    const [w, h] = papel === 'A4' ? ['210mm', '297mm'] : ['148mm', '210mm'];
+    const estilos = [...document.querySelectorAll('link[rel="stylesheet"], style')].map((e) => e.outerHTML).join('');
+    const frame = document.createElement('iframe');
+    frame.setAttribute('aria-hidden', 'true');
+    frame.style.cssText = `position:fixed;left:-10000px;top:0;width:${w};height:${h};border:0;`;
+    document.body.appendChild(frame);
+    const doc = frame.contentDocument!;
+    doc.open();
+    doc.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Cartaz Afilhie-se</title>${estilos}<style>@page { size: ${papel} portrait; margin: 0; } html, body { margin: 0; background: #fff; } .cartaz { width: ${w}; height: ${h}; aspect-ratio: auto; }</style></head><body>${copia.outerHTML}</body></html>`);
+    doc.close();
+    const fim = () => setTimeout(() => frame.remove(), 500);
+    frame.contentWindow!.addEventListener('afterprint', fim);
+    void Promise.all([doc.fonts.ready, ...[...doc.images].map((i) => i.decode().catch(() => undefined))]).then(() => {
+      frame.contentWindow!.focus();
+      frame.contentWindow!.print();
+    });
   };
   const copiar = async () => {
     await navigator.clipboard.writeText(url).then(() => notify('Link copiado.'), () => notify('Não foi possível copiar o link.', 'error'));
@@ -103,15 +113,14 @@ export default function QrCodeAfilhados() {
       <PageHead title="QR Code Afilhie-se" description="Coloque nas mesas, no balcão e na entrada: quem aponta a câmera cai direto no cadastro de afilhados (só maiores de 18 anos)." />
       <div className="qr-grid">
         <section className="panel pad-lg qr-painel">
-          <canvas ref={tela} className="qr-canvas" aria-label={`QR Code para ${url}`} />
-          <code className="qr-url">{url}</code>
+          <div className="cartaz-previa"><Cartaz qr={qr} folha={cartaz} url={url} fundo={fundo} /></div>
           <div className="qr-acoes">
-            <button type="button" className="btn btn--primary" onClick={() => void baixar()}><Download size={16} /> Baixar PNG</button>
-            <button type="button" className="btn btn--ghost" onClick={imprimir}><Printer size={16} /> Imprimir cartaz</button>
+            <button type="button" className="btn btn--primary" onClick={imprimir}><Printer size={16} /> Imprimir cartaz {papel}</button>
+            <button type="button" className="btn btn--ghost" onClick={() => void baixar()}><Download size={16} /> Baixar QR</button>
             <button type="button" className="btn btn--ghost" onClick={() => void copiar()}><Copy size={16} /> Copiar link</button>
           </div>
         </section>
-        <section className="panel pad-lg">
+        <section className="panel pad-lg qr-config">
           <h2 className="panel-title"><QrIcon size={16} className="gold" /> Para onde o QR Code leva</h2>
           <div className="qr-destinos" role="radiogroup">
             {(Object.keys(DESTINOS) as Destino[]).map((k) => (
@@ -121,19 +130,8 @@ export default function QrCodeAfilhados() {
               </label>
             ))}
           </div>
-          <ul className="muted small qr-dicas">
-            <li>O cadastro pede nome, CPF, data de nascimento, e-mail e celular, e recusa menores de 18 anos.</li>
-            <li>Quem se cadastra pelo QR Code aparece com a origem <b>QR Code</b> em Clientes (afilhados).</li>
-            <li>Imprima com pelo menos 6 cm de lado para a câmera ler de longe.</li>
-          </ul>
-        </section>
-      </div>
-
-      <section className="panel pad-lg cartaz-painel">
-        <div className="cartaz-previa"><Cartaz qr={previa} url={url} fundo={fundo} /></div>
-        <div className="cartaz-opcoes">
-          <h2 className="panel-title"><Printer size={16} className="gold" /> Cartaz para imprimir</h2>
-          <p className="muted small">Mostra o QR Code com o logo, a chamada para o cadastro e o endereço escrito, para quem preferir digitar.</p>
+          <code className="qr-url">{url}</code>
+          <h2 className="panel-title"><Printer size={16} className="gold" /> Cartaz</h2>
           <div className="cartaz-opcao">
             <span className="small">Papel</span>
             <div className="segmented" role="radiogroup" aria-label="Papel">
@@ -146,13 +144,13 @@ export default function QrCodeAfilhados() {
               {([['escuro', 'Escuro'], ['claro', 'Claro (gasta menos tinta)']] as [Fundo, string][]).map(([f, l]) => <button key={f} type="button" role="radio" aria-checked={fundo === f} className={fundo === f ? 'is-active' : ''} onClick={() => setFundo(f)}>{l}</button>)}
             </div>
           </div>
-          <button type="button" className="btn btn--primary" onClick={imprimir}><Printer size={16} /> Imprimir cartaz {papel}</button>
-          <p className="muted small">Na janela de impressão, deixe a escala em 100% e ative <b>Gráficos de fundo</b> se o fundo escuro sair branco. Para salvar em PDF, escolha <b>Salvar como PDF</b> como impressora.</p>
-        </div>
-      </section>
-
-      {/* folha que sai na impressão (fica fora da tela, direto no body) */}
-      {createPortal(<div className="cartaz-impressao" aria-hidden="true"><Cartaz qr={folha} url={url} fundo={fundo} /></div>, document.body)}
+          <ul className="muted small qr-dicas">
+            <li>O cartaz sai sozinho na folha, de ponta a ponta. Na janela de impressão, deixe a escala em 100% e, se o fundo escuro sair branco, ative <b>Gráficos de fundo</b>.</li>
+            <li>O cadastro pede nome, CPF, data de nascimento, e-mail e celular, e recusa menores de 18 anos.</li>
+            <li>Quem se cadastra pelo QR Code aparece com a origem <b>QR Code</b> em Clientes (afilhados).</li>
+          </ul>
+        </section>
+      </div>
     </div>
   );
 }

@@ -1459,7 +1459,10 @@ button.anexos__nome:hover { text-decoration: underline; }
 .foto-campo__ver { margin-top: 8px; }
 
 /* ---------- QR Code Afilhie-se ---------- */
-.qr-grid { display: grid; grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.qr-grid { display: grid; grid-template-columns: minmax(0, 460px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.qr-config { display: flex; flex-direction: column; gap: 12px; }
+.qr-config .panel-title:not(:first-child) { margin-top: 12px; }
+.qr-config .qr-url { text-align: left; }
 @media (max-width: 760px) { .qr-grid { grid-template-columns: 1fr; } }
 .qr-painel { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .qr-canvas { width: 100%; max-width: 320px; height: auto !important; aspect-ratio: 1; border-radius: 12px; background: #fff; }
@@ -1472,13 +1475,9 @@ button.anexos__nome:hover { text-decoration: underline; }
 .qr-destino small { color: var(--muted); font-size: 12px; }
 .qr-dicas { padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
 /* ---------- cartaz do QR Code (mede tudo em cqw: a mesma arte serve para a prévia, A4 e A5) ---------- */
-.cartaz-painel { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 32px; align-items: start; margin-top: 16px; }
-@media (max-width: 860px) { .cartaz-painel { grid-template-columns: 1fr; } }
-.cartaz-previa { width: 100%; max-width: 420px; border-radius: 8px; overflow: hidden; box-shadow: 0 8px 32px rgba(0, 0, 0, .45); }
-.cartaz-opcoes { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; max-width: 520px; }
+.cartaz-previa { width: 100%; border-radius: 8px; overflow: hidden; box-shadow: 0 8px 32px rgba(0, 0, 0, .45); }
 .cartaz-opcao { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .cartaz-opcao > span { width: 48px; color: var(--muted); }
-.cartaz-impressao { display: none; }
 
 .cartaz {
   --c-fundo: #120d0b; --c-fundo-2: #2a1710; --c-tinta: #f3ece6; --c-suave: #c9b8ab; --c-cobre: #e07a4c; --c-linha: #c4572a;
@@ -1494,12 +1493,12 @@ button.anexos__nome:hover { text-decoration: underline; }
   outline: .2cqw solid var(--c-linha); outline-offset: -1.4cqw;
 }
 .cartaz { position: relative; }
-.cartaz__logo { width: 19cqw; height: 19cqw; border-radius: 50%; box-shadow: 0 0 0 .5cqw var(--c-fundo), 0 0 0 .8cqw var(--c-linha); }
+.cartaz__logo { width: 16cqw; height: 16cqw; border-radius: 50%; box-shadow: 0 0 0 .5cqw var(--c-fundo), 0 0 0 .8cqw var(--c-linha); }
 .cartaz__eyebrow { font-size: 2.3cqw; font-weight: 700; letter-spacing: .32em; text-transform: uppercase; color: var(--c-cobre); margin-top: 1cqw; }
-.cartaz__titulo { font: 900 12.5cqw/1 var(--serif); letter-spacing: -.01em; color: var(--c-cobre); margin: -1cqw 0 0; }
-.cartaz__sub { font-size: 3.5cqw; line-height: 1.3; max-width: 64cqw; color: var(--c-tinta); }
-.cartaz__qr { width: 45cqw; padding: 2.2cqw; background: #fff; border-radius: 2.4cqw; box-shadow: 0 0 0 .8cqw var(--c-linha); }
-.cartaz__qr canvas { display: block; width: 100% !important; height: auto !important; aspect-ratio: 1; }
+.cartaz__titulo { font: 900 9.2cqw/1.05 var(--serif); letter-spacing: .01em; white-space: nowrap; color: var(--c-cobre); margin: -1cqw 0 0; }
+.cartaz__sub { font-size: 3.3cqw; line-height: 1.3; max-width: 64cqw; color: var(--c-tinta); }
+.cartaz__qr { width: 42cqw; padding: 2.2cqw; background: #fff; border-radius: 2.4cqw; box-shadow: 0 0 0 .8cqw var(--c-linha); }
+.cartaz__qr canvas, .cartaz__qr img { display: block; width: 100% !important; height: auto !important; aspect-ratio: 1; }
 .cartaz__mira { display: flex; align-items: center; gap: 1.4cqw; margin-top: 1cqw; font-size: 3.2cqw; font-weight: 700; color: var(--c-tinta); }
 .cartaz__mira svg { width: 4.2cqw; height: 4.2cqw; color: var(--c-cobre); }
 .cartaz__passos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 3cqw; width: 100%; }
@@ -1516,12 +1515,6 @@ button.anexos__nome:hover { text-decoration: underline; }
 .cartaz__18 { display: inline-flex; align-items: center; gap: 1.2cqw; font-size: 2.2cqw; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--c-suave); }
 .cartaz__18 b { display: grid; place-items: center; height: 4.4cqw; padding: 0 1.2cqw; border: .35cqw solid var(--c-cobre); border-radius: 99px; color: var(--c-cobre); font-size: 2.2cqw; }
 
-@media print {
-  body.imprimir-cartaz > :not(.cartaz-impressao) { display: none !important; }
-  body.imprimir-cartaz { background: #fff; }
-  body.imprimir-cartaz .cartaz-impressao { display: block; width: 100vw; height: 100vh; overflow: hidden; }
-  body.imprimir-cartaz .cartaz-impressao .cartaz { width: 100%; height: 100%; aspect-ratio: auto; }
-}
 .respostas { display: flex; flex-direction: column; gap: 12px; margin: 0; }
 .respostas dt { font-size: 12.5px; color: var(--muted); }
 .respostas dd { margin: 2px 0 0; font-weight: 500; }
