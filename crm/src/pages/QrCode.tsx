@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import { Copy, Download, Printer, QrCode as QrIcon } from 'lucide-react';
 import logoUrl from '../../../shared/assets/logo.webp';
 import { PageHead, notify } from '../components/ui';
+import { enderecoPublico } from '../../../shared/firebase-config';
 
 const DESTINOS = {
   app: { label: 'Aplicativo (cadastro completo)', caminho: '/?via=qr' },
@@ -31,7 +32,7 @@ async function desenhar(canvas: HTMLCanvasElement, url: string, tamanho: number)
 /** QR Code "Afilhie-se": leva ao cadastro de afilhados e marca a origem (QR Code) no cadastro. Baixa em PNG ou imprime um cartaz. */
 export default function QrCodeAfilhados() {
   const [destino, setDestino] = useState<Destino>('app');
-  const url = `${location.origin}${DESTINOS[destino].caminho}`;
+  const url = `${enderecoPublico()}${DESTINOS[destino].caminho}`;
   const tela = useRef<HTMLCanvasElement>(null);
   const cartaz = useRef<HTMLCanvasElement>(null);
 
