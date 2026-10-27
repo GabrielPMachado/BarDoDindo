@@ -155,6 +155,8 @@ export default function MeuPerfil() {
         <section className="panel pad-lg">
           <h2 className="panel-title"><KeyRound size={16} className="gold" /> Trocar senha</h2>
           <form className="form-grid form-grid--single" onSubmit={trocarSenha}>
+            {/* diz ao navegador de qual conta é a senha nova (senão ele chuta um campo qualquer como usuário) */}
+            <input type="email" name="username" autoComplete="username" value={usuario?.email ?? ''} readOnly hidden />
             <div className="form-field">
               <label htmlFor="s-atual">Senha atual</label>
               <input id="s-atual" ref={senhaRef} className="input" type="password" autoComplete="current-password" required value={senha.atual} onChange={(e) => setSenha({ ...senha, atual: e.target.value })} />
