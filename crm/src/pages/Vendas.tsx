@@ -12,6 +12,7 @@ import { currentMonth, monthOf } from '../lib/finance';
 import { useSession, type Config } from '../lib/session';
 import { useNavigate } from 'react-router-dom';
 import { AvisoCaixa, Segmentos, useCaixa } from './Salao';
+import { EscolherProdutos, type ProdutoVenda } from '../components/EscolherProdutos';
 
 interface Cliente {
   id: number;
@@ -171,7 +172,7 @@ export function Consumo() {
   const canCorrigir = pode('consumos', 'editar');
   const [editando, setEditando] = useState<Row | null>(null);
   const clientes = useResource<Cliente[]>('/crm/clientes');
-  const produtos = useResource<{ id: string; nome: string; categoria: string; preco: number; pontos: number; foto?: string }[]>('/crm/produtos-venda').data ?? [];
+  const produtos = useResource<ProdutoVenda[]>('/crm/produtos-venda').data ?? [];
   // a lista mostra os lançamentos recentes: basta o último mês
   const consumos = useCollection('consumos', true, isoFromToday(-30));
   const { caixa } = useCaixa();
@@ -181,7 +182,6 @@ export function Consumo() {
   const [nomeAvulso, setNomeAvulso] = useState('');
   const [clienteQ, setClienteQ] = useState('');
   const [clienteId, setClienteId] = useState<number | null>(null);
-  const [produtoQ, setProdutoQ] = useState('');
   const [itens, setItens] = useState<{ produtoId: string; quantidade: number }[]>([]);
   const [forma, setForma] = useState('Pix');
   const [error, setError] = useState<string | null>(null);
@@ -191,8 +191,6 @@ export function Consumo() {
   const sugestoes = cq
     ? (clientes.data ?? []).filter((c) => `${c.nome} ${c.email} ${c.telefone} ${String(c.numero).padStart(3, '0')}`.toLowerCase().includes(cq)).slice(0, 6)
     : [];
-  const pq = produtoQ.trim().toLowerCase();
-  const produtosFiltrados = produtos.filter((p) => !pq || String(p.nome).toLowerCase().includes(pq)).slice(0, 12);
   const linhas = itens.map((i) => {
     const p = produtos.find((x) => x.id === i.produtoId);
     return { ...i, nome: String(p?.nome ?? ''), preco: Number(p?.preco) || 0, pontos: Number(p?.pontos) || 0 };
@@ -274,20 +272,7 @@ export function Consumo() {
             {!produtos.length ? (
               <p className="muted">Nenhum produto ativo. Os produtos são cadastrados em Vendas → Produtos e cardápio.</p>
             ) : (
-              <>
-                <label className="search"><Search size={16} />
-                  <input placeholder="Buscar produto" value={produtoQ} onChange={(e) => setProdutoQ(e.target.value)} />
-                </label>
-                <div className="product-grid">
-                  {produtosFiltrados.map((p) => (
-                    <button key={p.id} className="product" onClick={() => addItem(p.id)}>
-                      {p.foto && <img className="product__foto" src={p.foto} alt="" loading="lazy" />}
-                      <span>{String(p.nome)}</span>
-                      <strong>{brl(Number(p.preco) || 0)}</strong>
-                    </button>
-                  ))}
-                </div>
-              </>
+              <EscolherProdutos produtos={produtos} onEscolher={(p) => addItem(p.id)} />
             )}
           </section>
 

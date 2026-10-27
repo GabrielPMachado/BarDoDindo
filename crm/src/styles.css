@@ -407,6 +407,19 @@ select.input { appearance: none; padding-right: 30px; background-image: linear-g
 .product__foto { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 6px; margin-bottom: 4px; background: #fff; }
 .product:hover { border-color: var(--brand); }
 .product strong { color: var(--brand); font-size: 13px; }
+/* seletor de produtos (Lançar consumo e Comandas): abas de categoria e de tamanho, como no cardápio do app.
+   No PC a grade rola por dentro, para o quadro de itens não ficar muito mais alto que a comanda ao lado */
+.escolher-produtos { display: flex; flex-direction: column; gap: 10px; }
+.escolher-produtos__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.escolher-produtos .chip { cursor: pointer; }
+.escolher-produtos .chip.is-active { color: var(--on-brand); background: linear-gradient(135deg, var(--brand-light), var(--brand)); border-color: var(--brand); font-weight: 600; }
+.chip--sm { height: 24px; padding: 0 9px; font-size: 12px; }
+@media (min-width: 1025px) {
+  .escolher-produtos__grid { max-height: max(320px, calc(100vh - 400px)); overflow-y: auto; padding-right: 4px; align-content: start; scrollbar-width: thin; }
+  /* Lançar consumo: a comanda acompanha a altura do quadro de itens (sem vão embaixo dela), com total e pagamento no rodapé */
+  .grid-2--wide-left > .panel.comanda { align-self: stretch; }
+  .grid-2--wide-left > .panel.comanda .comanda__total { margin-top: auto; }
+}
 /* z-index: a comanda "gruda" na tela (sticky) e cria uma camada própria; sem ele, a lista de forma de pagamento
    abria por baixo do quadro "Últimos lançamentos" */
 .comanda { display: flex; flex-direction: column; gap: 10px; align-self: start; position: sticky; top: 80px; z-index: 5; }

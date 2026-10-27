@@ -1338,7 +1338,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const [produtos, cfg] = await Promise.all([colecao('produtos'), getConfig()]);
     return produtos
       .filter((p) => p.status !== 'Inativo' && !agrupaTamanhos(p))
-      .map((p) => ({ id: p.id, nome: p.nome, categoria: p.categoria, preco: Number(p.preco) || 0, pontos: pontosDoProduto(p, cfg), foto: p.foto || undefined }))
+      .map((p) => ({ id: p.id, nome: p.nome, categoria: p.categoria, tamanho: p.pai ? String(p.tamanho ?? '').trim() : '', preco: Number(p.preco) || 0, pontos: pontosDoProduto(p, cfg), foto: p.foto || undefined }))
       .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
   });
 
