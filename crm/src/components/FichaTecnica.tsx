@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ClipboardList, PackagePlus, Plus, Printer, Trash2 } from 'lucide-react';
+import { ArrowUp, Check, ClipboardList, PackagePlus, Plus, Printer, Trash2, X } from 'lucide-react';
 import type { Field } from '../collections';
 import { api } from '../lib/api';
 import { reload, useResource, type Row } from '../lib/data';
 import { brl, num, pct } from '../lib/format';
 import {
-  atualizarCustos, calcularFicha, custoBaseTxt, custoDoItem, opcoesDoItem, UNIDADES, unidadesCompativeis, usarOpcao,
-  type Cotacao, type Ficha, type FixoFicha, type Insumo, type ItemFicha, type Opcao, type Recipiente,
+  atualizarCustos, calcularFicha, custoBaseTxt, custoDaAlternativa, custoDoItem, opcoesDoItem, tornarPrincipal, UNIDADES, unidadesCompativeis, usarOpcao,
+  type AlternativaFicha, type Cotacao, type Ficha, type FixoFicha, type Insumo, type ItemFicha, type Opcao, type Recipiente,
 } from '../lib/ficha';
 import { imprimirFicha } from '../lib/fichaPdf';
 import { useSession } from '../lib/session';
@@ -19,6 +19,8 @@ const CAMPO_INSUMO: Field = {
   key: 'insumo', label: 'Insumo', type: 'ref', ref: 'insumos', refKey: 'insumoId', livre: true,
   fill: { unidadeBase: 'unidade', custoBase: 'custo' },
 };
+/** Alternativa de um insumo: só itens do Estoque (é de lá que a baixa sai). */
+const CAMPO_ALTERNATIVA: Field = { ...CAMPO_INSUMO, livre: false };
 const QTD = { decimals: 3, min: 0, max: 100_000 };
 const DINHEIRO = { money: true, decimals: 2, min: 0, max: 100_000 };
 const ITEM_NOVO: ItemFicha = { insumo: '', insumoId: null, quantidade: 0, unidade: 'ml', unidadeBase: 'ml', custoBase: 0 };
@@ -248,6 +250,19 @@ function LinhaFicha({ item: it, opcoes, disabled, onChange, onUnidade, onInsumo,
 }) {
   const { pode } = useSession();
   const [cadastrando, setCadastrando] = useState(false);
+  const [alternando, setAlternando] = useState(false);
+  const alts = it.alternativas ?? [];
+  const comAlternativas = (alternativas: AlternativaFicha[]) => {
+    const { alternativas: _, ...resto } = it;
+    onChange(alternativas.length ? { ...resto, alternativas } : resto);
+  };
+  const adicionarAlternativa = (p: Record<string, unknown>) => {
+    const id = String(p.insumoId ?? '');
+    if (!id) return;
+    setAlternando(false);
+    if (id === it.insumoId || alts.some((a) => a.insumoId === id)) return notify(`"${String(p.insumo)}" já está nesta linha.`, 'error');
+    comAlternativas([...alts, { insumo: String(p.insumo ?? ''), insumoId: id, unidadeBase: String(p.unidadeBase ?? 'un'), custoBase: Number(p.custoBase) || 0 }]);
+  };
   const vinculado = !!it.insumoId;
   // unidades em que o Estoque ou algum fornecedor permite medir o insumo (ex.: Estoque em "un", fornecedor em ml)
   const unidades = vinculado
@@ -307,6 +322,38 @@ function LinhaFicha({ item: it, opcoes, disabled, onChange, onUnidade, onInsumo,
               </button>
             );
           })}
+        </div>
+      )}
+
+      {vinculado && (alts.length > 0 || !disabled) && (
+        <div className="ficha__alts" role="group" aria-label={`Alternativas para ${it.insumo}`}>
+          {alts.length > 0 && <span className="muted small">Se faltar, tira de:</span>}
+          {alts.map((a, k) => {
+            const ca = custoDaAlternativa(it, a);
+            return (
+              <span key={a.insumoId} className="ficha__alt" title={ca === null ? `"${a.insumo}" está em ${a.unidadeBase}: não se converte em ${it.unidade}` : undefined}>
+                <b className="ficha__alt-ordem">{k + 2}º</b>
+                <span className="ficha__alt-nome">{a.insumo}</span>
+                <span className="muted small">{ca === null ? 'outra unidade' : brl(ca)}</span>
+                {!disabled && (
+                  <>
+                    <button type="button" className="icon-btn" aria-label={`Usar ${a.insumo} como principal`} title="Usar como principal (custo da ficha)" onClick={() => onChange(tornarPrincipal(it, k))}><ArrowUp size={13} /></button>
+                    <button type="button" className="icon-btn" aria-label={`Tirar ${a.insumo}`} title="Tirar alternativa" onClick={() => comAlternativas(alts.filter((_, j) => j !== k))}><X size={13} /></button>
+                  </>
+                )}
+              </span>
+            );
+          })}
+          {!disabled && (alternando ? (
+            <div className="ficha__alt-novo">
+              <RefPicker field={CAMPO_ALTERNATIVA} value="" linkedId={null} onChange={adicionarAlternativa} />
+              <button type="button" className="btn btn--ghost btn--sm" onClick={() => setAlternando(false)}>Cancelar</button>
+            </div>
+          ) : (
+            <button type="button" className="btn btn--ghost btn--sm ficha__alt-add" onClick={() => setAlternando(true)} title="Outro item do Estoque que serve no lugar deste (ex.: barril de 30 L no lugar do de 50 L)">
+              <Plus size={13} /> {alts.length ? 'Outra alternativa' : 'Alternativa (ex.: outro barril)'}
+            </button>
+          ))}
         </div>
       )}
 

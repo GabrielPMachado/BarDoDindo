@@ -23,7 +23,13 @@ export interface ItemFicha {
   /** De onde vem o custo: preço de um fornecedor (Tabela de preços) ou, sem `precoId`, o custo do Estoque. */
   precoId?: string | null;
   fornecedor?: string;
+  /** Outros itens do Estoque que servem no lugar deste, na ordem de preferência (ex.: barril de 50 L, depois o de 30 L).
+   * Usam a mesma quantidade e unidade; o custo da ficha é sempre o do insumo principal. */
+  alternativas?: AlternativaFicha[];
 }
+
+/** Insumo do Estoque que pode substituir o principal de uma linha da ficha, com o custo do Estoque. */
+export interface AlternativaFicha { insumo: string; insumoId: string; unidadeBase: string; custoBase: number }
 
 /** Guarnição ou item de valor fixo por porção (gelo, rodela de laranja, canudo…): não se pesa, só se marca. */
 export interface FixoFicha { id: string; nome: string; custo: number }
@@ -68,11 +74,17 @@ export const FICHA_VAZIA: Ficha = {
 /** Texto de preparo antigo ("1. Macerar…\n2. Completar…") em passos, sem a numeração. */
 const passosDoTexto = (t: string) => t.split(/\r?\n/).map((l) => l.replace(/^\s*(\d+\s*[.)\-–]|[-•*])\s*/, '').trim()).filter(Boolean);
 
+/** Alternativas só ficam no item quando há alguma (fichas sem alternativas continuam iguais). */
+function itemDe({ alternativas, ...i }: ItemFicha): ItemFicha {
+  const alts = Array.isArray(alternativas) ? alternativas.filter((a) => a?.insumoId) : [];
+  return alts.length ? { ...i, alternativas: alts } : i;
+}
+
 export function fichaDe(v: unknown): Ficha {
   const f = (v && typeof v === 'object' ? v : {}) as Partial<Ficha>;
   return {
     ...FICHA_VAZIA, ...f,
-    itens: Array.isArray(f.itens) ? f.itens : [],
+    itens: Array.isArray(f.itens) ? f.itens.map(itemDe) : [],
     fixos: Array.isArray(f.fixos) ? f.fixos : [],
     utensilios: Array.isArray(f.utensilios) ? f.utensilios.map((u) => (typeof u === 'string' ? { id: null, nome: u } : { id: u?.id ?? null, nome: String(u?.nome ?? '') })) : [],
     copoCusto: Number(f.copoCusto) || 0,
@@ -110,6 +122,22 @@ export function precoNormalizado(preco: number, conteudo: number, unidade: strin
 /** Custo de compra legível: o que custa em ml ou g aparece por L ou kg (R$ 0,0693/ml → "R$ 69,33/L"). */
 export const custoBaseTxt = (i: Pick<ItemFicha, 'custoBase' | 'unidadeBase'>) =>
   precoNormalizado(Number(i.custoBase) || 0, 1, i.unidadeBase) ?? '—';
+
+/** Custo da quantidade da linha usando uma alternativa (se a unidade não se converte, não dá para comparar: null). */
+export const custoDaAlternativa = (i: ItemFicha, a: AlternativaFicha) =>
+  unidadesCompativeis(a.unidadeBase).includes(i.unidade) ? custoDoItem({ ...i, unidadeBase: a.unidadeBase, custoBase: a.custoBase }) : null;
+
+/** A alternativa passa a ser o insumo principal (com o custo do Estoque) e o principal vira a primeira alternativa. */
+export function tornarPrincipal(i: ItemFicha, idx: number): ItemFicha {
+  const alts = i.alternativas ?? [];
+  const a = alts[idx];
+  if (!a) return i;
+  const antigo: AlternativaFicha[] = i.insumoId ? [{ insumo: i.insumo, insumoId: i.insumoId, unidadeBase: i.unidadeBase, custoBase: Number(i.custoBase) || 0 }] : [];
+  return {
+    ...i, insumo: a.insumo, insumoId: a.insumoId, unidadeBase: a.unidadeBase, custoBase: a.custoBase, precoId: null, fornecedor: '',
+    alternativas: [...antigo, ...alts.filter((_, k) => k !== idx)],
+  };
+}
 
 export const custoDoItem = (i: ItemFicha) => (Number(i.quantidade) || 0) * conversao(i.unidade, i.unidadeBase) * (Number(i.custoBase) || 0);
 
@@ -204,7 +232,19 @@ export function atualizarCustos(f: Ficha, insumos: Insumo[], cotacoes: Cotacao[]
     mudou++;
     return { ...x, nome: g.nome, custo: g.custo };
   });
-  const itens = f.itens.map((i) => {
+  const itens = f.itens.map((item) => {
+    // alternativas acompanham nome, unidade e custo do Estoque (apagadas ficam como estavam)
+    let i = item;
+    if (i.alternativas?.length) {
+      let trocou = false;
+      const alternativas = i.alternativas.map((a) => {
+        const e = insumos.find((x) => x.id === a.insumoId);
+        if (!e || (e.nome === a.insumo && e.unidade === a.unidadeBase && Math.abs(e.custo - Number(a.custoBase)) < 1e-9)) return a;
+        trocou = true;
+        return { ...a, insumo: e.nome, unidadeBase: e.unidade, custoBase: e.custo };
+      });
+      if (trocou) { mudou++; i = { ...i, alternativas }; }
+    }
     if (!i.insumoId) return i;
     const c = i.precoId ? cotacoes.find((x) => x.id === i.precoId) : undefined;
     const e = insumos.find((x) => x.id === i.insumoId);

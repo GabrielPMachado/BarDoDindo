@@ -24,7 +24,7 @@ export async function imprimirFicha(nome: string, ficha: Ficha, preco: number) {
     margin: { left: 12, right: 12 },
     head: [['Insumo', 'Quantidade', 'Preço usado', 'Custo']],
     body: ficha.itens.map((i) => [
-      i.insumo || '—', `${qtd(Number(i.quantidade) || 0)} ${i.unidade}`,
+      `${i.insumo || '—'}${i.alternativas?.length ? ` (ou ${i.alternativas.map((a) => a.insumo).join(', ou ')})` : ''}`, `${qtd(Number(i.quantidade) || 0)} ${i.unidade}`,
       i.custoBase ? `${i.precoId && i.fornecedor ? `${i.fornecedor} · ` : ''}${custoBaseTxt(i)}` : '—', brl(custoDoItem(i)),
     ]).concat(ficha.fixos.map((x) => [
       x.nome, ficha.rendimento === 1 ? '1 por porção' : `${qtd(ficha.rendimento)} (1 por porção)`, `valor fixo · ${brl(x.custo)}`, brl(x.custo * ficha.rendimento),
