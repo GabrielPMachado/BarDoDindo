@@ -394,9 +394,11 @@ service cloud.firestore {
       allow create: if logado() && request.auth.uid == uid
         && request.resource.data.email == request.auth.token.email
         && request.resource.data.numero == getAfter(caminho('meta', 'contadores')).data.clientes
-        && cpfOk(request.resource.data.get('cpf', null)) && maiorDeIdade(request.resource.data.get('nascimento', null))
-        && cpfDoAfilhado(uid, request.resource.data.cpf)
-        && existsAfter(caminho('saldos', uid));
+        && existsAfter(caminho('saldos', uid))
+        && ((cpfOk(request.resource.data.get('cpf', null)) && maiorDeIdade(request.resource.data.get('nascimento', null))
+            && cpfDoAfilhado(uid, request.resource.data.cpf))
+          // usuários do CRM ganham o afilhado com o mesmo login; o CPF e a data de nascimento eles completam ao abrir o app
+          || (exists(caminho('usuarios', uid)) && !('cpf' in request.resource.data) && !('nascimento' in request.resource.data)));
       // o próprio afilhado edita nome, telefone, foto e as respostas do questionário opcional;
       // cadastros de antes do lançamento completam CPF e data de nascimento uma única vez
       allow update: if logado() && request.auth.uid == uid

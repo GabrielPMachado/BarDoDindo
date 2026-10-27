@@ -3,7 +3,7 @@
 // `node scripts/testar-regras.mjs <senhaCliente> <senhaAtendente>` — ou tudo de uma vez: `npm run testar:regras`.
 // (cliente2@teste.local e atendente@teste.local são contas que só existem no emulador).
 import { initializeApp } from 'firebase/app';
-import { connectAuthEmulator, getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { connectAuthEmulator, createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import {
   addDoc, arrayUnion, collection, connectFirestoreEmulator, deleteDoc, doc, getDoc, getDocs, getFirestore, increment, query, setDoc, updateDoc, where, writeBatch,
 } from 'firebase/firestore';
@@ -373,6 +373,34 @@ if (senhaAdministrativo) {
     const lote = writeBatch(db);
     lote.set(ref, { colecao: 'contratos', registroId: 'contrato-1', nome: 'contrato.pdf', tamanho: 9, partes: 1, criadoPor: auth.currentUser.uid, criadoEm: 'x' });
     lote.set(doc(db, 'anexos', ref.id, 'partes', '0'), { dados: pdf });
+    await lote.commit();
+  });
+  await signOut(auth);
+}
+
+if (senhaCaixa) {
+  console.log('— usuários do CRM também são afilhados (mesmo login, sem CPF até abrir o app) —');
+  // como o backend faz: número do contador, cadastro e saldo zerado no mesmo lote
+  const afilhadoSemCpf = async (numeroExtra = 1) => {
+    const u = auth.currentUser;
+    const numero = (Number((await getDoc(doc(db, 'meta/contadores'))).data()?.clientes) || 0) + numeroExtra;
+    const lote = writeBatch(db);
+    lote.set(doc(db, 'meta/contadores'), { clientes: numero }, { merge: true });
+    lote.set(doc(db, 'clientes', u.uid), { numero, nome: 'Sem CPF', email: u.email, telefone: '', foto: null, criadoEm: 'x', origem: 'Equipe', aceiteEm: null });
+    lote.set(doc(db, 'saldos', u.uid), { acumulados: 0, usados: 0, ultimoResgate: '' });
+    await lote.commit();
+  };
+  await createUserWithEmailAndPassword(auth, `sem-equipe-${Date.now()}@teste.local`, 'senha-teste-123');
+  await negado('quem não é da equipe criar afilhado sem CPF', () => afilhadoSemCpf());
+  await signOut(auth);
+  await signInWithEmailAndPassword(auth, 'caixa@teste.local', senhaCaixa);
+  await negado('usuário do CRM criar afilhado pulando o número', () => afilhadoSemCpf(2));
+  await permitido('usuário do CRM criar o próprio afilhado sem CPF', () => afilhadoSemCpf());
+  await permitido('usuário do CRM completar CPF e nascimento no app', async () => {
+    const uidCaixa = auth.currentUser.uid;
+    const lote = writeBatch(db);
+    lote.update(doc(db, 'clientes', uidCaixa), { cpf: '39053344705', nascimento: '1990-01-01' });
+    lote.set(doc(db, 'cpfs', '39053344705'), { uid: uidCaixa });
     await lote.commit();
   });
   await signOut(auth);

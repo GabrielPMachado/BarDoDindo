@@ -10,7 +10,7 @@ import {
 } from 'firebase/auth';
 import {
   arrayRemove, arrayUnion, collection, connectFirestoreEmulator, doc, getDoc, getDocFromServer, getDocs, increment, initializeFirestore, limit, onSnapshot, orderBy, persistentLocalCache, persistentMultipleTabManager, query, runTransaction, where, writeBatch,
-  type DocumentReference, type Query, type WriteBatch,
+  type DocumentReference, type Firestore, type Query, type WriteBatch,
 } from 'firebase/firestore';
 import { EMULADOR, EMULADOR_AUTH, EMULADOR_FIRESTORE, firebaseConfig } from './firebase-config';
 
@@ -481,28 +481,57 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       }
     }
   }
-  /** Cria a conta de outra pessoa sem derrubar a sessão de quem está logado. */
-  async function criarContaDeTerceiro(email: string, senha: string): Promise<string> {
+  /**
+   * Cria a conta de outra pessoa sem derrubar a sessão de quem está logado. `cadastrar` grava o usuário do CRM; em seguida,
+   * ainda com a sessão da pessoa, sai o cadastro de afilhado dela (mesmo e-mail e senha no app e no pré-cadastro).
+   */
+  async function criarContaDeTerceiro(email: string, senha: string, nome: string, cadastrar: (uid: string) => Promise<void>): Promise<string> {
     const aux = initializeApp(firebaseConfig, `aux-${Date.now()}`);
     const a = initializeAuth(aux, { persistence: inMemoryPersistence });
     if (EMULADOR) connectAuthEmulator(a, EMULADOR_AUTH, { disableWarnings: true });
     try {
+      let cred: UserCredential;
       try {
-        return (await createUserWithEmailAndPassword(a, email, senha)).user.uid;
+        cred = await createUserWithEmailAndPassword(a, email, senha);
       } catch (e) {
         if (codigo(e) !== 'auth/email-already-in-use') throw e;
         try {
-          return (await signInWithEmailAndPassword(a, email, senha)).user.uid;
+          cred = await signInWithEmailAndPassword(a, email, senha);
         } catch (e2) {
           if (credencialInvalida(e2)) return fail(409, 'Este e-mail já tem uma conta (por exemplo, como cliente do aplicativo). Para dar acesso ao CRM, informe a senha atual dessa conta.');
           throw e2;
         }
       }
+      await cadastrar(cred.user.uid);
+      const auxDb = initializeFirestore(aux, { ignoreUndefinedProperties: true });
+      if (EMULADOR) connectFirestoreEmulator(auxDb, EMULADOR_FIRESTORE.host, EMULADOR_FIRESTORE.port);
+      // se falhar, o afilhado sai no primeiro acesso da pessoa (CRM, app ou pré-cadastro)
+      await criarAfilhadoDaEquipe(auxDb, cred.user.uid, cred.user.email ?? email, { nome }).catch(() => undefined);
+      return cred.user.uid;
     } finally {
       await signOut(a).catch(() => undefined);
       await deleteApp(aux).catch(() => undefined);
     }
   }
+
+  /**
+   * Cadastro de afilhado de quem é da equipe (usuário do CRM), feito com a sessão da própria pessoa: o mesmo login vale no app e no
+   * pré-cadastro. Pega o próximo número, como um cadastro comum; CPF e data de nascimento a pessoa completa uma vez ao abrir o app.
+   * Não faz nada se o afilhado já existe (ex.: quem era cliente e entrou para a equipe).
+   */
+  async function criarAfilhadoDaEquipe(banco: Firestore, uid: string, email: string, u: Dados) {
+    await runTransaction(banco, async (t) => {
+      const ref = doc(banco, 'clientes', uid);
+      if ((await t.get(ref)).exists()) return;
+      const contadores = doc(banco, 'meta/contadores');
+      const numero = (Number((await t.get(contadores)).data()?.clientes) || 0) + 1;
+      t.set(contadores, { clientes: numero }, { merge: true });
+      t.set(ref, { numero, nome: str(u.nome, 120), email, telefone: typeof u.telefone === 'string' ? u.telefone : '', foto: null, criadoEm: now(), origem: 'Equipe', aceiteEm: null });
+      t.set(doc(banco, 'saldos', uid), { acumulados: 0, usados: 0, ultimoResgate: '' });
+    });
+  }
+  /** Afilhado de quem está logado e é da equipe; falhas não atrapalham o login (tenta de novo no próximo acesso). */
+  const garantirAfilhado = (uid: string, email: string, u: Dados) => criarAfilhadoDaEquipe(db, uid, email, u).then(() => true, () => false);
 
   /* ---------- autenticação ---------- */
   // última confirmação no servidor de que o afilhado não tem registro (o app pergunta /app/versao a cada 1 s)
@@ -678,6 +707,9 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   rota('POST', '/app/login', async ({ b }) => {
     const { user } = await entrar(str(b.email, 160), String(b.senha ?? ''));
     if (!(await getDoc(doc(db, 'clientes', user.uid))).exists()) {
+      // quem é da equipe já tem o afilhado (criado junto com o usuário do CRM); se ainda não tiver, ele sai agora
+      const equipe = await getDocFromServer(doc(db, 'usuarios', user.uid)).then((s) => s.data(), () => undefined);
+      if (equipe && (await garantirAfilhado(user.uid, user.email ?? '', equipe))) return { token: user.uid };
       await sair();
       fail(404, 'Não encontramos um cadastro de afilhado com este e-mail. Faça o cadastro com ele e esta mesma senha.');
     }
@@ -846,6 +878,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       await sair();
       throw e;
     }
+    await garantirAfilhado(cred.user.uid, cred.user.email ?? email, { nome });
     return { token: cred.user.uid };
   });
   rota('POST', '/crm/login', async ({ b }) => {
@@ -870,6 +903,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const lote = writeBatch(db);
     lote.update(doc(db, 'usuarios', user.uid), { ultimoAcesso: now() });
     await lote.commit();
+    // usuários de antes desta mudança (ou depois de "Apagar todos os afilhados") ganham o afilhado no próximo acesso
+    await garantirAfilhado(user.uid, user.email ?? '', u);
     return { token: user.uid };
   });
   /* CRM: esqueci a senha. Como no app, não diz se o e-mail tem conta; o link do e-mail cria a nova senha */
@@ -1065,12 +1100,13 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const funcao = (await colecao('funcoes')).find((f) => f.id === funcaoId);
     if (!funcao) return fail(400, 'Selecione uma função.');
     if ((await colecao('usuarios')).some((u) => u.email === email)) fail(409, 'Já existe um usuário com este e-mail.');
-    const uid = await criarContaDeTerceiro(email, senha);
     const usuario = { nome, email, funcaoId, status: b.status === 'Inativo' ? 'Inativo' : 'Ativo', ultimoAcesso: null, criadoEm: now() };
-    const lote = writeBatch(db);
-    lote.set(doc(db, 'usuarios', uid), usuario);
-    registrar(lote, ctx, 'usuarios', 'cadastrou o usuário', { colecao: 'usuarios', alvo: nome, detalhe: `Função: ${comNomeDaFuncao(funcao).nome}` });
-    await lote.commit();
+    const uid = await criarContaDeTerceiro(email, senha, nome, async (id) => {
+      const lote = writeBatch(db);
+      lote.set(doc(db, 'usuarios', id), usuario);
+      registrar(lote, ctx, 'usuarios', 'cadastrou o usuário', { colecao: 'usuarios', alvo: nome, detalhe: `Função: ${comNomeDaFuncao(funcao).nome}` });
+      await lote.commit();
+    });
     return publicUsuario({ ...usuario, id: uid });
   });
   /* CRM: ordem das funções (definida pela Presidência ou por quem edita funções); a função de sistema fica sempre no topo */
