@@ -23,8 +23,8 @@ createServer((req, res) => {
   const url = new URL(req.url ?? '/', 'http://localhost');
 
   // arquivos estáticos; qualquer rota desconhecida volta para o index.html
-  // /afilhado é o pré-cadastro, como no firebase.json
-  const caminho = /^\/afilhado(\/|$)/.test(url.pathname) ? '/precadastro/index.html' : decodeURIComponent(url.pathname);
+  // /queroserafilhado (e o antigo /afilhado) é o pré-cadastro, como no firebase.json
+  const caminho = /^\/(queroserafilhado|afilhado)(\/|$)/.test(url.pathname) ? '/precadastro/index.html' : decodeURIComponent(url.pathname);
   let file = normalize(join(base, caminho));
   if (!file.startsWith(base) || !existsSync(file) || statSync(file).isDirectory()) file = join(base, 'index.html');
   if (!existsSync(file)) {

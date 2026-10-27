@@ -105,7 +105,7 @@ function Shell() {
   );
 }
 
-// Antes do lançamento só o pré-cadastro fica aberto: na web, quem abre o app vai para /afilhado.
+// Antes do lançamento só o pré-cadastro fica aberto: na web, quem abre o app vai para /queroserafilhado.
 // Para liberar o app, troque para true. Para testar o app mesmo assim, abra com ?app=1 (vale até fechar a aba).
 const APP_LIBERADO = true;
 const testeDoApp = (() => {
@@ -117,9 +117,9 @@ const testeDoApp = (() => {
   }
 })();
 const redirecionar = !APP_LIBERADO && !testeDoApp && !Capacitor.isNativePlatform() && !import.meta.env.DEV
-  && !location.pathname.startsWith('/afilhado') // nunca em laço, se o servidor errar a rota
+  && !/^\/(queroserafilhado|afilhado)/.test(location.pathname) // nunca em laço, se o servidor errar a rota
   && !location.hash.startsWith('#/demo/'); // demonstrações abrem sem login e não gravam nada
-if (redirecionar) location.replace('/afilhado');
+if (redirecionar) location.replace('/queroserafilhado');
 
 // HashRouter funciona igual na web e dentro do Capacitor (Android/iOS)
 // reaproveita a raiz se o módulo for reexecutado (atualização em desenvolvimento)

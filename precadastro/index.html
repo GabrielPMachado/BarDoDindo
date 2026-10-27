@@ -452,6 +452,8 @@
 <canvas class="confetti" id="confetti" aria-hidden="true"></canvas>
 
 <script type="module">
+// endereço antigo (QR Codes e links já impressos): mostra o novo na barra, mantendo ?via=qr, ?demo=… e o resto
+if (/^\/afilhado(\/|$)/.test(location.pathname)) history.replaceState(null, '', '/queroserafilhado' + location.search + location.hash);
 import { api as dados } from '../src/api';
 import { cpfValido, idadeEm } from '../shared/backend';
 import { INSTAGRAM, LIMITE_TEXTO, alternar, contador, ehOutro, montarResposta } from '../shared/questionario';
@@ -491,7 +493,7 @@ import { INSTAGRAM, LIMITE_TEXTO, alternar, contador, ehOutro, montarResposta } 
     e.target.value = d.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
   });
   { const h = new Date(); h.setFullYear(h.getFullYear() - 18); $('nasc').max = h.toISOString().slice(0, 10); }
-  // QR Code do bar: /afilhado?via=qr
+  // QR Code do bar: /queroserafilhado?via=qr
   const via = new URLSearchParams(location.search).get('via') === 'qr' ? 'qr' : undefined;
   document.querySelectorAll('[data-toggle]').forEach((b) => b.addEventListener('click', () => {
     const inp = $(b.dataset.toggle);
