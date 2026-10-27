@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { AsyncButton, Badge, EmptyState, ErrorBox, KpiRow, Loading, Modal, NumberInput, PageHead, notify } from '../components/ui';
 import { SelectPicker, confirmar } from '../components/pickers';
+import { EscolherProdutos, type ProdutoVenda } from '../components/EscolherProdutos';
 import { api } from '../lib/api';
 import { reload, useCollection, useResource, type Row } from '../lib/data';
 import { brl, isoFromToday, isoToday, num } from '../lib/format';
@@ -25,7 +26,7 @@ interface Comanda {
   abertaEm: string; abertaPorNome: string; fechadaEm?: string; formaPagamento?: string;
 }
 interface Mesa { id: string; numero: number; nome: string; ambiente: string; lugares: number; formato: string; status: string; x?: number; y?: number }
-interface Produto { id: string; nome: string; categoria: string; preco: number; pontos: number; foto?: string }
+type Produto = ProdutoVenda;
 interface ClienteLite { id: string; numero: number; nome: string; email: string; telefone: string; pontos: number }
 
 const FORMAS = ['Pix', 'Crédito', 'Débito', 'Dinheiro', 'Vale-refeição'];
@@ -561,7 +562,6 @@ function DetalheComanda({ c, mesas, onClose, onMudou }: { c: Comanda; mesas: Mes
   const editavel = c.status === 'Aberta' && pode('comandas', 'editar');
   const produtos = useResource<Produto[]>(editavel ? '/crm/produtos-venda' : null).data ?? [];
   const [itens, setItens] = useState<Item[]>(c.itens);
-  const [busca, setBusca] = useState('');
   const [forma, setForma] = useState('Pix');
   const [salvando, setSalvando] = useState(false);
   const fila = useRef<Promise<unknown>>(Promise.resolve());
@@ -569,8 +569,6 @@ function DetalheComanda({ c, mesas, onClose, onMudou }: { c: Comanda; mesas: Mes
   const total = itens.reduce((s, i) => s + i.preco * i.quantidade, 0);
   // ao fechar, os pontos saem do cadastro atual de cada produto
   const pontos = itens.reduce((s, i) => s + (produtos.find((p) => p.id === i.produtoId)?.pontos ?? (Number(i.pontos) || 0)) * i.quantidade, 0);
-  const t = busca.trim().toLowerCase();
-  const filtrados = produtos.filter((p) => !t || `${p.nome} ${p.categoria}`.toLowerCase().includes(t)).slice(0, 18);
 
   // cada alteração é gravada na hora (em fila, para não atropelar a anterior)
   const gravar = (novos: Item[]) => {
@@ -637,16 +635,8 @@ function DetalheComanda({ c, mesas, onClose, onMudou }: { c: Comanda; mesas: Mes
         <div className={editavel ? 'grid-2 grid-2--wide-left' : ''}>
           {editavel && (
             <section>
-              <label className="search"><Search size={16} /><input placeholder="Buscar produto" value={busca} onChange={(e) => setBusca(e.target.value)} autoFocus /></label>
-              <div className="product-grid">
-                {filtrados.map((p) => (
-                  <button key={p.id} type="button" className="product" onClick={() => somar(p)}>
-                    {p.foto && <img className="product__foto" src={p.foto} alt="" loading="lazy" />}
-                    <span>{p.nome}</span><strong>{brl(p.preco)}</strong>
-                  </button>
-                ))}
-                {!produtos.length && <p className="muted small">Nenhum produto ativo em Vendas › Produtos e cardápio.</p>}
-              </div>
+              {produtos.length ? <EscolherProdutos produtos={produtos} onEscolher={somar} autoFocus />
+                : <p className="muted small">Nenhum produto ativo em Vendas › Produtos e cardápio.</p>}
             </section>
           )}
           <section className="comanda">
