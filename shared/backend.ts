@@ -9,7 +9,7 @@ import {
   reauthenticateWithCredential, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, updatePassword, type UserCredential,
 } from 'firebase/auth';
 import {
-  arrayRemove, arrayUnion, collection, connectFirestoreEmulator, doc, getDoc, getDocs, increment, initializeFirestore, limit, onSnapshot, orderBy, persistentLocalCache, persistentMultipleTabManager, query, runTransaction, where, writeBatch,
+  arrayRemove, arrayUnion, collection, connectFirestoreEmulator, doc, getDoc, getDocFromServer, getDocs, increment, initializeFirestore, limit, onSnapshot, orderBy, persistentLocalCache, persistentMultipleTabManager, query, runTransaction, where, writeBatch,
   type DocumentReference, type Query, type WriteBatch,
 } from 'firebase/firestore';
 import { EMULADOR, EMULADOR_AUTH, EMULADOR_FIRESTORE, firebaseConfig } from './firebase-config';
@@ -850,11 +850,18 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   });
   rota('POST', '/crm/login', async ({ b }) => {
     const { user } = await entrar(str(b.email, 160), String(b.senha ?? ''));
-    const u = (await getDoc(doc(db, 'usuarios', user.uid))).data();
+    // sempre no servidor: a cópia local do navegador pode guardar uma versão antiga (ou a ausência) do cadastro
+    let u: Dados | undefined;
+    try {
+      u = (await getDocFromServer(doc(db, 'usuarios', user.uid))).data();
+    } catch (e) {
+      await sair();
+      return fail(503, `Não foi possível conferir o seu cadastro no servidor (${codigo(e) || (e as Error).message}). Verifique a internet e tente de novo.`);
+    }
     if (!u) {
       await sair();
       // a senha está certa, mas o e-mail não é de um usuário do CRM (ex.: só afilhado, ou usuário excluído)
-      return fail(403, 'Este e-mail não tem acesso ao Cérebro. Peça à Presidência para cadastrar você como usuário.');
+      return fail(403, `Este e-mail não tem acesso ao Cérebro. Peça à Presidência para cadastrar você como usuário. (conta ${user.uid})`);
     }
     if (u.status !== 'Ativo') {
       await sair();
