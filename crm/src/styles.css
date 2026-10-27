@@ -56,7 +56,8 @@ h1, h2, h3, p { margin: 0; }
   scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent;
 }
 .main { min-width: 0; display: flex; flex-direction: column; }
-.content { padding: 24px 32px 48px; max-width: 1600px; width: 100%; }
+/* sem largura máxima: no PC o conteúdo ocupa a tela toda, sem faixa vazia à direita */
+.content { padding: 24px 32px 48px; width: 100%; }
 
 /* logo, "Cérebro", linha e menu com o mesmo espaço entre si (18px, igual ao espaçamento da barra lateral) */
 .brand { display: flex; flex-direction: column; align-items: center; gap: 18px; }
@@ -223,11 +224,13 @@ a.nav__setor-link.active svg:first-child { color: var(--on-brand); opacity: 1; }
 
 .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 .grid-2--wide-left { grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr); }
-@media (min-width: 1500px) { .grid-2:not(.grid-2--wide-left):not(fieldset) { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* três colunas só quando há itens para preenchê-las (3, 5 ou mais); com 2 ou 4 fica em duas, sem coluna vazia */
+@media (min-width: 1500px) { .grid-2:not(.grid-2--wide-left):not(fieldset):is(:has(> :nth-child(3):last-child), :has(> :nth-child(5))) { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 
 /* ---------- indicadores ---------- */
-/* auto-fill: um cartão sozinho na linha mantém o tamanho, sem esticar até a borda */
-.kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+/* auto-fit: os cartões dividem a linha toda; um cartão sozinho mantém o tamanho, sem esticar até a borda */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.kpis:has(> :only-child) { grid-template-columns: minmax(220px, 320px); }
 .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; position: relative; overflow: hidden; }
 .kpi::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--border-strong); }
 .kpi--good::before { background: var(--good); }
@@ -761,6 +764,8 @@ select.input { appearance: none; padding-right: 30px; background-image: linear-g
   .page-head__actions { flex-wrap: wrap; }
   .page-head__actions > * { flex: 1 1 auto; }
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  /* número ímpar de cartões: o último ocupa a linha toda, sem buraco ao lado */
+  .kpis > :last-child:nth-child(odd):not(:only-child) { grid-column: 1 / -1; }
   .kpi { padding: 12px; }
   .kpi__value { font-size: 18px; }
   .panel__head { padding: 14px 14px 6px; }
