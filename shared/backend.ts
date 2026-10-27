@@ -621,6 +621,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
         foto: typeof p.foto === 'string' ? p.foto : '', teor: Number(p.teor) || 0,
         perfil: (p.perfil ?? {}) as Record<string, number>, notas: Array.isArray(p.notas) ? p.notas : [],
         resumo: typeof p.resumo === 'string' ? p.resumo : '', ingredientes: Array.isArray(p.ingredientes) ? p.ingredientes : [],
+        tamanho: typeof p.tamanho === 'string' ? p.tamanho : '',
       }))
       .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
   });
@@ -1815,6 +1816,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       notas: String(d.notas ?? '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 8),
       resumo: String(d.resumo ?? '').trim().slice(0, 200),
       ingredientes: String(d.ingredientes ?? '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 20),
+      // tamanho de um item com tamanhos (ex.: chopp de 300 ml): o app filtra o cardápio por ele
+      tamanho: d.pai ? String(d.tamanho ?? '').trim().slice(0, 40) : '',
     };
   }
   // o item com tamanhos (ex.: chopp) só agrupa: quem vai para o cardápio é cada tamanho

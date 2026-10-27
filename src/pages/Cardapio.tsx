@@ -6,6 +6,15 @@ import { Empty, PageHeader } from '../components/ui';
 import { ItemFoto } from '../components/ItemIcon';
 import { useStore, type Produto } from '../store';
 
+/** Ordem dos tamanhos pelo volume (300 ml, 500 ml, 1 litro…); sem volume reconhecível, vão para o fim em ordem alfabética. */
+function volumeEmMl(t: string) {
+  const m = /(\d+(?:[.,]\d+)?)\s*(ml|l\b|litros?)/i.exec(t);
+  if (!m) return Infinity;
+  const n = Number(m[1].replace(',', '.'));
+  return m[2].toLowerCase() === 'ml' ? n : n * 1000;
+}
+const porVolume = (a: string, b: string) => volumeEmMl(a) - volumeEmMl(b) || a.localeCompare(b, 'pt-BR', { numeric: true });
+
 export default function Cardapio() {
   const { cardapio } = useStore();
   const hasHighlights = cardapio.some((i) => i.destaque);
@@ -18,12 +27,21 @@ export default function Cardapio() {
   const [aberto, setAberto] = useState<Produto | null>(null);
   const active = cat && tabs.includes(cat) ? cat : tabs[0];
 
+  const [tamanho, setTamanho] = useState<string | null>(null);
+
   const term = q.trim().toLowerCase();
-  const items = cardapio.filter((i) =>
+  const daVez = cardapio.filter((i) =>
     term
-      ? [i.nome, i.resumo, i.descricao, ...(i.ingredientes ?? [])].join(' ').toLowerCase().includes(term)
+      ? [i.nome, i.resumo, i.descricao, i.tamanho, ...(i.ingredientes ?? [])].join(' ').toLowerCase().includes(term)
       : active === 'Destaques' ? i.destaque : i.categoria === active,
   );
+  // filtro por tamanho (ex.: chopp de 300 ml, 500 ml ou 1 litro), quando os itens à vista têm tamanhos
+  const tamanhos = [...new Set(daVez.map((i) => i.tamanho?.trim() ?? '').filter(Boolean))].sort(porVolume);
+  const tamanhoAtivo = tamanho && tamanhos.includes(tamanho) ? tamanho : null;
+  // os tamanhos do mesmo item ficam juntos, do menor para o maior (300 ml, 500 ml, 1 litro)
+  const semTamanho = (i: Produto) => (i.tamanho && i.nome.endsWith(i.tamanho) ? i.nome.slice(0, -i.tamanho.length).trim() : i.nome);
+  const items = (tamanhoAtivo ? daVez.filter((i) => i.tamanho?.trim() === tamanhoAtivo) : daVez)
+    .slice().sort((a, b) => semTamanho(a).localeCompare(semTamanho(b), 'pt-BR') || porVolume(a.tamanho ?? '', b.tamanho ?? ''));
 
   const regra = 'Cada item consumido rende pontos para você';
 
@@ -51,6 +69,15 @@ export default function Cardapio() {
             <button key={c} className={`chip ${active === c ? 'is-active' : ''}`} onClick={() => setCat(c)}>
               {c === 'Destaques' && <Star size={14} fill="currentColor" />} {c}
             </button>
+          ))}
+        </div>
+      )}
+
+      {tamanhos.length > 1 && (
+        <div className="chips chips--scroll chips--tamanhos" role="group" aria-label="Filtrar por tamanho">
+          <button className={`chip chip--sm ${!tamanhoAtivo ? 'is-active' : ''}`} onClick={() => setTamanho(null)}>Todos os tamanhos</button>
+          {tamanhos.map((t) => (
+            <button key={t} className={`chip chip--sm ${tamanhoAtivo === t ? 'is-active' : ''}`} onClick={() => setTamanho(tamanhoAtivo === t ? null : t)}>{t}</button>
           ))}
         </div>
       )}

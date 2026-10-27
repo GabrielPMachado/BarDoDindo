@@ -1101,6 +1101,7 @@ COLLECTIONS.fichas = {
   fields: COLLECTIONS.produtos.fields.map((f) => (['nome', 'categoria', 'preco'].includes(f.key) ? f : { ...f, formOnly: true })),
   // cada tamanho tem a sua ficha; o item principal que os agrupa não tem receita
   ocultarNaLista: (r) => temTamanhos(r),
+  filtros: [...(COLLECTIONS.produtos.filtros ?? []), 'tamanho'],
   computed: [
     { label: 'Insumos', format: 'number', get: (r) => fichaDe(r.ficha).itens.length || null },
     { label: 'Custo por porção', format: 'money', get: (r) => cmvDe(r)?.porcao ?? (n(r.custo) || null) },
