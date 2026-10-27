@@ -138,6 +138,13 @@ if (senhaAtendente) {
   await negado('reabrir caixa fechado', () => updateDoc(doc(db, 'caixas', 'fechado'), { status: 'Aberto' }));
   await permitido('abrir comanda', () => addDoc(collection(db, 'comandas'), { numero: 9, nome: 'Avulsa', mesa: 1, itens: [], total: 0, status: 'Aberta' }));
   await permitido('ver as comandas do salão', () => getDocs(collection(db, 'comandas')));
+  // baixa do Estoque pela ficha técnica: quem vende só mexe nas quantidades
+  await permitido('ler um item do Estoque para dar baixa na venda', () => getDoc(doc(db, 'estoque', 'gin')));
+  await permitido('dar baixa no Estoque pela venda', () => updateDoc(doc(db, 'estoque', 'gin'), { quantidade: 1.96, locais: { Depósito: 1.96 }, atualizadoEm: new Date().toISOString() }));
+  await negado('trocar o custo de um item do Estoque ao vender', () => updateDoc(doc(db, 'estoque', 'gin'), { custo: 1 }));
+  await negado('renomear um item do Estoque ao vender', () => updateDoc(doc(db, 'estoque', 'gin'), { quantidade: 2, item: 'Outro' }));
+  await negado('cadastrar item no Estoque (só baixa)', () => addDoc(collection(db, 'estoque'), { item: 'x', quantidade: 1 }));
+  await negado('apagar item do Estoque (só baixa)', () => deleteDoc(doc(db, 'estoque', 'gin')));
   await permitido('lançar a receita de uma comanda avulsa', () => addDoc(collection(db, 'receitas'), { descricao: 'Comanda #009', valor: 10, comandaId: 'x', caixaId: 'aberto' }));
   // consumo sem afilhado (cliente sem cadastro): entra no caixa e na receita, sem pontos nem saldo
   await permitido('lançar consumo sem afilhado', () => addDoc(collection(db, 'consumos'), { clienteId: null, clienteUid: null, clienteNome: 'Cliente sem cadastro', valor: 10, pontos: 0, caixaId: 'aberto' }));
@@ -211,6 +218,7 @@ if (senhaMarketing) {
   await permitido('ver recompensas (Marketing)', () => getDocs(collection(db, 'recompensas')));
   await negado('ver o caixa (sem Atendimento)', () => getDoc(doc(db, 'caixas', 'aberto')));
   await negado('somar venda no caixa (sem Atendimento)', () => updateDoc(doc(db, 'caixas', 'aberto'), { totalVendas: increment(1) }));
+  await negado('dar baixa no Estoque (sem vender)', () => updateDoc(doc(db, 'estoque', 'gin'), { quantidade: 0 }));
   await negado('ver comandas (sem Atendimento)', () => getDocs(collection(db, 'comandas')));
   await negado('cadastrar produto (só "ver")', () => addDoc(collection(db, 'produtos'), { nome: 'x', preco: 1 }));
   await permitido('ver o Estoque (insumos da ficha técnica)', () => getDocs(collection(db, 'estoque')));
@@ -359,7 +367,7 @@ if (senhaAdministrativo) {
   console.log('— equipe: função só com Atendimento — PDFs de outras áreas —');
   await signInWithEmailAndPassword(auth, 'atendente@teste.local', senhaAtendente);
   await negado('listar os PDFs anexados', () => getDocs(collection(db, 'anexos')));
-  await negado('ver o Estoque (sem Vendas nem Estrutura)', () => getDocs(collection(db, 'estoque')));
+  await permitido('ver o Estoque (sem Vendas nem Estrutura, mas vende: baixa pela ficha técnica)', () => getDocs(collection(db, 'estoque')));
   await negado('ver a Tabela de preços (sem Vendas nem Administrativo)', () => getDocs(collection(db, 'precos')));
   await negado('ver guarnições e itens fixos (sem Vendas)', () => getDocs(collection(db, 'guarnicoes')));
   await negado('ver Materiais (sem Vendas nem Estrutura)', () => getDocs(collection(db, 'materiais')));
