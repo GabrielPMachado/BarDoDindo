@@ -1856,6 +1856,11 @@ button.anexos__nome:hover { text-decoration: underline; }
 .tamanhos__acoes { display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end; }
 .tamanhos__acoes .btn { white-space: nowrap; }
 .tamanhos__mais { align-self: flex-start; }
+/* ficha técnica do tamanho aberta dentro do item principal */
+.tamanhos__seta { transition: transform .15s; }
+.tamanhos li.is-aberto .tamanhos__seta { transform: rotate(180deg); }
+.tamanhos__ficha-aberta { grid-column: 1 / -1; padding-top: 4px; }
+.tamanhos li.is-aberto { background: var(--surface); }
 @media (max-width: 640px) {
   .tamanhos li { grid-template-columns: 1fr 1fr; }
   .tamanhos__ficha { grid-column: 1 / -1; }
