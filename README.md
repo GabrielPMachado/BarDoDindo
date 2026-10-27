@@ -6,7 +6,7 @@ Três partes que compartilham **um único projeto Firebase** (Authentication + F
 | --- | --- | --- | --- |
 | **App do afilhado** (celular, PWA / Android / iOS) | raiz (`src/`) | Clientes | `/` |
 | **CRM / Gestão** (computador) | `crm/` | Equipe do bar | `/crm` |
-| **Pré-cadastro** | `precadastro/` | Clientes, antes do lançamento | `/afilhado` |
+| **Pré-cadastro** | `precadastro/` | Clientes, antes do lançamento | `/queroserafilhado` (o antigo `/afilhado` continua abrindo) |
 
 Até o lançamento, o app do afilhado fica fechado na web: quem abre `/` vai para o pré-cadastro (`APP_LIBERADO` em `src/main.tsx`; para testar o app, abra `/?app=1`). O app instalado pelo Android/iOS não é afetado.
 

@@ -8,7 +8,7 @@ import { enderecoPublico } from '../../../shared/firebase-config';
 
 const DESTINOS = {
   app: { label: 'Aplicativo (cadastro completo)', caminho: '/?via=qr' },
-  pre: { label: 'Página de pré-cadastro', caminho: '/afilhado?via=qr' },
+  pre: { label: 'Página de pré-cadastro', caminho: '/queroserafilhado?via=qr' },
 } as const;
 type Destino = keyof typeof DESTINOS;
 type Papel = 'A4' | 'A5';

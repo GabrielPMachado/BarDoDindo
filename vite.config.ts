@@ -9,7 +9,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       // o CRM e o pré-cadastro nunca passam pelo cache do app
-      workbox: { navigateFallbackDenylist: [/^\/crm/, /^\/afilhado/] },
+      workbox: { navigateFallbackDenylist: [/^\/crm/, /^\/queroserafilhado/, /^\/afilhado/] },
       includeAssets: ['icon.png', 'icon-192.png', 'icon-maskable.png', 'apple-touch-icon.png'],
       manifest: {
         name: 'Bar do Dindo',
@@ -29,7 +29,7 @@ export default defineConfig({
     }),
   ],
   build: {
-    // o pré-cadastro é uma segunda página do mesmo build (publicada em /afilhado)
+    // o pré-cadastro é uma segunda página do mesmo build (publicada em /queroserafilhado)
     rollupOptions: { input: { main: 'index.html', precadastro: 'precadastro/index.html' } },
   },
 });

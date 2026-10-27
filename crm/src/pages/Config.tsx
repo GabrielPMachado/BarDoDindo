@@ -579,7 +579,7 @@ function QuestionarioEditor({ q, onChange }: { q: Questionario; onChange: (q: Qu
           <h2 className="panel-title">Questionário do afilhado</h2>
           <p className="muted small">Aparece no pré-cadastro e no aplicativo, uma pergunta por vez. É opcional para o afilhado. As respostas aparecem em Clientes (afilhados).</p>
         </div>
-        <a className="btn btn--ghost btn--sm" href="/afilhado?demo=questionario" target="_blank" rel="noreferrer"><ExternalLink size={14} /> Ver como o afilhado vê</a>
+        <a className="btn btn--ghost btn--sm" href="/queroserafilhado?demo=questionario" target="_blank" rel="noreferrer"><ExternalLink size={14} /> Ver como o afilhado vê</a>
       </div>
       <label className="check-row"><input type="checkbox" checked={q.ativo} onChange={(e) => onChange({ ...q, ativo: e.target.checked })} /> Mostrar o questionário aos afilhados</label>
       <label className="field-label" htmlFor="q-titulo">Título</label>
