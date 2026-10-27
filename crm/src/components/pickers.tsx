@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { AlertTriangle, CalendarDays, Check, ChevronLeft, ChevronRight, Clock, Link2, Search, Trash2, X } from 'lucide-react';
-import type { Field } from '../collections';
+import { AlertTriangle, CalendarDays, Check, ChevronLeft, ChevronRight, Clock, Link2, Plus, Search, Trash2, X } from 'lucide-react';
+import type { Field, Vinculo } from '../collections';
 import { useResource } from '../lib/data';
 import { ehOutro, removerOpcao, useOutro } from './OpcaoOutro';
 
@@ -458,6 +458,47 @@ export function RefPicker({ field, value, linkedId, onChange, disabled, id }: {
             </>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+/** Até quantos vínculos um campo de vários aceita (o principal e os outros). */
+const MAX_VINCULOS = 10;
+
+/**
+ * Vínculo que aceita mais de um (ex.: vários fornecedores para o mesmo item): o primeiro é o principal e,
+ * depois de preenchê-lo, a pessoa pode acrescentar outros. Tirar o principal promove o seguinte.
+ */
+export function VariosRefPicker({ field, lista, disabled, id, onChange }: {
+  field: Field; lista: Vinculo[]; disabled?: boolean; id?: string;
+  onChange: (lista: Vinculo[]) => void;
+}) {
+  const campo: Field = { ...field, key: 'nome', refKey: 'id', fill: undefined };
+  const singular = field.label.toLowerCase();
+  const ultimo = lista[lista.length - 1];
+  const trocar = (i: number, patch: Record<string, unknown>) =>
+    onChange(lista.map((v, k) => (k === i ? { nome: String(patch.nome ?? v.nome), id: 'id' in patch ? (patch.id as Vinculo['id']) ?? null : v.id } : v)));
+  const tirar = (i: number) => onChange(lista.length > 1 ? lista.filter((_, k) => k !== i) : [{ nome: '', id: null }]);
+  return (
+    <div className="varios">
+      {lista.map((v, i) => (
+        <div key={i} className="varios__linha">
+          <RefPicker id={i === 0 ? id : undefined} field={campo} value={v.nome} linkedId={v.id} disabled={disabled} onChange={(patch) => trocar(i, patch)} />
+          {!disabled && lista.length > 1 && (
+            <button type="button" className="icon-btn" aria-label={`Tirar ${v.nome || `o ${singular}`}`} title={i === 0 ? `Tirar (o próximo vira o ${singular} principal)` : 'Tirar'} onClick={() => tirar(i)}>
+              <Trash2 size={15} />
+            </button>
+          )}
+        </div>
+      ))}
+      {!disabled && ultimo?.nome.trim() && lista.length < MAX_VINCULOS && (
+        <p className="varios__pergunta">
+          <span className="muted small">{lista.length === 1 ? `Tem mais algum ${singular} para este item?` : `Mais algum ${singular}?`}</span>
+          <button type="button" className="btn btn--ghost btn--sm" onClick={() => onChange([...lista, { nome: '', id: null }])}>
+            <Plus size={13} /> Acrescentar outro {singular}
+          </button>
+        </p>
       )}
     </div>
   );

@@ -16,14 +16,17 @@ const buscar = (col: string) => api<Row[]>(`/crm/c/${col}`).catch(() => null);
 
 /**
  * Dentro do cadastro do fornecedor: o que compramos dele, com o botão de compra de cada item.
- * Liga pelo cadastro do fornecedor (fornecedorId) ou, nos registros antigos, pelo nome.
+ * Liga pelo cadastro do fornecedor (fornecedorId) ou, nos registros antigos, pelo nome; vale também para os outros fornecedores do item.
  */
 export function ItensDoFornecedor({ fornecedorId, nome }: { fornecedorId: string; nome: string }) {
   const [grupos, setGrupos] = useState<Grupo[] | null>(null);
 
   useEffect(() => {
     let vivo = true;
-    const deste = (r: Row) => r.fornecedorId === fornecedorId || (!r.fornecedorId && !!nome && String(r.fornecedor ?? '').trim().toLowerCase() === nome.trim().toLowerCase());
+    // o item pode ter vários fornecedores: o principal e os outros (outrosFornecedores)
+    const mesmo = (id: unknown, n: unknown) => id === fornecedorId || (!id && !!nome && String(n ?? '').trim().toLowerCase() === nome.trim().toLowerCase());
+    const deste = (r: Row) => mesmo(r.fornecedorId, r.fornecedor)
+      || (Array.isArray(r.outrosFornecedores) && (r.outrosFornecedores as { nome?: string; id?: string | null }[]).some((o) => mesmo(o?.id, o?.nome)));
     void Promise.all([buscar('precos'), buscar('estoque'), buscar('materiais')]).then(([precos, estoque, materiais]) => {
       if (!vivo) return;
       const g: Grupo[] = [];
