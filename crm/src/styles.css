@@ -1845,3 +1845,18 @@ button.anexos__nome:hover { text-decoration: underline; }
 .refazer-fotos .spin { animation: girar 1s linear infinite; }
 @keyframes girar { to { transform: rotate(360deg); } }
 @media (max-width: 520px) { .refazer-fotos__lista { grid-template-columns: 1fr; } }
+
+/* item com tamanhos (ex.: chopp de 300 ml, 500 ml e 1 litro): cada tamanho com preço e atalho para a ficha técnica */
+.tamanhos { gap: 8px; }
+.tamanhos ul { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); overflow: hidden; }
+.tamanhos li { display: grid; grid-template-columns: minmax(110px, 1fr) minmax(120px, 160px) minmax(0, 1.4fr) auto; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.tamanhos li:last-child { border-bottom: 0; }
+.tamanhos__acoes { display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.tamanhos__acoes .btn { white-space: nowrap; }
+.tamanhos__mais { align-self: flex-start; }
+@media (max-width: 640px) {
+  .tamanhos li { grid-template-columns: 1fr 1fr; }
+  .tamanhos__ficha { grid-column: 1 / -1; }
+  .tamanhos__acoes { grid-column: 1 / -1; justify-content: space-between; }
+}
+.tamanho-de { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); font-size: 13.5px; }

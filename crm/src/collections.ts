@@ -36,6 +36,8 @@ export interface Field {
   fill?: Record<string, string>;
   /** Só fica editável com a caixinha (campo "check") desta chave marcada. */
   ativadoPor?: string;
+  /** Só aparece no formulário (e só é obrigatório) quando a condição vale (ex.: preço só nos produtos sem tamanhos). */
+  mostrarSe?: (d: Record<string, unknown>) => boolean;
 }
 
 /** Limites efetivos de um campo numérico, com padrões seguros por tipo. */
@@ -103,6 +105,10 @@ export interface CollectionDef {
   iaProduto?: boolean;
   /** A ficha técnica vem antes dos outros campos no formulário (tela "Fichas técnicas"). */
   fichaPrimeiro?: boolean;
+  /** Produtos: um item principal (ex.: chopp) agrupa tamanhos; cada tamanho é um produto próprio, com preço e ficha técnica. */
+  tamanhos?: boolean;
+  /** Registros que não aparecem na lista (continuam nos indicadores). */
+  ocultarNaLista?: (r: Row) => boolean;
   /** Como um registro deste módulo vira despesa no DRE: pré-preenche a tela "Lançar despesa" (a pessoa confere antes de lançar). */
   despesa?: (r: Row) => DespesaSugerida;
 }
@@ -118,6 +124,12 @@ const s = (v: unknown) => String(v ?? '');
 const count = (rows: Row[], key: string, values: string[]) => rows.filter((r) => values.includes(s(r[key]))).length;
 const sum = (rows: Row[], key: string) => rows.reduce((t, r) => t + n(r[key]), 0);
 const juntar = (...partes: unknown[]) => partes.map(s).filter(Boolean).join(' · ');
+
+/** Produto principal com tamanhos (ex.: Chopp Pilsen): não é vendido nem conta como item; cada tamanho é um produto. */
+export const temTamanhos = (r: Record<string, unknown>) => r.comTamanhos === 'Sim' && !r.pai;
+/** Tamanhos do produto principal, anexados à linha pela lista (`_tamanhos`) para as colunas calculadas. */
+const tamanhosDe = (r: Row) => (Array.isArray(r._tamanhos) ? (r._tamanhos as Row[]) : []);
+const vendavel = (d: Record<string, unknown>) => !temTamanhos(d);
 /** Categoria de despesa sugerida para cada tipo de contrato. */
 const CATEGORIA_DO_CONTRATO: Record<string, string> = { Locação: 'Aluguel', 'Prestação de serviço': 'Terceirizados', Fornecimento: 'Fornecedores' };
 
@@ -587,16 +599,21 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     },
   },
   produtos: {
-    id: 'produtos', comFoto: true, fichaTecnica: true, iaProduto: true, area: 'produtos', title: 'Produtos e cardápio', singular: 'produto',
+    id: 'produtos', comFoto: true, fichaTecnica: true, iaProduto: true, tamanhos: true, area: 'produtos', title: 'Produtos e cardápio', singular: 'produto',
+    // os tamanhos ficam dentro do item principal (e cada um conta como um produto nos indicadores)
+    ocultarNaLista: (r) => !!r.pai,
     description: 'Produtos marcados como "No cardápio" e ativos aparecem no aplicativo dos clientes.',
     filterKey: 'categoria', filtros: ['status', 'noCardapio', 'destaque'], sortKey: 'nome',
     fields: [
       { key: 'nome', label: 'Produto', type: 'text', required: true, wide: true },
       { key: 'categoria', label: 'Categoria', type: 'select', options: ['Cervejas', 'Chopes', 'Drinks', 'Destilados', 'Vinhos', 'Petiscos', 'Porções', 'Pratos', 'Sobremesas', 'Sem álcool'], required: true },
-      { key: 'preco', label: 'Preço de venda', type: 'money', required: true, min: 0.01, max: 100_000 },
-      { key: 'custo', label: 'Custo', type: 'money', max: 100_000 },
-      { key: 'pontuacaoPersonalizada', label: 'Pontuação personalizada', type: 'check', formOnly: true, placeholder: 'Definir os pontos deste produto (senão, vale a tabela de Parâmetros pelo preço)' },
-      { key: 'pontos', label: 'Pontos por unidade', type: 'number', max: 100_000, formOnly: true, ativadoPor: 'pontuacaoPersonalizada', placeholder: 'Pela tabela de Parâmetros' },
+      // item principal com tamanhos: cada tamanho tem preço, pontos e ficha técnica próprios (ver "Tamanhos" no formulário)
+      { key: 'comTamanhos', label: 'Vendido em tamanhos', type: 'check', formOnly: true, wide: true, placeholder: 'Este item tem tamanhos (ex.: chopp de 300 ml, 500 ml e 1 litro), cada um com preço e ficha técnica', mostrarSe: (d) => !d.pai },
+      { key: 'tamanho', label: 'Tamanho', type: 'text', formOnly: true, placeholder: 'Ex.: 300 ml', mostrarSe: (d) => !!d.pai },
+      { key: 'preco', label: 'Preço de venda', type: 'money', required: true, min: 0.01, max: 100_000, mostrarSe: vendavel },
+      { key: 'custo', label: 'Custo', type: 'money', max: 100_000, mostrarSe: vendavel },
+      { key: 'pontuacaoPersonalizada', label: 'Pontuação personalizada', type: 'check', formOnly: true, placeholder: 'Definir os pontos deste produto (senão, vale a tabela de Parâmetros pelo preço)', mostrarSe: vendavel },
+      { key: 'pontos', label: 'Pontos por unidade', type: 'number', max: 100_000, formOnly: true, ativadoPor: 'pontuacaoPersonalizada', placeholder: 'Pela tabela de Parâmetros', mostrarSe: vendavel },
       { key: 'noCardapio', label: 'No cardápio do app', type: 'select', options: ['Sim', 'Não'], default: 'Sim' },
       { key: 'destaque', label: 'Destaque', type: 'select', options: ['Não', 'Sim'], default: 'Não' },
       { key: 'status', label: 'Status', type: 'select', options: ['Ativo', 'Sazonal', 'Inativo'], default: 'Ativo' },
@@ -614,7 +631,10 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     computed: [
       {
         label: 'Ficha técnica', format: 'text',
-        get: (r) => { const q = fichaDe(r.ficha).itens.length; return q ? `${q} ${q === 1 ? 'insumo' : 'insumos'}` : null; },
+        get: (r) => {
+          if (temTamanhos(r)) { const t = tamanhosDe(r); return t.length ? `${t.length} ${t.length === 1 ? 'tamanho' : 'tamanhos'}` : 'Sem tamanhos'; }
+          const q = fichaDe(r.ficha).itens.length; return q ? `${q} ${q === 1 ? 'insumo' : 'insumos'}` : null;
+        },
       },
       {
         label: 'Margem', format: 'percent',
@@ -622,7 +642,9 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
         tone: (r) => (n(r.preco) && n(r.custo) && (n(r.preco) - n(r.custo)) / n(r.preco) < 0.3 ? 'warn' : 'neutral'),
       },
     ],
-    kpis: (rows) => {
+    kpis: (todos) => {
+      // cada tamanho conta como um produto; o item principal que os agrupa, não
+      const rows = todos.filter(vendavel);
       const comCusto = rows.filter((r) => n(r.preco) && n(r.custo));
       const margem = comCusto.length ? comCusto.reduce((t, r) => t + (n(r.preco) - n(r.custo)) / n(r.preco), 0) / comCusto.length : null;
       return [
@@ -1077,6 +1099,8 @@ COLLECTIONS.fichas = {
   title: 'Fichas técnicas', singular: 'ficha técnica', feminino: true, fichaPrimeiro: true,
   description: 'Monte a receita com os insumos do Estoque e os preços dos fornecedores: o sistema calcula custo, CMV e preço sugerido e cria o produto do cardápio.',
   fields: COLLECTIONS.produtos.fields.map((f) => (['nome', 'categoria', 'preco'].includes(f.key) ? f : { ...f, formOnly: true })),
+  // cada tamanho tem a sua ficha; o item principal que os agrupa não tem receita
+  ocultarNaLista: (r) => temTamanhos(r),
   computed: [
     { label: 'Insumos', format: 'number', get: (r) => fichaDe(r.ficha).itens.length || null },
     { label: 'Custo por porção', format: 'money', get: (r) => cmvDe(r)?.porcao ?? (n(r.custo) || null) },
@@ -1086,7 +1110,8 @@ COLLECTIONS.fichas = {
     },
     { label: 'Preço sugerido', format: 'money', get: (r) => cmvDe(r)?.sugerido || null },
   ],
-  kpis: (rows) => {
+  kpis: (todos) => {
+    const rows = todos.filter(vendavel);
     const cmvs = rows.map((r) => cmvDe(r)?.cmv).filter((c): c is number => c != null);
     const acima = rows.filter(acimaDoAlvo).length;
     return [
