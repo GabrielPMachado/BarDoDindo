@@ -32,6 +32,8 @@ export interface Produto {
   notas?: string[];
   /** descrição curta para a lista; a `descricao` é a história completa */
   resumo?: string;
+  /** tamanho de um item vendido em tamanhos (ex.: chopp de 300 ml); vazio nos demais */
+  tamanho?: string;
   ingredientes?: string[];
 }
 
