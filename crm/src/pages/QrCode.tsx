@@ -23,7 +23,7 @@ function Cartaz({ qr, url, fundo, folha }: { qr: RefObject<HTMLCanvasElement | n
       <div className="cartaz__moldura">
         <img src={logoUrl} alt="" className="cartaz__logo" />
         <span className="cartaz__eyebrow">Programa de afilhados</span>
-        <h1 className="cartaz__titulo">&ldquo;Afilhie-se&rdquo;</h1>
+        <h1 className="cartaz__titulo">&ldquo;AFILHIE-SE&rdquo;</h1>
         <p className="cartaz__sub">Vire afilhado do Dindo e transforme cada visita em pontos.</p>
         <div className="cartaz__qr"><canvas ref={qr} /></div>
         <p className="cartaz__mira"><Camera aria-hidden="true" /> Aponte a câmera do celular</p>
