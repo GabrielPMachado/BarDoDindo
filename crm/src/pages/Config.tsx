@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowDownWideNarrow, ChevronDown, ChevronUp, ExternalLink, Lock, Pencil, Plus, Save, Sparkles, Trash2, X } from 'lucide-react';
+import { ArrowDownWideNarrow, ChevronDown, ChevronUp, Copy, ExternalLink, Lock, Pencil, Plus, Save, Sparkles, Trash2, X } from 'lucide-react';
 import { brl } from '../lib/format';
 import { CARGOS_SUGERIDOS, GRUPOS_DE_PERMISSAO, MODULOS, NIVEIS, poderDe, acoesDe, acoesNaArea, nivelDe, type Acao, type Modulo } from '../modules';
 import { AsyncButton, Badge, EmptyState, ErrorBox, Loading, Modal, NumberInput, PageHead, notify } from '../components/ui';
@@ -7,6 +7,7 @@ import { api } from '../lib/api';
 import { SelectPicker, confirmar } from '../components/pickers';
 import { reload, useCollection, useResource, type Row } from '../lib/data';
 import { QUESTIONARIO_PADRAO } from '../../../shared/backend';
+import { enderecoPublico } from '../../../shared/firebase-config';
 import { useSession, type Config, type Funcao, type Questionario, type Usuario } from '../lib/session';
 
 const acoesDaFuncao = (f: Funcao, k: string) => (f.sistema ? acoesDe('edit') : acoesNaArea(f.permissoes as Record<string, unknown>, k));
@@ -673,7 +674,8 @@ function Numeracao({ podeAjustar, podeApagar }: { podeAjustar: boolean; podeApag
   const apagarTodos = async () => {
     const r = await api<{ apagados: number }>('/crm/clientes', { method: 'DELETE' });
     await Promise.all([reload('/public/afilhados'), reload('/crm/clientes')]);
-    notify(`${r.apagados} ${r.apagados === 1 ? 'afilhado apagado' : 'afilhados apagados'}. O próximo cadastro será o #001.`);
+    await reload('/crm/reservados');
+    notify(`${r.apagados} ${r.apagados === 1 ? 'afilhado apagado' : 'afilhados apagados'}. A numeração recomeçou.`);
   };
   return (
     <section className="panel pad-lg">
@@ -686,12 +688,66 @@ function Numeracao({ podeAjustar, podeApagar }: { podeAjustar: boolean; podeApag
       {podeApagar && (
         <AsyncButton className="btn btn--ghost" onClick={apagarTodos} confirm={{
           title: 'Apagar todos os afilhados?',
-          message: 'Apaga os cadastros, saldos de pontos, consumos (com as receitas), vouchers e reservas de todos os afilhados, e a numeração volta para #001. Não dá para desfazer. As contas de login (e-mails) continuam existindo: quem se cadastrar de novo com o mesmo e-mail usa a senha de antes ou "Esqueci minha senha". Para apagá-las, use o console do Firebase (Authentication).',
+          message: 'Apaga os cadastros, saldos de pontos, consumos (com as receitas), vouchers e reservas de todos os afilhados, e a numeração recomeça (os números reservados continuam guardados). Não dá para desfazer. As contas de login (e-mails) continuam existindo: quem se cadastrar de novo com o mesmo e-mail usa a senha de antes ou "Esqueci minha senha". Para apagá-las, use o console do Firebase (Authentication).',
           confirmLabel: 'Apagar tudo', danger: true,
         }}><Trash2 size={16} /> Apagar todos os afilhados</AsyncButton>
       )}
       </div>
+      <NumerosReservados proximo={proximo} podeEditar={podeAjustar} />
     </section>
+  );
+}
+
+interface Reservado { id: string; numero: number; nome: string; usadoPor: string | null }
+/** Números guardados para pessoas específicas: cada um tem um link de cadastro que dá aquele número. */
+function NumerosReservados({ proximo, podeEditar }: { proximo: number; podeEditar: boolean }) {
+  const { data } = useResource<Reservado[]>('/crm/reservados');
+  const [numero, setNumero] = useState('');
+  const [nome, setNome] = useState('');
+  const link = (r: Reservado) => `${enderecoPublico()}/queroserafilhado?reserva=${r.id}`;
+  const copiar = (r: Reservado) => navigator.clipboard.writeText(link(r)).then(() => notify('Link copiado.'), () => notify('Não foi possível copiar o link.', 'error'));
+  const reservar = async () => {
+    const r = await api<Reservado>('/crm/reservados', { method: 'POST', body: { numero: Number(numero) || proximo, nome } });
+    await Promise.all([reload('/crm/reservados'), reload('/public/afilhados')]);
+    setNumero(''); setNome('');
+    notify(`#${String(r.numero).padStart(3, '0')} reservado para ${r.nome}. Copie o link e envie para a pessoa.`);
+  };
+  return (
+    <div style={{ marginTop: 20 }}>
+      <h3 className="panel-title" style={{ fontSize: 15 }}>Números reservados</h3>
+      <p className="muted small">Guarde um número para alguém. A pessoa recebe esse número ao se cadastrar pelo link da reserva; os demais cadastros pulam os números reservados.</p>
+      {!!data?.length && (
+        <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 12px', display: 'grid', gap: 8 }}>
+          {data.map((r) => (
+            <li key={r.id} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+              <strong>#{String(r.numero).padStart(3, '0')}</strong>
+              <span>{r.nome}</span>
+              {r.usadoPor ? <Badge tone="good">Cadastrado: {r.usadoPor}</Badge> : <Badge tone="warn">Aguardando cadastro</Badge>}
+              {!r.usadoPor && <button type="button" className="btn btn--ghost btn--sm" onClick={() => void copiar(r)}><Copy size={14} /> Copiar link</button>}
+              {podeEditar && !r.usadoPor && (
+                <AsyncButton className="btn btn--ghost btn--sm" onClick={async () => { await api(`/crm/reservados/${r.id}`, { method: 'DELETE' }); await reload('/crm/reservados'); }}
+                  confirm={{ title: 'Cancelar a reserva?', message: 'O link deixa de funcionar e o número fica livre.', confirmLabel: 'Cancelar reserva', danger: true }}>
+                  <Trash2 size={14} /> Cancelar
+                </AsyncButton>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {podeEditar && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 8 }}>
+          <div>
+            <label className="field-label" htmlFor="res-numero">Número</label>
+            <input id="res-numero" className="input" type="number" min={1} max={proximo} style={{ width: 110 }} placeholder={String(proximo)} value={numero} onChange={(e) => setNumero(e.target.value)} />
+          </div>
+          <div style={{ flex: '1 1 200px' }}>
+            <label className="field-label" htmlFor="res-nome">Para quem</label>
+            <input id="res-nome" className="input" maxLength={80} placeholder="Ex.: Santiago" value={nome} onChange={(e) => setNome(e.target.value)} />
+          </div>
+          <AsyncButton className="btn btn--primary" onClick={reservar}><Plus size={16} /> Reservar número</AsyncButton>
+        </div>
+      )}
+    </div>
   );
 }
 
