@@ -1953,6 +1953,11 @@ button.anexos__nome:hover { text-decoration: underline; }
 .nivel--good .nivel__cheio { background: var(--good); }
 .nivel--warn .nivel__cheio { background: var(--warn); }
 .nivel--bad .nivel__cheio { background: var(--bad); }
+/* acima da quantidade cheia: o excesso listrado depois da marca dos 100% */
+.nivel__excesso { position: absolute; top: 0; bottom: 0; right: 0; border-left: 2px solid var(--text);
+  background: repeating-linear-gradient(135deg, var(--good) 0 4px, color-mix(in srgb, var(--good) 45%, transparent) 4px 8px); }
+.nivel--acima .nivel__cheio { border-radius: 99px 0 0 99px; }
+.nivel--acima .nivel__pct { color: var(--good); }
 td.nivel-col { min-width: 140px; }
 .cartao__corpo .nivel { margin-top: 6px; }
 
