@@ -573,8 +573,6 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   function requirePresidencia(ctx: Ctx) {
     if (!ctx.funcao?.sistema) fail(403, semPermissao);
   }
-  /** Afilhados de número reservado (pedido da Presidência) não aparecem nas listas do resto da equipe. */
-  const ocultoPara = (ctx: Ctx, c: Dados) => !!c.reserva && !ctx.funcao?.sistema;
   /** Acesso a um cadastro: vale qualquer tela dele (ex.: despesas fixas, variáveis ou lançamento). */
   function requireColecao(ctx: Ctx, col: string, acao: Acao) {
     requireAnyAccess(ctx, PAGINAS_DA_COLECAO[collectionArea(col)] ?? [collectionArea(col)], acao);
@@ -642,12 +640,6 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
 
   /* público */
   rota('GET', '/public/afilhados', async () => ({ total: Number((await documento('meta/contadores'))?.clientes) || 0 }));
-  /* número reservado (link do Cérebro): diz qual número e para quem, se ainda estiver livre */
-  rota('GET', '/public/reserva/:codigo', async ({ p }) => {
-    const r = await getDocFromServer(doc(db, 'reservados', str(p.codigo, 40))).then((s) => s.data(), () => undefined);
-    if (!r || r.uid) return fail(404, 'Este link de número reservado já foi usado ou não existe mais.');
-    return { numero: r.numero, nome: r.nome };
-  });
   rota('GET', '/public/config', async () => {
     const c = await getConfig();
     return { nomeEstabelecimento: c.nomeEstabelecimento, horarios: c.horarios, ambientes: c.ambientes, diasFuncionamento: c.diasFuncionamento, antecedenciaMinutos: c.antecedenciaMinutos, faixasPontos: c.faixasPontos, pontosAcima: c.pontosAcima, niveis: c.niveis, questionario: c.questionario };
@@ -1201,8 +1193,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const ctx = await requireUsuario();
     requireAnyAccess(ctx, ['clientes', 'reservas', 'consumos', 'resgates', 'recompensas', 'comandas'], 'ver');
     // os totais de cada afilhado ficam no saldo (atualizados a cada consumo), sem carregar todos os consumos
-    const [todos, saldos, cfg] = await Promise.all([colecao('clientes'), colecao('saldos'), getConfig()]);
-    const clientes = todos.filter((c) => !ocultoPara(ctx, c));
+    const [clientes, saldos, cfg] = await Promise.all([colecao('clientes'), colecao('saldos'), getConfig()]);
     const saldoDe = new Map(saldos.map((s) => [s.id, s]));
     const faltando = clientes.filter((c) => !Array.isArray(saldoDe.get(c.id)?.dias));
     if (faltando.length) {
@@ -1225,7 +1216,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
         return {
           // a equipe vê o CPF completo (nota fiscal com CPF, conferência do cadastro)
           ...publicCliente(c), cpf: c.cpf ? String(c.cpf).replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : '', foto: undefined, pontos: acumulados - (Number(s.usados) || 0), acumulados, totalGasto: Math.round((Number(s.gasto) || 0) * 100) / 100,
-          visitas: dias.length, ultimaVisita: dias.at(-1) ?? null, nivel: nivelDe(acumulados, cfg.niveis).atual?.nome ?? '',
+          // número reservado pela Presidência (ex.: #001 e #002): a lista mostra em destaque
+          reservado: !!c.reserva, visitas: dias.length, ultimaVisita: dias.at(-1) ?? null, nivel: nivelDe(acumulados, cfg.niveis).atual?.nome ?? '',
         };
       })
       .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
@@ -1432,7 +1424,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
           }));
       case 'clientes':
         requireAnyAccess(ctx, ['clientes', 'reservas', 'consumos', 'resgates', 'recompensas', 'comandas'], 'ver');
-        return (await colecao('clientes')).filter((c) => !ocultoPara(ctx, c))
+        return (await colecao('clientes'))
           .map((c) => ({ id: c.numero, nome: c.nome, detalhe: `#${String(c.numero).padStart(3, '0')}${c.telefone ? ' · ' + c.telefone : ''}`, telefone: c.telefone }));
       default:
         return fail(404, 'Lista inexistente.');

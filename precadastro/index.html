@@ -59,8 +59,6 @@
   .dupla { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
   .dupla > div { display: flex; flex-direction: column; min-width: 0; }
   @media (max-width: 340px) { .dupla { grid-template-columns: 1fr; } }
-  .reserva { margin: 14px auto 0; max-width: 420px; padding: 10px 14px; border-radius: 12px; font-size: 14px; background: #c4572a1a; border: 1px solid #c4572a55; color: #f0a47f; }
-  .reserva strong { color: var(--text); }
   .aviso18 { margin: 10px 0 0; padding: 8px 12px; border-radius: 10px; font-size: 12.5px; background: #c4572a1a; border: 1px solid #c4572a55; color: #f0a47f; }
   label.lbl { font-size: 12.5px; color: var(--muted); font-weight: 500; margin-top: 8px; }
   .input { width: 100%; height: 48px; padding: 0 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font: inherit; }
@@ -298,7 +296,6 @@
       <span class="eyebrow eyebrow--grande">&ldquo;Afilhie-se&rdquo;</span>
       <h1>Seja bem-vindo ao <span>Bar&nbsp;do&nbsp;Dindo</span></h1>
       <p>Torne-se membro da nossa comunidade. Cadastre-se agora e <strong>garanta o seu número de afilhado</strong>. Ele será seu para sempre! Venha fazer parte desta história!</p>
-      <p class="reserva" id="reserva" hidden>Número <strong id="reserva-n"></strong> reservado para <strong id="reserva-nome"></strong>. Cadastre-se para garantir o seu.</p>
       <div class="proof" id="proof" hidden><span class="proof__dots"><i></i><i></i><i></i></span><span><strong id="proof-n">0</strong> <span id="proof-txt">afilhados já garantiram o seu</span></span></div>
     </div>
 
@@ -498,13 +495,9 @@ import { INSTAGRAM, LIMITE_TEXTO, alternar, contador, ehOutro, montarResposta } 
   { const h = new Date(); h.setFullYear(h.getFullYear() - 18); $('nasc').max = h.toISOString().slice(0, 10); }
   // QR Code do bar: /queroserafilhado?via=qr
   const via = new URLSearchParams(location.search).get('via') === 'qr' ? 'qr' : undefined;
-  // link de número reservado (criado no Cérebro): /queroserafilhado?reserva=<código>
-  let reserva = new URLSearchParams(location.search).get('reserva') || undefined;
-  if (reserva) dados(`/public/reserva/${encodeURIComponent(reserva)}`).then((r) => {
-    $('reserva-n').textContent = `#${pad(r.numero)}`;
-    $('reserva-nome').textContent = r.nome;
-    $('reserva').hidden = false;
-  }).catch(() => { reserva = undefined; });
+  // link de número reservado (criado no Cérebro): /queroserafilhado?reserva=<código>. A página não mostra o número nem o nome:
+  // o número aparece na revelação, depois do cadastro
+  const reserva = new URLSearchParams(location.search).get('reserva') || undefined;
   document.querySelectorAll('[data-toggle]').forEach((b) => b.addEventListener('click', () => {
     const inp = $(b.dataset.toggle);
     const ver = inp.type === 'password';
