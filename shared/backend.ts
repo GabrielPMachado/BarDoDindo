@@ -229,6 +229,8 @@ const DEFAULT_CONFIG = {
   },
   /** Meta de afilhados mostrada no contador oficial do Cérebro (0 = sem meta). */
   metaAfilhados: 0,
+  /** Números de afilhado com estrela (em destaque, no topo da lista de Clientes); quem edita Parâmetros liga e desliga. */
+  estrelas: [1, 2] as number[],
 };
 
 /** Perguntas padrão do questionário do afilhado (o Cérebro oferece voltar para elas). */
@@ -1082,6 +1084,11 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       if (!(Number.isInteger(meta) && meta >= 0 && meta <= 1000000)) fail(400, 'A meta de afilhados deve ser um número inteiro de 0 a 1.000.000.');
       b.metaAfilhados = meta;
     }
+    if (b.estrelas !== undefined) {
+      const estrelas = Array.isArray(b.estrelas) ? [...new Set(b.estrelas.map(Number))] : [];
+      if (estrelas.length > 50 || !estrelas.every((n) => Number.isInteger(n) && n !== 0 && Math.abs(n) <= 9999)) fail(400, 'Estrelas inválidas.');
+      b.estrelas = estrelas.sort((x, y) => x - y);
+    }
     if (b.horarios && !b.horarios.every((h: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(h))) fail(400, 'Horários devem estar no formato HH:MM (00:00 a 23:59).');
     if (b.questionario !== undefined) {
       const q = b.questionario as Dados;
@@ -1223,8 +1230,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
         return {
           // a equipe vê o CPF completo (nota fiscal com CPF, conferência do cadastro)
           ...publicCliente(c), cpf: c.cpf ? String(c.cpf).replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : '', foto: undefined, pontos: acumulados - (Number(s.usados) || 0), acumulados, totalGasto: Math.round((Number(s.gasto) || 0) * 100) / 100,
-          // números reservados pela Presidência: só o #001 e o #002 ficam em destaque na lista (pedido do dono); os outros, normais
-          reservado: !!c.reserva && [1, 2].includes(Number(c.numero)), visitas: dias.length, ultimaVisita: dias.at(-1) ?? null, nivel: nivelDe(acumulados, cfg.niveis).atual?.nome ?? '',
+          visitas: dias.length, ultimaVisita: dias.at(-1) ?? null, nivel: nivelDe(acumulados, cfg.niveis).atual?.nome ?? '',
         };
       })
       .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
