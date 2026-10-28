@@ -229,6 +229,8 @@ const DEFAULT_CONFIG = {
   },
   /** Meta de afilhados mostrada no contador oficial do Cérebro (0 = sem meta). */
   metaAfilhados: 0,
+  /** Números de afilhado com estrela (em destaque, no topo da lista de Clientes); quem edita Parâmetros liga e desliga. */
+  estrelas: [1, 2] as number[],
 };
 
 /** Perguntas padrão do questionário do afilhado (o Cérebro oferece voltar para elas). */
@@ -518,16 +520,16 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
 
   /**
    * Cadastro de afilhado de quem é da equipe (usuário do CRM), feito com a sessão da própria pessoa: o mesmo login vale no app e no
-   * pré-cadastro. Pega o próximo número, como um cadastro comum; CPF e data de nascimento a pessoa completa uma vez ao abrir o app.
-   * Não faz nada se o afilhado já existe (ex.: quem era cliente e entrou para a equipe).
+   * pré-cadastro. A equipe tem numeração própria, negativa (#-001, #-002...), e não entra na contagem dos afilhados; CPF e data de
+   * nascimento a pessoa completa uma vez ao abrir o app. Não faz nada se o afilhado já existe (ex.: quem era cliente e entrou para a equipe).
    */
   async function criarAfilhadoDaEquipe(banco: Firestore, uid: string, email: string, u: Dados) {
     await runTransaction(banco, async (t) => {
       const ref = doc(banco, 'clientes', uid);
       if ((await t.get(ref)).exists()) return;
       const contadores = doc(banco, 'meta/contadores');
-      const numero = (Number((await t.get(contadores)).data()?.clientes) || 0) + 1;
-      t.set(contadores, { clientes: numero }, { merge: true });
+      const equipe = (Number((await t.get(contadores)).data()?.equipe) || 0) + 1, numero = -equipe;
+      t.set(contadores, { equipe }, { merge: true });
       t.set(ref, { numero, nome: str(u.nome, 120), email, telefone: typeof u.telefone === 'string' ? u.telefone : '', foto: null, criadoEm: now(), origem: 'Equipe', aceiteEm: null });
       t.set(doc(banco, 'saldos', uid), { acumulados: 0, usados: 0, ultimoResgate: '' });
     });
@@ -1082,6 +1084,11 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       if (!(Number.isInteger(meta) && meta >= 0 && meta <= 1000000)) fail(400, 'A meta de afilhados deve ser um número inteiro de 0 a 1.000.000.');
       b.metaAfilhados = meta;
     }
+    if (b.estrelas !== undefined) {
+      const estrelas = Array.isArray(b.estrelas) ? [...new Set(b.estrelas.map(Number))] : [];
+      if (estrelas.length > 50 || !estrelas.every((n) => Number.isInteger(n) && n !== 0 && Math.abs(n) <= 9999)) fail(400, 'Estrelas inválidas.');
+      b.estrelas = estrelas.sort((x, y) => x - y);
+    }
     if (b.horarios && !b.horarios.every((h: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(h))) fail(400, 'Horários devem estar no formato HH:MM (00:00 a 23:59).');
     if (b.questionario !== undefined) {
       const q = b.questionario as Dados;
@@ -1223,8 +1230,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
         return {
           // a equipe vê o CPF completo (nota fiscal com CPF, conferência do cadastro)
           ...publicCliente(c), cpf: c.cpf ? String(c.cpf).replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : '', foto: undefined, pontos: acumulados - (Number(s.usados) || 0), acumulados, totalGasto: Math.round((Number(s.gasto) || 0) * 100) / 100,
-          // número reservado pela Presidência (ex.: #001 e #002): a lista mostra em destaque
-          reservado: !!c.reserva, visitas: dias.length, ultimaVisita: dias.at(-1) ?? null, nivel: nivelDe(acumulados, cfg.niveis).atual?.nome ?? '',
+          visitas: dias.length, ultimaVisita: dias.at(-1) ?? null, nivel: nivelDe(acumulados, cfg.niveis).atual?.nome ?? '',
         };
       })
       .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
@@ -1241,7 +1247,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     }
     return unicos.length;
   }
-  const pad3 = (n: number) => String(n).padStart(3, '0');
+  // a equipe tem números negativos: #-001
+  const pad3 = (n: number) => (n < 0 ? '-' : '') + String(Math.abs(n)).padStart(3, '0');
 
   /* CRM: excluir um afilhado (a pedido dele, como manda a LGPD): cadastro, saldo, consumos com as receitas, vouchers e reservas */
   rota('DELETE', '/crm/clientes/:numero', async ({ p }) => {
@@ -1282,7 +1289,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     ];
     await apagarEmLotes(refs, (lote) => {
       // os números reservados continuam guardados (e livres de novo) para quem tem o link
-      lote.set(doc(db, 'meta', 'contadores'), { clientes: Math.max(0, ...reservados.map((r) => Number(r.numero) || 0)) });
+      lote.set(doc(db, 'meta', 'contadores'), { clientes: Math.max(0, ...reservados.map((r) => Number(r.numero) || 0)), equipe: 0 });
       for (const r of reservados.filter((x) => x.uid)) lote.update(doc(db, 'reservados', r.id), { uid: null });
       registrar(lote, ctx, 'clientes', 'excluiu todos os afilhados', {
         colecao: 'clientes', alvo: `${clientes.length} afilhado(s)`,
@@ -1292,16 +1299,25 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     return { apagados: clientes.length };
   });
 
-  /* CRM: numeração dos afilhados — o próximo número volta a seguir o maior número em uso (ex.: depois de excluir afilhados de teste) */
+  /* CRM: numeração dos afilhados — o próximo número volta a seguir o maior número em uso (ex.: depois de excluir afilhados de teste).
+   * Afilhados da equipe que ainda têm número positivo (de antes da numeração própria) passam para a numeração negativa. */
   rota('POST', '/crm/clientes/numeracao', async () => {
     const ctx = await requireUsuario();
     requireAccess(ctx, 'parametros', 'editar');
-    const maior = Math.max(0, ...[...(await colecao('clientes')), ...(await reservasDeNumero())].map((c) => Number(c.numero) || 0));
+    const [clientes, reservados] = await Promise.all([colecao('clientes'), reservasDeNumero()]);
+    const daEquipe = (c: Dados) => c.origem === 'Equipe';
+    let equipe = Math.max(0, ...clientes.filter((c) => daEquipe(c) && Number(c.numero) < 0).map((c) => -Number(c.numero)));
+    const mudar = clientes.filter((c) => daEquipe(c) && Number(c.numero) > 0).sort((a, b) => Number(a.numero) - Number(b.numero));
+    const ficam = clientes.filter((c) => !mudar.includes(c));
+    const maior = Math.max(0, ...[...ficam, ...reservados].map((c) => Number(c.numero) || 0));
     const lote = writeBatch(db);
-    lote.set(doc(db, 'meta', 'contadores'), { clientes: maior });
-    registrar(lote, ctx, 'parametros', 'ajustou a numeração dos afilhados', { alvo: `próximo número: #${pad3(maior + 1)}` });
+    for (const c of mudar) lote.update(doc(db, 'clientes', c.id), { numero: -++equipe });
+    lote.set(doc(db, 'meta', 'contadores'), { clientes: maior, equipe });
+    registrar(lote, ctx, 'parametros', 'ajustou a numeração dos afilhados', {
+      alvo: `próximo número: #${pad3(maior + 1)}`, detalhe: mudar.length ? `${mudar.length} da equipe passaram para a numeração própria` : '',
+    });
     await lote.commit();
-    return { proximo: maior + 1 };
+    return { proximo: maior + 1, equipe: mudar.length };
   });
 
   /* CRM: números de afilhado reservados para pessoas específicas. Cada reserva tem um link (o código é o id do registro);
@@ -1432,7 +1448,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       case 'clientes':
         requireAnyAccess(ctx, ['clientes', 'reservas', 'consumos', 'resgates', 'recompensas', 'comandas'], 'ver');
         return (await colecao('clientes'))
-          .map((c) => ({ id: c.numero, nome: c.nome, detalhe: `#${String(c.numero).padStart(3, '0')}${c.telefone ? ' · ' + c.telefone : ''}`, telefone: c.telefone }));
+          .map((c) => ({ id: c.numero, nome: c.nome, detalhe: `#${pad3(c.numero)}${c.telefone ? ' · ' + c.telefone : ''}`, telefone: c.telefone }));
       default:
         return fail(404, 'Lista inexistente.');
     }
@@ -1774,7 +1790,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const pontos = cliente ? pontosDosItens(itens) : 0;
     const data = now();
     const consumoRef = doc(collection(db, 'consumos')), receitaRef = doc(collection(db, 'receitas'));
-    const quem = cliente ? `${cliente.nome} (#${String(cliente.numero).padStart(3, '0')})` : nomeAvulso ? `${nomeAvulso} (sem cadastro)` : 'Cliente sem cadastro';
+    const quem = cliente ? `${cliente.nome} (#${pad3(cliente.numero)})` : nomeAvulso ? `${nomeAvulso} (sem cadastro)` : 'Cliente sem cadastro';
     const baixaEstoque = await movimentarEstoque(lote, ctx, itens);
     const consumo = {
       clienteId: cliente ? cliente.numero : null, clienteUid: cliente ? cliente.id : null, clienteNome: cliente ? cliente.nome : nomeAvulso || 'Cliente sem cadastro',

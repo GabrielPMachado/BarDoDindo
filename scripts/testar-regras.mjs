@@ -8,7 +8,7 @@ import {
   addDoc, arrayUnion, collection, connectFirestoreEmulator, deleteDoc, doc, getDoc, getDocs, getFirestore, increment, query, setDoc, updateDoc, where, writeBatch,
 } from 'firebase/firestore';
 
-const [senhaCliente, senhaAtendente, senhaMarketing, senhaAdministrativo, senhaModular, senhaCaixa] = process.argv.slice(2);
+const [senhaCliente, senhaAtendente, senhaMarketing, senhaAdministrativo, senhaModular, senhaCaixa, senhaParametros] = process.argv.slice(2);
 const app = initializeApp({ apiKey: 'teste', projectId: 'demo-bardodindo' });
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -390,12 +390,13 @@ if (senhaAdministrativo) {
 
 if (senhaCaixa) {
   console.log('— usuários do CRM também são afilhados (mesmo login, sem CPF até abrir o app) —');
-  // como o backend faz: número do contador, cadastro e saldo zerado no mesmo lote
-  const afilhadoSemCpf = async (numeroExtra = 1) => {
+  // como o backend faz: número da equipe (negativo, contador à parte), cadastro e saldo zerado no mesmo lote
+  const afilhadoSemCpf = async (numeroExtra = 1, campo = 'equipe') => {
     const u = auth.currentUser;
-    const numero = (Number((await getDoc(doc(db, 'meta/contadores'))).data()?.clientes) || 0) + numeroExtra;
+    const proximo = (Number((await getDoc(doc(db, 'meta/contadores'))).data()?.[campo]) || 0) + numeroExtra;
+    const numero = campo === 'equipe' ? -proximo : proximo;
     const lote = writeBatch(db);
-    lote.set(doc(db, 'meta/contadores'), { clientes: numero }, { merge: true });
+    lote.set(doc(db, 'meta/contadores'), { [campo]: proximo }, { merge: true });
     lote.set(doc(db, 'clientes', u.uid), { numero, nome: 'Sem CPF', email: u.email, telefone: '', foto: null, criadoEm: 'x', origem: 'Equipe', aceiteEm: null });
     lote.set(doc(db, 'saldos', u.uid), { acumulados: 0, usados: 0, ultimoResgate: '' });
     await lote.commit();
@@ -405,6 +406,7 @@ if (senhaCaixa) {
   await signOut(auth);
   await signInWithEmailAndPassword(auth, 'caixa@teste.local', senhaCaixa);
   await negado('usuário do CRM criar afilhado pulando o número', () => afilhadoSemCpf(2));
+  await negado('usuário do CRM criar afilhado com número da contagem dos afilhados', () => afilhadoSemCpf(1, 'clientes'));
   await permitido('usuário do CRM criar o próprio afilhado sem CPF', () => afilhadoSemCpf());
   await permitido('usuário do CRM completar CPF e nascimento no app', async () => {
     const uidCaixa = auth.currentUser.uid;
@@ -413,7 +415,21 @@ if (senhaCaixa) {
     lote.set(doc(db, 'cpfs', '39053344705'), { uid: uidCaixa });
     await lote.commit();
   });
+  await negado('usuário do CRM trocar o próprio número de afilhado', () => updateDoc(doc(db, 'clientes', auth.currentUser.uid), { numero: -50 }));
   await signOut(auth);
+
+  if (senhaParametros) {
+    console.log('— numeração própria da equipe (Parâmetros > Numeração) —');
+    await signInWithEmailAndPassword(auth, 'parametros@teste.local', senhaParametros);
+    await permitido('passar afilhado antigo da equipe para número negativo', () => updateDoc(doc(db, 'clientes', 'equipe-antiga'), { numero: -2 }));
+    await negado('dar número positivo a afilhado da equipe', () => updateDoc(doc(db, 'clientes', 'equipe-antiga'), { numero: 5 }));
+    const comum = (await getDocs(collection(db, 'clientes'))).docs.find((d) => d.data().origem !== 'Equipe');
+    await negado('mudar o número de afilhado que não é da equipe', () => updateDoc(comum.ref, { numero: -9 }));
+    await negado('mudar outro campo junto com o número', () => updateDoc(doc(db, 'clientes', 'equipe-antiga'), { numero: -3, nome: 'X' }));
+    await permitido('ajustar os dois contadores', () => setDoc(doc(db, 'meta/contadores'), { clientes: 2, equipe: 2 }));
+    await negado('contador da equipe negativo', () => setDoc(doc(db, 'meta/contadores'), { clientes: 2, equipe: -1 }));
+    await signOut(auth);
+  }
 
   console.log('— números reservados (link do Cérebro) —');
   // a reserva é criada pela Presidência; aqui, direto no semear: reservados/codigo-teste → #900, livre

@@ -379,14 +379,22 @@ service cloud.firestore {
     function novoCliente() {
       return logado() && !exists(caminho('clientes', request.auth.uid)) && existsAfter(caminho('clientes', request.auth.uid));
     }
-    // contador que dá o número sequencial de afilhado: só anda de um em um, junto com um cadastro novo
+    // contadores que dão o número sequencial de afilhado: só andam de um em um, junto com um cadastro novo.
+    // "clientes" numera os afilhados (#001, #002...); "equipe" numera, à parte e em negativo, os usuários do CRM (#-001, #-002...)
+    function contador(d, campo) { return d.get(campo, 0); }
     match /meta/contadores {
       allow read: if true;
-      allow create: if request.resource.data.clientes == 1 && novoCliente();
-      allow update: if request.resource.data.clientes == resource.data.clientes + 1 && novoCliente();
+      allow create: if novoCliente() && request.resource.data.keys().hasOnly(['clientes', 'equipe'])
+        && contador(request.resource.data, 'clientes') + contador(request.resource.data, 'equipe') == 1;
+      allow update: if novoCliente() && request.resource.data.keys().hasOnly(['clientes', 'equipe'])
+        && ((contador(request.resource.data, 'clientes') == contador(resource.data, 'clientes') + 1
+            && contador(request.resource.data, 'equipe') == contador(resource.data, 'equipe'))
+          || (contador(request.resource.data, 'equipe') == contador(resource.data, 'equipe') + 1
+            && contador(request.resource.data, 'clientes') == contador(resource.data, 'clientes')));
       // o Administrador ajusta a numeração (ex.: depois de excluir afilhados de teste) ou a apaga ao zerar o sistema
-      allow create, update: if pode('parametros', 'editar') && request.resource.data.keys().hasOnly(['clientes'])
-        && request.resource.data.clientes is int && request.resource.data.clientes >= 0;
+      allow create, update: if pode('parametros', 'editar') && request.resource.data.keys().hasOnly(['clientes', 'equipe'])
+        && request.resource.data.clientes is int && request.resource.data.clientes >= 0
+        && contador(request.resource.data, 'equipe') is int && contador(request.resource.data, 'equipe') >= 0;
       allow delete: if sistema();
     }
     // afilhados e saldos: quem atende (reservas, consumos, vouchers), vende (clientes) ou cuida das recompensas
@@ -424,12 +432,15 @@ service cloud.firestore {
       allow read: if logado() && (request.auth.uid == uid || verAfilhados());
       allow create: if logado() && request.auth.uid == uid
         && request.resource.data.email == request.auth.token.email
-        && (request.resource.data.numero == getAfter(caminho('meta', 'contadores')).data.clientes || numeroReservado(uid))
         && existsAfter(caminho('saldos', uid))
         && ((cpfOk(request.resource.data.get('cpf', null)) && maiorDeIdade(request.resource.data.get('nascimento', null))
-            && cpfDoAfilhado(uid, request.resource.data.cpf))
-          // usuários do CRM ganham o afilhado com o mesmo login; o CPF e a data de nascimento eles completam ao abrir o app
-          || (exists(caminho('usuarios', uid)) && !('cpf' in request.resource.data) && !('nascimento' in request.resource.data)));
+            && cpfDoAfilhado(uid, request.resource.data.cpf)
+            && (request.resource.data.numero == contador(getAfter(caminho('meta', 'contadores')).data, 'clientes') || numeroReservado(uid)))
+          // usuários do CRM ganham o afilhado com o mesmo login, com número da equipe (negativo, à parte da contagem);
+          // o CPF e a data de nascimento eles completam ao abrir o app
+          || (exists(caminho('usuarios', uid)) && !('cpf' in request.resource.data) && !('nascimento' in request.resource.data)
+            && request.resource.data.origem == 'Equipe'
+            && request.resource.data.numero == -contador(getAfter(caminho('meta', 'contadores')).data, 'equipe')));
       // o próprio afilhado edita nome, telefone, foto e as respostas do questionário opcional;
       // cadastros de antes do lançamento completam CPF e data de nascimento uma única vez
       allow update: if logado() && request.auth.uid == uid
@@ -438,6 +449,10 @@ service cloud.firestore {
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nome', 'telefone', 'foto', 'respostas', 'cpf', 'nascimento'])
             && cpfOk(request.resource.data.cpf) && maiorDeIdade(request.resource.data.nascimento)
             && cpfDoAfilhado(uid, request.resource.data.cpf)));
+      // quem ajusta a numeração passa os afilhados da equipe de antes da numeração própria para um número negativo
+      allow update: if pode('parametros', 'editar') && resource.data.get('origem', '') == 'Equipe'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['numero'])
+        && request.resource.data.numero is int && request.resource.data.numero < 0;
       // excluir o afilhado (a pedido dele, LGPD) ou ao zerar o sistema
       allow delete: if pode('clientes', 'excluir');
     }

@@ -461,7 +461,7 @@ import { INSTAGRAM, LIMITE_TEXTO, alternar, contador, ehOutro, montarResposta } 
 (() => {
   const $ = (id) => document.getElementById(id);
   const reduz = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const pad = (n) => String(n).padStart(3, '0');
+  const pad = (n) => (n < 0 ? '-' : '') + String(Math.abs(n)).padStart(3, '0');
 
   /* ---------- dados (mesma base do aplicativo oficial) ---------- */
   const api = (path, body) => dados(path, body ? { method: 'POST', body } : {});

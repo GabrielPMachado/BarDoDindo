@@ -669,9 +669,10 @@ function Numeracao({ podeAjustar, podeApagar }: { podeAjustar: boolean; podeApag
   const { data } = useResource<{ total: number }>('/public/afilhados');
   const proximo = (data?.total ?? 0) + 1;
   const ajustar = async () => {
-    const r = await api<{ proximo: number }>('/crm/clientes/numeracao', { method: 'POST' });
-    await reload('/public/afilhados');
-    notify(`Pronto. O próximo afilhado será o #${String(r.proximo).padStart(3, '0')}.`);
+    const r = await api<{ proximo: number; equipe: number }>('/crm/clientes/numeracao', { method: 'POST' });
+    await Promise.all([reload('/public/afilhados'), reload('/crm/clientes')]);
+    const equipe = r.equipe ? ` ${r.equipe} ${r.equipe === 1 ? 'usuário do CRM passou' : 'usuários do CRM passaram'} para a numeração da equipe.` : '';
+    notify(`Pronto. O próximo afilhado será o #${String(r.proximo).padStart(3, '0')}.${equipe}`);
   };
   const apagarTodos = async () => {
     const r = await api<{ apagados: number }>('/crm/clientes', { method: 'DELETE' });
@@ -682,10 +683,10 @@ function Numeracao({ podeAjustar, podeApagar }: { podeAjustar: boolean; podeApag
   return (
     <section className="panel pad-lg">
       <h2 className="panel-title">Numeração dos afilhados</h2>
-      <p className="muted small">O próximo cadastro recebe o número <strong>#{String(proximo).padStart(3, '0')}</strong>. Depois de excluir afilhados (por exemplo, cadastros de teste), ajuste para a numeração voltar a seguir o maior número em uso.</p>
+      <p className="muted small">O próximo cadastro recebe o número <strong>#{String(proximo).padStart(3, '0')}</strong>. Depois de excluir afilhados (por exemplo, cadastros de teste), ajuste para a numeração voltar a seguir o maior número em uso. Os usuários do CRM têm numeração própria, negativa (#-001, #-002...), e não entram na contagem; o ajuste também passa para ela quem da equipe ainda tem número de afilhado comum.</p>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
       {podeAjustar && (
-        <AsyncButton className="btn btn--ghost" onClick={ajustar} confirm={{ title: 'Ajustar a numeração?', message: 'O próximo afilhado receberá o número seguinte ao maior número em uso.', confirmLabel: 'Ajustar' }}>Ajustar numeração</AsyncButton>
+        <AsyncButton className="btn btn--ghost" onClick={ajustar} confirm={{ title: 'Ajustar a numeração?', message: 'O próximo afilhado receberá o número seguinte ao maior número em uso. Usuários do CRM que ainda têm número comum passam para a numeração da equipe (#-001, #-002...).', confirmLabel: 'Ajustar' }}>Ajustar numeração</AsyncButton>
       )}
       {podeApagar && (
         <AsyncButton className="btn btn--ghost" onClick={apagarTodos} confirm={{

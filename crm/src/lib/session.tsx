@@ -35,6 +35,8 @@ export interface Config {
   pontosAcima: number;
   /** Meta do contador oficial de afilhados (0 = sem meta). */
   metaAfilhados?: number;
+  /** Números de afilhado com estrela em Clientes (padrão: #001 e #002). */
+  estrelas?: number[];
   horarios: string[];
   ambientes: string[];
   diasFuncionamento: number[];

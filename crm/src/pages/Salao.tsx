@@ -30,7 +30,8 @@ type Produto = ProdutoVenda;
 interface ClienteLite { id: string; numero: number; nome: string; email: string; telefone: string; pontos: number }
 
 const FORMAS = ['Pix', 'Crédito', 'Débito', 'Dinheiro', 'Vale-refeição'];
-export const numComanda = (n: number) => `#${String(n).padStart(3, '0')}`;
+// também mostra o número do afilhado (o da equipe é negativo: #-001)
+export const numComanda = (n: number) => `#${n < 0 ? '-' : ''}${String(Math.abs(n)).padStart(3, '0')}`;
 const hora = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '');
 const quando = (iso?: string) => (iso ? new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '');
 const desde = (iso: string) => {
@@ -505,7 +506,7 @@ function NovaComanda({ mesaInicial, mesas, onClose, onCriada }: { mesaInicial?: 
   const [mesa, setMesa] = useState(mesaInicial ? String(mesaInicial) : '');
   const [pessoas, setPessoas] = useState<number | ''>(1);
   const t = busca.trim().toLowerCase().replace('#', '');
-  const sugestoes = t ? clientes.filter((c) => `${String(c.numero).padStart(3, '0')} ${c.nome} ${c.email} ${c.telefone}`.toLowerCase().includes(t)).slice(0, 6) : [];
+  const sugestoes = t ? clientes.filter((c) => `${numComanda(c.numero)} ${c.nome} ${c.email} ${c.telefone}`.toLowerCase().includes(t)).slice(0, 6) : [];
   const ativas = mesas.filter((m) => m.status !== 'Inativa').sort((a, b) => a.numero - b.numero);
   const criar = async () => {
     const c = await api<Comanda>('/crm/comandas', { method: 'POST', body: { clienteId: tipo === 'afilhado' ? cliente?.numero : undefined, nome: tipo === 'avulsa' ? nome : undefined, mesa: mesa ? Number(mesa) : null, pessoas: Number(pessoas || 1) } });
