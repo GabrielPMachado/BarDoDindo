@@ -43,7 +43,8 @@ const idade = (n?: string) => {
   return h.getFullYear() - Number(m[1]) - (h.getMonth() + 1 < Number(m[2]) || (h.getMonth() + 1 === Number(m[2]) && h.getDate() < Number(m[3])) ? 1 : 0);
 };
 
-const numero = (n: number) => `#${String(n).padStart(3, '0')}`;
+// a equipe (usuários do CRM) tem numeração própria, negativa (#-001), e fica fora da contagem dos afilhados
+export const numero = (n: number) => `#${n < 0 ? '-' : ''}${String(Math.abs(n)).padStart(3, '0')}`;
 
 /* ---------------- Contador oficial ---------------- */
 /** Total de afilhados em destaque. A lista de clientes já chega ao vivo do Firestore e o CRM confere mudanças a cada
@@ -187,16 +188,18 @@ export function Clientes() {
     .sort((a, b) => Number(!!b.reservado) - Number(!!a.reservado) || (a.reservado ? a.numero - b.numero : 0));
   const mes = currentMonth();
   const hoje = isoFromToday(0);
+  const afilhados = clientes.filter((c) => c.origem !== 'Equipe'), equipe = clientes.length - afilhados.length;
 
   return (
     <div className="page">
       <PageHead title="Clientes (afilhados)" description="Clientes cadastrados pelo aplicativo, com pontos, consumo e frequência."
         actions={pode('qrcode', 'ver') && <button type="button" className="btn btn--ghost" onClick={() => navigate('/vendas/qrcode')}><QrCode size={16} /> QR Code Afilhie-se</button>} />
-      {!loading && <ContadorAfilhados total={clientes.length} hoje={clientes.filter((c) => String(c.desde).slice(0, 10) === hoje).length} meta={Number(config?.metaAfilhados) || 0} podeMeta={pode('parametros', 'editar')} />}
+      {!loading && <ContadorAfilhados total={afilhados.length} hoje={afilhados.filter((c) => String(c.desde).slice(0, 10) === hoje).length} meta={Number(config?.metaAfilhados) || 0} podeMeta={pode('parametros', 'editar')} />}
       {clientes.length > 0 && (
         <KpiRow items={[
-          { label: 'Afilhados', value: num(clientes.length) },
-          { label: 'Novos este mês', value: num(clientes.filter((c) => monthOf(c.desde) === mes).length) },
+          { label: 'Afilhados', value: num(afilhados.length) },
+          ...(equipe ? [{ label: 'Equipe (numeração própria)', value: num(equipe), hint: 'Usuários do CRM: não entram na contagem' }] : []),
+          { label: 'Novos este mês', value: num(afilhados.filter((c) => monthOf(c.desde) === mes).length) },
           { label: 'Vindos do pré-cadastro', value: num(clientes.filter((c) => c.origem === 'Pré-cadastro').length), tone: 'info' },
           { label: 'Pelo QR Code', value: num(clientes.filter((c) => c.via === 'QR Code').length), tone: 'info' },
           { label: 'Cadastro incompleto (sem CPF)', value: num(clientes.filter((c) => !c.cadastroCompleto).length), tone: clientes.some((c) => !c.cadastroCompleto) ? 'warn' : undefined },
@@ -224,7 +227,7 @@ export function Clientes() {
               <tbody>
                 {list.map((c) => (
                   <tr key={c.id} className={c.reservado ? 'row--destaque' : undefined}>
-                    <td data-label="Afilhado" className="text">{c.reservado && <Star size={14} className="gold" fill="currentColor" aria-label="Número reservado" style={{ verticalAlign: '-2px', marginRight: 4 }} />}<strong>{c.nome}</strong><div className="muted small">{numero(c.numero)}{c.origem === 'Pré-cadastro' && <> · <span className="gold">Pré-cadastro</span></>}{c.via === 'QR Code' && <> · <span className="gold">QR Code</span></>}</div></td>
+                    <td data-label="Afilhado" className="text">{c.reservado && <Star size={14} className="gold" fill="currentColor" aria-label="Número reservado" style={{ verticalAlign: '-2px', marginRight: 4 }} />}<strong>{c.nome}</strong><div className="muted small">{numero(c.numero)}{c.origem === 'Pré-cadastro' && <> · <span className="gold">Pré-cadastro</span></>}{c.origem === 'Equipe' && <> · Equipe</>}{c.via === 'QR Code' && <> · <span className="gold">QR Code</span></>}</div></td>
                     <td data-label="Contato" className="text"><div className="small">{c.email}</div><div className="muted small nowrap">{c.telefone ? maskPhone(c.telefone) : '—'}</div></td>
                     <td data-label="Documento" className="text">
                       {c.cpf ? <><div className="small nowrap">{c.cpf}</div><div className="muted small nowrap">{c.nascimento ? `${dateBR(c.nascimento)} · ${idade(c.nascimento)} anos` : ''}</div></> : <Badge tone="warn">Sem CPF</Badge>}
@@ -314,7 +317,7 @@ export function Consumo() {
   const cliente = clientes.data?.find((c) => c.id === clienteId) ?? null;
   const cq = clienteQ.trim().toLowerCase().replace('#', '');
   const sugestoes = cq
-    ? (clientes.data ?? []).filter((c) => `${c.nome} ${c.email} ${c.telefone} ${String(c.numero).padStart(3, '0')}`.toLowerCase().includes(cq)).slice(0, 6)
+    ? (clientes.data ?? []).filter((c) => `${c.nome} ${c.email} ${c.telefone} ${numero(c.numero)}`.toLowerCase().includes(cq)).slice(0, 6)
     : [];
   const linhas = itens.map((i) => {
     const p = produtos.find((x) => x.id === i.produtoId);

@@ -286,4 +286,5 @@ export function formatDateTime(isoStr: string) {
   return `${date} • ${time}`;
 }
 
-export const memberNumber = (n: number) => String(n).padStart(3, '0');
+// a equipe (usuários do CRM) tem numeração própria, negativa: -001
+export const memberNumber = (n: number) => (n < 0 ? '-' : '') + String(Math.abs(n)).padStart(3, '0');

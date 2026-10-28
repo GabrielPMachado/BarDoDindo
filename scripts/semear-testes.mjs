@@ -11,6 +11,7 @@ export const SENHA_MARKETING = 'senha-marketing-123';
 export const SENHA_ADMINISTRATIVO = 'senha-administrativo-123';
 export const SENHA_MODULAR = 'senha-modular-123';
 export const SENHA_CAIXA = 'senha-caixa-123';
+export const SENHA_PARAMETROS = 'senha-parametros-123';
 
 /** Converte um valor JS para o formato da API REST do Firestore. */
 function valor(v) {
@@ -45,6 +46,7 @@ const marketing = await conta('marketing@teste.local', SENHA_MARKETING);
 const administrativo = await conta('administrativo@teste.local', SENHA_ADMINISTRATIVO);
 const modular = await conta('modular@teste.local', SENHA_MODULAR);
 const caixa = await conta('caixa@teste.local', SENHA_CAIXA);
+const parametros = await conta('parametros@teste.local', SENHA_PARAMETROS);
 
 await gravar('meta/setup', { feitoEm: agora });
 await gravar('meta/contadores', { clientes: 2 });
@@ -68,6 +70,10 @@ await gravar('produtos/chopp', { nome: 'Chopp', categoria: 'Chopes', preco: 12, 
 // Atendimento completo (estorna vendas), sem poder excluir afilhados
 await gravar('funcoes/caixa', { nome: 'Caixa', descricao: '', permissoes: { atd: ['ver', 'criar', 'editar', 'excluir'] }, sistema: false, criadoEm: agora });
 await gravar(`usuarios/${caixa}`, { nome: 'Caixa Teste', email: 'caixa@teste.local', funcaoId: 'caixa', status: 'Ativo', criadoEm: agora });
+// quem ajusta a numeração (Parâmetros) e um afilhado da equipe de antes da numeração própria (número positivo)
+await gravar('funcoes/parametros', { nome: 'Parâmetros', descricao: '', permissoes: { parametros: ['ver', 'editar'], clientes: ['ver'] }, sistema: false, criadoEm: agora });
+await gravar(`usuarios/${parametros}`, { nome: 'Parâmetros Teste', email: 'parametros@teste.local', funcaoId: 'parametros', status: 'Ativo', criadoEm: agora });
+await gravar('clientes/equipe-antiga', { numero: 3, nome: 'Equipe Antiga', email: 'antiga@teste.local', telefone: '', criadoEm: agora, origem: 'Equipe' });
 await gravar(`usuarios/${atendente}`, { nome: 'Atendente Teste', email: 'atendente@teste.local', funcaoId: 'atendente', status: 'Ativo', criadoEm: agora });
 await gravar(`clientes/${cliente}`, { numero: 2, nome: 'Cliente Teste', email: 'cliente2@teste.local', telefone: '', criadoEm: agora });
 await gravar(`saldos/${cliente}`, { acumulados: 0, usados: 0 });

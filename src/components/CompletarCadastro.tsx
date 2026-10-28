@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { BadgeCheck, LogOut } from 'lucide-react';
 import { Marca } from './ui';
-import { useStore } from '../store';
+import { memberNumber, useStore } from '../store';
 import { maskCpf, nascimentoMaximo } from '../masks';
 import { cpfValido, idadeEm } from '../../shared/backend';
 
@@ -40,7 +40,7 @@ export default function CompletarCadastro() {
         <h1 className="auth__title"><BadgeCheck size={24} /> Complete seu cadastro</h1>
         <p className="muted">
           Olá, {me?.cliente.nome.split(' ')[0]}! O programa de afilhados agora pede o CPF e a data de nascimento.
-          Seu número <b>#{String(me?.cliente.numero ?? '').padStart(3, '0')}</b> e seus pontos continuam garantidos.
+          Seu número <b>#{me ? memberNumber(me.cliente.numero) : ''}</b> e seus pontos continuam garantidos.
         </p>
         <form className="form auth__form" onSubmit={salvar}>
           <label className="label" htmlFor="c-cpf">CPF</label>

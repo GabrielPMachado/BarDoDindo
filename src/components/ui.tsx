@@ -7,7 +7,7 @@ import {
 import { brl } from '../data';
 import { ItemIcon } from './ItemIcon';
 import logoUrl from '../../shared/assets/logo.webp';
-import { dateParts, formatDateTime, parseDate, upcoming, useStore, type Consumption, type Reservation } from '../store';
+import { dateParts, formatDateTime, memberNumber, parseDate, upcoming, useStore, type Consumption, type Reservation } from '../store';
 
 export function Logo({ small = false, asLink = true, size }: { small?: boolean; asLink?: boolean; size?: number }) {
   const px = size ?? (small ? 44 : 52);
@@ -134,7 +134,7 @@ export function TopBar() {
                 </NavLink>
               ))}
             </div>
-            {me && <p className="drawer__foot">{me.cliente.nome.split(' ')[0]} · Afilhado #{String(me.cliente.numero).padStart(3, '0')}</p>}
+            {me && <p className="drawer__foot">{me.cliente.nome.split(' ')[0]} · Afilhado #{memberNumber(me.cliente.numero)}</p>}
           </nav>
         </div>
       )}

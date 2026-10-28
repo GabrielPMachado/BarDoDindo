@@ -20,7 +20,9 @@ import 'react-resizable/css/styles.css';
 /** Grade livre do painel: mede a largura disponível sozinha. */
 const Grade = RGL.WidthProvider(RGL);
 
-interface ClienteResumo { id: number; nome: string; totalGasto: number; visitas: number; criadoEm?: string; desde: string }
+interface ClienteResumo { id: number; nome: string; totalGasto: number; visitas: number; criadoEm?: string; desde: string; origem?: string }
+// usuários do CRM também são afilhados, com numeração própria, mas não entram na contagem dos afilhados
+const daContagem = (c: ClienteResumo) => c.origem !== 'Equipe';
 
 /** Um bloco do painel: um indicador (cartão pequeno) ou um painel (gráfico, lista). */
 interface Bloco {
@@ -141,7 +143,7 @@ function PainelDeBlocos(info: PainelInfo) {
   const notaMedia = ult30.length ? sumBy(ult30, 'nota') / ult30.length : null;
   const metasAtivas = metas.filter((m) => !['Concluída', 'Cancelada'].includes(String(m.status))).slice(0, 6);
   const topClientes = [...clientes].sort((a, b) => b.totalGasto - a.totalGasto).slice(0, 5).filter((c) => c.totalGasto > 0);
-  const novosClientes = clientes.filter((c) => monthOf(c.desde) === mes).length;
+  const novosClientes = clientes.filter((c) => daContagem(c) && monthOf(c.desde) === mes).length;
   const pendentes = reservas.filter((r) => r.status === 'Pendente').length;
 
   const kpi = (k: Kpi) => () => (
@@ -161,7 +163,7 @@ function PainelDeBlocos(info: PainelInfo) {
   });
   add(can('fin'), { id: 'k-despesas', titulo: 'Despesas do mês', tipo: 'kpi', render: kpi({ label: 'Despesas do mês', value: brl(despMes) }) });
   add(can('fin'), { id: 'k-resultado', titulo: 'Resultado do mês', tipo: 'kpi', render: kpi({ label: 'Resultado do mês', value: brl(recMes - despMes), tone: recMes - despMes < 0 ? 'bad' : 'good' }) });
-  add(can('vnd'), { id: 'k-afilhados', titulo: 'Afilhados cadastrados', tipo: 'kpi', render: kpi({ label: 'Afilhados cadastrados', value: num(clientes.length), hint: `${num(novosClientes)} novos este mês` }) });
+  add(can('vnd'), { id: 'k-afilhados', titulo: 'Afilhados cadastrados', tipo: 'kpi', render: kpi({ label: 'Afilhados cadastrados', value: num(clientes.filter(daContagem).length), hint: `${num(novosClientes)} novos este mês` }) });
   add(can('atd'), { id: 'k-reservas', titulo: 'Reservas pendentes', tipo: 'kpi', render: kpi({ label: 'Reservas pendentes', value: num(pendentes), tone: pendentes ? 'warn' : undefined }) });
   add(can('rh'), { id: 'k-equipe', titulo: 'Equipe ativa', tipo: 'kpi', render: kpi({ label: 'Equipe ativa', value: num(colaboradores.filter((c) => c.status !== 'Desligado').length) }) });
 
@@ -404,7 +406,7 @@ function PainelDeBlocos(info: PainelInfo) {
     .filter((r) => reservasAtivas(r) && daysUntil(r.data) >= 1 && daysUntil(r.data) <= 7)
     .sort((a, b) => `${a.data} ${a.hora}`.localeCompare(`${b.data} ${b.hora}`));
   const pessoasHoje = reservasHoje.reduce((t, r) => t + (Number(r.pessoas) || 0), 0);
-  const novosDoMes = clientes.filter((c) => monthOf(c.desde) === mes).sort((a, b) => String(b.desde).localeCompare(String(a.desde)));
+  const novosDoMes = clientes.filter((c) => daContagem(c) && monthOf(c.desde) === mes).sort((a, b) => String(b.desde).localeCompare(String(a.desde)));
   const contagem = (rows: Row[], campo: string) => Object.entries(rows.reduce<Record<string, number>>((acc, r) => {
     const k = String(r[campo] ?? 'Outros') || 'Outros';
     acc[k] = (acc[k] ?? 0) + 1;
