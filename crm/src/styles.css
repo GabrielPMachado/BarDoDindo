@@ -891,6 +891,24 @@ button.anexos__nome:hover { text-decoration: underline; }
 .ficha__kpi--bad strong { color: var(--bad); }
 .ficha__sugerido { border-left-color: var(--brand) !important; }
 .ficha__sugerido .btn { align-self: flex-start; margin-top: 4px; }
+/* produção própria (Estoque): o que sai de cada insumo e as últimas produções */
+.producao__resumo { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.producao__resumo > div { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--brand); }
+.producao__resumo span { font-size: 12px; color: var(--muted); }
+.producao__resumo strong { font-size: 17px; }
+.producao__saidas, .producao__historico ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.producao__saidas li { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); }
+.producao__saidas li .muted { text-align: right; }
+.producao__saidas li.is-falta { border-color: var(--bad); }
+.producao__saidas li.is-falta .muted { color: var(--bad); }
+.producao__insumo { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.producao__historico { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+.producao__historico li { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 0; border-top: 1px solid var(--border); }
+@media (max-width: 640px) {
+  .producao__resumo { grid-template-columns: 1fr 1fr; }
+  .producao__saidas li { grid-template-columns: minmax(0, 1fr) auto; }
+  .producao__saidas li .muted { grid-column: 1 / -1; text-align: left; }
+}
 /* guarnições e itens fixos: marcar, sem pesar */
 .ficha__fixos { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
 .ficha__fixos-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-weight: 600; font-size: 13px; }

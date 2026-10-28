@@ -43,8 +43,11 @@ const unidadeDaReceita = (base: string, atual: string) => {
  * Ficha técnica do produto: insumos com quantidade e custo (do Estoque ou do fornecedor escolhido),
  * rendimento e perdas. Calcula custo por porção, CMV, margem e o preço sugerido para o CMV desejado.
  */
-export function FichaTecnica({ ficha, preco, nome, disabled, preMarcar, recolhivel, onChange, onUsarPreco }: {
+export function FichaTecnica({ ficha, preco, nome, disabled, preMarcar, recolhivel, producao, onChange, onUsarPreco }: {
   ficha: Ficha; preco: number; nome: string; disabled: boolean;
+  /** Receita de um item de produção própria do Estoque (xarope, molho…): rende uma quantidade na unidade do item,
+   * sem itens fixos, preço nem CMV; o custo vira o custo por unidade do item. */
+  producao?: { unidade: string };
   /** A ficha começa fechada e abre pelo título. */
   recolhivel?: boolean;
   /** Ficha nova (tela "Fichas técnicas"): já marca os itens fixos "padrão", como o gelo. */
@@ -66,6 +69,7 @@ export function FichaTecnica({ ficha, preco, nome, disabled, preMarcar, recolhiv
   // os marcados que saíram do cadastro (inativos ou apagados) continuam visíveis para poder desmarcar
   const fixosNaTela = [...fixosAtivos, ...ficha.fixos.filter((x) => !fixosAtivos.some((g) => g.id === x.id)).map((x) => ({ ...x, padrao: false }))];
   const temReceita = ficha.itens.length > 0 || ficha.fixos.length > 0;
+  const un = producao?.unidade || 'un';
   const c = calcularFicha(ficha, preco);
   // começa fechada: o resumo ao lado do título já mostra o custo por porção e o CMV
   const [recolhida, setRecolhida] = useState(true);
@@ -146,17 +150,18 @@ export function FichaTecnica({ ficha, preco, nome, disabled, preMarcar, recolhiv
       <div className="ficha__titulo">
         {recolhivel ? (
           <button type="button" className={`ficha__abrir ${fechada ? '' : 'is-aberta'}`} aria-expanded={!fechada} onClick={() => setRecolhida((r) => !r)}>
-            <ClipboardList size={15} /> Ficha técnica <ChevronDown size={14} className="ficha__seta" />
+            <ClipboardList size={15} /> {producao ? 'Receita do preparo' : 'Ficha técnica'} <ChevronDown size={14} className="ficha__seta" />
             {fechada && (
               <span className="muted small ficha__resumo-curto">
-                {temReceita ? `${brl(c.porcao)} por porção${c.cmv === null ? '' : ` · CMV ${pct(c.cmv)}`}` : 'sem receita'}
+                {!temReceita ? 'sem receita' : producao ? `rende ${num(ficha.rendimento, 3)} ${un} · ${brl(c.porcao)}/${un}`
+                  : `${brl(c.porcao)} por porção${c.cmv === null ? '' : ` · CMV ${pct(c.cmv)}`}`}
               </span>
             )}
           </button>
         ) : (
-          <label><ClipboardList size={15} /> Ficha técnica</label>
+          <label><ClipboardList size={15} /> {producao ? 'Receita do preparo' : 'Ficha técnica'}</label>
         )}
-        {temReceita && !fechada && (
+        {temReceita && !fechada && !producao && (
           <button type="button" className="btn btn--ghost btn--sm" onClick={() => void imprimir()}><Printer size={14} /> Imprimir ficha</button>
         )}
       </div>
@@ -186,12 +191,12 @@ export function FichaTecnica({ ficha, preco, nome, disabled, preMarcar, recolhiv
           <button type="button" className="btn btn--ghost btn--sm" onClick={() => onChange({ ...ficha, itens: [...ficha.itens, { ...ITEM_NOVO }] })}>
             <Plus size={14} /> Adicionar insumo
           </button>
-          {ficha.itens.length === 0 && <span className="muted small"> Monte a receita com os insumos do Estoque para calcular o custo da porção.</span>}
+          {ficha.itens.length === 0 && <span className="muted small"> {producao ? 'Monte a receita com os insumos do Estoque: produzir tira deles e soma o que rendeu a este item.' : 'Monte a receita com os insumos do Estoque para calcular o custo da porção.'}</span>}
         </div>
       )}
       {insumos.error && <p className="error small">Não foi possível carregar o Estoque: {insumos.error}</p>}
 
-      <div className="ficha__fixos">
+      {!producao && <div className="ficha__fixos">
         <div className="ficha__fixos-cab">
           <span>Guarnições e itens fixos <span className="muted small">· valor fixo por porção, sem pesar</span></span>
           {c.fixos > 0 && <strong className="small">{brl(c.fixos)} por porção</strong>}
@@ -211,25 +216,33 @@ export function FichaTecnica({ ficha, preco, nome, disabled, preMarcar, recolhiv
         ) : (
           <span className="muted small">{guarnicoes.error ? 'Não foi possível carregar os itens fixos.' : 'Cadastre gelo, rodelas de fruta, canudos etc. em Vendas → Guarnições e itens fixos, com o valor de cada um por drink.'}</span>
         )}
-      </div>
+      </div>}
 
       {temReceita && (
         <>
           <div className="ficha__params">
             <div className="form-field">
-              <label>Rendimento (porções)</label>
-              <NumberInput spec={{ decimals: 1, min: 0.1, max: 10_000 }} value={ficha.rendimento} disabled={disabled} onChange={(v) => onChange({ ...ficha, rendimento: v === '' ? 1 : Math.max(0.1, v) })} />
+              <label>{producao ? `Rendimento da receita (${un})` : 'Rendimento (porções)'}</label>
+              {producao
+                ? <NumberInput spec={{ decimals: 3, min: 0.001, max: 100_000 }} suffix={un} value={ficha.rendimento} disabled={disabled} onChange={(v) => onChange({ ...ficha, rendimento: v === '' ? 1 : Math.max(0.001, v) })} />
+                : <NumberInput spec={{ decimals: 1, min: 0.1, max: 10_000 }} value={ficha.rendimento} disabled={disabled} onChange={(v) => onChange({ ...ficha, rendimento: v === '' ? 1 : Math.max(0.1, v) })} />}
             </div>
             <div className="form-field">
               <label>Perdas e quebras</label>
               <NumberInput spec={{ decimals: 1, min: 0, max: 100 }} suffix="%" value={ficha.perdas} disabled={disabled} onChange={(v) => onChange({ ...ficha, perdas: v === '' ? 0 : v })} />
             </div>
-            <div className="form-field">
+            {!producao && <div className="form-field">
               <label>CMV desejado</label>
               <NumberInput spec={{ decimals: 1, min: 1, max: 100 }} suffix="%" value={ficha.cmvAlvo} disabled={disabled} onChange={(v) => onChange({ ...ficha, cmvAlvo: v === '' ? 30 : Math.max(1, v) })} />
-            </div>
+            </div>}
           </div>
 
+          {producao ? (
+            <div className="ficha__resumo">
+              <div><span>Custo da receita</span><strong>{brl(c.total)}</strong></div>
+              <div><span>Custo por {un}</span><strong>{brl(c.porcao)}</strong></div>
+            </div>
+          ) : <>
           <div className="ficha__resumo">
             <div><span>Custo da receita</span><strong>{brl(c.total)}</strong></div>
             <div><span>Custo por porção</span><strong>{brl(c.porcao)}</strong></div>
@@ -248,8 +261,11 @@ export function FichaTecnica({ ficha, preco, nome, disabled, preMarcar, recolhiv
           </div>
           <EconomiaPossivel ficha={ficha} insumos={listaInsumos} cotacoes={listaCotacoes} />
           <p className="muted small">O campo "Custo" do produto passa a ser o custo por porção calculado aqui.</p>
+          </>}
+          {producao && <EconomiaPossivel ficha={ficha} insumos={listaInsumos} cotacoes={listaCotacoes} unidade={un} />}
+          {producao && <p className="muted small">O custo unitário do item passa a ser o custo por {un} calculado aqui.</p>}
 
-          <PreparoFicha ficha={ficha} copos={copos.data ?? []} utensilios={utensilios.data ?? []} disabled={disabled} onChange={onChange} />
+          <PreparoFicha ficha={ficha} copos={copos.data ?? []} utensilios={utensilios.data ?? []} disabled={disabled} producao={!!producao} onChange={onChange} />
         </>
       )}
       </>}
@@ -399,7 +415,7 @@ function LinhaFicha({ item: it, opcoes, disabled, onChange, onUnidade, onInsumo,
 }
 
 /** Quanto a receita ficaria mais barata usando, em cada insumo, o fornecedor mais barato. */
-function EconomiaPossivel({ ficha, insumos, cotacoes }: { ficha: Ficha; insumos: Insumo[]; cotacoes: Cotacao[] }) {
+function EconomiaPossivel({ ficha, insumos, cotacoes, unidade }: { ficha: Ficha; insumos: Insumo[]; cotacoes: Cotacao[]; unidade?: string }) {
   let economia = 0;
   for (const it of ficha.itens) {
     const melhor = opcoesDoItem(it, insumos, cotacoes).find((o) => o.compativel);
@@ -407,7 +423,7 @@ function EconomiaPossivel({ ficha, insumos, cotacoes }: { ficha: Ficha; insumos:
   }
   const porPorcao = (economia * (1 + (ficha.perdas || 0) / 100)) / (ficha.rendimento || 1);
   if (porPorcao < 0.005) return null;
-  return <p className="ficha__economia">Com o fornecedor mais barato em cada insumo, a porção sairia <b>{brl(porPorcao)}</b> mais barata.</p>;
+  return <p className="ficha__economia">Com o fornecedor mais barato em cada insumo, {unidade ? <>cada {unidade} sairia</> : 'a porção sairia'} <b>{brl(porPorcao)}</b> mais barat{unidade ? 'o' : 'a'}.</p>;
 }
 
 /** Cadastra no Estoque um insumo digitado na receita, sem sair da tela. */

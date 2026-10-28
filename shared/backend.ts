@@ -1542,6 +1542,98 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     return { ok: true };
   });
 
+  /* CRM: produção própria do Estoque (xarope, molho, preparo…). Produzir tira os insumos da receita do item e soma o que
+   * rendeu ao saldo dele; desfazer devolve exatamente o que saiu. A receita fica no próprio item (`receita`, no formato da
+   * ficha técnica, com o rendimento na unidade do item) e as últimas produções em `producoes`. */
+  const PRODUCAO_PROPRIA = 'Produção própria';
+  type Producao = { id: string; em: string; por: string; receitas: number; quantidade: number; local: string; validade: string; insumos: BaixaEstoque; faltou: { nome: string; unidade: string; qtd: number }[] };
+  const producoesDe = (d: Dados) => (Array.isArray(d.producoes) ? (d.producoes as Producao[]) : []);
+  const somaLocais = (l: Record<string, number>) => arred4(Object.values(l).reduce((a, x) => a + x, 0));
+  const diaLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  rota('POST', '/crm/c/estoque/:id/produzir', async ({ p, b }) => {
+    const ctx = await requireUsuario();
+    requireColecao(ctx, 'estoque', 'editar');
+    const cur = await registro('estoque', p.id);
+    if (!cur) return fail(404, 'Item não encontrado.');
+    if (cur.origem !== PRODUCAO_PROPRIA) fail(400, 'Este item não está marcado como produção própria.');
+    const receita = (cur.receita && typeof cur.receita === 'object' ? cur.receita : {}) as Dados;
+    const linhas = Array.isArray(receita.itens) ? (receita.itens as Dados[]) : [];
+    const rendimento = Number(receita.rendimento) || 0;
+    if (!linhas.length || !(rendimento > 0)) fail(400, 'Cadastre a receita do preparo (insumos e rendimento) antes de produzir.');
+    const receitas = Number(b.receitas);
+    if (!(receitas > 0 && receitas <= 1000)) fail(400, 'Informe quantas receitas foram feitas.');
+    const local = str(b.local, 40) || Object.keys(locaisDe(cur))[0] || 'Depósito';
+    // o próprio item não entra como insumo dele mesmo
+    const usos: UsoEstoque[] = [];
+    for (const l of linhas) {
+      const qtd = (Number(l.quantidade) || 0) * receitas;
+      const candidatos = [l, ...(Array.isArray(l.alternativas) ? l.alternativas : [])]
+        .filter((c: Dados) => c?.insumoId && c.insumoId !== p.id).map((c: Dados) => ({ id: String(c.insumoId), nome: String(c.insumo ?? '') }));
+      if (qtd > 0 && candidatos.length) usos.push({ candidatos, unidade: String(l.unidade ?? ''), qtd });
+    }
+    const ids = [...new Set(usos.flatMap((u) => u.candidatos.map((c) => c.id)))];
+    const docs = new Map((await Promise.all(ids.map((id) => registro('estoque', id)))).filter((d): d is Dados => !!d).map((d) => [String(d.id), d]));
+    const saldo = new Map([...docs].map(([id, d]) => [id, locaisDe(d)]));
+    const { tirado, faltou } = tirarDoSaldo(usos, docs, saldo);
+    const t = now();
+    const lote = writeBatch(db);
+    for (const [id, l] of saldo) {
+      if (!tirado.has(id)) continue;
+      for (const k of Object.keys(l)) if (!(l[k] > 0)) delete l[k];
+      lote.update(doc(db, 'estoque', id), { locais: l, quantidade: somaLocais(l), atualizadoEm: t });
+    }
+    const quantidade = arred4(receitas * rendimento);
+    const meus = locaisDe(cur);
+    meus[local] = arred4((meus[local] ?? 0) + quantidade);
+    const total = somaLocais(meus);
+    // validade: o que acabou de ficar pronto dura "diasValidade" (sem isso, vale a data informada ou a que já estava)
+    const dias = Math.floor(Number(cur.diasValidade) || 0);
+    const validade = dias > 0 ? diaLocal(new Date(Date.now() + dias * 86_400_000)) : (dataValida(str(b.validade, 10)) ? str(b.validade, 10) : String(cur.validade ?? ''));
+    const insumos = [...tirado].map(([id, locais]) => ({ id, nome: String(docs.get(id)?.item ?? ''), locais }));
+    const producao: Producao = { id: doc(collection(db, 'estoque')).id, em: t, por: str(ctx.usuario.nome, 80), receitas, quantidade, local, validade, insumos, faltou };
+    lote.update(doc(db, 'estoque', p.id), {
+      // como na nota de compra, a barra de nível recomeça cheia
+      locais: meus, quantidade: total, cheio: total, validade, producoes: [producao, ...producoesDe(cur)].slice(0, 20), atualizadoEm: t,
+    });
+    const un = String(cur.unidade || 'un');
+    registrar(lote, ctx, collectionArea('estoque'), 'produziu', {
+      colecao: 'estoque', alvo: nomeDe(cur), registroId: p.id,
+      detalhe: [`${quantidade.toLocaleString('pt-BR')} ${un} (${receitas.toLocaleString('pt-BR')} receita${receitas === 1 ? '' : 's'}) em ${local}`,
+        faltou.length ? `faltou: ${faltou.map((f) => `${f.qtd.toLocaleString('pt-BR')} ${f.unidade} de ${f.nome}`).join(', ')}` : ''].filter(Boolean).join(' · '),
+    });
+    await lote.commit();
+    return { ok: true, producao };
+  });
+  rota('POST', '/crm/c/estoque/:id/desfazer-producao', async ({ p, b }) => {
+    const ctx = await requireUsuario();
+    requireColecao(ctx, 'estoque', 'editar');
+    const cur = await registro('estoque', p.id);
+    if (!cur) return fail(404, 'Item não encontrado.');
+    const lista = producoesDe(cur);
+    const pr = lista.find((x) => x.id === str(b.producaoId, 40));
+    if (!pr) return fail(404, 'Produção não encontrada.');
+    const t = now();
+    const lote = writeBatch(db);
+    // os insumos recebem de volta o que saiu (os apagados ficam de fora)
+    const outros = (await Promise.all(pr.insumos.filter((x) => x.id !== p.id).map((x) => registro('estoque', String(x.id))))).filter((d): d is Dados => !!d);
+    for (const d of outros) {
+      const l = locaisDe(d);
+      for (const [k, v] of Object.entries(pr.insumos.find((x) => x.id === d.id)?.locais ?? {})) l[k] = arred4((l[k] ?? 0) + (Number(v) || 0));
+      lote.update(doc(db, 'estoque', String(d.id)), { locais: l, quantidade: somaLocais(l), atualizadoEm: t });
+    }
+    // o item perde o que a produção somou (sem negativo: o que já foi vendido não volta)
+    const meus = locaisDe(cur);
+    meus[pr.local] = arred4(Math.max(0, (meus[pr.local] ?? 0) - pr.quantidade));
+    for (const k of Object.keys(meus)) if (!(meus[k] > 0)) delete meus[k];
+    lote.update(doc(db, 'estoque', p.id), { locais: meus, quantidade: somaLocais(meus), producoes: lista.filter((x) => x.id !== pr.id), atualizadoEm: t });
+    registrar(lote, ctx, collectionArea('estoque'), 'desfez a produção', {
+      colecao: 'estoque', alvo: nomeDe(cur), registroId: p.id,
+      detalhe: `${pr.quantidade.toLocaleString('pt-BR')} ${String(cur.unidade || 'un')} de ${new Date(pr.em).toLocaleString('pt-BR')}`,
+    });
+    await lote.commit();
+    return { ok: true };
+  });
+
   /* CRM: lançamento de consumo (credita pontos e gera receita) */
   /* ---------- caixa, comandas e consumo ----------
    * Toda venda (consumo de afilhado ou comanda) entra no caixa aberto: o caixa guarda os totais por forma de pagamento,
@@ -1583,6 +1675,39 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     else if (Number(e.quantidade) > 0) l[String(e.local || 'Depósito')] = Number(e.quantidade);
     return l;
   }
+  type UsoEstoque = { candidatos: { id: string; nome: string }[]; unidade: string; qtd: number };
+  /**
+   * Tira de `saldo` (por item e local) o que cada uso pede, na ordem dos candidatos (principal e alternativas), sem negativo.
+   * Devolve o que saiu de cada item, por local, e o que faltou de cada uso (na unidade da receita).
+   */
+  function tirarDoSaldo(usos: UsoEstoque[], docs: Map<string, Dados>, saldo: Map<string, Record<string, number>>) {
+    const tirado = new Map<string, Record<string, number>>();
+    const faltou: { nome: string; unidade: string; qtd: number }[] = [];
+    for (const u of usos) {
+      let falta = u.qtd;
+      for (const c of u.candidatos) {
+        const d = docs.get(c.id), fator = d ? fatorEstoque(u.unidade, d) : null;
+        if (!d || !fator) continue;
+        const l = saldo.get(c.id)!;
+        let precisa = falta * fator;
+        // do local com mais quantidade para o com menos
+        for (const k of Object.keys(l).sort((a, b) => l[b] - l[a])) {
+          const t = arred4(Math.min(l[k], precisa));
+          if (t <= 0) continue;
+          l[k] = arred4(l[k] - t);
+          precisa -= t;
+          const r = tirado.get(c.id) ?? {};
+          r[k] = arred4((r[k] ?? 0) + t);
+          tirado.set(c.id, r);
+          if (precisa < 1e-4) break;
+        }
+        falta = Math.max(0, precisa) / fator;
+        if (precisa < 1e-4) { falta = 0; break; }
+      }
+      if (falta > 1e-4) faltou.push({ nome: u.candidatos[0]?.nome ?? '', unidade: u.unidade, qtd: arred4(falta) });
+    }
+    return { tirado, faltou };
+  }
   /**
    * Dá baixa no Estoque pelo que a venda usa (ficha técnica de cada produto) e devolve o que uma baixa anterior tirou.
    * Cada insumo sai na ordem da ficha (o principal e depois as alternativas): tira o que houver do primeiro e o que faltar
@@ -1595,7 +1720,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     if (!ctx.acoes('consumos').includes('criar')) return devolvido;
     try {
       const produtos = await colecao('produtos');
-      const usos: { candidatos: { id: string; nome: string }[]; unidade: string; qtd: number }[] = [];
+      const usos: UsoEstoque[] = [];
       for (const it of itens) {
         const f = produtos.find((x) => x.id === it.produtoId)?.ficha as Dados | undefined;
         if (!f || !Array.isArray(f.itens)) continue;
@@ -1616,29 +1741,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
         const l = saldo.get(String(b.id));
         if (l) for (const [k, v] of Object.entries(b.locais ?? {})) l[k] = arred4((l[k] ?? 0) + (Number(v) || 0));
       }
-      const tirado = new Map<string, Record<string, number>>();
-      for (const u of usos) {
-        let falta = u.qtd;
-        for (const c of u.candidatos) {
-          const d = docs.get(c.id), fator = d ? fatorEstoque(u.unidade, d) : null;
-          if (!d || !fator) continue;
-          const l = saldo.get(c.id)!;
-          let precisa = falta * fator;
-          // do local com mais quantidade para o com menos
-          for (const k of Object.keys(l).sort((a, b) => l[b] - l[a])) {
-            const t = arred4(Math.min(l[k], precisa));
-            if (t <= 0) continue;
-            l[k] = arred4(l[k] - t);
-            precisa -= t;
-            const r = tirado.get(c.id) ?? {};
-            r[k] = arred4((r[k] ?? 0) + t);
-            tirado.set(c.id, r);
-            if (precisa < 1e-4) break;
-          }
-          falta = Math.max(0, precisa) / fator;
-          if (precisa < 1e-4) break;
-        }
-      }
+      const { tirado } = tirarDoSaldo(usos, docs, saldo);
       const t = now();
       for (const [id, l] of saldo) {
         if (!tirado.has(id) && !devolvido.some((b) => String(b.id) === id)) continue;

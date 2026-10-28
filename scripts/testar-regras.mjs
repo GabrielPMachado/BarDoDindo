@@ -145,6 +145,7 @@ if (senhaAtendente) {
   await negado('renomear um item do Estoque ao vender', () => updateDoc(doc(db, 'estoque', 'gin'), { quantidade: 2, item: 'Outro' }));
   await negado('cadastrar item no Estoque (só baixa)', () => addDoc(collection(db, 'estoque'), { item: 'x', quantidade: 1 }));
   await negado('apagar item do Estoque (só baixa)', () => deleteDoc(doc(db, 'estoque', 'gin')));
+  await negado('lançar produção própria no Estoque ao vender (só baixa)', () => updateDoc(doc(db, 'estoque', 'gin'), { quantidade: 5, producoes: [{ id: 'x' }], cheio: 5 }));
   await permitido('lançar a receita de uma comanda avulsa', () => addDoc(collection(db, 'receitas'), { descricao: 'Comanda #009', valor: 10, comandaId: 'x', caixaId: 'aberto' }));
   // consumo sem afilhado (cliente sem cadastro): entra no caixa e na receita, sem pontos nem saldo
   await permitido('lançar consumo sem afilhado', () => addDoc(collection(db, 'consumos'), { clienteId: null, clienteUid: null, clienteNome: 'Cliente sem cadastro', valor: 10, pontos: 0, caixaId: 'aberto' }));
