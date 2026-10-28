@@ -830,6 +830,7 @@ function RecordForm({ def, row, rows = [], canEdit, defaults, titulo, aviso, des
     <FichaTecnica
       ficha={fichaDe(data.ficha)} preco={Number(data.preco) || 0} nome={String(data.nome ?? '')} disabled={!canEdit}
       preMarcar={!row && def.fichaPrimeiro}
+      recolhivel={!def.fichaPrimeiro}
       onChange={mudarFicha}
       onUsarPreco={(preco) => setData((d) => ({ ...d, preco }))}
     />
