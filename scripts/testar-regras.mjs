@@ -412,6 +412,36 @@ if (senhaCaixa) {
     await lote.commit();
   });
   await signOut(auth);
+
+  console.log('— números reservados (link do Cérebro) —');
+  // a reserva é criada pela Presidência; aqui, direto no semear: reservados/codigo-teste → #900, livre
+  const cadastroReservado = async (codigoReserva, numero) => {
+    const u = auth.currentUser;
+    const lote = writeBatch(db);
+    lote.set(doc(db, 'clientes', u.uid), { numero, nome: 'Reservado', email: u.email, telefone: '', criadoEm: 'x', cpf: '86288366757', nascimento: '1990-01-01', reserva: codigoReserva });
+    lote.set(doc(db, 'cpfs', '86288366757'), { uid: u.uid });
+    lote.set(doc(db, 'saldos', u.uid), { acumulados: 0, usados: 0, ultimoResgate: '' });
+    lote.update(doc(db, 'reservados', codigoReserva), { uid: u.uid });
+    await lote.commit();
+  };
+  await permitido('ler a reserva pelo link, sem login', () => getDoc(doc(db, 'reservados', 'codigo-teste')));
+  await negado('listar as reservas sem login', () => getDocs(collection(db, 'reservados')));
+  await createUserWithEmailAndPassword(auth, `reservado-${Date.now()}@teste.local`, 'senha-teste-123');
+  await negado('pegar outro número com o link da reserva', () => cadastroReservado('codigo-teste', 901));
+  await negado('pegar o número reservado sem o link', async () => {
+    const u = auth.currentUser;
+    const lote = writeBatch(db);
+    lote.set(doc(db, 'clientes', u.uid), { numero: 900, nome: 'X', email: u.email, telefone: '', criadoEm: 'x', cpf: '86288366757', nascimento: '1990-01-01' });
+    lote.set(doc(db, 'cpfs', '86288366757'), { uid: u.uid });
+    lote.set(doc(db, 'saldos', u.uid), { acumulados: 0, usados: 0, ultimoResgate: '' });
+    await lote.commit();
+  });
+  await permitido('cadastrar com o número reservado pelo link', () => cadastroReservado('codigo-teste', 900));
+  await signOut(auth);
+  await createUserWithEmailAndPassword(auth, `reservado2-${Date.now()}@teste.local`, 'senha-teste-123');
+  await negado('usar de novo um link de reserva já usado', () => cadastroReservado('codigo-teste', 900));
+  await negado('criar reserva sem ser da equipe', () => setDoc(doc(db, 'reservados', 'meu'), { numero: 1, nome: 'eu', uid: null }));
+  await signOut(auth);
 }
 
 console.log(falhas ? `\n${falhas} verificação(ões) falharam.` : '\nTodas as verificações passaram.');

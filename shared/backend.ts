@@ -636,6 +636,12 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
 
   /* público */
   rota('GET', '/public/afilhados', async () => ({ total: Number((await documento('meta/contadores'))?.clientes) || 0 }));
+  /* número reservado (link do Cérebro): diz qual número e para quem, se ainda estiver livre */
+  rota('GET', '/public/reserva/:codigo', async ({ p }) => {
+    const r = await getDocFromServer(doc(db, 'reservados', str(p.codigo, 40))).then((s) => s.data(), () => undefined);
+    if (!r || r.uid) return fail(404, 'Este link de número reservado já foi usado ou não existe mais.');
+    return { numero: r.numero, nome: r.nome };
+  });
   rota('GET', '/public/config', async () => {
     const c = await getConfig();
     return { nomeEstabelecimento: c.nomeEstabelecimento, horarios: c.horarios, ambientes: c.ambientes, diasFuncionamento: c.diasFuncionamento, antecedenciaMinutos: c.antecedenciaMinutos, faixasPontos: c.faixasPontos, pontosAcima: c.pontosAcima, niveis: c.niveis, questionario: c.questionario };
@@ -682,14 +688,24 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const uid = cred.user.uid;
     try {
       if (!nova && (await getDoc(doc(db, 'clientes', uid))).exists()) fail(409, 'Este e-mail já está cadastrado. Entre com ele para ver o seu número.');
-      // o número de afilhado é sequencial: sai do contador na mesma transação que cria o cadastro
+      // o número de afilhado é sequencial: sai do contador na mesma transação que cria o cadastro;
+      // pelo link de um número reservado no Cérebro, sai o número da reserva (e ela fica marcada como usada)
+      const reserva = b.reserva ? str(b.reserva, 40) : '';
       await runTransaction(db, async (t) => {
-        const contadores = doc(db, 'meta/contadores');
-        const numero = (Number((await t.get(contadores)).data()?.clientes) || 0) + 1;
-        t.set(contadores, { clientes: numero }, { merge: true });
+        let numero: number;
+        if (reserva) {
+          const r = (await t.get(doc(db, 'reservados', reserva))).data();
+          if (!r || r.uid) fail(409, 'Este link de número reservado já foi usado. Peça um novo ao Bar do Dindo ou cadastre-se pelo endereço comum.');
+          numero = Number(r!.numero);
+          t.update(doc(db, 'reservados', reserva), { uid });
+        } else {
+          const contadores = doc(db, 'meta/contadores');
+          numero = (Number((await t.get(contadores)).data()?.clientes) || 0) + 1;
+          t.set(contadores, { clientes: numero }, { merge: true });
+        }
         t.set(doc(db, 'clientes', uid), {
           numero, nome, email: cred.user.email ?? email, telefone: tel, foto: null, criadoEm: now(), origem, aceiteEm: b.aceite === true ? now() : null,
-          cpf, nascimento, ...(b.via === 'qr' ? { via: 'QR Code' } : {}),
+          cpf, nascimento, ...(b.via === 'qr' ? { via: 'QR Code' } : {}), ...(reserva ? { reserva } : {}),
         });
         // um CPF, um afilhado: o registro do CPF só pode ser criado uma vez (as regras recusam se já existir)
         t.set(doc(db, 'cpfs', cpf), { uid });
@@ -1250,6 +1266,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     requireAccess(ctx, 'consumos', 'excluir');
     requireAccess(ctx, 'parametros', 'editar');
     const [clientes, saldos, consumos, resgates, reservas] = await Promise.all(['clientes', 'saldos', 'consumos', 'resgates', 'reservas'].map(colecao));
+    const reservados = await reservasDeNumero();
     const vendas = consumos.filter((x) => x.clienteUid), vouchers = resgates.filter((x) => x.clienteUid), doApp = reservas.filter((x) => x.clienteUid);
     const refs = [
       ...clientes.flatMap((c) => [doc(db, 'clientes', c.id), ...(c.cpf ? [doc(db, 'cpfs', String(c.cpf))] : [])]),
@@ -1258,7 +1275,9 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       ...vouchers.map((x) => doc(db, 'resgates', x.id)), ...doApp.map((x) => doc(db, 'reservas', x.id)),
     ];
     await apagarEmLotes(refs, (lote) => {
-      lote.set(doc(db, 'meta', 'contadores'), { clientes: 0 });
+      // os números reservados continuam guardados (e livres de novo) para quem tem o link
+      lote.set(doc(db, 'meta', 'contadores'), { clientes: Math.max(0, ...reservados.map((r) => Number(r.numero) || 0)) });
+      for (const r of reservados.filter((x) => x.uid)) lote.update(doc(db, 'reservados', r.id), { uid: null });
       registrar(lote, ctx, 'clientes', 'excluiu todos os afilhados', {
         colecao: 'clientes', alvo: `${clientes.length} afilhado(s)`,
         detalhe: `${vendas.length} consumo(s), ${vouchers.length} voucher(s) e ${doApp.length} reserva(s) apagados; numeração reiniciada`,
@@ -1271,12 +1290,55 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   rota('POST', '/crm/clientes/numeracao', async () => {
     const ctx = await requireUsuario();
     requireAccess(ctx, 'parametros', 'editar');
-    const maior = Math.max(0, ...(await colecao('clientes')).map((c) => Number(c.numero) || 0));
+    const maior = Math.max(0, ...[...(await colecao('clientes')), ...(await reservasDeNumero())].map((c) => Number(c.numero) || 0));
     const lote = writeBatch(db);
     lote.set(doc(db, 'meta', 'contadores'), { clientes: maior });
     registrar(lote, ctx, 'parametros', 'ajustou a numeração dos afilhados', { alvo: `próximo número: #${pad3(maior + 1)}` });
     await lote.commit();
     return { proximo: maior + 1 };
+  });
+
+  /* CRM: números de afilhado reservados para pessoas específicas. Cada reserva tem um link (o código é o id do registro);
+   * quem se cadastra por ele recebe o número. O contador pula os números reservados. */
+  const reservasDeNumero = () => getDocs(collection(db, 'reservados')).then((s) => s.docs.map((d) => ({ ...d.data(), id: d.id }) as Dados));
+  rota('GET', '/crm/reservados', async () => {
+    requireAccess(await requireUsuario(), 'parametros', 'ver');
+    const [reservados, clientes] = await Promise.all([reservasDeNumero(), colecao('clientes')]);
+    return reservados
+      .map((r) => ({ id: r.id, numero: Number(r.numero), nome: String(r.nome ?? ''), usadoPor: r.uid ? (clientes.find((c) => c.id === r.uid)?.nome ?? 'Afilhado') : null }))
+      .sort((a, b) => a.numero - b.numero);
+  });
+  rota('POST', '/crm/reservados', async ({ b }) => {
+    const ctx = await requireUsuario();
+    requireAccess(ctx, 'parametros', 'editar');
+    const numero = Math.floor(Number(b.numero)), nome = str(b.nome, 80);
+    if (!(numero >= 1 && numero <= 9999)) fail(400, 'Informe o número a reservar.');
+    if (nome.length < 2) fail(400, 'Informe para quem é o número.');
+    const [clientes, reservados, contador] = await Promise.all([colecao('clientes'), reservasDeNumero(), getDocFromServer(doc(db, 'meta/contadores'))]);
+    const dono = clientes.find((c) => Number(c.numero) === numero);
+    if (dono) fail(409, `O #${pad3(numero)} já é de ${dono.nome}. Só dá para reservar um número livre.`);
+    if (reservados.some((r) => Number(r.numero) === numero)) fail(409, `O #${pad3(numero)} já está reservado.`);
+    const atual = Number(contador.data()?.clientes) || 0;
+    // um número livre já passado pelo contador (afilhado excluído) ou o próximo, que faz o contador pular para o seguinte
+    if (numero > atual + 1) fail(400, `O próximo afilhado será o #${pad3(atual + 1)}: reserve um número até ele.`);
+    const codigo = Array.from(crypto.getRandomValues(new Uint8Array(12)), (x) => x.toString(16).padStart(2, '0')).join('');
+    const lote = writeBatch(db);
+    lote.set(doc(db, 'reservados', codigo), { numero, nome, uid: null, criadoEm: now() });
+    if (numero > atual) lote.set(doc(db, 'meta', 'contadores'), { clientes: numero });
+    registrar(lote, ctx, 'parametros', 'reservou um número de afilhado', { alvo: `#${pad3(numero)} para ${nome}` });
+    await lote.commit();
+    return { id: codigo, numero, nome, usadoPor: null };
+  });
+  rota('DELETE', '/crm/reservados/:id', async ({ p }) => {
+    const ctx = await requireUsuario();
+    requireAccess(ctx, 'parametros', 'editar');
+    const r = (await reservasDeNumero()).find((x) => x.id === p.id);
+    if (!r) return fail(404, 'Reserva não encontrada.');
+    const lote = writeBatch(db);
+    lote.delete(doc(db, 'reservados', p.id));
+    registrar(lote, ctx, 'parametros', 'cancelou a reserva de número', { alvo: `#${pad3(Number(r.numero))} de ${r.nome}` });
+    await lote.commit();
+    return { ok: true };
   });
 
   /* CRM: listas para vincular registros (só nome e identificação — sem salários ou dados sensíveis) */

@@ -73,6 +73,7 @@ await gravar(`clientes/${cliente}`, { numero: 2, nome: 'Cliente Teste', email: '
 await gravar(`saldos/${cliente}`, { acumulados: 0, usados: 0 });
 // CPF já usado por outro afilhado (o registro de CPF é único)
 await gravar('cpfs/52998224725', { uid: 'outro-afilhado' });
+await gravar('reservados/codigo-teste', { numero: 900, nome: 'Reservado Teste', uid: null, criadoEm: agora });
 // caixa, comandas e mesas
 await gravar('caixas/aberto', { nome: 'Caixa de teste', status: 'Aberto', abertoEm: agora, valorInicial: 100, vendas: {}, totalVendas: 0, qtdVendas: 0, movimentos: [] });
 await gravar('caixas/fechado', { nome: 'Caixa antigo', status: 'Fechado', abertoEm: agora, valorInicial: 0, vendas: {}, totalVendas: 0, qtdVendas: 0, movimentos: [] });

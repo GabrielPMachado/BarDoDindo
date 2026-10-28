@@ -400,11 +400,31 @@ service cloud.firestore {
         && timestamp.date(int(n[0:4]) + 18, int(n[5:7]), n[5:7] == '02' && int(n[8:10]) > 28 ? 28 : int(n[8:10])) <= request.time;
     }
     function cpfDoAfilhado(uid, cpf) { return existsAfter(caminho('cpfs', cpf)) && getAfter(caminho('cpfs', cpf)).data.uid == uid; }
+    // número reservado no Cérebro para uma pessoa: quem tem o link (o código é o id) recebe o número, uma única vez
+    function numeroReservado(uid) {
+      let codigo = request.resource.data.get('reserva', null);
+      return codigo is string && exists(caminho('reservados', codigo))
+        && get(caminho('reservados', codigo)).data.uid == null
+        && get(caminho('reservados', codigo)).data.numero == request.resource.data.numero
+        && getAfter(caminho('reservados', codigo)).data.uid == uid;
+    }
+    match /reservados/{codigo} {
+      allow get: if true;
+      allow list: if pode('parametros', 'ver');
+      allow create: if pode('parametros', 'editar') && request.resource.data.keys().hasOnly(['numero', 'nome', 'uid', 'criadoEm'])
+        && request.resource.data.numero is int && request.resource.data.numero >= 1 && request.resource.data.uid == null;
+      // a Presidência libera a reserva de novo (ao apagar os afilhados); quem se cadastra pelo link marca a reserva como sua
+      allow update: if (pode('parametros', 'editar') && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uid']) && request.resource.data.uid == null)
+        || (logado() && resource.data.uid == null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uid'])
+          && request.resource.data.uid == request.auth.uid && novoCliente()
+          && getAfter(caminho('clientes', request.auth.uid)).data.get('reserva', null) == codigo);
+      allow delete: if pode('parametros', 'editar');
+    }
     match /clientes/{uid} {
       allow read: if logado() && (request.auth.uid == uid || verAfilhados());
       allow create: if logado() && request.auth.uid == uid
         && request.resource.data.email == request.auth.token.email
-        && request.resource.data.numero == getAfter(caminho('meta', 'contadores')).data.clientes
+        && (request.resource.data.numero == getAfter(caminho('meta', 'contadores')).data.clientes || numeroReservado(uid))
         && existsAfter(caminho('saldos', uid))
         && ((cpfOk(request.resource.data.get('cpf', null)) && maiorDeIdade(request.resource.data.get('nascimento', null))
             && cpfDoAfilhado(uid, request.resource.data.cpf))
