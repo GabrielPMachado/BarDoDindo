@@ -108,6 +108,8 @@ export interface CollectionDef {
   anexos?: string;
   /** Produtos: ficha técnica com insumos, custo por porção, CMV e preço sugerido. */
   fichaTecnica?: boolean;
+  /** Estoque: itens de produção própria (xarope, molho…) com receita do preparo, custo calculado e botão "Produzir". */
+  producao?: boolean;
   /** Entrada de notas: itens da compra (somados ao Estoque ou aos Materiais) e leitura da nota por IA. */
   compra?: boolean;
   /** Logo depois de cadastrar, abre "Lançar despesa" já preenchida. */
@@ -170,6 +172,10 @@ export function nivelEstoque(r: Record<string, unknown>) {
   const tone: Tone = (n(r.minimo) && q <= n(r.minimo)) || fracao <= 0.25 ? 'bad' : fracao <= 0.5 ? 'warn' : 'good';
   return { fracao, tone, detalhe: `${qtd(q)} de ${qtd(cheio)} ${un}${aberto}` };
 }
+
+export const PRODUCAO_PROPRIA = 'Produção própria';
+/** Item do Estoque feito no próprio bar (xarope, molho, preparo). */
+export const ehProducao = (r: Record<string, unknown>) => r.origem === PRODUCAO_PROPRIA;
 
 /** Produto principal com tamanhos (ex.: Chopp Pilsen): não é vendido nem conta como item; cada tamanho é um produto. */
 export const temTamanhos = (r: Record<string, unknown>) => r.comTamanhos === 'Sim' && !r.pai;
@@ -325,10 +331,12 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   estoque: {
     id: 'estoque', comFoto: true, porLocal: true, fotoPadrao: 'estoque', area: 'estoque', title: 'Estoque', singular: 'item de estoque',
     description: 'Insumos com controle de quantidade mínima e validade.',
-    filterKey: 'categoria', filtros: ['fornecedor', 'unidade'], sortKey: 'item',
+    filterKey: 'categoria', filtros: ['origem', 'fornecedor', 'unidade'], sortKey: 'item', producao: true,
     fields: [
       { key: 'item', label: 'Item', type: 'text', required: true, wide: true },
       { key: 'categoria', label: 'Categoria', type: 'select', options: ['Bebidas', 'Alimentos', 'Descartáveis', 'Limpeza', 'Outros'], required: true },
+      // produção própria: a receita do preparo dá o custo, e "Produzir" tira os insumos e soma o que rendeu
+      { key: 'origem', label: 'Origem', type: 'select', options: ['Comprado', PRODUCAO_PROPRIA], default: 'Comprado', formOnly: true },
       { key: 'unidade', label: 'Unidade', type: 'select', options: ['un', 'cx', 'fardo', 'kg', 'g', 'L', 'ml', 'pct'], default: 'un' },
       // para a ficha técnica medir em ml/g um item contado em unidades (ex.: 1 garrafa = 750 ml)
       { key: 'conteudo', label: 'Conteúdo de cada unidade', type: 'number', decimals: 3, max: 1_000_000, formOnly: true, placeholder: 'Ex.: 750 (garrafa de 750 ml)' },
@@ -341,9 +349,11 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'fornecedor', label: 'Fornecedor', type: 'ref', ref: 'fornecedores', refKey: 'fornecedorId', livre: true, formOnly: true, outros: 'outrosFornecedores' },
       { key: 'link', label: 'Link para compra', type: 'url', formOnly: true, wide: true, acao: 'comprar', outrosLinks: 'outrosLinks', placeholder: 'Cole aqui o link do produto na loja' },
       { key: 'validade', label: 'Validade', type: 'date' },
+      // ao produzir, a validade passa a ser hoje + estes dias
+      { key: 'diasValidade', label: 'Dura quantos dias depois de pronto', type: 'number', max: 3650, formOnly: true, placeholder: 'Ex.: 7', mostrarSe: ehProducao },
     ],
     // o item novo começa sem saldo (os locais ficam, zerados): a quantidade entra pela nota de compra ou à mão
-    naoCopiar: ['quantidade', 'cheio', 'validade'],
+    naoCopiar: ['quantidade', 'cheio', 'validade', 'producoes'],
     computed: [
       { label: 'Nível', format: 'nivel', get: (r) => nivelEstoque(r)?.fracao ?? null, tone: (r) => nivelEstoque(r)?.tone ?? 'neutral', detalhe: (r) => nivelEstoque(r)?.detalhe ?? '' },
       { label: 'Locais', format: 'text', get: (r) => resumoLocais(locaisDe(r)) || null },
@@ -1207,6 +1217,7 @@ export function copiaDe(def: CollectionDef, r: Record<string, unknown>): Record<
   if (def.comFoto && !temTamanhos(r)) d.foto = r.foto ?? '';
   if (def.fotoJunto) d.fotoJunto = r.fotoJunto ?? '';
   if (def.fichaTecnica) d.ficha = r.ficha;
+  if (def.producao) d.receita = r.receita;
   if (def.porLocal) {
     // os mesmos locais; sem saldo, se a quantidade não é copiada
     const zerar = def.naoCopiar?.includes('quantidade');

@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useState, type DragEvent, type ReactNode, Fragment } from 'react';
-import { ArrowDown, ArrowLeftRight, ArrowUp, Camera, ChevronDown, ChevronRight, CopyPlus, Download, FileSpreadsheet, FileText, Globe, ImageOff, Maximize2, Paperclip, Pencil, Plus, Receipt, Search, Sheet, ShoppingCart, Sparkles, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowLeftRight, ArrowUp, Camera, ChefHat, ChevronDown, ChevronRight, CopyPlus, Download, FileSpreadsheet, FileText, Globe, ImageOff, Maximize2, Paperclip, Pencil, Plus, Receipt, Search, Sheet, ShoppingCart, Sparkles, Trash2, X } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { findModule } from '../modules';
-import { copiaDe, linksDe, numberSpec, podeDuplicar, STATUS_KEYS, temTamanhos, termos, toneOf, vinculosDe, type CollectionDef, type Computed, type Field } from '../collections';
+import { copiaDe, ehProducao, linksDe, numberSpec, podeDuplicar, STATUS_KEYS, temTamanhos, termos, toneOf, vinculosDe, type CollectionDef, type Computed, type Field } from '../collections';
 import { maskCnpj, maskPhone } from '../lib/masks';
 import { useCollection, type Row } from '../lib/data';
 import { brl, dateBR, num, pct } from '../lib/format';
@@ -28,6 +28,7 @@ import { PreencherProdutoIA } from './PreencherProdutoIA';
 import { GerarFotoIA } from './GerarFotoIA';
 import { RefazerFotos } from './RefazerFotos';
 import { MoverVarios } from './MoverVarios';
+import { ProduzirModal } from './Producao';
 import { Ampliar } from './Ampliar';
 import { SeletorVisao, VisaoCalendario, VisaoCartoes, VisaoQuadro, campoDoQuadro, useVisao } from './Visoes';
 import { CompraItens, itemVazio, totalItens, type ItemCompra } from './CompraItens';
@@ -138,6 +139,8 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   const [refazendoFotos, setRefazendoFotos] = useState(false);
   const [lancando, setLancando] = useState<Row | null>(null);
   const [transferindo, setTransferindo] = useState<Row | null>(null);
+  // produção própria do Estoque: tira os insumos da receita e soma o que rendeu
+  const [produzindo, setProduzindo] = useState<Row | null>(null);
   // mover para outra tela do mesmo fluxo (ex.: da Gestão de mídias para a Criação): o registro novo abre preenchido
   const destinos = useMemo(() => destinosDe(def.id).filter((d) => pode(d.area, 'criar')), [def.id, pode]);
   const [movendo, setMovendo] = useState<{ row: Row; dados: Record<string, unknown>; destino: CollectionDef } | null>(null);
@@ -560,6 +563,11 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
                             {campoLink.acao === 'site' ? <Globe size={16} /> : <ShoppingCart size={16} />}
                           </a>
                         )}
+                        {def.producao && ehProducao(r) && canEdit && (
+                          <button className="icon-btn" onClick={() => setProduzindo(r)} aria-label={`Produzir ${tituloDe(r)}`} title="Produzir (tira os insumos da receita e soma ao saldo)">
+                            <ChefHat size={16} />
+                          </button>
+                        )}
                         {def.porLocal && canEdit && (
                           <button className="icon-btn" onClick={() => setTransferindo(r)} aria-label="Transferir entre locais" title="Transferir entre locais">
                             <ArrowLeftRight size={16} />
@@ -612,6 +620,9 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
           onSalvar={async (dados) => { await col.update(transferindo.id, dados); }}
         />
       )}
+      {produzindo && (
+        <ProduzirModal row={produzindo} rows={col.rows} onClose={() => setProduzindo(null)} onFeito={col.reload} />
+      )}
       {lancando && def.despesa && (
         <LancarDespesa def={def} row={lancando} sugestao={def.despesa(lancando)} onClose={() => setLancando(null)} onDone={col.reload} />
       )}
@@ -633,6 +644,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
           modelo={editing === 'new' ? modelo : null}
           rows={col.rows}
           onDuplicar={duplicavel && editing !== 'new' ? () => duplicar(editing) : undefined}
+          onProduzir={def.producao && canEdit && editing !== 'new' && ehProducao(editing) ? () => { setProduzindo(editing); setEditing(null); } : undefined}
           // dos tamanhos para o item principal e de volta (cada tamanho abre com a sua ficha técnica)
           onAbrir={(r) => setEditing(r)}
           // registro novo depende de "Criar"; um existente, de "Editar"
@@ -724,7 +736,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   );
 }
 
-function RecordForm({ def, row, modelo, rows = [], canEdit, defaults, titulo, aviso, destinos = [], onClose, onSave, onDelete, onAbrir, onMover, onDuplicar }: {
+function RecordForm({ def, row, modelo, rows = [], canEdit, defaults, titulo, aviso, destinos = [], onClose, onSave, onDelete, onAbrir, onMover, onDuplicar, onProduzir }: {
   def: CollectionDef; row: Row | null; rows?: Row[]; canEdit: boolean; defaults?: Record<string, unknown>;
   titulo?: string; aviso?: ReactNode; destinos?: CollectionDef[];
   /** Registro novo copiado deste ("Duplicar"). */
@@ -732,6 +744,8 @@ function RecordForm({ def, row, modelo, rows = [], canEdit, defaults, titulo, av
   onClose: () => void; onSave: (d: Record<string, unknown>) => Promise<void>; onDelete?: () => Promise<void>;
   onAbrir?: (r: Row) => void; onMover?: (destino: CollectionDef, dados: Record<string, unknown>) => void;
   onDuplicar?: () => void;
+  /** Item de produção própria já salvo: abre "Produzir". */
+  onProduzir?: () => void;
 }) {
   const [data, setData] = useState<Record<string, unknown>>(() => {
     if (row) return { ...row };
@@ -765,6 +779,12 @@ function RecordForm({ def, row, modelo, rows = [], canEdit, defaults, titulo, av
   // com a ficha técnica preenchida, o custo do produto é o custo por porção calculado nela
   const mudarFicha = useCallback((ficha: Ficha) => setData((d) => ({
     ...d, ficha, ...(ficha.itens.length || ficha.fixos.length ? { custo: calcularFicha(ficha, Number(d.preco) || 0).custoPorcao } : {}),
+  })), []);
+
+  // produção própria (Estoque): a receita do preparo dá o custo unitário do item (4 casas, para itens medidos em ml ou g)
+  const comReceita = !!def.producao && ehProducao(data);
+  const mudarReceita = useCallback((receita: Ficha) => setData((d) => ({
+    ...d, receita, ...(receita.itens.length ? { custo: Math.round(calcularFicha(receita, 0).porcao * 10_000) / 10_000 } : {}),
   })), []);
 
   const submit = async (e: React.FormEvent) => {
@@ -804,6 +824,14 @@ function RecordForm({ def, row, modelo, rows = [], canEdit, defaults, titulo, av
       const semQtd = itens.find((i) => !(Number(i.quantidade) > 0));
       if (semQtd) return setError(`Ficha técnica: informe a quantidade de "${semQtd.insumo}".`);
     }
+    if (comReceita) {
+      const itens = fichaDe(data.receita).itens;
+      const vazio = itens.findIndex((i) => !String(i.insumo ?? '').trim());
+      if (vazio >= 0) return setError(`Receita do preparo: informe o insumo da linha ${vazio + 1}.`);
+      const semQtd = itens.find((i) => !(Number(i.quantidade) > 0));
+      if (semQtd) return setError(`Receita do preparo: informe a quantidade de "${semQtd.insumo}".`);
+      if (row && itens.some((i) => i.insumoId === row.id)) return setError('Receita do preparo: o item não pode ser insumo dele mesmo.');
+    }
     setBusy(true);
     setError(null);
     try {
@@ -842,6 +870,11 @@ function RecordForm({ def, row, modelo, rows = [], canEdit, defaults, titulo, av
       if (def.compra && row) delete payload.valor;
       if (def.porLocal) Object.assign(payload, camposDosLocais(locaisDe(data), def.fields.some((f) => f.key === 'local')));
       if (def.fichaTecnica) payload.ficha = fichaDe(comTamanhos ? null : data.ficha);
+      // item que deixou de ser produção própria guarda a receita (volta se marcar de novo)
+      if (comReceita) {
+        payload.receita = fichaDe(data.receita);
+        if (fichaDe(data.receita).itens.length) payload.custo = Math.round(calcularFicha(fichaDe(data.receita), 0).porcao * 10_000) / 10_000;
+      }
       if (comTamanhos) payload._tamanhos = tamanhos;
       if (def.anexos) {
         // a lista dos que ficam (os removidos são apagados ao salvar) e os PDFs novos
@@ -882,6 +915,11 @@ function RecordForm({ def, row, modelo, rows = [], canEdit, defaults, titulo, av
             <AsyncButton className="btn btn--danger" onClick={onDelete} confirm={{ title: `Excluir ${def.feminino ? 'esta' : 'este'} ${def.singular}?`, message: 'Esta ação não pode ser desfeita.', confirmLabel: 'Excluir', danger: true }}>
               <Trash2 size={16} /> Excluir
             </AsyncButton>
+          )}
+          {onProduzir && (
+            <button className="btn btn--ghost" type="button" onClick={onProduzir} title="Tira os insumos da receita e soma o que rendeu ao saldo">
+              <ChefHat size={16} /> <span className="btn-duplicar__texto">Produzir</span>
+            </button>
           )}
           {onDuplicar && (
             <button className="btn btn--ghost" type="button" onClick={onDuplicar} aria-label="Duplicar" title="Abre um cadastro novo com os dados deste, para criar um parecido">
@@ -973,6 +1011,13 @@ function RecordForm({ def, row, modelo, rows = [], canEdit, defaults, titulo, av
         ))}
         {comTamanhos && <TamanhosCampo itens={tamanhos} salvos={salvosTamanhos} avulsos={avulsos} nome={String(data.nome ?? '')} disabled={!canEdit} onChange={setTamanhos} onAbrir={onAbrir} />}
         {def.fichaTecnica && !def.fichaPrimeiro && fichaCampo}
+        {comReceita && (
+          <FichaTecnica
+            ficha={fichaDe(data.receita)} preco={0} nome={String(data.item ?? '')} disabled={!canEdit} recolhivel
+            producao={{ unidade: String(data.unidade || 'un') }}
+            onChange={mudarReceita} onUsarPreco={() => undefined}
+          />
+        )}
         {def.compra && (
           <CompraItens
             itens={itensCompra} somenteLeitura={!!row || !canEdit} onChange={setItensCompra}

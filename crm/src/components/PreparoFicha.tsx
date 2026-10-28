@@ -14,8 +14,11 @@ const vinculo = (id: unknown) => (typeof id === 'string' && id && !id.startsWith
  * Preparo da ficha técnica: técnica, copo e utensílios (ligados ao Estoque e aos Materiais),
  * passo a passo numerado e finalização. "Gerar passo a passo" monta um rascunho com os insumos da receita.
  */
-export function PreparoFicha({ ficha, copos, utensilios, disabled, onChange }: {
-  ficha: Ficha; copos: Recipiente[]; utensilios: Recipiente[]; disabled: boolean; onChange: (f: Ficha) => void;
+export function PreparoFicha({ ficha, copos, utensilios, disabled, producao, onChange }: {
+  ficha: Ficha; copos: Recipiente[]; utensilios: Recipiente[]; disabled: boolean;
+  /** Receita de produção própria (Estoque): sem técnica de drink, copo nem rascunho; o fim vira "como guardar". */
+  producao?: boolean;
+  onChange: (f: Ficha) => void;
 }) {
   const [novoUtensilio, setNovoUtensilio] = useState('');
   const mudar = (patch: Partial<Ficha>) => onChange({ ...ficha, ...patch });
@@ -63,7 +66,7 @@ export function PreparoFicha({ ficha, copos, utensilios, disabled, onChange }: {
     <div className="preparo">
       <div className="preparo__cab"><ListOrdered size={15} /> Preparo</div>
 
-      <div className="preparo__grade">
+      {!producao && <div className="preparo__grade">
         <div className="form-field">
           <label>Técnica</label>
           <div className="preparo__tecnicas" role="radiogroup" aria-label="Técnica">
@@ -80,7 +83,7 @@ export function PreparoFicha({ ficha, copos, utensilios, disabled, onChange }: {
           <RefPicker id="ficha-copo" field={CAMPO_COPO} value={ficha.copo} linkedId={ficha.copoId} disabled={disabled} onChange={escolherCopo} />
           {copoDescartavel && <span className="muted small">Descartável do Estoque: {brl(ficha.copoCusto)} por drink, somado ao custo da porção.</span>}
         </div>
-      </div>
+      </div>}
 
       <div className="form-field">
         <label>Utensílios</label>
@@ -106,7 +109,7 @@ export function PreparoFicha({ ficha, copos, utensilios, disabled, onChange }: {
       <div className="form-field">
         <div className="preparo__passos-cab">
           <label>Passo a passo</label>
-          {!disabled && (ficha.itens.length > 0 || ficha.fixos.length > 0) && (
+          {!disabled && !producao && (ficha.itens.length > 0 || ficha.fixos.length > 0) && (
             <button type="button" className="btn btn--ghost btn--sm" onClick={gerar} title="Monta um rascunho com a técnica, os insumos, o copo e as guarnições">
               <Wand2 size={13} /> {ficha.passos.length ? 'Gerar de novo' : 'Gerar passo a passo'}
             </button>
@@ -144,8 +147,9 @@ export function PreparoFicha({ ficha, copos, utensilios, disabled, onChange }: {
       </div>
 
       <div className="form-field">
-        <label htmlFor="ficha-montagem">Finalização e decoração</label>
-        <textarea id="ficha-montagem" className="input" rows={2} maxLength={1000} disabled={disabled} value={ficha.montagem} onChange={(e) => mudar({ montagem: e.target.value })} placeholder="Ex.: rodela de laranja na borda, servir com canudo" />
+        <label htmlFor="ficha-montagem">{producao ? 'Como guardar' : 'Finalização e decoração'}</label>
+        <textarea id="ficha-montagem" className="input" rows={2} maxLength={1000} disabled={disabled} value={ficha.montagem} onChange={(e) => mudar({ montagem: e.target.value })}
+          placeholder={producao ? 'Ex.: garrafa de vidro fechada, na geladeira, com etiqueta da data' : 'Ex.: rodela de laranja na borda, servir com canudo'} />
       </div>
     </div>
   );
