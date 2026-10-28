@@ -32,6 +32,7 @@ import { SeletorVisao, VisaoCalendario, VisaoCartoes, VisaoQuadro, campoDoQuadro
 import { CompraItens, itemVazio, totalItens, type ItemCompra } from './CompraItens';
 import { camposDosLocais, locaisDe, locaisNoFormulario } from '../lib/locais';
 import { calcularFicha, fichaDe, type Ficha } from '../lib/ficha';
+import { dadosParaMover, destinosDe } from '../lib/mover';
 import { conferirTamanhos, fotoDosTamanhos, novoTamanho, rascunhoDe, salvarTamanhos, tirarTamanho, TAMANHOS_SUGERIDOS, TamanhosCampo, tamanhosDoItem, type TamanhoRascunho } from './Tamanhos';
 
 const PAGE = 50;
@@ -131,6 +132,9 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   const [refazendoFotos, setRefazendoFotos] = useState(false);
   const [lancando, setLancando] = useState<Row | null>(null);
   const [transferindo, setTransferindo] = useState<Row | null>(null);
+  // mover para outra tela do mesmo fluxo (ex.: da Gestão de mídias para a Criação): o registro novo abre preenchido
+  const destinos = useMemo(() => destinosDe(def.id).filter((d) => pode(d.area, 'criar')), [def.id, pode]);
+  const [movendo, setMovendo] = useState<{ row: Row; dados: Record<string, unknown>; destino: CollectionDef } | null>(null);
 
   const tableFields = def.fields.filter((f) => !f.formOnly);
 
@@ -634,6 +638,8 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
             notify(editing === 'new' ? (def.compra ? 'Nota lançada: as quantidades já entraram no estoque' : 'Registro criado') : 'Alterações salvas');
             setEditing(null);
           }}
+          destinos={editing !== 'new' && canDelete ? destinos : []}
+          onMover={(destino, dados) => { if (editing !== 'new') { setMovendo({ row: editing, dados, destino }); setEditing(null); } }}
           onDelete={
             editing !== 'new' && canDelete
               ? async () => {
@@ -648,14 +654,56 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
           }
         />
       )}
+      {movendo && (() => {
+        const { dados, ficam } = dadosParaMover(def, movendo.destino, movendo.dados as Row);
+        const nome = tituloDe(movendo.row);
+        return (
+          <RecordForm
+            key={`mover-${movendo.row.id}`}
+            def={movendo.destino} row={null} canEdit defaults={dados}
+            titulo={`Mover para ${movendo.destino.title}`}
+            aviso={
+              <p className="mover-aviso form-field--wide">
+                <ArrowLeftRight size={15} />
+                <span>
+                  <b>{nome}</b> sai de {def.title} e passa para {movendo.destino.title}. Confira os campos e salve: o registro antigo é excluído.
+                  {ficam.length > 0 && <> Não vão junto: {ficam.join(', ')}.</>}
+                  {def.id === 'estoque' && <> Fichas técnicas que usam este item deixam de dar baixa nele.</>}
+                </span>
+              </p>
+            }
+            onClose={() => setMovendo(null)}
+            onSave={async (payload) => {
+              // os anexos que ficaram na lista vão como arquivos novos (os da origem são apagados junto com ela)
+              const manter = Array.isArray(payload.anexos) ? (payload.anexos as string[]) : [];
+              const copiados = await Promise.all(manter.map(async (id) => {
+                const a = await api<{ nome: string; dados: string }>(`/crm/anexos/${encodeURIComponent(id)}`);
+                return { nome: a.nome, dados: a.dados };
+              }));
+              const novos = Array.isArray(payload.anexosNovos) ? payload.anexosNovos : [];
+              await api(`/crm/c/${movendo.destino.id}`, { method: 'POST', body: { ...payload, ...(movendo.destino.anexos ? { anexos: [], anexosNovos: [...copiados, ...novos] } : {}) } });
+              setMovendo(null);
+              try {
+                await col.remove(movendo.row.id);
+                notify(`“${nome}” foi para ${movendo.destino.title}`);
+              } catch {
+                // o novo já foi gravado: avisa em vez de deixar salvar de novo (o que duplicaria)
+                notify(`“${nome}” foi copiado para ${movendo.destino.title}, mas não deu para excluir daqui. Exclua manualmente.`, 'error');
+                await col.reload();
+              }
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }
 
-function RecordForm({ def, row, rows = [], canEdit, defaults, onClose, onSave, onDelete, onAbrir }: {
+function RecordForm({ def, row, rows = [], canEdit, defaults, titulo, aviso, destinos = [], onClose, onSave, onDelete, onAbrir, onMover }: {
   def: CollectionDef; row: Row | null; rows?: Row[]; canEdit: boolean; defaults?: Record<string, unknown>;
+  titulo?: string; aviso?: ReactNode; destinos?: CollectionDef[];
   onClose: () => void; onSave: (d: Record<string, unknown>) => Promise<void>; onDelete?: () => Promise<void>;
-  onAbrir?: (r: Row) => void;
+  onAbrir?: (r: Row) => void; onMover?: (destino: CollectionDef, dados: Record<string, unknown>) => void;
 }) {
   const [data, setData] = useState<Record<string, unknown>>(() => {
     if (row) return { ...row };
@@ -787,7 +835,10 @@ function RecordForm({ def, row, rows = [], canEdit, defaults, onClose, onSave, o
     />
   );
 
-  const title = row ? (canEdit ? `Editar ${def.singular}` : termos(def).detalhes) : termos(def).novo;
+  const title = titulo ?? (row ? (canEdit ? `Editar ${def.singular}` : termos(def).detalhes) : termos(def).novo);
+  const [menuMover, setMenuMover] = useState<MenuPos | null>(null);
+  // leva o que está no formulário (mesmo o que ainda não foi salvo)
+  const mover = (d: CollectionDef) => onMover?.(d, { ...row, ...data });
 
   return (
     <Modal
@@ -800,6 +851,23 @@ function RecordForm({ def, row, rows = [], canEdit, defaults, onClose, onSave, o
               <Trash2 size={16} /> Excluir
             </AsyncButton>
           )}
+          {onMover && destinos.length > 0 && (
+            <button
+              type="button" className="btn btn--ghost" title={`Passar ${def.feminino ? 'esta' : 'este'} ${def.singular} para outra tela`}
+              onClick={(e) => {
+                if (destinos.length === 1) return mover(destinos[0]);
+                const r = e.currentTarget.getBoundingClientRect();
+                setMenuMover({ x: r.left, y: Math.max(8, r.top - 8 - 44 * destinos.length) });
+              }}
+            >
+              <ArrowLeftRight size={16} /> {destinos.length === 1 ? `Mover para ${destinos[0].title}` : 'Mover para…'}
+            </button>
+          )}
+          {menuMover && (
+            <ContextMenu at={menuMover} onClose={() => setMenuMover(null)}>
+              {destinos.map((d) => <button key={d.id} role="menuitem" onClick={() => { setMenuMover(null); mover(d); }}>{d.title}</button>)}
+            </ContextMenu>
+          )}
           <span className="spacer" />
           <button className="btn btn--ghost" type="button" onClick={onClose}>{canEdit ? 'Cancelar' : 'Fechar'}</button>
           {canEdit && <button className="btn btn--primary" form="record-form" disabled={busy}>{busy ? 'Salvando…' : 'Salvar'}</button>}
@@ -807,6 +875,7 @@ function RecordForm({ def, row, rows = [], canEdit, defaults, onClose, onSave, o
       }
     >
       <form id="record-form" className="form-grid" onSubmit={submit}>
+        {aviso}
         {def.comFoto && !comTamanhos && (
           <FotoCampo valor={typeof data.foto === 'string' ? data.foto : ''} disabled={!canEdit} grande={def.fotoGrande} titulo={String(data[def.fields[0].key] ?? '')} onChange={(foto) => setData((d) => ({ ...d, foto }))} />
         )}

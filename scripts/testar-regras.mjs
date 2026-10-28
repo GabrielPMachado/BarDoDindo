@@ -347,6 +347,7 @@ if (senhaAdministrativo) {
   await permitido('abrir o PDF anexado', async () => { await getDoc(anexo); await getDoc(doc(db, 'anexos', anexo.id, 'partes', '0')); });
   await negado('anexar PDF a um cadastro de outra área (RH)', () => anexar({ colecao: 'colaboradores' }));
   await negado('anexar PDF a um cadastro que não aceita anexos', () => anexar({ colecao: 'reservas' }));
+  await negado('anexar PDF numa publicação da Gestão de mídias (outra área: Marketing)', () => anexar({ colecao: 'midias' }));
   await negado('anexar PDF em nome de outra pessoa', () => anexar({ criadoPor: 'outro' }));
   await negado('anexar PDF acima de 5 MB', () => anexar({ tamanho: 6 * 1024 * 1024 }));
   await negado('anexar PDF com campo extra', () => anexar({ publico: true }));
