@@ -2180,7 +2180,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
         if (col === 'materiais') patch.local = principal;
         // a unidade trocada na nota corrige o cadastro (ex.: gin cadastrado em "ml" que é comprado por garrafa)
         if (sinal > 0 && col === 'estoque' && it.unidade && it.unidade !== cur.unidade) patch.unidade = it.unidade;
-        if (sinal > 0 && col === 'estoque') Object.assign(patch, { custo: it.valorUnitario, ...fornecedorDaCompra(cur, compra) });
+        // a barra de nível do Estoque recomeça cheia: o total depois da compra vira a referência
+        if (sinal > 0 && col === 'estoque') Object.assign(patch, { custo: it.valorUnitario, cheio: quantidade, ...fornecedorDaCompra(cur, compra) });
         if (sinal > 0 && col === 'materiais') Object.assign(patch, { valor: it.valorUnitario, aquisicao: compra.data || '', ...fornecedorDaCompra(cur, compra) });
         lote.update(doc(db, col, cur.id), patch);
         item = { ...cur, ...patch };
@@ -2189,7 +2190,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
         const ref = doc(collection(db, col));
         it.itemId = ref.id;
         item = col === 'estoque'
-          ? { item: it.nome, categoria: it.categoria || 'Outros', unidade: it.unidade || 'un', locais, quantidade, custo: it.valorUnitario, fornecedor: compra.fornecedor ?? '', fornecedorId: compra.fornecedorId ?? null, criadoEm: t, atualizadoEm: t }
+          ? { item: it.nome, categoria: it.categoria || 'Outros', unidade: it.unidade || 'un', locais, quantidade, cheio: quantidade, custo: it.valorUnitario, fornecedor: compra.fornecedor ?? '', fornecedorId: compra.fornecedorId ?? null, criadoEm: t, atualizadoEm: t }
           : { material: it.nome, tipo: it.tipo || 'Utensílio', locais, quantidade, local: principal, estado: 'Novo', valor: it.valorUnitario, aquisicao: compra.data || '', fornecedor: compra.fornecedor ?? '', fornecedorId: compra.fornecedorId ?? null, criadoEm: t, atualizadoEm: t };
         lote.set(ref, item);
         item.id = ref.id;

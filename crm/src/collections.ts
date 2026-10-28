@@ -32,6 +32,8 @@ export interface Field {
   livre?: boolean;
   /** Vínculo que aceita mais de um (ex.: vários fornecedores): o primeiro fica em `key`/`refKey` e os demais nesta chave, como lista de { nome, id }. */
   outros?: string;
+  /** Link (url) que aceita mais de um (ex.: loja alternativa): o primeiro fica em `key` e os demais nesta chave, como lista de textos. */
+  outrosLinks?: string;
   /** Campo de link (url): vira um botão na linha da tabela ("comprar" = carrinho, "site" = site do fornecedor). */
   acao?: 'comprar' | 'site';
   /** Ao escolher um item, copia outros dados dele (campo do registro → campo do item). */
@@ -51,6 +53,12 @@ export function vinculosDe(r: Record<string, unknown>, f: Field): Vinculo[] {
   return [principal, ...outros];
 }
 
+/** Todos os links de um campo que aceita mais de um: o principal primeiro e depois os outros (sem os vazios). */
+export function linksDe(r: Record<string, unknown>, f: Field): string[] {
+  const outros = f.outrosLinks && Array.isArray(r[f.outrosLinks]) ? (r[f.outrosLinks] as unknown[]) : [];
+  return [r[f.key], ...outros].map((v) => String(v ?? '').trim()).filter(Boolean);
+}
+
 /** Limites efetivos de um campo numérico, com padrões seguros por tipo. */
 export function numberSpec(f: Field) {
   if (f.type === 'money') return { money: true, decimals: 2, min: f.min ?? 0, max: f.max ?? 9_999_999.99 };
@@ -63,8 +71,10 @@ export type Tone = 'good' | 'warn' | 'bad' | 'info' | 'neutral';
 export interface Computed {
   label: string;
   get: (r: Row) => string | number | null;
-  format?: 'money' | 'number' | 'percent' | 'badge' | 'text';
+  /** "nivel": barra de 0 a 1 (o `get` devolve a fração), com o `detalhe` embaixo. */
+  format?: 'money' | 'number' | 'percent' | 'badge' | 'text' | 'nivel';
   tone?: (r: Row) => Tone;
+  detalhe?: (r: Row) => string;
 }
 
 export interface Kpi {
@@ -135,6 +145,28 @@ const s = (v: unknown) => String(v ?? '');
 const count = (rows: Row[], key: string, values: string[]) => rows.filter((r) => values.includes(s(r[key]))).length;
 const sum = (rows: Row[], key: string) => rows.reduce((t, r) => t + n(r[key]), 0);
 const juntar = (...partes: unknown[]) => partes.map(s).filter(Boolean).join(' · ');
+
+const MEDIDAS = ['kg', 'g', 'L', 'ml'];
+const qtd = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+
+/**
+ * Nível do item do Estoque (barra): o saldo contra a quantidade cheia. A referência é o campo `cheio`, que a Entrada de notas
+ * atualiza sozinha (o total logo depois da última compra) e que dá para ajustar à mão. Sem ela, o item contado em unidades com
+ * conteúdo (ex.: barril de 50 L) usa as unidades inteiras: 2,4 barris = 3 barris, um deles aberto com 40%.
+ */
+export function nivelEstoque(r: Record<string, unknown>) {
+  const q = Math.max(0, n(r.quantidade)), un = s(r.unidade) || 'un';
+  const conteudo = n(r.conteudo), cu = s(r.conteudoUnidade) || 'ml';
+  const porUnidade = conteudo > 0 && !MEDIDAS.includes(un);
+  const cheio = n(r.cheio) > 0 ? n(r.cheio) : porUnidade ? Math.max(1, Math.ceil(q - 1e-6)) : 0;
+  if (!(cheio > 0)) return null;
+  const fracao = Math.min(1, q / cheio);
+  // a unidade aberta (barril, garrafa): quanto resta nela
+  const resto = porUnidade ? q - Math.floor(q + 1e-6) : 0;
+  const aberto = resto > 1e-6 ? ` · aberto: ${qtd(resto * conteudo)} ${cu}` : '';
+  const tone: Tone = (n(r.minimo) && q <= n(r.minimo)) || fracao <= 0.25 ? 'bad' : fracao <= 0.5 ? 'warn' : 'good';
+  return { fracao, tone, detalhe: `${qtd(q)} de ${qtd(cheio)} ${un}${aberto}` };
+}
 
 /** Produto principal com tamanhos (ex.: Chopp Pilsen): não é vendido nem conta como item; cada tamanho é um produto. */
 export const temTamanhos = (r: Record<string, unknown>) => r.comTamanhos === 'Sim' && !r.pai;
@@ -299,12 +331,15 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'conteudoUnidade', label: 'Medida do conteúdo', type: 'select', options: ['ml', 'L', 'g', 'kg'], default: 'ml', formOnly: true },
       { key: 'quantidade', label: 'Quantidade', type: 'number', required: true, decimals: 3, max: 1_000_000 },
       { key: 'minimo', label: 'Estoque mínimo', type: 'number', decimals: 3, max: 1_000_000 },
+      // referência da barra de nível: a Entrada de notas põe aqui o total depois da compra
+      { key: 'cheio', label: 'Quantidade cheia (barra de nível)', type: 'number', decimals: 3, max: 1_000_000, formOnly: true, placeholder: 'Vazio: a nota de compra preenche' },
       { key: 'custo', label: 'Custo unitário', type: 'money', max: 100_000 },
       { key: 'fornecedor', label: 'Fornecedor', type: 'ref', ref: 'fornecedores', refKey: 'fornecedorId', livre: true, formOnly: true, outros: 'outrosFornecedores' },
-      { key: 'link', label: 'Link para compra', type: 'url', formOnly: true, wide: true, acao: 'comprar', placeholder: 'Cole aqui o link do produto na loja' },
+      { key: 'link', label: 'Link para compra', type: 'url', formOnly: true, wide: true, acao: 'comprar', outrosLinks: 'outrosLinks', placeholder: 'Cole aqui o link do produto na loja' },
       { key: 'validade', label: 'Validade', type: 'date' },
     ],
     computed: [
+      { label: 'Nível', format: 'nivel', get: (r) => nivelEstoque(r)?.fracao ?? null, tone: (r) => nivelEstoque(r)?.tone ?? 'neutral', detalhe: (r) => nivelEstoque(r)?.detalhe ?? '' },
       { label: 'Locais', format: 'text', get: (r) => resumoLocais(locaisDe(r)) || null },
       { label: 'Valor em estoque', get: (r) => n(r.quantidade) * n(r.custo), format: 'money' },
       {
@@ -337,7 +372,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'valor', label: 'Valor unitário', type: 'money', max: 10_000_000 },
       { key: 'aquisicao', label: 'Aquisição', type: 'date' },
       { key: 'fornecedor', label: 'Fornecedor', type: 'ref', ref: 'fornecedores', refKey: 'fornecedorId', livre: true, formOnly: true, outros: 'outrosFornecedores' },
-      { key: 'link', label: 'Link para compra', type: 'url', formOnly: true, wide: true, acao: 'comprar', placeholder: 'Cole aqui o link do produto na loja' },
+      { key: 'link', label: 'Link para compra', type: 'url', formOnly: true, wide: true, acao: 'comprar', outrosLinks: 'outrosLinks', placeholder: 'Cole aqui o link do produto na loja' },
       { key: 'observacoes', label: 'Observações', type: 'textarea', formOnly: true, wide: true },
     ],
     computed: [{ label: 'Locais', format: 'text', get: (r) => resumoLocais(locaisDe(r)) || null }],

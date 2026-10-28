@@ -3,7 +3,7 @@
  * data, colunas no formato certo (dinheiro, datas, status coloridos), totais e as fotos dos registros.
  * As bibliotecas (ExcelJS e jsPDF) só são baixadas quando alguém exporta.
  */
-import { STATUS_KEYS, toneOf, vinculosDe, type CollectionDef, type Tone } from '../collections';
+import { linksDe, STATUS_KEYS, toneOf, vinculosDe, type CollectionDef, type Tone } from '../collections';
 import type { Row } from './data';
 import { brl, dateBR, num } from './format';
 import { maskCnpj, maskPhone } from './masks';
@@ -29,13 +29,14 @@ export function colunasDe(def: CollectionDef): Coluna[] {
         : f.type === 'time' ? (r: Row) => String(r[f.key] ?? '').slice(0, 5)
           // vínculo com vários (ex.: fornecedores): todos na mesma célula
           : f.outros ? (r: Row) => vinculosDe(r, f).map((v) => v.nome).filter(Boolean).join(', ')
+            : f.outrosLinks ? (r: Row) => linksDe(r, f).join(', ')
             : (r: Row) => r[f.key];
     cols.push({ titulo: f.outros ? `${f.label}(es)` : f.label, tipo, valor });
   }
   for (const c of def.computed ?? []) {
-    const tipo: TipoColuna = c.format === 'money' ? 'dinheiro' : c.format === 'number' ? 'numero' : c.format === 'percent' ? 'percentual' : c.format === 'badge' ? 'status' : 'texto';
+    const tipo: TipoColuna = c.format === 'money' ? 'dinheiro' : c.format === 'number' ? 'numero' : c.format === 'percent' || c.format === 'nivel' ? 'percentual' : c.format === 'badge' ? 'status' : 'texto';
     // percentuais calculados vêm como fração (0,743 = 74,3%); nas exportações, como nos campos, vão de 0 a 100
-    const valor = c.format === 'percent' ? (r: Row) => { const v = c.get(r); return v === null || v === undefined || v === '' ? v : Number(v) * 100; } : c.get;
+    const valor = c.format === 'percent' || c.format === 'nivel' ? (r: Row) => { const v = c.get(r); return v === null || v === undefined || v === '' ? v : Number(v) * 100; } : c.get;
     cols.push({ titulo: c.label, tipo, valor });
   }
   return cols;
