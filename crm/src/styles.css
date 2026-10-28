@@ -1940,6 +1940,7 @@ button.anexos__nome:hover { text-decoration: underline; }
 .tamanho-de { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); font-size: 13.5px; }
 .mover-aviso { display: flex; align-items: flex-start; gap: 10px; margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); font-size: 13.5px; line-height: 1.45; }
 .mover-aviso svg { flex: none; margin-top: 2px; color: var(--brand-light); }
+.mover-destinos { flex-wrap: wrap; flex-shrink: 1; max-width: 100%; }
 
 /* contador oficial de afilhados (Clientes): número grande ao vivo */
 .contador { position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 22px 20px 18px; text-align: center; border-radius: 18px; border: 1px solid var(--border-strong); background: radial-gradient(90% 140% at 50% 0%, #3a1f14 0%, #1a1210 55%, var(--surface) 100%); box-shadow: 0 18px 40px #0009, inset 0 1px 0 #ffffff12; }
