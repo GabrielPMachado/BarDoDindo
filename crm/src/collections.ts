@@ -1,7 +1,7 @@
 import type { Row } from './lib/data';
 import { brl, daysUntil, isoToday, num, pct } from './lib/format';
 import { calcularFicha, fichaDe, precoNormalizado } from './lib/ficha';
-import { locaisDe, resumoLocais } from './lib/locais';
+import { locaisDe, locaisNoFormulario, resumoLocais } from './lib/locais';
 
 export type FieldType = 'text' | 'textarea' | 'number' | 'money' | 'date' | 'select' | 'email' | 'phone' | 'percent' | 'cnpj' | 'time' | 'ref' | 'url' | 'check';
 
@@ -132,6 +132,8 @@ export interface CollectionDef {
   ocultarNaLista?: (r: Row, filtros: Record<string, string>) => boolean;
   /** Como um registro deste módulo vira despesa no DRE: pré-preenche a tela "Lançar despesa" (a pessoa confere antes de lançar). */
   despesa?: (r: Row) => DespesaSugerida;
+  /** Campos que ficam vazios ao duplicar um registro (ex.: saldo, nº de patrimônio, contatos da pessoa). */
+  naoCopiar?: string[];
 }
 
 export interface DespesaSugerida {
@@ -250,6 +252,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'status', label: 'Situação', type: 'select', options: ['Ativo', 'Férias', 'Afastado', 'Desligado'], default: 'Ativo' },
       { key: 'observacoes', label: 'Observações', type: 'textarea', formOnly: true, wide: true },
     ],
+    naoCopiar: ['telefone', 'email', 'admissao'],
     kpis: (rows) => {
       const ativos = rows.filter((r) => r.status !== 'Desligado');
       return [
@@ -339,6 +342,8 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'link', label: 'Link para compra', type: 'url', formOnly: true, wide: true, acao: 'comprar', outrosLinks: 'outrosLinks', placeholder: 'Cole aqui o link do produto na loja' },
       { key: 'validade', label: 'Validade', type: 'date' },
     ],
+    // o item novo começa sem saldo (os locais ficam, zerados): a quantidade entra pela nota de compra ou à mão
+    naoCopiar: ['quantidade', 'cheio', 'validade'],
     computed: [
       { label: 'Nível', format: 'nivel', get: (r) => nivelEstoque(r)?.fracao ?? null, tone: (r) => nivelEstoque(r)?.tone ?? 'neutral', detalhe: (r) => nivelEstoque(r)?.detalhe ?? '' },
       { label: 'Locais', format: 'text', get: (r) => resumoLocais(locaisDe(r)) || null },
@@ -402,6 +407,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'descricaoReserva', label: 'Descrição no app (categoria Reserva)', type: 'textarea', formOnly: true, wide: true, placeholder: 'Ex.: Dois controles e os jogos de futebol e corrida. Aparece para o afilhado ao reservar.' },
       { key: 'observacoes', label: 'Observações', type: 'textarea', formOnly: true, wide: true },
     ],
+    naoCopiar: ['plaqueta'],
     computed: [
       { label: 'Valor de aquisição', get: (r) => n(r.quantidade || 1) * n(r.valor), format: 'money' },
       { label: 'Valor atual', get: (r) => valorAtualDoBem(r), format: 'money' },
@@ -772,6 +778,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'status', label: 'Status', type: 'select', options: ['Em andamento', 'Acordo', 'Encerrado (favorável)', 'Encerrado (desfavorável)'], default: 'Em andamento' },
       { key: 'observacoes', label: 'Andamento', type: 'textarea', formOnly: true, wide: true },
     ],
+    naoCopiar: ['numero'],
     kpis: (rows) => {
       const ativos = rows.filter((r) => ['Em andamento', 'Acordo'].includes(s(r.status)));
       return [
@@ -1176,3 +1183,37 @@ export const termos = (def: CollectionDef) => ({
   nenhum: `${def.feminino ? 'Nenhuma' : 'Nenhum'} ${def.singular} ${def.feminino ? 'cadastrada' : 'cadastrado'}`,
   detalhes: `Detalhes ${def.feminino ? 'da' : 'do'} ${def.singular}`,
 });
+
+/** Dá para duplicar? A nota de compra não (lançar de novo somaria as quantidades outra vez no estoque). */
+export const podeDuplicar = (def: CollectionDef) => !def.compra;
+
+/**
+ * Dados de um registro novo a partir de outro ("Duplicar"): copia os campos do cadastro, a foto e a ficha técnica,
+ * e deixa de fora o que é só daquele registro (identificador, datas de criação, PDFs anexados, saldo, nº de patrimônio,
+ * CNPJ…). O status volta ao inicial e o nome ganha "(cópia)" para não confundir com o original.
+ * Um tamanho duplicado vira um produto solto (sem o item principal).
+ */
+export function copiaDe(def: CollectionDef, r: Record<string, unknown>): Record<string, unknown> {
+  const d: Record<string, unknown> = {};
+  for (const f of def.fields) {
+    if (def.naoCopiar?.includes(f.key) || f.type === 'cnpj') continue;
+    d[f.key] = f.key === 'status' && f.default !== undefined ? f.default : r[f.key];
+    if (f.refKey) d[f.refKey] = r[f.refKey];
+    if (f.outros) d[f.outros] = r[f.outros];
+    if (f.outrosLinks) d[f.outrosLinks] = r[f.outrosLinks];
+    for (const extra of Object.keys(f.fill ?? {})) if (!(extra in d)) d[extra] = r[extra];
+  }
+  if (def.tamanhos && r.pai) { delete d.tamanho; delete d.comTamanhos; }
+  if (def.comFoto && !temTamanhos(r)) d.foto = r.foto ?? '';
+  if (def.fotoJunto) d.fotoJunto = r.fotoJunto ?? '';
+  if (def.fichaTecnica) d.ficha = r.ficha;
+  if (def.porLocal) {
+    // os mesmos locais; sem saldo, se a quantidade não é copiada
+    const zerar = def.naoCopiar?.includes('quantidade');
+    d.locais = Object.fromEntries(Object.entries(locaisNoFormulario(r)).map(([k, v]) => [k, zerar ? 0 : v]));
+    if (zerar) d.quantidade = 0;
+  }
+  const titulo = def.fields[0];
+  if (titulo.type === 'text' && String(d[titulo.key] ?? '').trim()) d[titulo.key] = `${String(d[titulo.key]).trim()} (cópia)`;
+  return d;
+}

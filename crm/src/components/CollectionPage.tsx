@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useState, type DragEvent, type ReactNode, Fragment } from 'react';
-import { ArrowDown, ArrowLeftRight, ArrowUp, Camera, ChevronDown, ChevronRight, Download, FileSpreadsheet, FileText, Globe, ImageOff, Maximize2, Paperclip, Pencil, Plus, Receipt, Search, Sheet, ShoppingCart, Sparkles, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowLeftRight, ArrowUp, Camera, ChevronDown, ChevronRight, CopyPlus, Download, FileSpreadsheet, FileText, Globe, ImageOff, Maximize2, Paperclip, Pencil, Plus, Receipt, Search, Sheet, ShoppingCart, Sparkles, Trash2, X } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { findModule } from '../modules';
-import { linksDe, numberSpec, STATUS_KEYS, temTamanhos, termos, toneOf, vinculosDe, type CollectionDef, type Computed, type Field } from '../collections';
+import { copiaDe, linksDe, numberSpec, podeDuplicar, STATUS_KEYS, temTamanhos, termos, toneOf, vinculosDe, type CollectionDef, type Computed, type Field } from '../collections';
 import { maskCnpj, maskPhone } from '../lib/masks';
 import { useCollection, type Row } from '../lib/data';
 import { brl, dateBR, num, pct } from '../lib/format';
@@ -130,6 +130,11 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   const [sort, setSort] = useState<{ key: string; dir: 'asc' | 'desc' }>({ key: def.sortKey ?? def.fields[0].key, dir: def.sortDir ?? 'asc' });
   const [page, setPage] = useState(0);
   const [editing, setEditing] = useState<Row | 'new' | null>(null);
+  // "Duplicar": o formulário de criação abre preenchido com os dados deste registro
+  const [modelo, setModelo] = useState<Row | null>(null);
+  const novo = () => { setModelo(null); setEditing('new'); };
+  const duplicavel = canCreate && podeDuplicar(def);
+  const duplicar = (r: Row) => { setModelo(r); setEditing('new'); };
   const [refazendoFotos, setRefazendoFotos] = useState(false);
   const [lancando, setLancando] = useState<Row | null>(null);
   const [transferindo, setTransferindo] = useState<Row | null>(null);
@@ -364,7 +369,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
             {def.fotoPadrao === 'estoque' && canEdit && (
               <button className="btn btn--ghost" disabled={!all.length} onClick={() => setRefazendoFotos(true)}><Sparkles size={16} /> Refazer fotos em alta</button>
             )}
-            {canCreate && <button className="btn btn--primary" onClick={() => setEditing('new')}><Plus size={16} /> {termos(def).novo}</button>}
+            {canCreate && <button className="btn btn--primary" onClick={novo}><Plus size={16} /> {termos(def).novo}</button>}
           </>
         }
       />
@@ -456,7 +461,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
         ) : all.length === 0 ? (
           <EmptyState
             title={termos(def).nenhum}
-            action={canCreate ? <button className="btn btn--primary" onClick={() => setEditing('new')}><Plus size={16} /> Cadastrar</button> : undefined}
+            action={canCreate ? <button className="btn btn--primary" onClick={novo}><Plus size={16} /> Cadastrar</button> : undefined}
           >
             {canCreate ? 'Comece cadastrando o primeiro registro.' : 'Ainda não há registros nesta área.'}
           </EmptyState>
@@ -565,6 +570,11 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
                             <Receipt size={16} />
                           </button>
                         )}
+                        {duplicavel && (
+                          <button className="icon-btn" onClick={() => duplicar(r)} aria-label={`Duplicar ${tituloDe(r)}`} title="Duplicar (criar um parecido)">
+                            <CopyPlus size={16} />
+                          </button>
+                        )}
                         <button className="icon-btn" onClick={() => setEditing(r)} aria-label={canEdit ? 'Editar' : 'Visualizar'} title={canEdit ? 'Editar' : 'Visualizar'}>
                           <Pencil size={16} />
                         </button>
@@ -617,10 +627,12 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
 
       {editing && (
         <RecordForm
-          key={editing === 'new' ? 'novo' : editing.id}
+          key={editing === 'new' ? `novo:${modelo?.id ?? ''}` : editing.id}
           def={def}
           row={editing === 'new' ? null : editing}
+          modelo={editing === 'new' ? modelo : null}
           rows={col.rows}
+          onDuplicar={duplicavel && editing !== 'new' ? () => duplicar(editing) : undefined}
           // dos tamanhos para o item principal e de volta (cada tamanho abre com a sua ficha técnica)
           onAbrir={(r) => setEditing(r)}
           // registro novo depende de "Criar"; um existente, de "Editar"
@@ -642,7 +654,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
               // nota de compra: já abre "Lançar despesa" preenchida (dá para fechar e lançar depois)
               if (def.lancarAoCriar && def.despesa && canEdit) setLancando(novo as Row);
             } else await col.update(editing.id, data);
-            notify(editing === 'new' ? (def.compra ? 'Nota lançada: as quantidades já entraram no estoque' : 'Registro criado') : 'Alterações salvas');
+            notify(editing === 'new' ? (def.compra ? 'Nota lançada: as quantidades já entraram no estoque' : modelo ? 'Cópia criada' : 'Registro criado') : 'Alterações salvas');
             setEditing(null);
           }}
           destinos={editing !== 'new' && canDelete ? destinos : []}
@@ -712,14 +724,18 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   );
 }
 
-function RecordForm({ def, row, rows = [], canEdit, defaults, titulo, aviso, destinos = [], onClose, onSave, onDelete, onAbrir, onMover }: {
+function RecordForm({ def, row, modelo, rows = [], canEdit, defaults, titulo, aviso, destinos = [], onClose, onSave, onDelete, onAbrir, onMover, onDuplicar }: {
   def: CollectionDef; row: Row | null; rows?: Row[]; canEdit: boolean; defaults?: Record<string, unknown>;
   titulo?: string; aviso?: ReactNode; destinos?: CollectionDef[];
+  /** Registro novo copiado deste ("Duplicar"). */
+  modelo?: Row | null;
   onClose: () => void; onSave: (d: Record<string, unknown>) => Promise<void>; onDelete?: () => Promise<void>;
   onAbrir?: (r: Row) => void; onMover?: (destino: CollectionDef, dados: Record<string, unknown>) => void;
+  onDuplicar?: () => void;
 }) {
   const [data, setData] = useState<Record<string, unknown>>(() => {
     if (row) return { ...row };
+    if (modelo) return copiaDe(def, modelo);
     const init: Record<string, unknown> = {};
     for (const f of def.fields) if (f.default !== undefined) init[f.key] = f.default;
     return { ...init, ...defaults };
@@ -731,7 +747,9 @@ function RecordForm({ def, row, rows = [], canEdit, defaults, titulo, aviso, des
   // tamanhos do item principal (ex.: chopp de 300 ml, 500 ml e 1 litro): cada um é um produto, com preço e ficha próprios
   const comTamanhos = !!def.tamanhos && temTamanhos(data);
   const salvosTamanhos = useMemo(() => (def.tamanhos && row ? tamanhosDoItem(rows, row.id) : []), [def.tamanhos, row, rows]);
-  const [tamanhos, setTamanhos] = useState<TamanhoRascunho[]>(() => salvosTamanhos.map(rascunhoDe));
+  // na cópia de um item com tamanhos, os tamanhos vêm junto como novos (cada um vira um produto novo ao salvar)
+  const [tamanhos, setTamanhos] = useState<TamanhoRascunho[]>(() =>
+    modelo && def.tamanhos && temTamanhos(modelo) ? tamanhosDoItem(rows, modelo.id).map((t) => ({ ...rascunhoDe(t), id: undefined })) : salvosTamanhos.map(rascunhoDe));
   const marcarTamanhos = (v: unknown) => {
     // um produto que já tinha foto e passa a ter tamanhos: a foto vai para os tamanhos
     if (v === 'Sim' && !tamanhos.length) setTamanhos(TAMANHOS_SUGERIDOS.map((t) => novoTamanho(t, typeof data.foto === 'string' ? data.foto : '')));
@@ -849,7 +867,7 @@ function RecordForm({ def, row, rows = [], canEdit, defaults, titulo, aviso, des
     />
   );
 
-  const title = titulo ?? (row ? (canEdit ? `Editar ${def.singular}` : termos(def).detalhes) : termos(def).novo);
+  const title = titulo ?? (row ? (canEdit ? `Editar ${def.singular}` : termos(def).detalhes) : modelo ? `${termos(def).novo} (cópia)` : termos(def).novo);
   const [menuMover, setMenuMover] = useState<MenuPos | null>(null);
   // leva o que está no formulário (mesmo o que ainda não foi salvo)
   const mover = (d: CollectionDef) => onMover?.(d, { ...row, ...data });
@@ -864,6 +882,11 @@ function RecordForm({ def, row, rows = [], canEdit, defaults, titulo, aviso, des
             <AsyncButton className="btn btn--danger" onClick={onDelete} confirm={{ title: `Excluir ${def.feminino ? 'esta' : 'este'} ${def.singular}?`, message: 'Esta ação não pode ser desfeita.', confirmLabel: 'Excluir', danger: true }}>
               <Trash2 size={16} /> Excluir
             </AsyncButton>
+          )}
+          {onDuplicar && (
+            <button className="btn btn--ghost" type="button" onClick={onDuplicar} aria-label="Duplicar" title="Abre um cadastro novo com os dados deste, para criar um parecido">
+              <CopyPlus size={16} /> <span className="btn-duplicar__texto">Duplicar</span>
+            </button>
           )}
           {onMover && destinos.length > 0 && (
             <button
@@ -889,6 +912,15 @@ function RecordForm({ def, row, rows = [], canEdit, defaults, titulo, aviso, des
       }
     >
       <form id="record-form" className="form-grid" onSubmit={submit}>
+        {modelo && (
+          <p className="copia-de form-field--wide">
+            <CopyPlus size={15} />
+            <span>
+              Cópia de <b>{String(modelo[def.fields[0].key] ?? '').trim() || def.singular}</b>: confira, ajuste o que muda e salve para criar {def.feminino ? 'a nova' : 'o novo'}.
+              {' '}{naoCopiados(def, modelo)}
+            </span>
+          </p>
+        )}
         {aviso}
         {def.comFoto && !comTamanhos && (
           <FotoCampo valor={typeof data.foto === 'string' ? data.foto : ''} disabled={!canEdit} grande={def.fotoGrande} titulo={String(data[def.fields[0].key] ?? '')} onChange={(foto) => setData((d) => ({ ...d, foto }))} />
@@ -964,6 +996,17 @@ function RecordForm({ def, row, rows = [], canEdit, defaults, titulo, aviso, des
       </form>
     </Modal>
   );
+}
+
+/** O que a cópia deixou de fora, para avisar no formulário. */
+function naoCopiados(def: CollectionDef, modelo: Row) {
+  const fora = def.fields.filter((f) => (def.naoCopiar?.includes(f.key) || f.type === 'cnpj') && modelo[f.key] !== undefined && modelo[f.key] !== '' && modelo[f.key] !== null)
+    .map((f) => f.label.replace(/\s*\(.*\)$/, '').toLocaleLowerCase('pt-BR'));
+  if (def.anexos && anexosDe(modelo.anexos).length) fora.push('PDFs anexados');
+  if (def.tamanhos && modelo.pai) fora.push('vínculo com o item principal (vira um produto solto)');
+  if (!fora.length) return null;
+  const lista = fora.length > 1 ? `${fora.slice(0, -1).join(', ')} e ${fora[fora.length - 1]}` : fora[0];
+  return <span className="muted">Não {fora.length > 1 ? 'foram copiados' : 'foi copiado'}: {lista}.</span>;
 }
 
 /** Foto do registro: escolher (a imagem é reduzida antes de salvar), trocar ou remover. */
