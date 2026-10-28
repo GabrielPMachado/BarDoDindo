@@ -1938,3 +1938,6 @@ button.anexos__nome:hover { text-decoration: underline; }
   .tamanhos__acoes { grid-column: 1 / -1; justify-content: space-between; }
 }
 .tamanho-de { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); font-size: 13.5px; }
+
+/* afilhados de número reservado (#001, #002…): destaque na lista de clientes */
+.table tr.row--destaque { background: color-mix(in srgb, var(--brand) 9%, transparent); }
