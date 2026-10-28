@@ -43,11 +43,9 @@ const unidadeDaReceita = (base: string, atual: string) => {
  * Ficha técnica do produto: insumos com quantidade e custo (do Estoque ou do fornecedor escolhido),
  * rendimento e perdas. Calcula custo por porção, CMV, margem e o preço sugerido para o CMV desejado.
  */
-const CHAVE_RECOLHIDA = 'crm.fichaRecolhida';
-
 export function FichaTecnica({ ficha, preco, nome, disabled, preMarcar, recolhivel, onChange, onUsarPreco }: {
   ficha: Ficha; preco: number; nome: string; disabled: boolean;
-  /** Dá para fechar a ficha pelo título (fica lembrado neste navegador). */
+  /** A ficha começa fechada e abre pelo título. */
   recolhivel?: boolean;
   /** Ficha nova (tela "Fichas técnicas"): já marca os itens fixos "padrão", como o gelo. */
   preMarcar?: boolean;
@@ -69,13 +67,8 @@ export function FichaTecnica({ ficha, preco, nome, disabled, preMarcar, recolhiv
   const fixosNaTela = [...fixosAtivos, ...ficha.fixos.filter((x) => !fixosAtivos.some((g) => g.id === x.id)).map((x) => ({ ...x, padrao: false }))];
   const temReceita = ficha.itens.length > 0 || ficha.fixos.length > 0;
   const c = calcularFicha(ficha, preco);
-  const [recolhida, setRecolhida] = useState(() => {
-    try { return !!recolhivel && localStorage.getItem(CHAVE_RECOLHIDA) === '1'; } catch { return false; }
-  });
-  const alternarRecolhida = () => setRecolhida((r) => {
-    try { localStorage.setItem(CHAVE_RECOLHIDA, r ? '0' : '1'); } catch { /* sem armazenamento: vale só nesta visita */ }
-    return !r;
-  });
+  // começa fechada: o resumo ao lado do título já mostra o custo por porção e o CMV
+  const [recolhida, setRecolhida] = useState(true);
   const fechada = !!recolhivel && recolhida;
 
   // ao abrir, cada item pega o custo de hoje (do fornecedor escolhido ou do Estoque), uma vez só, quando as listas chegam
@@ -152,7 +145,7 @@ export function FichaTecnica({ ficha, preco, nome, disabled, preMarcar, recolhiv
     <div className="form-field form-field--wide ficha">
       <div className="ficha__titulo">
         {recolhivel ? (
-          <button type="button" className={`ficha__abrir ${fechada ? '' : 'is-aberta'}`} aria-expanded={!fechada} onClick={alternarRecolhida}>
+          <button type="button" className={`ficha__abrir ${fechada ? '' : 'is-aberta'}`} aria-expanded={!fechada} onClick={() => setRecolhida((r) => !r)}>
             <ClipboardList size={15} /> Ficha técnica <ChevronDown size={14} className="ficha__seta" />
             {fechada && (
               <span className="muted small ficha__resumo-curto">
