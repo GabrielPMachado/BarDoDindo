@@ -27,6 +27,7 @@ import { BarraNivel, LinksDeCompra, VariosLinks } from './Nivel';
 import { PreencherProdutoIA } from './PreencherProdutoIA';
 import { GerarFotoIA } from './GerarFotoIA';
 import { RefazerFotos } from './RefazerFotos';
+import { MoverVarios } from './MoverVarios';
 import { Ampliar } from './Ampliar';
 import { SeletorVisao, VisaoCalendario, VisaoCartoes, VisaoQuadro, campoDoQuadro, useVisao } from './Visoes';
 import { CompraItens, itemVazio, totalItens, type ItemCompra } from './CompraItens';
@@ -280,6 +281,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   const algunsNaPagina = visible.some((r) => sel.has(r.id));
   const marcarPagina = (on: boolean) => setSel((x) => { const n = new Set(x); for (const r of visible) { if (on) n.add(r.id); else n.delete(r.id); } return n; });
   const [excluindo, setExcluindo] = useState(false);
+  const [movendoVarios, setMovendoVarios] = useState(false);
   /** Quadro: arrastar o cartão para outra coluna muda o status. */
   const moverNoQuadro = async (r: Row, valor: string) => {
     const campo = campoDoQuadro(def);
@@ -433,6 +435,11 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
               <button className="btn btn--ghost btn--sm" disabled={exportando} onClick={() => exportar('pdf')}><FileText size={14} /> PDF</button>
               <button className="btn btn--ghost btn--sm" disabled={exportando} onClick={() => exportar('xlsx')}><FileSpreadsheet size={14} /> Excel</button>
               <button className="btn btn--ghost btn--sm" onClick={exportCsv}><Sheet size={14} /> CSV</button>
+              {canDelete && destinos.length > 0 && (
+                <button className="btn btn--ghost btn--sm" onClick={() => setMovendoVarios(true)}>
+                  <ArrowLeftRight size={14} /> {destinos.length === 1 ? `Mover para ${destinos[0].title}` : 'Mover para…'}
+                </button>
+              )}
               {canDelete && (
                 <button className="btn btn--danger btn--sm" disabled={excluindo} onClick={() => void excluirSelecionados()}>
                   <Trash2 size={14} /> {excluindo ? 'Excluindo…' : 'Excluir'}
@@ -652,6 +659,12 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
                 }
               : undefined
           }
+        />
+      )}
+      {movendoVarios && (
+        <MoverVarios
+          def={def} rows={selecionados} destinos={destinos} onClose={() => setMovendoVarios(false)}
+          onFim={async (movidos) => { for (const id of movidos) marcar(id, false); await col.reload(); }}
         />
       )}
       {movendo && (() => {

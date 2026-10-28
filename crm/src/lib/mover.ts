@@ -5,7 +5,7 @@
  */
 import { COLLECTIONS, type CollectionDef, type Field } from '../collections';
 import type { Row } from './data';
-import { locaisDe } from './locais';
+import { camposDosLocais, locaisDe } from './locais';
 
 /** Telas que seguem o mesmo fluxo: um registro de uma pode ir para outra. */
 const FAMILIAS = [
@@ -85,4 +85,28 @@ export function dadosParaMover(origem: CollectionDef, destino: CollectionDef, ro
   if (row.foto && !destino.comFoto) ficam.push('Foto');
   if (Array.isArray(row.anexos) && row.anexos.length && !destino.anexos) ficam.push('Anexos');
   return { dados, ficam };
+}
+
+/**
+ * Mover vários de uma vez (sem abrir o formulário de cada um): o corpo do registro novo, no formato que o
+ * formulário grava. `extras` preenche os obrigatórios que o item não tem (ex.: o Canal, na Gestão de mídias).
+ */
+export function registroParaMover(destino: CollectionDef, dados: Record<string, unknown>, extras: Record<string, unknown> = {}) {
+  const corpo: Record<string, unknown> = {};
+  for (const f of destino.fields) {
+    corpo[f.key] = vazio(dados[f.key]) ? (extras[f.key] ?? f.default ?? '') : dados[f.key];
+    if (f.refKey) corpo[f.refKey] = dados[f.refKey] ?? null;
+    if (f.outros) corpo[f.outros] = Array.isArray(dados[f.outros]) ? dados[f.outros] : [];
+    if (f.outrosLinks) corpo[f.outrosLinks] = Array.isArray(dados[f.outrosLinks]) ? dados[f.outrosLinks] : [];
+  }
+  if (destino.comFoto) corpo.foto = dados.foto ?? '';
+  if (destino.porLocal) Object.assign(corpo, camposDosLocais(locaisDe(dados), destino.fields.some((f) => f.key === 'local')));
+  const falta = destino.fields.find((f) => f.required && vazio(corpo[f.key]));
+  return { corpo, falta: falta?.label };
+}
+
+/** Campos obrigatórios do destino que algum dos itens não tem como preencher. */
+export function obrigatoriosQueFaltam(origem: CollectionDef, destino: CollectionDef, rows: Row[]): Field[] {
+  const todos = rows.map((r) => dadosParaMover(origem, destino, r).dados);
+  return destino.fields.filter((f) => f.required && f.default === undefined && todos.some((d) => vazio(d[f.key])));
 }
