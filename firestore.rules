@@ -343,7 +343,7 @@ service cloud.firestore {
     // Vale a permissão da área do cadastro de origem: quem vê o cadastro abre o PDF; quem cria ou edita anexa.
     function colecoesComAnexo() {
       return ['metas', 'colaboradores', 'ferias', 'projetos', 'materiais', 'patrimonio', 'compras', 'terceirizados', 'fornecedores', 'contratos',
-        'receitas', 'despesas', 'criacao', 'trabalhista', 'consultoria', 'qualidade', 'naoconformidades',
+        'receitas', 'despesas', 'criacao', 'midias', 'trabalhista', 'consultoria', 'qualidade', 'naoconformidades',
         'publicidade', 'atestados', 'acoes', 'creditos', 'docfin', 'arquivos', 'investimentos', 'prestadores', 'conduta', 'advogados', 'normas', 'equipamentos'];
     }
     function anexaEm(col) { return col in colecoesComAnexo() && (podeColecao(col, 'criar') || podeColecao(col, 'editar')); }

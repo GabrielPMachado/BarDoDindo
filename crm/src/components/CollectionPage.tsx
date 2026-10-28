@@ -27,11 +27,13 @@ import { BarraNivel, LinksDeCompra, VariosLinks } from './Nivel';
 import { PreencherProdutoIA } from './PreencherProdutoIA';
 import { GerarFotoIA } from './GerarFotoIA';
 import { RefazerFotos } from './RefazerFotos';
+import { MoverVarios } from './MoverVarios';
 import { Ampliar } from './Ampliar';
 import { SeletorVisao, VisaoCalendario, VisaoCartoes, VisaoQuadro, campoDoQuadro, useVisao } from './Visoes';
 import { CompraItens, itemVazio, totalItens, type ItemCompra } from './CompraItens';
 import { camposDosLocais, locaisDe, locaisNoFormulario } from '../lib/locais';
 import { calcularFicha, fichaDe, type Ficha } from '../lib/ficha';
+import { dadosParaMover, destinosDe } from '../lib/mover';
 import { conferirTamanhos, fotoDosTamanhos, novoTamanho, rascunhoDe, salvarTamanhos, tirarTamanho, TAMANHOS_SUGERIDOS, TamanhosCampo, tamanhosDoItem, type TamanhoRascunho } from './Tamanhos';
 
 const PAGE = 50;
@@ -136,6 +138,9 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   const [refazendoFotos, setRefazendoFotos] = useState(false);
   const [lancando, setLancando] = useState<Row | null>(null);
   const [transferindo, setTransferindo] = useState<Row | null>(null);
+  // mover para outra tela do mesmo fluxo (ex.: da Gestão de mídias para a Criação): o registro novo abre preenchido
+  const destinos = useMemo(() => destinosDe(def.id).filter((d) => pode(d.area, 'criar')), [def.id, pode]);
+  const [movendo, setMovendo] = useState<{ row: Row; dados: Record<string, unknown>; destino: CollectionDef } | null>(null);
 
   const tableFields = def.fields.filter((f) => !f.formOnly);
 
@@ -281,6 +286,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   const algunsNaPagina = visible.some((r) => sel.has(r.id));
   const marcarPagina = (on: boolean) => setSel((x) => { const n = new Set(x); for (const r of visible) { if (on) n.add(r.id); else n.delete(r.id); } return n; });
   const [excluindo, setExcluindo] = useState(false);
+  const [movendoVarios, setMovendoVarios] = useState(false);
   /** Quadro: arrastar o cartão para outra coluna muda o status. */
   const moverNoQuadro = async (r: Row, valor: string) => {
     const campo = campoDoQuadro(def);
@@ -434,6 +440,11 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
               <button className="btn btn--ghost btn--sm" disabled={exportando} onClick={() => exportar('pdf')}><FileText size={14} /> PDF</button>
               <button className="btn btn--ghost btn--sm" disabled={exportando} onClick={() => exportar('xlsx')}><FileSpreadsheet size={14} /> Excel</button>
               <button className="btn btn--ghost btn--sm" onClick={exportCsv}><Sheet size={14} /> CSV</button>
+              {canDelete && destinos.length > 0 && (
+                <button className="btn btn--ghost btn--sm" onClick={() => setMovendoVarios(true)}>
+                  <ArrowLeftRight size={14} /> {destinos.length === 1 ? `Mover para ${destinos[0].title}` : 'Mover para…'}
+                </button>
+              )}
               {canDelete && (
                 <button className="btn btn--danger btn--sm" disabled={excluindo} onClick={() => void excluirSelecionados()}>
                   <Trash2 size={14} /> {excluindo ? 'Excluindo…' : 'Excluir'}
@@ -646,6 +657,8 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
             notify(editing === 'new' ? (def.compra ? 'Nota lançada: as quantidades já entraram no estoque' : modelo ? 'Cópia criada' : 'Registro criado') : 'Alterações salvas');
             setEditing(null);
           }}
+          destinos={editing !== 'new' && canDelete ? destinos : []}
+          onMover={(destino, dados) => { if (editing !== 'new') { setMovendo({ row: editing, dados, destino }); setEditing(null); } }}
           onDelete={
             editing !== 'new' && canDelete
               ? async () => {
@@ -660,16 +673,64 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
           }
         />
       )}
+      {movendoVarios && (
+        <MoverVarios
+          def={def} rows={selecionados} destinos={destinos} onClose={() => setMovendoVarios(false)}
+          onFim={async (movidos) => { for (const id of movidos) marcar(id, false); await col.reload(); }}
+        />
+      )}
+      {movendo && (() => {
+        const { dados, ficam } = dadosParaMover(def, movendo.destino, movendo.dados as Row);
+        const nome = tituloDe(movendo.row);
+        return (
+          <RecordForm
+            key={`mover-${movendo.row.id}`}
+            def={movendo.destino} row={null} canEdit defaults={dados}
+            titulo={`Mover para ${movendo.destino.title}`}
+            aviso={
+              <p className="mover-aviso form-field--wide">
+                <ArrowLeftRight size={15} />
+                <span>
+                  <b>{nome}</b> sai de {def.title} e passa para {movendo.destino.title}. Confira os campos e salve: o registro antigo é excluído.
+                  {ficam.length > 0 && <> Não vão junto: {ficam.join(', ')}.</>}
+                  {def.id === 'estoque' && <> Fichas técnicas que usam este item deixam de dar baixa nele.</>}
+                </span>
+              </p>
+            }
+            onClose={() => setMovendo(null)}
+            onSave={async (payload) => {
+              // os anexos que ficaram na lista vão como arquivos novos (os da origem são apagados junto com ela)
+              const manter = Array.isArray(payload.anexos) ? (payload.anexos as string[]) : [];
+              const copiados = await Promise.all(manter.map(async (id) => {
+                const a = await api<{ nome: string; dados: string }>(`/crm/anexos/${encodeURIComponent(id)}`);
+                return { nome: a.nome, dados: a.dados };
+              }));
+              const novos = Array.isArray(payload.anexosNovos) ? payload.anexosNovos : [];
+              await api(`/crm/c/${movendo.destino.id}`, { method: 'POST', body: { ...payload, ...(movendo.destino.anexos ? { anexos: [], anexosNovos: [...copiados, ...novos] } : {}) } });
+              setMovendo(null);
+              try {
+                await col.remove(movendo.row.id);
+                notify(`“${nome}” foi para ${movendo.destino.title}`);
+              } catch {
+                // o novo já foi gravado: avisa em vez de deixar salvar de novo (o que duplicaria)
+                notify(`“${nome}” foi copiado para ${movendo.destino.title}, mas não deu para excluir daqui. Exclua manualmente.`, 'error');
+                await col.reload();
+              }
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }
 
-function RecordForm({ def, row, modelo, rows = [], canEdit, defaults, onClose, onSave, onDelete, onAbrir, onDuplicar }: {
+function RecordForm({ def, row, modelo, rows = [], canEdit, defaults, titulo, aviso, destinos = [], onClose, onSave, onDelete, onAbrir, onMover, onDuplicar }: {
   def: CollectionDef; row: Row | null; rows?: Row[]; canEdit: boolean; defaults?: Record<string, unknown>;
+  titulo?: string; aviso?: ReactNode; destinos?: CollectionDef[];
   /** Registro novo copiado deste ("Duplicar"). */
   modelo?: Row | null;
   onClose: () => void; onSave: (d: Record<string, unknown>) => Promise<void>; onDelete?: () => Promise<void>;
-  onAbrir?: (r: Row) => void;
+  onAbrir?: (r: Row) => void; onMover?: (destino: CollectionDef, dados: Record<string, unknown>) => void;
   onDuplicar?: () => void;
 }) {
   const [data, setData] = useState<Record<string, unknown>>(() => {
@@ -800,12 +861,16 @@ function RecordForm({ def, row, modelo, rows = [], canEdit, defaults, onClose, o
     <FichaTecnica
       ficha={fichaDe(data.ficha)} preco={Number(data.preco) || 0} nome={String(data.nome ?? '')} disabled={!canEdit}
       preMarcar={!row && def.fichaPrimeiro}
+      recolhivel={!def.fichaPrimeiro}
       onChange={mudarFicha}
       onUsarPreco={(preco) => setData((d) => ({ ...d, preco }))}
     />
   );
 
-  const title = row ? (canEdit ? `Editar ${def.singular}` : termos(def).detalhes) : modelo ? `${termos(def).novo} (cópia)` : termos(def).novo;
+  const title = titulo ?? (row ? (canEdit ? `Editar ${def.singular}` : termos(def).detalhes) : modelo ? `${termos(def).novo} (cópia)` : termos(def).novo);
+  const [menuMover, setMenuMover] = useState<MenuPos | null>(null);
+  // leva o que está no formulário (mesmo o que ainda não foi salvo)
+  const mover = (d: CollectionDef) => onMover?.(d, { ...row, ...data });
 
   return (
     <Modal
@@ -823,6 +888,23 @@ function RecordForm({ def, row, modelo, rows = [], canEdit, defaults, onClose, o
               <CopyPlus size={16} /> <span className="btn-duplicar__texto">Duplicar</span>
             </button>
           )}
+          {onMover && destinos.length > 0 && (
+            <button
+              type="button" className="btn btn--ghost" title={`Passar ${def.feminino ? 'esta' : 'este'} ${def.singular} para outra tela`}
+              onClick={(e) => {
+                if (destinos.length === 1) return mover(destinos[0]);
+                const r = e.currentTarget.getBoundingClientRect();
+                setMenuMover({ x: r.left, y: Math.max(8, r.top - 8 - 44 * destinos.length) });
+              }}
+            >
+              <ArrowLeftRight size={16} /> {destinos.length === 1 ? `Mover para ${destinos[0].title}` : 'Mover para…'}
+            </button>
+          )}
+          {menuMover && (
+            <ContextMenu at={menuMover} onClose={() => setMenuMover(null)}>
+              {destinos.map((d) => <button key={d.id} role="menuitem" onClick={() => { setMenuMover(null); mover(d); }}>{d.title}</button>)}
+            </ContextMenu>
+          )}
           <span className="spacer" />
           <button className="btn btn--ghost" type="button" onClick={onClose}>{canEdit ? 'Cancelar' : 'Fechar'}</button>
           {canEdit && <button className="btn btn--primary" form="record-form" disabled={busy}>{busy ? 'Salvando…' : 'Salvar'}</button>}
@@ -839,6 +921,7 @@ function RecordForm({ def, row, modelo, rows = [], canEdit, defaults, onClose, o
             </span>
           </p>
         )}
+        {aviso}
         {def.comFoto && !comTamanhos && (
           <FotoCampo valor={typeof data.foto === 'string' ? data.foto : ''} disabled={!canEdit} grande={def.fotoGrande} titulo={String(data[def.fields[0].key] ?? '')} onChange={(foto) => setData((d) => ({ ...d, foto }))} />
         )}

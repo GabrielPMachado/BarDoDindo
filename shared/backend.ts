@@ -227,6 +227,8 @@ const DEFAULT_CONFIG = {
       { id: 'sugestao', texto: 'Agora que você já se tornou um afilhado do Bar do Dindo e conhece nossa proposta, nos diga, nas suas próprias palavras, qualquer conselho, sugestão ou feedback que ache interessante a ponto de agregar à comunidade. Contamos com você, afilhado(a)!', opcoes: [] },
     ] as Pergunta[],
   },
+  /** Meta de afilhados mostrada no contador oficial do Cérebro (0 = sem meta). */
+  metaAfilhados: 0,
 };
 
 /** Perguntas padrão do questionário do afilhado (o Cérebro oferece voltar para elas). */
@@ -340,7 +342,7 @@ function inssEmpregado(salario: number, faixas: { ate: number; aliquota: number 
 /** Cadastros que aceitam PDF (currículo, contratos, notas fiscais, laudos…). Igual a `colecoesComAnexo()` em firestore.rules. */
 export const COM_ANEXOS = [
   'metas', 'colaboradores', 'ferias', 'projetos', 'materiais', 'patrimonio', 'compras', 'terceirizados', 'fornecedores', 'contratos',
-  'receitas', 'despesas', 'criacao', 'trabalhista', 'consultoria', 'qualidade', 'naoconformidades',
+  'receitas', 'despesas', 'criacao', 'midias', 'trabalhista', 'consultoria', 'qualidade', 'naoconformidades',
   'publicidade', 'atestados', 'acoes', 'creditos', 'docfin', 'arquivos', 'investimentos', 'prestadores', 'conduta', 'advogados', 'normas', 'equipamentos',
 ];
 export const ANEXO_MAX_BYTES = 5 * 1024 * 1024;
@@ -1075,6 +1077,11 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       if (new Set(b.faixasPontos.map((f: Dados) => f.ate)).size !== b.faixasPontos.length) fail(400, 'Duas faixas de pontos têm o mesmo preço limite.');
     }
     if (b.pontosAcima !== undefined && !(Number.isInteger(Number(b.pontosAcima)) && Number(b.pontosAcima) >= 0)) fail(400, 'Pontos acima da última faixa inválidos.');
+    if (b.metaAfilhados !== undefined) {
+      const meta = Number(b.metaAfilhados);
+      if (!(Number.isInteger(meta) && meta >= 0 && meta <= 1000000)) fail(400, 'A meta de afilhados deve ser um número inteiro de 0 a 1.000.000.');
+      b.metaAfilhados = meta;
+    }
     if (b.horarios && !b.horarios.every((h: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(h))) fail(400, 'Horários devem estar no formato HH:MM (00:00 a 23:59).');
     if (b.questionario !== undefined) {
       const q = b.questionario as Dados;

@@ -870,6 +870,10 @@ button.anexos__nome:hover { text-decoration: underline; }
 .ficha { display: flex; flex-direction: column; gap: 12px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
 .ficha__titulo { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .ficha__titulo label { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.ficha__abrir { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 0; border: 0; background: none; color: inherit; font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
+.ficha__seta { transition: transform .15s; transform: rotate(-90deg); }
+.ficha__abrir.is-aberta .ficha__seta { transform: none; }
+.ficha__resumo-curto { font-weight: 400; }
 .ficha__itens { display: flex; flex-direction: column; gap: 8px; }
 .ficha__cab, .ficha__item { display: grid; grid-template-columns: minmax(140px, 2fr) 84px 72px minmax(150px, 1.5fr) 76px 32px; gap: 8px; align-items: center; }
 .ficha__cab { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
@@ -1942,6 +1946,9 @@ button.anexos__nome:hover { text-decoration: underline; }
 .tamanho-de { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); font-size: 13.5px; }
 .copia-de { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); font-size: 13.5px; line-height: 1.45; }
 .copia-de > svg { flex: none; margin-top: 2px; color: var(--brand); }
+.mover-aviso { display: flex; align-items: flex-start; gap: 10px; margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); font-size: 13.5px; line-height: 1.45; }
+.mover-aviso svg { flex: none; margin-top: 2px; color: var(--brand-light); }
+.mover-destinos { flex-wrap: wrap; flex-shrink: 1; max-width: 100%; }
 
 /* contador oficial de afilhados (Clientes): número grande ao vivo */
 .contador { position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 22px 20px 18px; text-align: center; border-radius: 18px; border: 1px solid var(--border-strong); background: radial-gradient(90% 140% at 50% 0%, #3a1f14 0%, #1a1210 55%, var(--surface) 100%); box-shadow: 0 18px 40px #0009, inset 0 1px 0 #ffffff12; }
@@ -1959,11 +1966,42 @@ button.anexos__nome:hover { text-decoration: underline; }
 .contador__txt { margin: 0; font-size: clamp(15px, 1.8vw, 19px); font-weight: 600; color: var(--text); }
 .contador__rodape { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 16px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .contador__novo { padding: 3px 10px; border-radius: 999px; font-weight: 700; color: var(--on-brand); background: var(--brand-light); animation: contador-digito .5s cubic-bezier(.2, .9, .3, 1); }
+.contador.is-batida { border-color: var(--good); }
+.contador__meta { width: min(100%, 560px); display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 12px; background: #0007; border: 1px solid var(--border); }
+.contador__meta-topo, .contador__meta-rodape { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; font-size: 14px; color: var(--muted); }
+.contador__meta-topo span { display: inline-flex; align-items: center; gap: 6px; }
+.contador__meta-topo strong { color: var(--text); }
+.contador__meta-rodape { font-size: 13px; }
+.contador__meta-rodape .link { display: inline-flex; align-items: center; gap: 5px; }
+.contador__pct { font: 800 18px/1 var(--serif); color: var(--brand-light) !important; font-variant-numeric: tabular-nums; }
+.contador.is-batida .contador__pct { color: var(--good) !important; }
+.contador__barra { position: relative; height: 12px; border-radius: 99px; background: var(--surface-3); box-shadow: inset 0 0 0 1px var(--border); overflow: hidden; }
+.contador__barra span { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: linear-gradient(90deg, var(--brand-dark), var(--brand-light)); box-shadow: 0 0 12px #e07a4c88; transition: width .8s cubic-bezier(.2, .9, .3, 1); }
+.contador.is-batida .contador__barra span, .contador-fixo.is-batida .contador__barra span { background: linear-gradient(90deg, #2f8a55, var(--good)); }
+.contador__sugestoes { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.contador__sugestoes .chip { cursor: pointer; }
+/* faixa presa no topo ao rolar a lista (a área tem altura zero e não empurra a página) */
+.contador-fixo { position: sticky; top: 60px; z-index: 15; height: 0; margin-bottom: -18px; }
+.contador-fixo__barra { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; padding: 10px 16px; border-radius: 14px; border: 1px solid var(--border-strong);
+  background: linear-gradient(90deg, #2a1812f2, #161110f2); backdrop-filter: blur(6px); box-shadow: 0 12px 30px #000b; border-top: 0; border-radius: 0 0 14px 14px; opacity: 0; transform: translateY(-10px); pointer-events: none; transition: opacity .2s ease, transform .2s ease; }
+.contador-fixo.is-on .contador-fixo__barra { opacity: 1; transform: none; pointer-events: auto; }
+.contador-fixo__n { font: 900 30px/1 var(--serif); font-variant-numeric: tabular-nums; color: var(--text); }
+.contador-fixo__txt { font-weight: 600; color: var(--text); }
+.contador-fixo__meta { margin-left: auto; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.contador-fixo .contador__barra { flex: 1 1 160px; max-width: 320px; height: 8px; }
+@media (max-width: 640px) {
+  .contador-fixo { top: 56px; }
+  .contador-fixo__barra { padding: 8px 12px; gap: 6px 10px; border-radius: 0 0 12px 12px; }
+  .contador-fixo__n { font-size: 24px; }
+  .contador-fixo__meta { margin-left: 0; }
+  .contador-fixo .contador__barra { flex-basis: 100%; max-width: none; }
+}
 @keyframes contador-pulso { 0% { box-shadow: 0 0 0 0 #e5484d99; } 70%, 100% { box-shadow: 0 0 0 9px #e5484d00; } }
 @keyframes contador-digito { from { opacity: 0; transform: translateY(-45%) scale(.9); } }
 @keyframes contador-brilho { 30% { opacity: 1; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
   .contador__digito, .contador__novo, .contador.is-novo::after, .contador__vivo.is-on i { animation: none; }
+  .contador__barra span, .contador-fixo__barra { transition: none; }
 }
 
 /* afilhados de número reservado (#001, #002…): destaque na lista de clientes */

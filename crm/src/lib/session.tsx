@@ -33,6 +33,8 @@ export interface Config {
   nomeEstabelecimento: string;
   faixasPontos: { ate: number; pontos: number }[];
   pontosAcima: number;
+  /** Meta do contador oficial de afilhados (0 = sem meta). */
+  metaAfilhados?: number;
   horarios: string[];
   ambientes: string[];
   diasFuncionamento: number[];
