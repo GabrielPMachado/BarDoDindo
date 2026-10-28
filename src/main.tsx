@@ -105,9 +105,10 @@ function Shell() {
   );
 }
 
-// Antes do lançamento só o pré-cadastro fica aberto: na web, quem abre o app vai para /queroserafilhado.
-// Para liberar o app, troque para true. Para testar o app mesmo assim, abra com ?app=1 (vale até fechar a aba).
-const APP_LIBERADO = true;
+// Antes do lançamento só o pré-cadastro fica aberto no domínio oficial: quem abre bardodindo.com.br vai para
+// /queroserafilhado. No endereço do Firebase (bardo-c0878.web.app) o app segue aberto.
+// Para liberar o app em todo lugar, troque para true. Para testar o app mesmo assim, abra com ?app=1 (vale até fechar a aba).
+const APP_LIBERADO = !/^(www\.)?bardodindo\.com\.br$/.test(location.hostname);
 const testeDoApp = (() => {
   try {
     if (new URLSearchParams(location.search).has('app')) sessionStorage.setItem('app-liberado', '1');
