@@ -807,6 +807,8 @@ select.input { appearance: none; padding-right: 30px; background-image: linear-g
   .modal-overlay { padding: 0; }
   .modal { max-width: none !important; min-height: 100dvh; border-radius: 0; border: 0; }
   .modal__body { padding: 16px; }
+  /* no rodapé do formulário, "Duplicar" fica só com o ícone para caber tudo numa linha */
+  .btn-duplicar__texto { display: none; }
   .modal__foot { flex-wrap: wrap; position: sticky; bottom: 0; background: var(--surface); }
   .form-grid { grid-template-columns: 1fr; }
   .confirm { min-height: 0; border-radius: 14px; margin: 0 16px; max-width: none !important; }
@@ -1938,6 +1940,8 @@ button.anexos__nome:hover { text-decoration: underline; }
   .tamanhos__acoes { grid-column: 1 / -1; justify-content: space-between; }
 }
 .tamanho-de { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); font-size: 13.5px; }
+.copia-de { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); font-size: 13.5px; line-height: 1.45; }
+.copia-de > svg { flex: none; margin-top: 2px; color: var(--brand); }
 
 /* contador oficial de afilhados (Clientes): número grande ao vivo */
 .contador { position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 22px 20px 18px; text-align: center; border-radius: 18px; border: 1px solid var(--border-strong); background: radial-gradient(90% 140% at 50% 0%, #3a1f14 0%, #1a1210 55%, var(--surface) 100%); box-shadow: 0 18px 40px #0009, inset 0 1px 0 #ffffff12; }
