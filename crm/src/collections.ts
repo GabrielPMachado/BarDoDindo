@@ -617,7 +617,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     ],
   },
   midias: {
-    id: 'midias', comFoto: true, fotoGrande: true, feminino: true, area: 'midias', title: 'Gestão de mídias', singular: 'publicação',
+    id: 'midias', anexos: 'Artes e relatórios', comFoto: true, fotoGrande: true, feminino: true, area: 'midias', title: 'Gestão de mídias', singular: 'publicação',
     despesa: (r) => ({ descricao: juntar('Mídia', r.conteudo, r.canal), categoria: 'Marketing', valor: n(r.investimento) }),
     description: 'Calendário de publicações e resultados por canal.',
     filterKey: 'canal', filtros: ['tipo', 'status'], sortKey: 'data', sortDir: 'desc',

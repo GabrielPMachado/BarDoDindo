@@ -340,7 +340,7 @@ function inssEmpregado(salario: number, faixas: { ate: number; aliquota: number 
 /** Cadastros que aceitam PDF (currículo, contratos, notas fiscais, laudos…). Igual a `colecoesComAnexo()` em firestore.rules. */
 export const COM_ANEXOS = [
   'metas', 'colaboradores', 'ferias', 'projetos', 'materiais', 'patrimonio', 'compras', 'terceirizados', 'fornecedores', 'contratos',
-  'receitas', 'despesas', 'criacao', 'trabalhista', 'consultoria', 'qualidade', 'naoconformidades',
+  'receitas', 'despesas', 'criacao', 'midias', 'trabalhista', 'consultoria', 'qualidade', 'naoconformidades',
   'publicidade', 'atestados', 'acoes', 'creditos', 'docfin', 'arquivos', 'investimentos', 'prestadores', 'conduta', 'advogados', 'normas', 'equipamentos',
 ];
 export const ANEXO_MAX_BYTES = 5 * 1024 * 1024;
