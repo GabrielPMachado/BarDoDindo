@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Minus, Pencil, Plus, QrCode, Receipt, Search, Trash2, UserX, Users, X } from 'lucide-react';
+import { Check, Minus, Pencil, Plus, QrCode, Receipt, Search, Star, Trash2, UserX, Users, X } from 'lucide-react';
 import { COLLECTIONS } from '../collections';
 import { CollectionPage } from '../components/CollectionPage';
 import { AsyncButton, Badge, EmptyState, ErrorBox, KpiRow, Loading, Modal, PageHead, notify } from '../components/ui';
@@ -16,6 +16,7 @@ import { EscolherProdutos, type ProdutoVenda } from '../components/EscolherProdu
 
 interface Cliente {
   id: number;
+  reservado?: boolean;
   numero: number;
   nome: string;
   email: string;
@@ -101,7 +102,9 @@ export function Clientes() {
   const [q, setQ] = useState('');
   const clientes = data ?? [];
   const term = q.trim().toLowerCase();
-  const list = clientes.filter((c) => !term || `${c.nome} ${c.email} ${c.telefone} ${c.cpf ?? ''} ${numero(c.numero)}`.toLowerCase().includes(term));
+  // números reservados pela Presidência ficam em destaque, no topo da lista
+  const list = clientes.filter((c) => !term || `${c.nome} ${c.email} ${c.telefone} ${c.cpf ?? ''} ${numero(c.numero)}`.toLowerCase().includes(term))
+    .sort((a, b) => Number(!!b.reservado) - Number(!!a.reservado) || (a.reservado ? a.numero - b.numero : 0));
   const mes = currentMonth();
   const hoje = isoFromToday(0);
 
@@ -140,8 +143,8 @@ export function Clientes() {
               </thead>
               <tbody>
                 {list.map((c) => (
-                  <tr key={c.id}>
-                    <td data-label="Afilhado" className="text"><strong>{c.nome}</strong><div className="muted small">{numero(c.numero)}{c.origem === 'Pré-cadastro' && <> · <span className="gold">Pré-cadastro</span></>}{c.via === 'QR Code' && <> · <span className="gold">QR Code</span></>}</div></td>
+                  <tr key={c.id} className={c.reservado ? 'row--destaque' : undefined}>
+                    <td data-label="Afilhado" className="text">{c.reservado && <Star size={14} className="gold" fill="currentColor" aria-label="Número reservado" style={{ verticalAlign: '-2px', marginRight: 4 }} />}<strong>{c.nome}</strong><div className="muted small">{numero(c.numero)}{c.origem === 'Pré-cadastro' && <> · <span className="gold">Pré-cadastro</span></>}{c.via === 'QR Code' && <> · <span className="gold">QR Code</span></>}</div></td>
                     <td data-label="Contato" className="text"><div className="small">{c.email}</div><div className="muted small nowrap">{c.telefone ? maskPhone(c.telefone) : '—'}</div></td>
                     <td data-label="Documento" className="text">
                       {c.cpf ? <><div className="small nowrap">{c.cpf}</div><div className="muted small nowrap">{c.nascimento ? `${dateBR(c.nascimento)} · ${idade(c.nascimento)} anos` : ''}</div></> : <Badge tone="warn">Sem CPF</Badge>}

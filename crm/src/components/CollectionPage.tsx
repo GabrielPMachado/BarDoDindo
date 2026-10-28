@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState, type DragEvent, type ReactNode, Fragmen
 import { ArrowDown, ArrowLeftRight, ArrowUp, Camera, ChevronDown, ChevronRight, Download, FileSpreadsheet, FileText, Globe, ImageOff, Maximize2, Paperclip, Pencil, Plus, Receipt, Search, Sheet, ShoppingCart, Sparkles, Trash2, X } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { findModule } from '../modules';
-import { numberSpec, STATUS_KEYS, temTamanhos, termos, toneOf, vinculosDe, type CollectionDef, type Computed, type Field } from '../collections';
+import { linksDe, numberSpec, STATUS_KEYS, temTamanhos, termos, toneOf, vinculosDe, type CollectionDef, type Computed, type Field } from '../collections';
 import { maskCnpj, maskPhone } from '../lib/masks';
 import { useCollection, type Row } from '../lib/data';
 import { brl, dateBR, num, pct } from '../lib/format';
@@ -23,6 +23,7 @@ import { CelulaRapida, editavelNaTabela } from './EdicaoRapida';
 import { comExtras, listaDe, useOpcoesExtras } from './OpcaoOutro';
 import { ItensDoFornecedor } from './ItensDoFornecedor';
 import { linkSeguro } from '../lib/links';
+import { BarraNivel, LinksDeCompra, VariosLinks } from './Nivel';
 import { PreencherProdutoIA } from './PreencherProdutoIA';
 import { GerarFotoIA } from './GerarFotoIA';
 import { RefazerFotos } from './RefazerFotos';
@@ -77,6 +78,7 @@ function formatComputed(c: Computed, r: Row): ReactNode {
   const v = c.get(r);
   if (v === null || v === undefined || v === '') return <span className="muted">—</span>;
   const tone = c.tone?.(r);
+  if (c.format === 'nivel') return <BarraNivel fracao={Number(v)} tone={tone ?? 'neutral'} detalhe={c.detalhe?.(r) ?? ''} />;
   const text =
     c.format === 'money' ? brl(Number(v)) : c.format === 'percent' ? pct(Number(v)) : c.format === 'number' ? num(Number(v)) : String(v);
   if (c.format === 'badge') return <Badge tone={tone ?? toneOf(v)}>{text}</Badge>;
@@ -482,7 +484,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
                       </button>
                     </th>
                   ))}
-                  {def.computed?.map((c) => <th key={c.label} className={c.format === 'badge' || c.format === 'text' ? '' : 'num'}>{c.label}</th>)}
+                  {def.computed?.map((c) => <th key={c.label} className={c.format === 'badge' || c.format === 'text' || c.format === 'nivel' ? '' : 'num'}>{c.label}</th>)}
                   <th className="actions-col" aria-label="Ações" />
                 </tr>
               </thead>
@@ -523,7 +525,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
                       <td key={f.key} data-label={f.label} className={`${cellClass(f)} ${fi === 0 ? 'col-titulo' : ''}`}>{formatField(f, r[f.key])}</td>
                     ))}
                     {def.computed?.map((c) => (
-                      <td key={c.label} data-label={c.label} className={c.format === 'badge' || c.format === 'text' ? 'nowrap' : 'num'}>{formatComputed(c, r)}</td>
+                      <td key={c.label} data-label={c.label} className={c.format === 'nivel' ? 'nivel-col' : c.format === 'badge' || c.format === 'text' ? 'nowrap' : 'num'}>{formatComputed(c, r)}</td>
                     ))}
                     <td className="actions-col" onClick={(e) => e.stopPropagation()}>
                       <div className="row-actions">
@@ -533,7 +535,9 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
                           </button>
                         )}
                         {rowActions?.(r, canEdit)}
-                        {campoLink && linkSeguro(r[campoLink.key]) && (
+                        {campoLink && campoLink.outrosLinks && linksDe(r, campoLink).length > 1 ? (
+                          <LinksDeCompra links={linksDe(r, campoLink)} />
+                        ) : campoLink && linkSeguro(r[campoLink.key]) && (
                           <a className="icon-btn" href={linkSeguro(r[campoLink.key])!} target="_blank" rel="noopener noreferrer"
                             aria-label={campoLink.acao === 'site' ? 'Abrir o site do fornecedor' : 'Comprar (abre o link da loja)'}
                             title={campoLink.acao === 'site' ? 'Abrir o site' : 'Comprar'}>
@@ -742,6 +746,12 @@ function RecordForm({ def, row, rows = [], canEdit, defaults, onClose, onSave, o
           payload[f.refKey!] = lista[0]?.id ?? null;
           payload[f.outros] = lista.slice(1).map((v) => ({ nome: v.nome.trim(), id: v.id ?? null }));
         }
+        if (f.outrosLinks) {
+          // vários links: sem os vazios e sem repetir; se o principal ficou vazio, o seguinte assume
+          const lista = [...new Set(linksDe(data, f).map((l) => linkSeguro(l) ?? l))];
+          payload[f.key] = lista[0] ?? '';
+          payload[f.outrosLinks] = lista.slice(1);
+        }
         for (const extra of Object.keys(f.fill ?? {})) if (!def.fields.some((x) => x.key === extra)) payload[extra] = data[extra] ?? '';
       }
       if (def.comFoto) payload.foto = comTamanhos ? '' : data.foto ?? '';
@@ -827,7 +837,10 @@ function RecordForm({ def, row, rows = [], canEdit, defaults, onClose, onSave, o
             )}
             <div className={`form-field ${f.wide || f.type === 'textarea' || f.outros ? 'form-field--wide' : ''}`}>
               <label htmlFor={`f-${f.key}`}>{f.outros && vinculosDe(data, f).length > 1 ? plural(f.label) : f.label}{f.required && canEdit && <span className="req"> *</span>}</label>
-              {f.outros ? (
+              {f.outrosLinks ? (
+                <VariosLinks field={f} links={[String(data[f.key] ?? ''), ...(Array.isArray(data[f.outrosLinks]) ? (data[f.outrosLinks] as unknown[]).map(String) : [])]} disabled={!canEdit}
+                  onChange={(l) => setData((d) => ({ ...d, [f.key]: l[0] ?? '', [f.outrosLinks!]: l.slice(1) }))} />
+              ) : f.outros ? (
                 <VariosRefPicker
                   id={`f-${f.key}`} field={f} lista={vinculosDe(data, f)} disabled={!canEdit}
                   onChange={(lista) => setData((d) => ({ ...d, [f.key]: lista[0]?.nome ?? '', [f.refKey!]: lista[0]?.id ?? null, [f.outros!]: lista.slice(1) }))}
