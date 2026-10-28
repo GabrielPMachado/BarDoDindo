@@ -7,17 +7,20 @@ import { FieldInput } from './ui';
 
 /** Barra de nível (ex.: quanto resta no barril): a fração cheia, a porcentagem e o detalhe embaixo. */
 export function BarraNivel({ fracao, tone, detalhe }: { fracao: number; tone: Tone; detalhe?: string }) {
-  const p = Math.round(Math.max(0, Math.min(1, fracao)) * 100);
+  const p = Math.round(Math.max(0, fracao) * 100);
+  // acima de 100%: a barra inteira vira a escala, com o cheio marcado e o excesso listrado
+  const acima = p > 100;
   // "2,4 de 3 un · aberto: 20 L": o total ao lado da porcentagem e a unidade aberta embaixo da barra
   const [total, ...resto] = (detalhe ?? '').split(' · ');
   return (
-    <div className={`nivel nivel--${tone}`} title={detalhe}>
+    <div className={`nivel nivel--${tone} ${acima ? 'nivel--acima' : ''}`} title={acima ? `${detalhe} (acima da quantidade cheia)` : detalhe}>
       <div className="nivel__topo">
         <b className="nivel__pct">{p}%</b>
         {total && <span className="nivel__detalhe">{total}</span>}
       </div>
-      <span className="nivel__barra" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={p} aria-label={detalhe ? `${p}% · ${detalhe}` : `${p}%`}>
-        <span className="nivel__cheio" style={{ width: `${p}%` }} />
+      <span className="nivel__barra" role="meter" aria-valuemin={0} aria-valuemax={Math.max(100, p)} aria-valuenow={p} aria-label={detalhe ? `${p}% · ${detalhe}` : `${p}%`}>
+        <span className="nivel__cheio" style={{ width: `${acima ? 10000 / p : p}%` }} />
+        {acima && <span className="nivel__excesso" style={{ left: `${10000 / p}%` }} />}
       </span>
       {resto.length > 0 && <span className="nivel__detalhe">{resto.join(' · ')}</span>}
     </div>

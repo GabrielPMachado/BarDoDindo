@@ -160,7 +160,8 @@ export function nivelEstoque(r: Record<string, unknown>) {
   const porUnidade = conteudo > 0 && !MEDIDAS.includes(un);
   const cheio = n(r.cheio) > 0 ? n(r.cheio) : porUnidade ? Math.max(1, Math.ceil(q - 1e-6)) : 0;
   if (!(cheio > 0)) return null;
-  const fracao = Math.min(1, q / cheio);
+  // pode passar de 1 (ex.: chegou mais um barril além da quantidade cheia): a barra mostra o excesso
+  const fracao = q / cheio;
   // a unidade aberta (barril, garrafa): quanto resta nela
   const resto = porUnidade ? q - Math.floor(q + 1e-6) : 0;
   const aberto = resto > 1e-6 ? ` · aberto: ${qtd(resto * conteudo)} ${cu}` : '';
