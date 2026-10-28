@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Minus, Pencil, Plus, QrCode, Receipt, Search, Star, Trash2, UserX, Users, X } from 'lucide-react';
+import { Check, Minus, Pencil, Plus, QrCode, Receipt, Search, Star, Target, Trash2, UserX, Users, X } from 'lucide-react';
 import { COLLECTIONS } from '../collections';
 import { CollectionPage } from '../components/CollectionPage';
-import { AsyncButton, Badge, EmptyState, ErrorBox, KpiRow, Loading, Modal, PageHead, notify } from '../components/ui';
+import { AsyncButton, Badge, EmptyState, ErrorBox, KpiRow, Loading, Modal, NumberInput, PageHead, notify } from '../components/ui';
 import { api } from '../lib/api';
 import { SelectPicker } from '../components/pickers';
 import { reload, useCollection, useLastSync, useResource, type Row } from '../lib/data';
@@ -47,11 +47,15 @@ const numero = (n: number) => `#${String(n).padStart(3, '0')}`;
 
 /* ---------------- Contador oficial ---------------- */
 /** Total de afilhados em destaque. A lista de clientes já chega ao vivo do Firestore e o CRM confere mudanças a cada
- *  segundo (sem leituras extras), então o número sobe sozinho; a hora embaixo mostra cada conferência. */
-function ContadorAfilhados({ total, hoje }: { total: number; hoje: number }) {
+ *  segundo (sem leituras extras), então o número sobe sozinho; a hora embaixo mostra cada conferência.
+ *  Ao rolar a lista, uma faixa compacta com o total e a meta fica presa no topo da tela. */
+function ContadorAfilhados({ total, hoje, meta, podeMeta }: { total: number; hoje: number; meta: number; podeMeta: boolean }) {
   const lastSync = useLastSync();
   const anterior = useRef<number | null>(null);
   const [novos, setNovos] = useState(0);
+  const [editando, setEditando] = useState(false);
+  const caixa = useRef<HTMLElement>(null);
+  const [fixo, setFixo] = useState(false);
   useEffect(() => {
     const antes = anterior.current;
     anterior.current = total;
@@ -60,28 +64,103 @@ function ContadorAfilhados({ total, hoje }: { total: number; hoje: number }) {
     const t = setTimeout(() => setNovos(0), 6000);
     return () => clearTimeout(t);
   }, [total]);
+  useEffect(() => {
+    // a faixa fixa aparece quando o número grande sai da tela (passa por baixo da barra do topo)
+    const el = caixa.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(([e]) => setFixo(!e.isIntersecting && e.boundingClientRect.top < 0), { rootMargin: '-60px 0px 0px 0px' });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
   const texto = total < 1000 ? String(total).padStart(3, '0') : total.toLocaleString('pt-BR');
   const casas = [...texto];
   const aoVivo = !!lastSync && Date.now() - lastSync.getTime() < 10000;
+  const pct = meta > 0 ? Math.min(100, (total / meta) * 100) : 0;
+  const batida = meta > 0 && total >= meta;
+  const falta = Math.max(0, meta - total);
+  const vivo = <span className={`contador__vivo ${aoVivo ? 'is-on' : ''}`}><i />{aoVivo ? 'Ao vivo' : 'Conectando…'}</span>;
+  const barra = (
+    <div className="contador__barra" role="progressbar" aria-valuemin={0} aria-valuemax={meta} aria-valuenow={Math.min(total, meta)} aria-label="Progresso da meta">
+      <span style={{ width: `${pct}%` }} />
+    </div>
+  );
   return (
-    <section className={`contador ${novos ? 'is-novo' : ''}`} aria-label="Contador oficial de afilhados">
-      <div className="contador__topo">
-        <span className={`contador__vivo ${aoVivo ? 'is-on' : ''}`}><i />{aoVivo ? 'Ao vivo' : 'Conectando…'}</span>
-        <span className="contador__titulo">Contador oficial</span>
+    <>
+      <div className={`contador-fixo ${fixo ? 'is-on' : ''} ${batida ? 'is-batida' : ''}`} aria-hidden={!fixo}>
+        <div className="contador-fixo__barra">
+          {vivo}
+          <strong className="contador-fixo__n">{num(total)}</strong>
+          <span className="contador-fixo__txt">{total === 1 ? 'afilhado' : 'afilhados'}</span>
+          {meta > 0 && <>
+            <span className="contador-fixo__meta">{batida ? 'Meta batida!' : `Meta ${num(meta)} · ${Math.floor(pct)}%`}</span>
+            {barra}
+          </>}
+          {novos > 0 && <span className="contador__novo">+{num(novos)}</span>}
+        </div>
       </div>
-      <div className="contador__n" role="status" aria-live="polite" aria-atomic="true" aria-label={`${total} ${total === 1 ? 'afilhado' : 'afilhados'}`}>
-        {/* a chave muda junto com o algarismo: só a casa que mudou entra animada */}
-        {casas.map((c, i) => (
-          <span key={`${casas.length - i}-${c}`} className={/\d/.test(c) ? 'contador__digito' : 'contador__sep'} aria-hidden="true">{c}</span>
-        ))}
-      </div>
-      <p className="contador__txt">{total === 1 ? 'afilhado já garantiu o seu número' : 'afilhados já garantiram o seu número'}</p>
-      <div className="contador__rodape">
-        {novos > 0 && <span className="contador__novo">+{num(novos)} {novos === 1 ? 'novo afilhado agora!' : 'novos afilhados agora!'}</span>}
-        <span>{num(hoje)} {hoje === 1 ? 'novo hoje' : 'novos hoje'}</span>
-        <span className="contador__hora">Atualizado às {lastSync ? lastSync.toLocaleTimeString('pt-BR') : '--:--:--'}</span>
-      </div>
-    </section>
+      <section ref={caixa} className={`contador ${novos ? 'is-novo' : ''} ${batida ? 'is-batida' : ''}`} aria-label="Contador oficial de afilhados">
+        <div className="contador__topo">
+          {vivo}
+          <span className="contador__titulo">Contador oficial</span>
+        </div>
+        <div className="contador__n" role="status" aria-live="polite" aria-atomic="true" aria-label={`${total} ${total === 1 ? 'afilhado' : 'afilhados'}`}>
+          {/* a chave muda junto com o algarismo: só a casa que mudou entra animada */}
+          {casas.map((c, i) => (
+            <span key={`${casas.length - i}-${c}`} className={/\d/.test(c) ? 'contador__digito' : 'contador__sep'} aria-hidden="true">{c}</span>
+          ))}
+        </div>
+        <p className="contador__txt">{total === 1 ? 'afilhado já garantiu o seu número' : 'afilhados já garantiram o seu número'}</p>
+        {meta > 0 ? (
+          <div className="contador__meta">
+            <div className="contador__meta-topo">
+              <span><Target size={15} /> Meta: <strong>{num(meta)}</strong> afilhados</span>
+              <strong className="contador__pct">{batida ? 'Meta batida! 🎉' : `${pct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`}</strong>
+            </div>
+            {barra}
+            <div className="contador__meta-rodape">
+              <span>{batida ? `${num(total - meta)} acima da meta` : `Faltam ${num(falta)} ${falta === 1 ? 'afilhado' : 'afilhados'}`}</span>
+              {podeMeta && <button type="button" className="link" onClick={() => setEditando(true)}><Pencil size={13} /> {batida ? 'Definir nova meta' : 'Alterar meta'}</button>}
+            </div>
+          </div>
+        ) : podeMeta && (
+          <button type="button" className="btn btn--ghost btn--sm" onClick={() => setEditando(true)}><Target size={15} /> Definir uma meta</button>
+        )}
+        <div className="contador__rodape">
+          {novos > 0 && <span className="contador__novo">+{num(novos)} {novos === 1 ? 'novo afilhado agora!' : 'novos afilhados agora!'}</span>}
+          <span>{num(hoje)} {hoje === 1 ? 'novo hoje' : 'novos hoje'}</span>
+          <span className="contador__hora">Atualizado às {lastSync ? lastSync.toLocaleTimeString('pt-BR') : '--:--:--'}</span>
+        </div>
+      </section>
+      {editando && <MetaAfilhados atual={meta} total={total} onClose={() => setEditando(false)} />}
+    </>
+  );
+}
+
+/** Define ou troca a meta do contador (fica em Parâmetros, junto da configuração do aplicativo). */
+function MetaAfilhados({ atual, total, onClose }: { atual: number; total: number; onClose: () => void }) {
+  const [meta, setMeta] = useState<number | ''>(atual || '');
+  const salvar = async (valor: number) => {
+    await api('/crm/config', { method: 'PUT', body: { metaAfilhados: valor } });
+    await reload('/crm/config');
+    notify(valor ? `Meta de ${num(valor)} afilhados definida.` : 'Meta removida.');
+    onClose();
+  };
+  const sugestoes = [50, 100, 250, 500, 1000].filter((n) => n > total).slice(0, 3);
+  return (
+    <Modal title="Meta de afilhados" onClose={onClose} width={440}
+      footer={<>
+        {atual > 0 && <AsyncButton className="btn btn--ghost" onClick={() => salvar(0)}>Remover meta</AsyncButton>}
+        <AsyncButton className="btn btn--primary" disabled={!meta} onClick={() => salvar(Number(meta))}><Check size={15} /> Salvar meta</AsyncButton>
+      </>}>
+      <label className="field-label" htmlFor="meta-afilhados">Quantos afilhados queremos alcançar?</label>
+      <NumberInput id="meta-afilhados" spec={{ decimals: 0, min: 1, max: 1_000_000 }} value={meta} onChange={setMeta} placeholder="Ex.: 100" />
+      {sugestoes.length > 0 && (
+        <div className="contador__sugestoes">
+          {sugestoes.map((n) => <button key={n} type="button" className="chip" onClick={() => setMeta(n)}>{num(n)}</button>)}
+        </div>
+      )}
+      <p className="muted small">Hoje são {num(total)} afilhados. A meta aparece no contador oficial e pode ser trocada sempre que for batida.</p>
+    </Modal>
   );
 }
 
@@ -90,6 +169,7 @@ export function Clientes() {
   const { data, loading, error } = useResource<Cliente[]>('/crm/clientes');
   const { pode } = useSession();
   const perguntas = useResource<Config>('/public/config').data?.questionario?.perguntas ?? [];
+  const config = useResource<Config>('/crm/config').data;
   const navigate = useNavigate();
   const [vendo, setVendo] = useState<Cliente | null>(null);
   // excluir apaga também consumos, vouchers e reservas do afilhado, por isso exige as duas permissões
@@ -112,7 +192,7 @@ export function Clientes() {
     <div className="page">
       <PageHead title="Clientes (afilhados)" description="Clientes cadastrados pelo aplicativo, com pontos, consumo e frequência."
         actions={pode('qrcode', 'ver') && <button type="button" className="btn btn--ghost" onClick={() => navigate('/vendas/qrcode')}><QrCode size={16} /> QR Code Afilhie-se</button>} />
-      {!loading && <ContadorAfilhados total={clientes.length} hoje={clientes.filter((c) => String(c.desde).slice(0, 10) === hoje).length} />}
+      {!loading && <ContadorAfilhados total={clientes.length} hoje={clientes.filter((c) => String(c.desde).slice(0, 10) === hoje).length} meta={Number(config?.metaAfilhados) || 0} podeMeta={pode('parametros', 'editar')} />}
       {clientes.length > 0 && (
         <KpiRow items={[
           { label: 'Afilhados', value: num(clientes.length) },
