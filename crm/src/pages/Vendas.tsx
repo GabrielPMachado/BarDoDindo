@@ -1,11 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Minus, Pencil, Plus, QrCode, Receipt, Search, Star, Trash2, UserX, Users, X } from 'lucide-react';
 import { COLLECTIONS } from '../collections';
 import { CollectionPage } from '../components/CollectionPage';
 import { AsyncButton, Badge, EmptyState, ErrorBox, KpiRow, Loading, Modal, PageHead, notify } from '../components/ui';
 import { api } from '../lib/api';
 import { SelectPicker } from '../components/pickers';
-import { reload, useCollection, useResource, type Row } from '../lib/data';
+import { reload, useCollection, useLastSync, useResource, type Row } from '../lib/data';
 import { brl, dateBR, isoFromToday, num } from '../lib/format';
 import { maskPhone } from '../lib/masks';
 import { currentMonth, monthOf } from '../lib/finance';
@@ -45,6 +45,46 @@ const idade = (n?: string) => {
 
 const numero = (n: number) => `#${String(n).padStart(3, '0')}`;
 
+/* ---------------- Contador oficial ---------------- */
+/** Total de afilhados em destaque. A lista de clientes já chega ao vivo do Firestore e o CRM confere mudanças a cada
+ *  segundo (sem leituras extras), então o número sobe sozinho; a hora embaixo mostra cada conferência. */
+function ContadorAfilhados({ total, hoje }: { total: number; hoje: number }) {
+  const lastSync = useLastSync();
+  const anterior = useRef<number | null>(null);
+  const [novos, setNovos] = useState(0);
+  useEffect(() => {
+    const antes = anterior.current;
+    anterior.current = total;
+    if (antes === null || total <= antes) return;
+    setNovos(total - antes);
+    const t = setTimeout(() => setNovos(0), 6000);
+    return () => clearTimeout(t);
+  }, [total]);
+  const texto = total < 1000 ? String(total).padStart(3, '0') : total.toLocaleString('pt-BR');
+  const casas = [...texto];
+  const aoVivo = !!lastSync && Date.now() - lastSync.getTime() < 10000;
+  return (
+    <section className={`contador ${novos ? 'is-novo' : ''}`} aria-label="Contador oficial de afilhados">
+      <div className="contador__topo">
+        <span className={`contador__vivo ${aoVivo ? 'is-on' : ''}`}><i />{aoVivo ? 'Ao vivo' : 'Conectando…'}</span>
+        <span className="contador__titulo">Contador oficial</span>
+      </div>
+      <div className="contador__n" role="status" aria-live="polite" aria-atomic="true" aria-label={`${total} ${total === 1 ? 'afilhado' : 'afilhados'}`}>
+        {/* a chave muda junto com o algarismo: só a casa que mudou entra animada */}
+        {casas.map((c, i) => (
+          <span key={`${casas.length - i}-${c}`} className={/\d/.test(c) ? 'contador__digito' : 'contador__sep'} aria-hidden="true">{c}</span>
+        ))}
+      </div>
+      <p className="contador__txt">{total === 1 ? 'afilhado já garantiu o seu número' : 'afilhados já garantiram o seu número'}</p>
+      <div className="contador__rodape">
+        {novos > 0 && <span className="contador__novo">+{num(novos)} {novos === 1 ? 'novo afilhado agora!' : 'novos afilhados agora!'}</span>}
+        <span>{num(hoje)} {hoje === 1 ? 'novo hoje' : 'novos hoje'}</span>
+        <span className="contador__hora">Atualizado às {lastSync ? lastSync.toLocaleTimeString('pt-BR') : '--:--:--'}</span>
+      </div>
+    </section>
+  );
+}
+
 /* ---------------- Clientes ---------------- */
 export function Clientes() {
   const { data, loading, error } = useResource<Cliente[]>('/crm/clientes');
@@ -66,11 +106,13 @@ export function Clientes() {
   const list = clientes.filter((c) => !term || `${c.nome} ${c.email} ${c.telefone} ${c.cpf ?? ''} ${numero(c.numero)}`.toLowerCase().includes(term))
     .sort((a, b) => Number(!!b.reservado) - Number(!!a.reservado) || (a.reservado ? a.numero - b.numero : 0));
   const mes = currentMonth();
+  const hoje = isoFromToday(0);
 
   return (
     <div className="page">
       <PageHead title="Clientes (afilhados)" description="Clientes cadastrados pelo aplicativo, com pontos, consumo e frequência."
         actions={pode('qrcode', 'ver') && <button type="button" className="btn btn--ghost" onClick={() => navigate('/vendas/qrcode')}><QrCode size={16} /> QR Code Afilhie-se</button>} />
+      {!loading && <ContadorAfilhados total={clientes.length} hoje={clientes.filter((c) => String(c.desde).slice(0, 10) === hoje).length} />}
       {clientes.length > 0 && (
         <KpiRow items={[
           { label: 'Afilhados', value: num(clientes.length) },
