@@ -185,6 +185,7 @@ export function Clientes() {
   // afilhados com estrela ficam em destaque, no topo da lista; quem edita Parâmetros escolhe quais (padrão: #001 e #002)
   const estrelas = config?.estrelas ?? [1, 2];
   const comEstrela = (c: Cliente) => estrelas.includes(c.numero);
+  const daEquipe = (c: Cliente) => c.origem === 'Equipe' || c.numero <= 0;
   const podeEstrela = pode('parametros', 'editar');
   const alternarEstrela = async (c: Cliente) => {
     const liga = !comEstrela(c);
@@ -193,8 +194,9 @@ export function Clientes() {
     notify(liga ? `${c.nome} ganhou estrela.` : `Estrela de ${c.nome} removida.`);
   };
   const list = clientes.filter((c) => !term || `${c.nome} ${c.email} ${c.telefone} ${c.cpf ?? ''} ${numero(c.numero)}`.toLowerCase().includes(term))
-    // depois em ordem crescente de número; a equipe (#-001, #-002...) vem por último
-    .sort((a, b) => Number(comEstrela(b)) - Number(comEstrela(a)) || Number(a.numero < 0) - Number(b.numero < 0) || Math.abs(a.numero) - Math.abs(b.numero));
+    // depois os afilhados em ordem crescente de número; a equipe vem junta, por último (#000, #-001, #-002...)
+    .sort((a, b) => Number(comEstrela(b)) - Number(comEstrela(a)) || Number(daEquipe(a)) - Number(daEquipe(b))
+      || (daEquipe(a) ? b.numero - a.numero : a.numero - b.numero));
   const mes = currentMonth();
   const hoje = isoFromToday(0);
   const afilhados = clientes.filter((c) => c.origem !== 'Equipe'), equipe = clientes.length - afilhados.length;
