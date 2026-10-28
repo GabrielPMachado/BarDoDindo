@@ -868,6 +868,10 @@ button.anexos__nome:hover { text-decoration: underline; }
 .ficha { display: flex; flex-direction: column; gap: 12px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
 .ficha__titulo { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .ficha__titulo label { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.ficha__abrir { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 0; border: 0; background: none; color: inherit; font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
+.ficha__seta { transition: transform .15s; transform: rotate(-90deg); }
+.ficha__abrir.is-aberta .ficha__seta { transform: none; }
+.ficha__resumo-curto { font-weight: 400; }
 .ficha__itens { display: flex; flex-direction: column; gap: 8px; }
 .ficha__cab, .ficha__item { display: grid; grid-template-columns: minmax(140px, 2fr) 84px 72px minmax(150px, 1.5fr) 76px 32px; gap: 8px; align-items: center; }
 .ficha__cab { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
