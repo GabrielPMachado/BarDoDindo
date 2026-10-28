@@ -4,6 +4,7 @@ import { STATUS_KEYS, toneOf, type CollectionDef, type Field } from '../collecti
 import type { Row } from '../lib/data';
 import { isoToday } from '../lib/format';
 import { Badge } from './ui';
+import { BarraNivel } from './Nivel';
 
 /* ---------- formas de ver um cadastro: tabela, cartões com foto, quadro por status e calendário ---------- */
 export type Visao = 'tabela' | 'cartoes' | 'quadro' | 'calendario';
@@ -73,6 +74,8 @@ const statusDe = (def: CollectionDef, r: Row) => {
 /* ---------- cartões (galeria com foto) ---------- */
 /* O cartão mostra só o título (e foto/status); os demais campos aparecem ao abrir o item. */
 export function VisaoCartoes({ def, rows, onAbrir, titulo, sel, marcar, onAmpliar }: Comum & { sel: Set<string>; marcar: (id: string, on: boolean) => void; onAmpliar: (r: Row) => void }) {
+  // barra de nível (Estoque) embaixo do nome
+  const nivel = def.computed?.find((c) => c.format === 'nivel');
   return (
     <div className="cartoes">
       {rows.map((r) => {
@@ -89,6 +92,7 @@ export function VisaoCartoes({ def, rows, onAbrir, titulo, sel, marcar, onAmplia
             </div>
             <div className="cartao__corpo">
               <b className="cartao__titulo">{titulo(r)}</b>
+              {nivel && nivel.get(r) !== null && <BarraNivel fracao={Number(nivel.get(r))} tone={nivel.tone?.(r) ?? 'neutral'} detalhe={nivel.detalhe?.(r)} />}
             </div>
           </article>
         );
