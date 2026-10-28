@@ -664,6 +664,8 @@ function Opcoes({ p, n, onChange }: { p: Pergunta; n: number; onChange: (opcoes:
 
 /** Numeração dos afilhados: mostra o próximo número e, depois de excluir afilhados (ex.: de teste), volta a seguir o maior número em uso. */
 function Numeracao({ podeAjustar, podeApagar }: { podeAjustar: boolean; podeApagar: boolean }) {
+  // os números reservados (e quem os usou) só a Presidência vê
+  const { funcao } = useSession();
   const { data } = useResource<{ total: number }>('/public/afilhados');
   const proximo = (data?.total ?? 0) + 1;
   const ajustar = async () => {
@@ -693,7 +695,7 @@ function Numeracao({ podeAjustar, podeApagar }: { podeAjustar: boolean; podeApag
         }}><Trash2 size={16} /> Apagar todos os afilhados</AsyncButton>
       )}
       </div>
-      <NumerosReservados proximo={proximo} podeEditar={podeAjustar} />
+      {funcao?.sistema && <NumerosReservados proximo={proximo} podeEditar={podeAjustar} />}
     </section>
   );
 }

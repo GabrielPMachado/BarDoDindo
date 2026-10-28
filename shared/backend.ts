@@ -569,6 +569,12 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   function requireAccess(ctx: Ctx, area: string, acao: Acao) {
     if (!ctx.acoes(area).includes(acao)) fail(403, semPermissao);
   }
+  /** Só a Presidência (função de sistema). */
+  function requirePresidencia(ctx: Ctx) {
+    if (!ctx.funcao?.sistema) fail(403, semPermissao);
+  }
+  /** Afilhados de número reservado (pedido da Presidência) não aparecem nas listas do resto da equipe. */
+  const ocultoPara = (ctx: Ctx, c: Dados) => !!c.reserva && !ctx.funcao?.sistema;
   /** Acesso a um cadastro: vale qualquer tela dele (ex.: despesas fixas, variáveis ou lançamento). */
   function requireColecao(ctx: Ctx, col: string, acao: Acao) {
     requireAnyAccess(ctx, PAGINAS_DA_COLECAO[collectionArea(col)] ?? [collectionArea(col)], acao);
@@ -1195,7 +1201,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const ctx = await requireUsuario();
     requireAnyAccess(ctx, ['clientes', 'reservas', 'consumos', 'resgates', 'recompensas', 'comandas'], 'ver');
     // os totais de cada afilhado ficam no saldo (atualizados a cada consumo), sem carregar todos os consumos
-    const [clientes, saldos, cfg] = await Promise.all([colecao('clientes'), colecao('saldos'), getConfig()]);
+    const [todos, saldos, cfg] = await Promise.all([colecao('clientes'), colecao('saldos'), getConfig()]);
+    const clientes = todos.filter((c) => !ocultoPara(ctx, c));
     const saldoDe = new Map(saldos.map((s) => [s.id, s]));
     const faltando = clientes.filter((c) => !Array.isArray(saldoDe.get(c.id)?.dias));
     if (faltando.length) {
@@ -1302,7 +1309,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
    * quem se cadastra por ele recebe o número. O contador pula os números reservados. */
   const reservasDeNumero = () => getDocs(collection(db, 'reservados')).then((s) => s.docs.map((d) => ({ ...d.data(), id: d.id }) as Dados));
   rota('GET', '/crm/reservados', async () => {
-    requireAccess(await requireUsuario(), 'parametros', 'ver');
+    requirePresidencia(await requireUsuario());
     const [reservados, clientes] = await Promise.all([reservasDeNumero(), colecao('clientes')]);
     return reservados
       .map((r) => ({ id: r.id, numero: Number(r.numero), nome: String(r.nome ?? ''), usadoPor: r.uid ? (clientes.find((c) => c.id === r.uid)?.nome ?? 'Afilhado') : null }))
@@ -1311,6 +1318,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   rota('POST', '/crm/reservados', async ({ b }) => {
     const ctx = await requireUsuario();
     requireAccess(ctx, 'parametros', 'editar');
+    requirePresidencia(ctx);
     const numero = Math.floor(Number(b.numero)), nome = str(b.nome, 80);
     if (!(numero >= 1 && numero <= 9999)) fail(400, 'Informe o número a reservar.');
     if (nome.length < 2) fail(400, 'Informe para quem é o número.');
@@ -1332,6 +1340,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   rota('DELETE', '/crm/reservados/:id', async ({ p }) => {
     const ctx = await requireUsuario();
     requireAccess(ctx, 'parametros', 'editar');
+    requirePresidencia(ctx);
     const r = (await reservasDeNumero()).find((x) => x.id === p.id);
     if (!r) return fail(404, 'Reserva não encontrada.');
     const lote = writeBatch(db);
@@ -1423,7 +1432,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
           }));
       case 'clientes':
         requireAnyAccess(ctx, ['clientes', 'reservas', 'consumos', 'resgates', 'recompensas', 'comandas'], 'ver');
-        return (await colecao('clientes'))
+        return (await colecao('clientes')).filter((c) => !ocultoPara(ctx, c))
           .map((c) => ({ id: c.numero, nome: c.nome, detalhe: `#${String(c.numero).padStart(3, '0')}${c.telefone ? ' · ' + c.telefone : ''}`, telefone: c.telefone }));
       default:
         return fail(404, 'Lista inexistente.');
