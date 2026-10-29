@@ -1347,7 +1347,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const codigo = Array.from(crypto.getRandomValues(new Uint8Array(12)), (x) => x.toString(16).padStart(2, '0')).join('');
     const lote = writeBatch(db);
     lote.set(doc(db, 'reservados', codigo), { numero, nome, uid: null, criadoEm: now() });
-    if (numero > atual) lote.set(doc(db, 'meta', 'contadores'), { clientes: numero });
+    if (numero > atual) lote.set(doc(db, 'meta', 'contadores'), { clientes: numero }, { merge: true }); // sem apagar o contador da equipe
     registrar(lote, ctx, 'parametros', 'reservou um número de afilhado', { alvo: `#${pad3(numero)} para ${nome}` });
     await lote.commit();
     return { id: codigo, numero, nome, usadoPor: null };
@@ -2609,8 +2609,13 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       if (c === 'unavailable' || c === 'auth/network-request-failed') return fail(0, 'Sem conexão com o servidor. Verifique sua internet.');
       if (c === 'auth/too-many-requests') return fail(429, 'Muitas tentativas. Aguarde alguns minutos e tente de novo.');
       if (c === 'auth/weak-password') return fail(400, 'Senha muito fraca. Use pelo menos 6 caracteres.');
+      if (c === 'auth/password-does-not-meet-requirements') return fail(400, 'A senha não atende às exigências de segurança. Use letras e números, com pelo menos 6 caracteres.');
+      // plano gratuito do Firebase: a cota diária de leituras e gravações zera às 4h (horário de Brasília)
+      if (c === 'resource-exhausted' || c === 'auth/quota-exceeded') return fail(503, 'O sistema atingiu o limite de uso de hoje. Tente de novo mais tarde.');
+      if (c === 'auth/operation-not-allowed' || c === 'auth/admin-restricted-operation') return fail(503, 'Os cadastros novos estão desativados no momento. Avise o Bar do Dindo.');
       console.error(e);
-      return fail(500, 'Não foi possível concluir a operação.');
+      // o código do erro aparece na mensagem para dar para descobrir a causa pelo print da tela
+      return fail(500, `Não foi possível concluir a operação.${c ? ` (${c})` : ''}`);
     }
   }
 
