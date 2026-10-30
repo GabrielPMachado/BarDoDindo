@@ -25,6 +25,7 @@ import { Funcoes, Parametros, Usuarios } from './pages/Config';
 import MeuPerfil from './pages/MeuPerfil';
 import QrCodeAfilhados from './pages/QrCode';
 import { CaixaPage, ComandasPage, MesasPage } from './pages/Salao';
+import { TemposResposta } from './components/TemposResposta';
 import './styles.css';
 
 // three.js é pesado: o simulador de pintura só baixa quando a página é aberta
@@ -41,7 +42,6 @@ const GENERIC: Record<string, string> = {
   '/fiscalizacao/atestados': 'atestados',
   '/financeiro/credito': 'creditos',
   '/financeiro/investimentos': 'investimentos',
-  '/ti/chamados': 'chamados',
   '/ti/equipamentos': 'equipamentos',
   '/estrutura/projetos': 'projetos',
   '/estrutura/estoque': 'estoque',
@@ -106,6 +106,7 @@ const CUSTOM: Record<string, () => ReactNode> = {
   '/financeiro/resultado': () => <Resultado />,
   '/vendas/clientes': () => <Clientes />,
   '/vendas/qrcode': () => <QrCodeAfilhados />,
+  '/ti/chamados': () => <CollectionPage def={COLLECTIONS.chamados} before={() => <TemposResposta />} />,
   '/vendas/guarnicoes': () => <CollectionPage def={COLLECTIONS.guarnicoes} before={(rows) => <CalculadoraGuarnicoes rows={rows} />} />,
   '/atendimento/reservas': () => <Reservas />,
   '/atendimento/consumo': () => <Consumo />,

@@ -1401,6 +1401,19 @@ button.anexos__nome:hover { text-decoration: underline; }
   .calendario__pontos small { font-size: 10px; color: var(--muted); }
 }
 
+/* ---------- Tempos de resposta (Chamados de suporte) ---------- */
+.tempos { margin-bottom: 18px; }
+.tempos > summary { cursor: pointer; list-style: none; flex-wrap: wrap; padding-bottom: 12px; }
+.tempos > summary::-webkit-details-marker { display: none; }
+.tempos__seta { vertical-align: -3px; color: var(--muted); transition: transform .15s; }
+.tempos:not([open]) .tempos__seta { transform: rotate(-90deg); }
+.tempos__grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; padding: 0 16px 16px; }
+.tempos__item { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.tempos__item .badge { align-self: flex-start; }
+.tempos__item p { margin: 0; color: var(--text); flex: 1; }
+.tempos__item dl { display: flex; gap: 18px; margin: 0; }
+.tempos__item dd { margin: 0; font-weight: 600; }
+
 /* ---------- Leis de referência (Jurídico) ---------- */
 .leis { margin-bottom: 18px; }
 .leis__grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; padding: 0 16px 16px; }
