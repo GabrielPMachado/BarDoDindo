@@ -6,7 +6,7 @@
 import { deleteApp, initializeApp } from 'firebase/app';
 import {
   EmailAuthProvider, connectAuthEmulator, createUserWithEmailAndPassword, getAuth, inMemoryPersistence, initializeAuth,
-  reauthenticateWithCredential, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, updatePassword, type UserCredential,
+  reauthenticateWithCredential, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, updateCurrentUser, updatePassword, type UserCredential,
 } from 'firebase/auth';
 import {
   arrayRemove, arrayUnion, collection, connectFirestoreEmulator, doc, getDoc, getDocFromServer, getDocs, increment, initializeFirestore, limit, onSnapshot, orderBy, persistentLocalCache, persistentMultipleTabManager, query, runTransaction, serverTimestamp, startAfter, updateDoc, where, writeBatch,
@@ -402,6 +402,16 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     connectAuthEmulator(auth, EMULADOR_AUTH, { disableWarnings: true });
     connectFirestoreEmulator(db, EMULADOR_FIRESTORE.host, EMULADOR_FIRESTORE.port);
   }
+  // Cérebro aberto pelo atalho "Área da equipe" do app (?equipe=1): sem sessão própria, aproveita a do app neste navegador
+  // (a /crm/me confere se a pessoa é usuária ativa; quem não for cai na tela de login)
+  const sessaoPronta = auth.authStateReady().then(async () => {
+    if (kind !== 'crm' || auth.currentUser || typeof location === 'undefined' || !new URLSearchParams(location.search).has('equipe')) return;
+    history.replaceState(null, '', location.pathname + location.hash);
+    const doApp = getAuth(initializeApp(firebaseConfig, 'app'));
+    if (EMULADOR) connectAuthEmulator(doApp, EMULADOR_AUTH, { disableWarnings: true });
+    await doApp.authStateReady();
+    if (doApp.currentUser) await updateCurrentUser(auth, doApp.currentUser).catch(() => {});
+  });
   const semPermissao = kind === 'crm' ? 'Sua função não tem permissão para esta ação.' : 'Você não tem permissão para esta ação.';
 
   /* ---------- dados ao vivo ----------
@@ -780,6 +790,12 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       resgates: r.resgates,
       reservas,
     };
+  });
+  /* app: quem também é da equipe (usuário ativo do CRM) ganha o atalho para o Cérebro; a função dele decide o que vê lá */
+  rota('GET', '/app/equipe', async () => {
+    const { uid } = await requireCliente();
+    const u = await documento(`usuarios/${uid}`).catch(() => null);
+    return { equipe: u?.status === 'Ativo' };
   });
   rota('PATCH', '/app/me', async ({ b }) => {
     const { uid, c } = await requireCliente();
@@ -2795,7 +2811,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const method = options.method ?? 'GET';
     const url = new URL(path, 'http://local');
     try {
-      await auth.authStateReady();
+      await sessaoPronta;
       for (const r of rotas) {
         if (r.method !== method) continue;
         const m = url.pathname.match(r.re);
