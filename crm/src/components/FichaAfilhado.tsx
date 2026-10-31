@@ -1,5 +1,5 @@
 /**
- * Ficha do afilhado no Cérebro (Vendas → Clientes): corrige o cadastro e as respostas do questionário,
+ * Ficha do afilhado no Cérebro (Afilhados → Clientes): corrige o cadastro e as respostas do questionário,
  * gera o relatório individual em PDF e as mesmas imagens do cartão que o afilhado salva no pré-cadastro
  * (post e Stories do Instagram).
  */

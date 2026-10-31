@@ -1,11 +1,11 @@
 import {
-  BarChart3, Briefcase, Building, Calculator, Cctv, ClipboardCheck, ConciergeBell, Cpu, FileStack, FolderOpen, Gavel, HandCoins, History, KeyRound, Landmark,
+  BarChart3, Briefcase, Building, Calculator, Cctv, ClipboardCheck, ConciergeBell, Cpu, FileStack, FolderOpen, Gavel, HandCoins, HeartHandshake, History, KeyRound, Landmark,
   Library, LifeBuoy, Megaphone, MonitorSmartphone, Plane, Receipt, Scale, ScrollText, Settings, ShieldCheck, ShoppingBag, SlidersHorizontal, Truck, UserCog,
   UserRound, Users, Wallet, Warehouse, type LucideIcon,
 } from 'lucide-react';
 import { PAI_DO_MODULO, permissaoDe } from '../../shared/backend';
 
-export type AreaKey = 'eu' | 'dir' | 'atd' | 'vnd' | 'mkt' | 'rh' | 'dp' | 'adm' | 'fin' | 'jur' | 'fis' | 'mon' | 'ti' | 'cfg';
+export type AreaKey = 'eu' | 'dir' | 'atd' | 'vnd' | 'afi' | 'mkt' | 'rh' | 'dp' | 'adm' | 'fin' | 'jur' | 'fis' | 'mon' | 'ti' | 'cfg';
 /** Resumo do acesso a uma área: sem acesso, só leitura ou com alguma permissão de alteração. */
 export type Access = 'none' | 'view' | 'edit';
 
@@ -90,7 +90,7 @@ export const AREAS: Area[] = [
   /* ---------- Departamento Administrativo (um setor = uma área) ---------- */
   {
     key: 'atd', label: 'Atendimento', icon: ConciergeBell,
-    description: 'Reservas, caixa, comandas, mapa de mesas, vouchers, conversas com os afilhados e o calendário da casa.',
+    description: 'Reservas, caixa, comandas, mapa de mesas, vouchers e o calendário da casa.',
     items: [
       { path: '/atendimento/reservas', perm: 'reservas', label: 'Reservas' },
       { path: '/atendimento/caixa', perm: 'caixas', label: 'Caixa' },
@@ -98,19 +98,26 @@ export const AREAS: Area[] = [
       { path: '/atendimento/mesas', perm: 'mesas', label: 'Mapa de mesas' },
       { path: '/atendimento/consumo', perm: 'consumos', label: 'Lançar consumo' },
       { path: '/atendimento/vouchers', perm: 'resgates', label: 'Validar vouchers' },
-      { path: '/atendimento/conversas', perm: 'conversas', label: 'Conversas' },
       { path: '/atendimento/calendario', perm: 'eventos', label: 'Calendário' },
     ],
   },
   {
     key: 'vnd', label: 'Vendas', icon: ShoppingBag,
-    description: 'Produtos e cardápio do aplicativo, fichas técnicas e os clientes (afilhados).',
+    description: 'Produtos e cardápio do aplicativo, fichas técnicas e guarnições.',
     items: [
       { path: '/vendas/produtos', perm: 'produtos', label: 'Produtos e cardápio' },
       { path: '/vendas/fichas', perm: 'fichas', label: 'Fichas técnicas' },
       { path: '/vendas/guarnicoes', perm: 'guarnicoes', label: 'Guarnições e itens fixos' },
+    ],
+  },
+  {
+    // só agrupa no menu: as telas mantêm o endereço e a permissão de antes (clientes e qrcode vêm de Vendas, conversas do Atendimento)
+    key: 'afi', label: 'Afilhados', icon: HeartHandshake,
+    description: 'Os clientes do programa: cadastro e ficha de cada afilhado, resultado do questionário, conversas e o QR Code para se afiliar.',
+    items: [
       { path: '/vendas/clientes', perm: 'clientes', label: 'Clientes (afilhados)' },
       { path: '/vendas/questionario', perm: 'clientes', label: 'Resultado do questionário' },
+      { path: '/atendimento/conversas', perm: 'conversas', label: 'Conversas' },
       { path: '/vendas/qrcode', perm: 'qrcode', label: 'QR Code Afilhie-se' },
     ],
   },
@@ -259,7 +266,7 @@ const depto = (key: string, label: string, icon: LucideIcon, areas: AreaKey[]): 
   ({ key, label, icon, setores: areas.map(areaByKey).filter((a) => !a.oculta).flatMap(setoresDe) });
 /** III - Departamentos, na ordem da casa. */
 export const DEPARTAMENTOS: Departamento[] = [
-  depto('adm', 'Administrativo', Briefcase, ['atd', 'vnd', 'mkt', 'dp', 'adm', 'fis']),
+  depto('adm', 'Administrativo', Briefcase, ['atd', 'vnd', 'afi', 'mkt', 'dp', 'adm', 'fis']),
   depto('fin', 'Financeiro', Wallet, ['fin']),
   depto('rh', 'Recursos Humanos / Pessoal', Users, ['rh']),
   depto('jur', 'Jurídico', Scale, ['jur']),

@@ -35,7 +35,8 @@ Nenhum dado vem pré-cadastrado: cardápio, recompensas, clientes, equipe e lan�
 
 - **Diretoria**: painel executivo, metas e decisões
 - **Atendimento**: reservas, lançar consumo, validar vouchers
-- **Vendas**: produtos e cardápio, clientes (afilhados)
+- **Vendas**: produtos e cardápio, fichas técnicas, guarnições
+- **Afilhados**: clientes (ficha de cada afilhado), resultado do questionário, conversas, QR Code Afilhie-se
 - **Marketing**: recompensas (programa de fidelidade), criação, gestão de mídias
 - **Pessoal**: colaboradores, férias e afastamentos, folha de pagamento (o lançamento como despesa é feito pelo Financeiro)
 - **Estrutura**: projetos, estoque, materiais
@@ -124,7 +125,7 @@ Versões novas também entram sozinhas: o app (service worker) procura atualiza�
 
 ## Administração
 
-- **Excluir afilhado** (Vendas → Clientes): apaga o cadastro, o saldo, os consumos (com as receitas), os vouchers e as reservas do afilhado. Exige permissão de excluir em Vendas e em Atendimento.
+- **Excluir afilhado** (Afilhados → Clientes): apaga o cadastro, o saldo, os consumos (com as receitas), os vouchers e as reservas do afilhado. Exige permissão de excluir em Vendas e em Atendimento.
 - **Numeração dos afilhados** (Configurações → Parâmetros): mostra o próximo número e, depois de excluir afilhados, ajusta para voltar a seguir o maior número em uso.
 
 ## Permissões
