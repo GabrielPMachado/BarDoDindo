@@ -2338,7 +2338,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const ctx = await requireUsuario();
     requireAccess(ctx, 'parametros', 'editar');
     const url = str(b.url, 300).trim();
-    if (url && !/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(url)) fail(400, 'Endereço inválido. Copie o "URL do app da Web" do Apps Script (termina em /exec).');
+    if (url && !/^https:\/\/script\.google\.com\/(a\/macros\/[A-Za-z0-9.-]+|macros)\/s\/[A-Za-z0-9_-]+\/exec$/.test(url)) fail(400, 'Endereço inválido. Copie o "URL do app da Web" do Apps Script (termina em /exec).');
     const lote = writeBatch(db);
     lote.set(doc(db, 'segredos', 'email'), { url, atualizadoEm: now(), atualizadoPor: ctx.usuario.id });
     registrar(lote, ctx, 'parametros', url ? 'configurou o e-mail dos chamados' : 'desligou o e-mail dos chamados');
