@@ -10,6 +10,7 @@ import { api } from '../lib/api';
 import { reload, useCollection, useResource, type Row } from '../lib/data';
 import { brl, isoFromToday, isoToday, num } from '../lib/format';
 import { useSession, type Config } from '../lib/session';
+import { ocultarEmail } from '../components/DadosOcultos';
 
 /* ---------------- tipos e dados comuns ---------------- */
 interface Caixa {
@@ -499,6 +500,8 @@ function CartaoComanda({ c, onClick }: { c: Comanda; onClick: () => void }) {
 
 function NovaComanda({ mesaInicial, mesas, onClose, onCriada }: { mesaInicial?: number; mesas: Mesa[]; onClose: () => void; onCriada: (c: Comanda) => void }) {
   const clientes = useResource<ClienteLite[]>('/crm/clientes').data ?? [];
+  // e-mail dos afilhados só aparece inteiro para quem edita Clientes
+  const verDados = useSession().pode('clientes', 'editar');
   const [tipo, setTipo] = useState<'afilhado' | 'avulsa'>('afilhado');
   const [busca, setBusca] = useState('');
   const [cliente, setCliente] = useState<ClienteLite | null>(null);
@@ -530,7 +533,7 @@ function NovaComanda({ mesaInicial, mesas, onClose, onCriada }: { mesaInicial?: 
               <div className="autocomplete">
                 <label className="search"><Search size={16} /><input id="nc-busca" autoFocus placeholder="Número do afilhado, nome, e-mail ou telefone" value={busca} onChange={(e) => setBusca(e.target.value)} /></label>
                 {sugestoes.length > 0 && (
-                  <ul className="autocomplete__list">{sugestoes.map((c) => <li key={c.id}><button type="button" onClick={() => { setCliente(c); setBusca(''); }}><strong>{numComanda(c.numero)}</strong> {c.nome} <span className="muted small">{c.email}</span></button></li>)}</ul>
+                  <ul className="autocomplete__list">{sugestoes.map((c) => <li key={c.id}><button type="button" onClick={() => { setCliente(c); setBusca(''); }}><strong>{numComanda(c.numero)}</strong> {c.nome} <span className="muted small">{verDados ? c.email : ocultarEmail(c.email)}</span></button></li>)}</ul>
                 )}
                 {t && !sugestoes.length && <p className="muted small">Nenhum afilhado encontrado. Use uma comanda avulsa.</p>}
               </div>

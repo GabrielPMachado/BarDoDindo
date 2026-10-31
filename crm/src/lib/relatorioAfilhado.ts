@@ -6,6 +6,7 @@ import type { Pergunta } from '../../../shared/backend';
 import { logoEmPng } from './exportar';
 import { brl, dateBR, num } from './format';
 import { maskPhone } from './masks';
+import { DATA_OCULTA, ocultarCpf, ocultarEmail, ocultarTelefone } from '../components/DadosOcultos';
 
 export interface AfilhadoRelatorio {
   numero: number; nome: string; email: string; telefone: string; desde: string; origem?: string; via?: string;
@@ -23,7 +24,8 @@ const dataHora = (iso: string) => {
   return Number.isNaN(d.getTime()) ? dateBR(iso) : `${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
 };
 
-export async function relatorioAfilhado(c: AfilhadoRelatorio, h: HistoricoAfilhado, perguntas: Pergunta[]) {
+/** `ocultar`: e-mail, celular, CPF e nascimento saem ocultos, como na tela (quem não revelou ou não pode ver). */
+export async function relatorioAfilhado(c: AfilhadoRelatorio, h: HistoricoAfilhado, perguntas: Pergunta[], ocultar = true) {
   const [{ jsPDF }, { autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
@@ -74,8 +76,8 @@ export async function relatorioAfilhado(c: AfilhadoRelatorio, h: HistoricoAfilha
   secao('Cadastro');
   pares([
     ['Nome', c.nome], ['Número', numero(c.numero)],
-    ['E-mail', c.email || '—'], ['Celular', c.telefone ? maskPhone(c.telefone) : '—'],
-    ['CPF', c.cpf || '—'], ['Nascimento', c.nascimento ? dateBR(c.nascimento) : '—'],
+    ['E-mail', !c.email ? '—' : ocultar ? ocultarEmail(c.email) : c.email], ['Celular', !c.telefone ? '—' : ocultar ? ocultarTelefone(c.telefone) : maskPhone(c.telefone)],
+    ['CPF', !c.cpf ? '—' : ocultar ? ocultarCpf(c.cpf) : c.cpf], ['Nascimento', ocultar ? (c.cpf || c.nascimento ? DATA_OCULTA : '—') : c.nascimento ? dateBR(c.nascimento) : '—'],
     ['Afilhado desde', dateBR(c.desde)], ['Origem', [c.origem, c.via].filter(Boolean).join(' · ') || '—'],
   ]);
 

@@ -2189,3 +2189,11 @@ td.nivel-col { min-width: 140px; }
 }
 .cliente-nome { color: var(--text); text-align: left; }
 .cliente-nome:hover { color: var(--brand-light); }
+
+/* dados pessoais dos afilhados: ocultos até alguém com permissão de editar Clientes revelar */
+.dados-pessoais { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
+.dados-pessoais > div { min-width: 0; }
+.oculto { letter-spacing: .02em; color: var(--muted); user-select: none; }
+.revelar[aria-pressed="true"] { color: var(--brand-light); }
+.afi__cabecalho { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 22px 0 10px; }
+.afi__cabecalho .afi__titulo { margin: 0; }

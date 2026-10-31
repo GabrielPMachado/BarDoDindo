@@ -1249,14 +1249,17 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       }
       if (ctx.acoes('consumos').some((a) => a !== 'ver')) await lote.commit().catch(() => undefined);
     }
+    // CPF e nascimento completos só para quem edita Clientes; os demais recebem o CPF mascarado, como o app
+    const verDocumentos = ctx.acoes('clientes').includes('editar');
     return clientes
       .map((c) => {
         const s = saldoDe.get(c.id) ?? {};
         const dias: string[] = Array.isArray(s.dias) ? [...s.dias].sort() : [];
         const acumulados = Number(s.acumulados) || 0;
         return {
-          // a equipe vê o CPF completo (nota fiscal com CPF, conferência do cadastro)
-          ...publicCliente(c), uid: c.id, cpf: c.cpf ? String(c.cpf).replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : '', foto: undefined, pontos: acumulados - (Number(s.usados) || 0), acumulados, totalGasto: Math.round((Number(s.gasto) || 0) * 100) / 100,
+          // quem edita Clientes vê o CPF completo (nota fiscal com CPF, conferência do cadastro)
+          ...publicCliente(c), uid: c.id, foto: undefined,
+          ...(verDocumentos ? { cpf: c.cpf ? String(c.cpf).replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : '' } : { nascimento: '' }), pontos: acumulados - (Number(s.usados) || 0), acumulados, totalGasto: Math.round((Number(s.gasto) || 0) * 100) / 100,
           visitas: dias.length, ultimaVisita: dias.at(-1) ?? null, nivel: nivelDe(acumulados, cfg.niveis).atual?.nome ?? '',
         };
       })
