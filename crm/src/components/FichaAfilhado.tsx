@@ -15,6 +15,7 @@ import { brl, dateBR, num } from '../lib/format';
 import { maskPhone } from '../lib/masks';
 import { relatorioAfilhado, type AfilhadoRelatorio, type HistoricoAfilhado } from '../lib/relatorioAfilhado';
 import { AsyncButton, Badge, Modal, notify } from './ui';
+import { BotaoRevelar, DATA_OCULTA, ocultarCpf, ocultarEmail, ocultarTelefone } from './DadosOcultos';
 
 const numero = (n: number) => `#${n < 0 ? '-' : ''}${String(Math.abs(n)).padStart(3, '0')}`;
 const pad = (n: number) => numero(n).slice(1);
@@ -65,6 +66,9 @@ export function FichaAfilhado({ cliente: c, perguntas, podeEditar, onClose }: {
   const inicial = useMemo<Estado>(() => Object.fromEntries(perguntas.map((p) => [p.id, lerResposta(p, String(c.respostas?.[p.id] ?? ''))])), [perguntas, c.respostas]);
   const [resp, setResp] = useState<Estado>(inicial);
   const [previa, setPrevia] = useState<string | null>(null);
+  // e-mail, celular, CPF e nascimento ficam ocultos; só quem edita Clientes revela (e só então edita esses campos)
+  const [mostrar, setMostrar] = useState(false);
+  const aberto = podeEditar && mostrar;
   const afilhado = { numero: c.numero, nome, desde: c.desde };
 
   // prévia do cartão (formato post), refeita quando o nome muda
@@ -97,7 +101,7 @@ export function FichaAfilhado({ cliente: c, perguntas, podeEditar, onClose }: {
   };
   const relatorio = async () => {
     const h = await api<HistoricoAfilhado>(`/crm/clientes/${c.numero}/historico`);
-    await relatorioAfilhado({ ...c, nome: nome.trim() || c.nome }, h, perguntas);
+    await relatorioAfilhado({ ...c, nome: nome.trim() || c.nome }, h, perguntas, !aberto);
   };
   const imagem = async (formato: 'post' | 'stories') => {
     const blob = await imagemCartao(formato, afilhado, await carregarImagem(logoUrl));
@@ -116,7 +120,7 @@ export function FichaAfilhado({ cliente: c, perguntas, podeEditar, onClose }: {
   return (
     <Modal title={`Ficha de ${c.nome}`} onClose={onClose} width={980}
       footer={<>
-        <span className="muted small afi__aviso">{podeEditar ? 'As alterações ficam registradas nos logs.' : 'Você pode consultar e gerar o material; para editar, peça a permissão de editar Clientes.'}</span>
+        <span className="muted small afi__aviso">{podeEditar ? 'As alterações ficam registradas nos logs.' : 'Você pode consultar e gerar o material; para ver os dados pessoais e editar, peça a permissão de editar Clientes.'}</span>
         <button type="button" className="btn btn--ghost" onClick={onClose}>{sujo ? 'Cancelar' : 'Fechar'}</button>
         {podeEditar && <AsyncButton className="btn btn--primary" disabled={!sujo} onClick={salvar}><Save size={15} /> Salvar alterações</AsyncButton>}
       </>}>
@@ -135,7 +139,10 @@ export function FichaAfilhado({ cliente: c, perguntas, podeEditar, onClose }: {
             <div><dt>Consumo</dt><dd>{brl(c.totalGasto)}</dd></div>
           </dl>
 
-          <h3 className="afi__titulo">Cadastro</h3>
+          <div className="afi__cabecalho">
+            <h3 className="afi__titulo">Cadastro</h3>
+            {podeEditar && <BotaoRevelar visivel={mostrar} onClick={() => setMostrar((v) => !v)} />}
+          </div>
           <div className="form-grid">
             <div className="form-field form-field--wide">
               <label htmlFor="fa-nome">Nome completo</label>
@@ -143,19 +150,25 @@ export function FichaAfilhado({ cliente: c, perguntas, podeEditar, onClose }: {
             </div>
             <div className="form-field">
               <label htmlFor="fa-email">E-mail (login)</label>
-              <input id="fa-email" className="input" value={c.email} disabled title="O e-mail é o login da conta: só o próprio afilhado troca." />
+              <input id="fa-email" className="input" value={aberto ? c.email : ocultarEmail(c.email)} disabled title="O e-mail é o login da conta: só o próprio afilhado troca." />
             </div>
             <div className="form-field">
               <label htmlFor="fa-tel">Celular</label>
-              <input id="fa-tel" className="input" inputMode="tel" value={telefone} disabled={!podeEditar} onChange={(e) => setTelefone(maskPhone(e.target.value))} placeholder="(51) 99999-9999" />
+              {aberto
+                ? <input id="fa-tel" className="input" inputMode="tel" value={telefone} onChange={(e) => setTelefone(maskPhone(e.target.value))} placeholder="(51) 99999-9999" />
+                : <input id="fa-tel" className="input" value={c.telefone ? ocultarTelefone(c.telefone) : '—'} disabled />}
             </div>
             <div className="form-field">
               <label htmlFor="fa-cpf">CPF</label>
-              <input id="fa-cpf" className="input" inputMode="numeric" value={cpf} disabled={!podeEditar} onChange={(e) => setCpf(maskCpf(e.target.value))} placeholder="000.000.000-00" />
+              {aberto
+                ? <input id="fa-cpf" className="input" inputMode="numeric" value={cpf} onChange={(e) => setCpf(maskCpf(e.target.value))} placeholder="000.000.000-00" />
+                : <input id="fa-cpf" className="input" value={c.cpf ? ocultarCpf(c.cpf) : '—'} disabled />}
             </div>
             <div className="form-field">
               <label htmlFor="fa-nasc">Nascimento</label>
-              <input id="fa-nasc" className="input" type="date" value={nascimento} disabled={!podeEditar} onChange={(e) => setNascimento(e.target.value)} />
+              {aberto
+                ? <input id="fa-nasc" className="input" type="date" value={nascimento} onChange={(e) => setNascimento(e.target.value)} />
+                : <input id="fa-nasc" className="input" value={c.cpf || c.nascimento ? DATA_OCULTA : '—'} disabled />}
             </div>
             <div className="form-field">
               <label>Afilhado desde</label>

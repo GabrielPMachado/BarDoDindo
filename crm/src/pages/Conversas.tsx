@@ -6,6 +6,7 @@ import { chat, type Conversa, type Mensagem } from '../lib/api';
 import { useResource } from '../lib/data';
 import { useSession } from '../lib/session';
 import { numero } from './Vendas';
+import { ocultarEmail } from '../components/DadosOcultos';
 
 const hora = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 function diaDe(iso: string) {
@@ -218,6 +219,7 @@ function ConversaAberta({ uid, afilhado, naoLidas, onVoltar }: { uid: string; af
 function NovaConversa({ onClose, onEscolher }: { onClose: () => void; onEscolher: (a: Afilhado) => void }) {
   const { data, loading, error } = useResource<{ uid: string; nome: string; numero: number; email: string }[]>('/crm/clientes');
   const [q, setQ] = useState('');
+  const verDados = useSession().pode('clientes', 'editar');
   const term = q.trim().toLowerCase();
   const lista = (data ?? []).filter((c) => !term || `${c.nome} ${c.email} ${numero(c.numero)}`.toLowerCase().includes(term)).slice(0, 50);
   return (
@@ -230,7 +232,7 @@ function NovaConversa({ onClose, onEscolher }: { onClose: () => void; onEscolher
             <li key={c.uid}>
               <button type="button" className="conversa-item" onClick={() => onEscolher({ uid: c.uid, nome: c.nome, numero: c.numero })}>
                 <span className="conversa-item__topo"><strong>{c.nome}</strong><small className="muted">{numero(c.numero)}</small></span>
-                <span className="muted small">{c.email}</span>
+                <span className="muted small">{verDados ? c.email : ocultarEmail(c.email)}</span>
               </button>
             </li>
           ))}
