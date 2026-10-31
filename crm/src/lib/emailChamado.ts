@@ -117,12 +117,18 @@ export function montarEmailChamado({ chamado: c, registradoPor, teste }: DadosDo
   return { assunto, html, texto };
 }
 
+const SCRIPT_BLOQUEADO = 'O Google recusou a chamada ao script. No Apps Script, abra Implantar → Gerenciar implantações e confira: '
+  + 'tipo "App da Web", Executar como "Eu", Quem pode acessar "Qualquer pessoa" (não "Qualquer pessoa com Conta do Google"). '
+  + 'Se mudar algo, publique uma nova versão e autorize o Gmail quando pedir.';
+
 /** Manda o e-mail pelo script. Sem endereço configurado, não faz nada (devolve false). */
 export async function enviarEmailChamado(dados: DadosDoEmail) {
   const { url } = await api<{ url: string }>('/crm/email/chamados');
   if (!url) return false;
   // text/plain evita a consulta prévia (CORS) que o Apps Script não responde
-  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(montarEmailChamado(dados)) });
+  // quando o Google não deixa o Cérebro chamar o script (acesso restrito, Gmail não autorizado), o navegador só diz "Failed to fetch"
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(montarEmailChamado(dados)) })
+    .catch(() => { throw new Error(navigator.onLine ? SCRIPT_BLOQUEADO : 'Sem internet. Tente de novo quando a conexão voltar.'); });
   const r = await res.json().catch(() => null) as { ok?: boolean; erro?: string } | null;
   if (!res.ok || !r?.ok) throw new Error(r?.erro || 'O script do e-mail não respondeu. Confira o endereço em Configurações.');
   return true;
