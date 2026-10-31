@@ -24,6 +24,7 @@ import { Clientes, Consumo, Reservas, Resgates } from './pages/Vendas';
 import { Funcoes, Parametros, Usuarios } from './pages/Config';
 import MeuPerfil from './pages/MeuPerfil';
 import QrCodeAfilhados from './pages/QrCode';
+import ResultadoQuestionario from './pages/ResultadoQuestionario';
 import { CaixaPage, ComandasPage, MesasPage } from './pages/Salao';
 import { TemposResposta } from './components/TemposResposta';
 import './styles.css';
@@ -106,6 +107,7 @@ const CUSTOM: Record<string, () => ReactNode> = {
   '/financeiro/resultado': () => <Resultado />,
   '/vendas/clientes': () => <Clientes />,
   '/vendas/qrcode': () => <QrCodeAfilhados />,
+  '/vendas/questionario': () => <ResultadoQuestionario />,
   '/ti/chamados': () => <CollectionPage def={COLLECTIONS.chamados} before={() => <TemposResposta />} />,
   '/vendas/guarnicoes': () => <CollectionPage def={COLLECTIONS.guarnicoes} before={(rows) => <CalculadoraGuarnicoes rows={rows} />} />,
   '/atendimento/reservas': () => <Reservas />,

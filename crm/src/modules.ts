@@ -109,6 +109,7 @@ export const AREAS: Area[] = [
       { path: '/vendas/fichas', perm: 'fichas', label: 'Fichas técnicas' },
       { path: '/vendas/guarnicoes', perm: 'guarnicoes', label: 'Guarnições e itens fixos' },
       { path: '/vendas/clientes', perm: 'clientes', label: 'Clientes (afilhados)' },
+      { path: '/vendas/questionario', perm: 'clientes', label: 'Resultado do questionário' },
       { path: '/vendas/qrcode', perm: 'qrcode', label: 'QR Code Afilhie-se' },
     ],
   },
