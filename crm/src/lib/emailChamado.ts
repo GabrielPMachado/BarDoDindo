@@ -117,12 +117,17 @@ export function montarEmailChamado({ chamado: c, registradoPor, teste }: DadosDo
   return { assunto, html, texto };
 }
 
+export const ERRO_DE_PUBLICACAO = 'O Google não deixou o Cérebro falar com o script. Abra o endereço do script numa aba nova: '
+  + 'se não aparecer "funcionando", salve o código, publique uma nova versão com "Quem pode acessar: Qualquer pessoa" e conclua a autorização do Gmail.';
+
 /** Manda o e-mail pelo script. Sem endereço configurado, não faz nada (devolve false). */
 export async function enviarEmailChamado(dados: DadosDoEmail) {
   const { url } = await api<{ url: string }>('/crm/email/chamados');
   if (!url) return false;
   // text/plain evita a consulta prévia (CORS) que o Apps Script não responde
-  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(montarEmailChamado(dados)) });
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(montarEmailChamado(dados)) })
+    // o Google devolve uma página de erro sem liberar a leitura (CORS) quando o script não está publicado do jeito certo
+    .catch(() => { throw new Error(ERRO_DE_PUBLICACAO); });
   const r = await res.json().catch(() => null) as { ok?: boolean; erro?: string } | null;
   if (!res.ok || !r?.ok) throw new Error(r?.erro || 'O script do e-mail não respondeu. Confira o endereço em Configurações.');
   return true;
