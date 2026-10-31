@@ -1182,6 +1182,7 @@ button.anexos__nome:hover { text-decoration: underline; }
 .ia-chave { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
 .ia-chave__passos { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
 .ia-chave__link { display: inline-flex; align-items: center; gap: 5px; align-self: flex-start; }
+.email-previa { display: block; width: 100%; height: min(70vh, 900px); border: 0; border-radius: 10px; background: #0a0909; }
 
 /* edição rápida na tabela: tocar no valor vira campo */
 .celula-rapida { all: unset; box-sizing: border-box; cursor: pointer; display: inline-block; min-width: 28px; padding: 3px 6px; margin: -3px -6px; border-radius: 6px;

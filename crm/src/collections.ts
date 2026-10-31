@@ -114,6 +114,8 @@ export interface CollectionDef {
   compra?: boolean;
   /** Logo depois de cadastrar, abre "Lançar despesa" já preenchida. */
   lancarAoCriar?: boolean;
+  /** Chamados: depois de cadastrar, manda o e-mail de aviso (se configurado em Configurações). */
+  emailAoCriar?: boolean;
   /** Quantidade guardada por local (Bar, Depósito…), com botão de transferir entre locais. */
   porLocal?: boolean;
   /** No cadastro do fornecedor, mostra os itens que temos dele (Estoque, Materiais e Tabela de preços). */
@@ -1114,7 +1116,7 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
 
   /* ---------------- TI: chamados e equipamentos ---------------- */
   chamados: {
-    id: 'chamados', area: 'chamados', title: 'Chamados de suporte', singular: 'chamado',
+    id: 'chamados', area: 'chamados', title: 'Chamados de suporte', singular: 'chamado', emailAoCriar: true,
     description: 'Problemas de sistema, internet, equipamentos e impressoras, até a solução.',
     filterKey: 'status', filtros: ['categoria', 'prioridade', 'solicitante'], sortKey: 'abertura', sortDir: 'desc',
     fields: [

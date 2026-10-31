@@ -32,6 +32,7 @@ const permitido = (nome, fn) => espera('permitido', nome, fn);
 
 console.log('— sem login —');
 await negado('ler a chave da IA sem login', () => getDoc(doc(db, 'segredos', 'ia')));
+await negado('ler o endereço do e-mail dos chamados sem login', () => getDoc(doc(db, 'segredos', 'email')));
 await permitido('ler o cardápio público', () => getDocs(collection(db, 'cardapio')));
 await permitido('ler recompensas ativas', () => getDocs(query(collection(db, 'recompensas'), where('status', '==', 'Ativa'))));
 await negado('listar clientes', () => getDocs(collection(db, 'clientes')));
@@ -378,6 +379,8 @@ if (senhaAdministrativo) {
   await negado('ver os Arquivos da empresa (Financeiro)', () => getDocs(collection(db, 'arquivos')));
   await permitido('ler a chave da IA (equipe logada)', () => getDoc(doc(db, 'segredos', 'ia')));
   await negado('trocar a chave da IA (sem Configurações)', () => setDoc(doc(db, 'segredos', 'ia'), { chave: 'x' }));
+  await permitido('ler o endereço do e-mail dos chamados (equipe logada)', () => getDoc(doc(db, 'segredos', 'email')));
+  await negado('trocar o endereço do e-mail dos chamados (sem Configurações)', () => setDoc(doc(db, 'segredos', 'email'), { url: 'https://exemplo.com' }));
   await negado('anexar PDF a um contrato (Administrativo)', async () => {
     const ref = doc(collection(db, 'anexos'));
     const lote = writeBatch(db);
