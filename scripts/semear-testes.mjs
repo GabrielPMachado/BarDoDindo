@@ -12,6 +12,7 @@ export const SENHA_ADMINISTRATIVO = 'senha-administrativo-123';
 export const SENHA_MODULAR = 'senha-modular-123';
 export const SENHA_CAIXA = 'senha-caixa-123';
 export const SENHA_PARAMETROS = 'senha-parametros-123';
+export const SENHA_FICHA = 'senha-ficha-123';
 
 /** Converte um valor JS para o formato da API REST do Firestore. */
 function valor(v) {
@@ -47,6 +48,7 @@ const administrativo = await conta('administrativo@teste.local', SENHA_ADMINISTR
 const modular = await conta('modular@teste.local', SENHA_MODULAR);
 const caixa = await conta('caixa@teste.local', SENHA_CAIXA);
 const parametros = await conta('parametros@teste.local', SENHA_PARAMETROS);
+const ficha = await conta('ficha@teste.local', SENHA_FICHA);
 
 await gravar('meta/setup', { feitoEm: agora });
 await gravar('meta/contadores', { clientes: 2 });
@@ -79,6 +81,11 @@ await gravar(`clientes/${cliente}`, { numero: 2, nome: 'Cliente Teste', email: '
 await gravar(`saldos/${cliente}`, { acumulados: 0, usados: 0 });
 // CPF já usado por outro afilhado (o registro de CPF é único)
 await gravar('cpfs/52998224725', { uid: 'outro-afilhado' });
+// quem corrige o cadastro dos afilhados pela ficha (Clientes: ver e editar) e um afilhado completo para corrigir
+await gravar('funcoes/ficha', { nome: 'Ficha', descricao: '', permissoes: { clientes: ['ver', 'editar'] }, sistema: false, criadoEm: agora });
+await gravar(`usuarios/${ficha}`, { nome: 'Ficha Teste', email: 'ficha@teste.local', funcaoId: 'ficha', status: 'Ativo', criadoEm: agora });
+await gravar('clientes/editavel', { numero: 4, nome: 'Editável Teste', email: 'editavel@teste.local', telefone: '', criadoEm: agora, cpf: '15350946056', nascimento: '1990-01-01' });
+await gravar('cpfs/15350946056', { uid: 'editavel' });
 await gravar('reservados/codigo-teste', { numero: 900, nome: 'Reservado Teste', uid: null, criadoEm: agora });
 // caixa, comandas e mesas
 await gravar('caixas/aberto', { nome: 'Caixa de teste', status: 'Aberto', abertoEm: agora, valorInicial: 100, vendas: {}, totalVendas: 0, qtdVendas: 0, movimentos: [] });

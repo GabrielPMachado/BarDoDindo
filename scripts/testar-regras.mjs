@@ -8,7 +8,7 @@ import {
   addDoc, arrayUnion, collection, connectFirestoreEmulator, deleteDoc, doc, getDoc, getDocs, getFirestore, increment, query, setDoc, updateDoc, where, writeBatch,
 } from 'firebase/firestore';
 
-const [senhaCliente, senhaAtendente, senhaMarketing, senhaAdministrativo, senhaModular, senhaCaixa, senhaParametros] = process.argv.slice(2);
+const [senhaCliente, senhaAtendente, senhaMarketing, senhaAdministrativo, senhaModular, senhaCaixa, senhaParametros, senhaFicha] = process.argv.slice(2);
 const app = initializeApp({ apiKey: 'teste', projectId: 'demo-bardodindo' });
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -462,6 +462,38 @@ if (senhaCaixa) {
   await createUserWithEmailAndPassword(auth, `reservado2-${Date.now()}@teste.local`, 'senha-teste-123');
   await negado('usar de novo um link de reserva já usado', () => cadastroReservado('codigo-teste', 900));
   await negado('criar reserva sem ser da equipe', () => setDoc(doc(db, 'reservados', 'meu'), { numero: 1, nome: 'eu', uid: null }));
+  await signOut(auth);
+}
+
+if (senhaFicha) {
+  console.log('— ficha do afilhado no Cérebro (Clientes: editar) —');
+  const ed = doc(db, 'clientes', 'editavel');
+  // como o backend faz: o cadastro e o registro do CPF (o novo entra, o antigo sai) no mesmo lote
+  const trocarCpf = (novo, antigo, nascimento = '1990-01-01', { registrar = true, apagar = true } = {}) => {
+    const l = writeBatch(db);
+    l.update(ed, { cpf: novo, nascimento });
+    if (registrar) l.set(doc(db, 'cpfs', novo), { uid: 'editavel' });
+    if (apagar) l.delete(doc(db, 'cpfs', antigo));
+    return l.commit();
+  };
+  await signInWithEmailAndPassword(auth, 'parametros@teste.local', senhaParametros);
+  await negado('corrigir o nome só com Clientes: ver', () => updateDoc(ed, { nome: 'Outro Nome' }));
+  await signOut(auth);
+  await signInWithEmailAndPassword(auth, 'ficha@teste.local', senhaFicha);
+  await permitido('corrigir nome e celular', () => updateDoc(ed, { nome: 'Editável Corrigido', telefone: '(51) 99999-0000' }));
+  await permitido('preencher as respostas do questionário', () => updateDoc(ed, { respostas: { p1: 'Instagram', respondidoEm: 'x' } }));
+  await negado('nome com menos de 3 letras', () => updateDoc(ed, { nome: 'X' }));
+  await negado('trocar o e-mail (login) pela ficha', () => updateDoc(ed, { email: 'outro@teste.local' }));
+  await negado('trocar o número pela ficha', () => updateDoc(ed, { numero: 1 }));
+  await negado('mexer na foto ou na origem pela ficha', () => updateDoc(ed, { origem: 'Equipe' }));
+  await negado('trocar o CPF sem registrar o novo', () => trocarCpf('12345678909', '15350946056', '1990-01-01', { registrar: false }));
+  await negado('trocar para um CPF que já é de outro afilhado', () => trocarCpf('52998224725', '15350946056'));
+  await negado('nascimento de menor de 18 anos', () => trocarCpf('15350946056', '15350946056', '2015-01-01', { registrar: false, apagar: false }));
+  await negado('registrar CPF para afilhado que não o usa', () => setDoc(doc(db, 'cpfs', '98765432100'), { uid: 'editavel' }));
+  await negado('apagar o registro do CPF que o afilhado ainda usa', () => deleteDoc(doc(db, 'cpfs', '15350946056')));
+  await permitido('corrigir a data de nascimento', () => trocarCpf('15350946056', '15350946056', '1985-06-15', { registrar: false, apagar: false }));
+  await permitido('trocar o CPF (o novo entra, o antigo sai)', () => trocarCpf('12345678909', '15350946056'));
+  await permitido('ler o histórico (consumos) do afilhado', () => getDocs(query(collection(db, 'consumos'), where('clienteUid', '==', 'editavel'))));
   await signOut(auth);
 }
 
