@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BarChart3, Check, Minus, Pencil, Plus, QrCode, Receipt, Search, Star, Target, Trash2, UserX, Users, X } from 'lucide-react';
+import { BarChart3, Check, IdCard, Minus, Pencil, Plus, QrCode, Receipt, Search, Star, Target, Trash2, UserX, Users, X } from 'lucide-react';
 import { COLLECTIONS } from '../collections';
 import { CollectionPage } from '../components/CollectionPage';
 import { AsyncButton, Badge, EmptyState, ErrorBox, KpiRow, Loading, Modal, NumberInput, PageHead, notify } from '../components/ui';
@@ -13,6 +13,7 @@ import { useSession, type Config } from '../lib/session';
 import { useNavigate } from 'react-router-dom';
 import { AvisoCaixa, Segmentos, useCaixa } from './Salao';
 import { EscolherProdutos, type ProdutoVenda } from '../components/EscolherProdutos';
+import { FichaAfilhado } from '../components/FichaAfilhado';
 
 interface Cliente {
   id: number;
@@ -171,9 +172,11 @@ export function Clientes() {
   const perguntas = useResource<Config>('/public/config').data?.questionario?.perguntas ?? [];
   const config = useResource<Config>('/crm/config').data;
   const navigate = useNavigate();
-  const [vendo, setVendo] = useState<Cliente | null>(null);
+  // a ficha abre pelo número (a lista chega ao vivo: depois de salvar, a ficha mostra os dados novos)
+  const [fichaDe, setFichaDe] = useState<number | null>(null);
   // excluir apaga também consumos, vouchers e reservas do afilhado, por isso exige as duas permissões
   const podeExcluir = pode('clientes', 'excluir') && pode('consumos', 'excluir');
+  const podeEditar = pode('clientes', 'editar');
   const excluir = async (c: Cliente) => {
     await api(`/crm/clientes/${c.numero}`, { method: 'DELETE' });
     await reload('/crm/clientes');
@@ -181,6 +184,7 @@ export function Clientes() {
   };
   const [q, setQ] = useState('');
   const clientes = data ?? [];
+  const ficha = fichaDe === null ? null : clientes.find((c) => c.numero === fichaDe) ?? null;
   const term = q.trim().toLowerCase();
   // afilhados com estrela ficam em destaque, no topo da lista; quem edita Parâmetros escolhe quais (padrão: #001 e #002)
   const estrelas = config?.estrelas ?? [1, 2];
@@ -235,7 +239,7 @@ export function Clientes() {
               <thead>
                 <tr>
                   <th>Afilhado</th><th>Contato</th><th>Documento</th>
-                  <th className="num">Pontos</th><th className="num">Visitas</th><th className="num">Consumo total</th><th>Última visita</th><th>Cliente desde</th>{podeExcluir && <th aria-label="Ações" />}
+                  <th className="num">Pontos</th><th className="num">Visitas</th><th className="num">Consumo total</th><th>Última visita</th><th>Cliente desde</th><th aria-label="Ações" />
                 </tr>
               </thead>
               <tbody>
@@ -246,26 +250,29 @@ export function Clientes() {
                         title={comEstrela(c) ? 'Tirar a estrela' : 'Dar estrela (fica em destaque, no topo)'} aria-label={comEstrela(c) ? 'Tirar a estrela' : 'Dar estrela'}>
                         <Star size={14} className={comEstrela(c) ? 'gold' : 'muted'} fill={comEstrela(c) ? 'currentColor' : 'none'} />
                       </button>
-                    ) : comEstrela(c) && <Star size={14} className="gold" fill="currentColor" aria-label="Com estrela" style={{ verticalAlign: '-2px', marginRight: 4 }} />}<strong>{c.nome}</strong><div className="muted small">{numero(c.numero)}{c.origem === 'Pré-cadastro' && <> · <span className="gold">Pré-cadastro</span></>}{c.origem === 'Equipe' && <> · Equipe</>}{c.via === 'QR Code' && <> · <span className="gold">QR Code</span></>}</div></div></td>
+                    ) : comEstrela(c) && <Star size={14} className="gold" fill="currentColor" aria-label="Com estrela" style={{ verticalAlign: '-2px', marginRight: 4 }} />}<button type="button" className="link cliente-nome" onClick={() => setFichaDe(c.numero)} title="Abrir a ficha (editar, relatório e cartão)"><strong>{c.nome}</strong></button><div className="muted small">{numero(c.numero)}{c.origem === 'Pré-cadastro' && <> · <span className="gold">Pré-cadastro</span></>}{c.origem === 'Equipe' && <> · Equipe</>}{c.via === 'QR Code' && <> · <span className="gold">QR Code</span></>}</div></div></td>
                     <td data-label="Contato" className="text"><div className="small">{c.email}</div><div className="muted small nowrap">{c.telefone ? maskPhone(c.telefone) : '—'}</div></td>
                     <td data-label="Documento" className="text">
                       {c.cpf ? <><div className="small nowrap">{c.cpf}</div><div className="muted small nowrap">{c.nascimento ? `${dateBR(c.nascimento)} · ${idade(c.nascimento)} anos` : ''}</div></> : <Badge tone="warn">Sem CPF</Badge>}
-                      {c.respostas && <button type="button" className="link small" onClick={() => setVendo(c)}>Ver respostas</button>}
+                      {c.respostas && <button type="button" className="link small" onClick={() => setFichaDe(c.numero)}>Ver respostas</button>}
                     </td>
                     <td data-label="Pontos" className="num">{num(c.pontos)}</td>
                     <td data-label="Visitas" className="num">{num(c.visitas)}</td>
                     <td data-label="Consumo total" className="num">{brl(c.totalGasto)}</td>
                     <td data-label="Última visita" className="nowrap">{c.ultimaVisita ? dateBR(c.ultimaVisita) : <span className="muted">—</span>}</td>
                     <td data-label="Cliente desde" className="nowrap">{dateBR(c.desde)}</td>
-                    {podeExcluir && (
-                      <td className="actions">
+                    <td className="actions">
+                      <button type="button" className="icon-btn" onClick={() => setFichaDe(c.numero)} title={podeEditar ? 'Ficha: editar, relatório e cartão' : 'Ficha: relatório e cartão'}>
+                        <IdCard size={15} aria-label={`Ficha de ${c.nome}`} />
+                      </button>
+                      {podeExcluir && (
                         <AsyncButton
                           className="icon-btn"
                           confirm={{ title: `Excluir ${c.nome} (${numero(c.numero)})?`, message: 'Apaga o cadastro, os pontos, os consumos (e as receitas deles), os vouchers e as reservas deste afilhado. Não dá para desfazer.', confirmLabel: 'Excluir afilhado', danger: true }}
                           onClick={() => excluir(c)}
                         ><Trash2 size={15} aria-label={`Excluir ${c.nome}`} /></AsyncButton>
-                      </td>
-                    )}
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -273,16 +280,7 @@ export function Clientes() {
           </div>
         )}
       </div>
-      {vendo?.respostas && (
-        <Modal title={`Respostas de ${vendo.nome}`} onClose={() => setVendo(null)}>
-          <dl className="respostas">
-            {Object.entries(vendo.respostas).filter(([k, v]) => k !== 'respondidoEm' && v).map(([k, v]) => (
-              <div key={k}><dt>{perguntas.find((p) => p.id === k)?.texto ?? 'Pergunta removida'}</dt><dd>{v}</dd></div>
-            ))}
-          </dl>
-          {vendo.respostas.respondidoEm && <p className="muted small">Respondido em {dateBR(vendo.respostas.respondidoEm)}.</p>}
-        </Modal>
-      )}
+      {ficha && <FichaAfilhado key={ficha.numero} cliente={ficha} perguntas={perguntas} podeEditar={podeEditar} onClose={() => setFichaDe(null)} />}
     </div>
   );
 }
