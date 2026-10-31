@@ -10,6 +10,7 @@
  *  3. Salve, clique em Implantar → Nova implantação → tipo "App da Web".
  *     Executar como: "Eu". Quem pode acessar: "Qualquer pessoa". Clique em Implantar e autorize o acesso ao Gmail.
  *  4. Copie o "URL do app da Web" (termina em /exec) e cole no Cérebro, em Configurações → E-mail dos chamados.
+ *     Para conferir, abra esse endereço no navegador: deve aparecer "funcionando".
  *
  * Os destinatários ficam só aqui: quem tem o endereço do script consegue mandar e-mail apenas para eles.
  * Depois de editar este arquivo, publique de novo em Implantar → Gerenciar implantações → editar → Nova versão.
@@ -19,6 +20,7 @@ const REMETENTE = 'Cérebro · Bar do Dindo';
 
 function doPost(e) {
   try {
+    if (DESTINOS.some((x) => x.indexOf('@exemplo.com') > 0)) throw new Error('Troque seu-email@exemplo.com pelo seu e-mail no código do script e publique uma nova versão.');
     const d = JSON.parse(e.postData.contents);
     const assunto = String(d.assunto || 'Novo chamado de suporte').slice(0, 200);
     const html = String(d.html || '');
@@ -28,6 +30,11 @@ function doPost(e) {
   } catch (erro) {
     return responder({ ok: false, erro: String(erro && erro.message || erro) });
   }
+}
+
+/** Abrir o endereço do script no navegador mostra se ele está publicado do jeito certo. */
+function doGet() {
+  return responder({ ok: true, mensagem: 'Script do e-mail dos chamados do Bar do Dindo funcionando.', destinatarios: DESTINOS.length });
 }
 
 function responder(obj) {
