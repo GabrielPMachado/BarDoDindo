@@ -1282,6 +1282,83 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     return { ok: true };
   });
 
+  /* CRM: corrigir o cadastro de um afilhado pela ficha: nome, celular, CPF, nascimento e as respostas do questionário.
+   * O e-mail é o login da conta (só o próprio afilhado troca). Trocar o CPF troca junto o registro que garante um CPF por afilhado. */
+  rota('PATCH', '/crm/clientes/:numero', async ({ p, b }) => {
+    const ctx = await requireUsuario();
+    requireAccess(ctx, 'clientes', 'editar');
+    const clientes = await colecao('clientes');
+    const c = clientes.find((x) => x.numero === Number(p.numero));
+    if (!c) return fail(404, 'Afilhado não encontrado.');
+    const patch: Dados = {};
+    const mudou: string[] = [];
+    if (b.nome !== undefined) {
+      const nome = str(b.nome, 120);
+      if (nome.length < 3) fail(400, 'Informe o nome completo.');
+      if (nome !== c.nome) { patch.nome = nome; mudou.push('nome'); }
+    }
+    if (b.telefone !== undefined) {
+      const tel = telefone(b.telefone);
+      if (tel !== (c.telefone ?? '')) { patch.telefone = tel; mudou.push('celular'); }
+    }
+    const cpfAntes = c.cpf ? String(c.cpf) : '';
+    if ((b.cpf !== undefined || b.nascimento !== undefined) && (cpfValido(b.cpf) !== (cpfAntes || null) || String(b.nascimento ?? '') !== String(c.nascimento ?? ''))) {
+      // CPF e nascimento andam juntos (as regras conferem os dois): a idade mínima vale também aqui
+      const docs = conferirDocumentos(b);
+      if (docs.cpf !== cpfAntes && clientes.some((x) => x.id !== c.id && String(x.cpf ?? '') === docs.cpf)) fail(409, 'Este CPF já está cadastrado em outro afilhado.');
+      if (docs.cpf !== cpfAntes) mudou.push('CPF');
+      if (docs.nascimento !== c.nascimento) mudou.push('nascimento');
+      Object.assign(patch, docs);
+    }
+    if (b.respostas !== undefined) {
+      const cfg = await getConfig();
+      const ids = new Set(cfg.questionario.perguntas.map((q) => q.id));
+      const r = (b.respostas && typeof b.respostas === 'object' ? b.respostas : {}) as Dados;
+      const antes = (c.respostas ?? {}) as Dados;
+      // respostas de perguntas que já saíram do questionário continuam guardadas como estavam
+      const respostas: Dados = {
+        ...Object.fromEntries(Object.entries(antes).filter(([k]) => !ids.has(k) && k !== 'respondidoEm')),
+        ...Object.fromEntries(Object.entries(r).filter(([k]) => ids.has(k)).map(([k, v]) => [k, str(v, 2000)]).filter(([, v]) => v)),
+      };
+      const iguais = (x: Dados) => JSON.stringify(Object.entries(x).filter(([k, v]) => k !== 'respondidoEm' && v).sort());
+      if (iguais(respostas) !== iguais(antes)) {
+        patch.respostas = { ...respostas, respondidoEm: antes.respondidoEm ?? now() };
+        mudou.push('questionário');
+      }
+    }
+    if (!mudou.length) return { ok: true, mudou };
+    const lote = writeBatch(db);
+    lote.update(doc(db, 'clientes', c.id), patch);
+    if (patch.cpf && patch.cpf !== cpfAntes) {
+      if (cpfAntes) lote.delete(doc(db, 'cpfs', cpfAntes));
+      lote.set(doc(db, 'cpfs', String(patch.cpf)), { uid: c.id });
+    }
+    registrar(lote, ctx, 'clientes', 'editou o afilhado', { colecao: 'clientes', alvo: `${patch.nome ?? c.nome} (#${pad3(c.numero)})`, detalhe: `Alterou: ${mudou.join(', ')}` });
+    try {
+      await lote.commit();
+    } catch (e) {
+      if (patch.cpf && codigo(e) === 'permission-denied') fail(409, 'Este CPF já está cadastrado no programa.');
+      throw e;
+    }
+    return { ok: true, mudou };
+  });
+
+  /* CRM: histórico de um afilhado para o relatório individual (só os consumos e vouchers dele, lidos ao abrir a ficha) */
+  rota('GET', '/crm/clientes/:numero/historico', async ({ p }) => {
+    const ctx = await requireUsuario();
+    requireAccess(ctx, 'clientes', 'ver');
+    const c = (await colecao('clientes')).find((x) => x.numero === Number(p.numero));
+    if (!c) return fail(404, 'Afilhado não encontrado.');
+    const [consumos, resgates] = await Promise.all([doCliente('consumos', c.id), doCliente('resgates', c.id)]);
+    return {
+      consumos: consumos.map((x) => ({
+        id: x.id, data: String(x.data ?? x.criadoEm ?? ''), valor: Number(x.valor) || 0, pontos: Number(x.pontos) || 0, formaPagamento: String(x.formaPagamento ?? ''),
+        itens: (Array.isArray(x.itens) ? x.itens : []).map((i: Dados) => ({ nome: String(i.nome ?? ''), quantidade: Number(i.quantidade) || 0 })),
+      })),
+      resgates: resgates.map((x) => ({ id: x.id, data: String(x.data ?? x.criadoEm ?? ''), recompensa: String(x.recompensa ?? ''), custo: Number(x.custo) || 0, status: String(x.status ?? ''), codigo: String(x.codigo ?? '') })),
+    };
+  });
+
   /* CRM: excluir TODOS os afilhados (ex.: cadastros de teste antes do lançamento): cadastros, saldos, CPFs, consumos com as receitas,
    * vouchers e reservas feitas por afilhados; a numeração volta a começar do #001. As contas de login (Firebase Auth) continuam existindo
    * (só o Admin SDK as apaga): quem se cadastrar de novo com o mesmo e-mail usa a senha de antes ou "Esqueci minha senha". */
@@ -2247,6 +2324,24 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     const lote = writeBatch(db);
     lote.set(doc(db, 'segredos', 'ia'), { chave, modelo, atualizadoEm: now(), atualizadoPor: ctx.usuario.id });
     registrar(lote, ctx, 'parametros', chave ? 'configurou a IA de leitura de notas' : 'removeu a chave da IA de leitura de notas');
+    await lote.commit();
+    return { ok: true };
+  });
+
+  /* CRM: endereço do Google Apps Script que manda o e-mail dos chamados de suporte (scripts/email-chamados.gs).
+   * Fica no banco, legível só pela equipe logada; os destinatários ficam no próprio script. */
+  rota('GET', '/crm/email/chamados', async () => {
+    await requireUsuario();
+    return { url: (await getDoc(doc(db, 'segredos', 'email'))).data()?.url ?? '' };
+  });
+  rota('PUT', '/crm/email/chamados', async ({ b }) => {
+    const ctx = await requireUsuario();
+    requireAccess(ctx, 'parametros', 'editar');
+    const url = str(b.url, 300).trim();
+    if (url && !/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(url)) fail(400, 'Endereço inválido. Copie o "URL do app da Web" do Apps Script (termina em /exec).');
+    const lote = writeBatch(db);
+    lote.set(doc(db, 'segredos', 'email'), { url, atualizadoEm: now(), atualizadoPor: ctx.usuario.id });
+    registrar(lote, ctx, 'parametros', url ? 'configurou o e-mail dos chamados' : 'desligou o e-mail dos chamados');
     await lote.commit();
     return { ok: true };
   });

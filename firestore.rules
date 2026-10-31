@@ -499,6 +499,14 @@ service cloud.firestore {
       allow update: if pode('parametros', 'editar') && resource.data.get('origem', '') == 'Equipe'
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['numero'])
         && request.resource.data.numero is int && request.resource.data.numero < 0;
+      // a equipe corrige o cadastro pela ficha do Cérebro (o e-mail é o login e fica com o afilhado);
+      // CPF e nascimento só mudam juntos e válidos, com o registro do CPF novo gravado no mesmo lote
+      allow update: if pode('clientes', 'editar')
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nome', 'telefone', 'respostas', 'cpf', 'nascimento'])
+        && request.resource.data.nome is string && request.resource.data.nome.size() >= 3 && request.resource.data.nome.size() <= 120
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['cpf', 'nascimento'])
+          || (cpfOk(request.resource.data.cpf) && maiorDeIdade(request.resource.data.nascimento)
+            && cpfDoAfilhado(uid, request.resource.data.cpf)));
       // excluir o afilhado (a pedido dele, LGPD) ou ao zerar o sistema
       allow delete: if pode('clientes', 'excluir');
     }
@@ -508,7 +516,11 @@ service cloud.firestore {
     match /cpfs/{cpf} {
       allow create: if logado() && cpfOk(cpf) && request.resource.data.keys().hasOnly(['uid']) && request.resource.data.uid == request.auth.uid
         && getAfter(caminho('clientes', request.auth.uid)).data.cpf == cpf;
-      allow delete: if pode('clientes', 'excluir') || zerando();
+      // CPF corrigido pela equipe na ficha do afilhado: o registro novo entra e o antigo sai no mesmo lote
+      allow create: if pode('clientes', 'editar') && cpfOk(cpf) && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid is string && getAfter(caminho('clientes', request.resource.data.uid)).data.get('cpf', null) == cpf;
+      allow delete: if pode('clientes', 'excluir') || zerando()
+        || (pode('clientes', 'editar') && getAfter(caminho('clientes', resource.data.uid)).data.get('cpf', null) != cpf);
     }
 
     // saldo de pontos usado para validar resgates: quem credita é a equipe; o cliente só debita junto com um voucher

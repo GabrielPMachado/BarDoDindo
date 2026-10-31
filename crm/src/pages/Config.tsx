@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowDownWideNarrow, ChevronDown, ChevronUp, Copy, ExternalLink, Lock, Pencil, Plus, Save, Sparkles, Trash2, X } from 'lucide-react';
+import { ArrowDownWideNarrow, ChevronDown, ChevronUp, Copy, Eye, ExternalLink, Lock, Mail, Pencil, Plus, Save, Send, Sparkles, Trash2, X } from 'lucide-react';
 import { brl } from '../lib/format';
 import { CARGOS_SUGERIDOS, GRUPOS_DE_PERMISSAO, MODULOS, NIVEIS, poderDe, acoesDe, acoesNaArea, nivelDe, type Acao, type Modulo } from '../modules';
 import { AsyncButton, Badge, EmptyState, ErrorBox, Loading, Modal, NumberInput, PageHead, notify } from '../components/ui';
@@ -8,6 +8,8 @@ import { SelectPicker, confirmar } from '../components/pickers';
 import { reload, useCollection, useResource, type Row } from '../lib/data';
 import { QUESTIONARIO_PADRAO } from '../../../shared/backend';
 import { enderecoPublico } from '../../../shared/firebase-config';
+import { enviarEmailChamado, montarEmailChamado } from '../lib/emailChamado';
+import SCRIPT_DO_EMAIL from '../../../scripts/email-chamados.gs?raw';
 import { useSession, type Config, type Funcao, type Questionario, type Usuario } from '../lib/session';
 
 const acoesDaFuncao = (f: Funcao, k: string) => (f.sistema ? acoesDe('edit') : acoesNaArea(f.permissoes as Record<string, unknown>, k));
@@ -539,6 +541,7 @@ export function Parametros() {
         <QuestionarioEditor q={cfg.questionario ?? { ...QUESTIONARIO_PADRAO, ativo: false }} onChange={(questionario) => setCfg({ ...cfg, questionario })} />
       </fieldset>
       {canEdit && <ChaveIA />}
+      {canEdit && <EmailChamados />}
     </div>
   );
 }
@@ -751,6 +754,68 @@ function NumerosReservados({ proximo, podeEditar }: { proximo: number; podeEdita
         </div>
       )}
     </div>
+  );
+}
+
+/** Chamado de exemplo para a prévia e o e-mail de teste. */
+const CHAMADO_EXEMPLO = {
+  id: 'exemplo', titulo: 'Maquininha do caixa 2 não liga', categoria: 'Impressora / maquininha', prioridade: 'Alta', solicitante: 'Equipe do caixa',
+  abertura: new Date().toLocaleDateString('sv-SE'), status: 'Aberta',
+  descricao: 'Desde a abertura a maquininha do caixa 2 não liga, mesmo carregada.\nEstamos passando tudo na do caixa 1, mas a fila está grande.',
+};
+
+/** E-mail bonito a cada chamado de suporte aberto: enviado por um Google Apps Script na conta do bar (sem servidor pago). */
+function EmailChamados() {
+  const { usuario } = useSession();
+  const atual = useResource<{ url: string }>('/crm/email/chamados');
+  const [url, setUrl] = useState('');
+  const [previa, setPrevia] = useState(false);
+  useEffect(() => { if (atual.data) setUrl(atual.data.url); }, [atual.data]);
+  const configurado = !!atual.data?.url;
+  const salvar = async (remover = false) => {
+    await api('/crm/email/chamados', { method: 'PUT', body: { url: remover ? '' : url.trim() } });
+    await reload('/crm/email/chamados');
+    notify(remover ? 'E-mail dos chamados desligado.' : 'E-mail dos chamados configurado.');
+  };
+  const copiar = async () => { await navigator.clipboard.writeText(SCRIPT_DO_EMAIL); notify('Código do script copiado.'); };
+  const testar = async () => {
+    if (!await enviarEmailChamado({ chamado: CHAMADO_EXEMPLO, registradoPor: usuario?.nome, teste: true })) throw new Error('Salve o endereço do script antes de testar.');
+    notify('E-mail de teste enviado. Confira a caixa de entrada (e o spam, na primeira vez).');
+  };
+  return (
+    <section className="panel pad-lg ia-chave">
+      <h2 className="panel-title"><Mail size={16} className="gold" /> E-mail dos chamados</h2>
+      <p className="muted small">
+        A cada chamado aberto em <b>TI → Chamados de suporte</b>, chega um e-mail com a prioridade, os prazos de resposta e solução,
+        a descrição, quem abriu e o botão para abrir o chamado. Quem envia é um script gratuito do Google na conta do bar (até 100 e-mails por dia).
+      </p>
+      <p className="small">Situação: {configurado ? <Badge tone="good">Ligado</Badge> : <Badge tone="warn">Desligado</Badge>}</p>
+      <ol className="ia-chave__passos small muted">
+        <li>Copie o código do script e abra o Google Apps Script com a conta que vai enviar os e-mails.</li>
+        <li>Crie um <b>Novo projeto</b>, cole o código e troque <b>seu-email@exemplo.com</b> pelos e-mails que vão receber os avisos.</li>
+        <li>Clique em <b>Implantar → Nova implantação → App da Web</b>, com "Executar como: Eu" e "Quem pode acessar: Qualquer pessoa". Autorize o Gmail.</li>
+        <li>Copie o <b>URL do app da Web</b> (termina em /exec), cole aqui, salve e envie um teste.</li>
+      </ol>
+      <div className="profile-actions" style={{ justifyContent: 'flex-start' }}>
+        <AsyncButton className="btn btn--ghost" onClick={copiar}><Copy size={15} /> Copiar código do script</AsyncButton>
+        <a className="btn btn--ghost" href="https://script.google.com/home/projects/create" target="_blank" rel="noreferrer"><ExternalLink size={15} /> Abrir o Apps Script</a>
+        <button type="button" className="btn btn--ghost" onClick={() => setPrevia(true)}><Eye size={15} /> Ver como fica</button>
+      </div>
+      <div className="form-field">
+        <label htmlFor="email-url">URL do app da Web</label>
+        <input id="email-url" className="input" type="url" autoComplete="off" spellCheck={false} placeholder="https://script.google.com/macros/s/…/exec" value={url} onChange={(e) => setUrl(e.target.value)} />
+      </div>
+      <div className="profile-actions">
+        {configurado && <AsyncButton className="btn btn--ghost" onClick={() => salvar(true)} confirm={{ title: 'Desligar o e-mail dos chamados?', message: 'Os chamados novos deixam de ser avisados por e-mail.', confirmLabel: 'Desligar', danger: true }}>Desligar</AsyncButton>}
+        {configurado && <AsyncButton className="btn btn--ghost" onClick={testar}><Send size={15} /> Enviar teste</AsyncButton>}
+        <AsyncButton className="btn btn--primary" onClick={() => { if (!url.trim()) throw new Error('Cole o URL do app da Web.'); return salvar(); }}><Save size={16} /> Salvar</AsyncButton>
+      </div>
+      {previa && (
+        <Modal title="Como fica o e-mail" onClose={() => setPrevia(false)} width={680}>
+          <iframe className="email-previa" title="Prévia do e-mail do chamado" sandbox="" srcDoc={montarEmailChamado({ chamado: CHAMADO_EXEMPLO, registradoPor: usuario?.nome }).html} />
+        </Modal>
+      )}
+    </section>
   );
 }
 
