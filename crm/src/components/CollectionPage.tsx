@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useState, type DragEvent, type ReactNode, Fragment } from 'react';
+import { useCallback, useEffect, useMemo, useState, type DragEvent, type ReactNode, Fragment } from 'react';
 import { ArrowDown, ArrowLeftRight, ArrowUp, Camera, ChefHat, ChevronDown, ChevronRight, CopyPlus, Download, FileSpreadsheet, FileText, Globe, ImageOff, Maximize2, Paperclip, Pencil, Plus, Receipt, Search, Sheet, ShoppingCart, Sparkles, Trash2, X } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { findModule } from '../modules';
 import { copiaDe, ehProducao, linksDe, numberSpec, podeDuplicar, STATUS_KEYS, temTamanhos, termos, toneOf, vinculosDe, type CollectionDef, type Computed, type Field } from '../collections';
 import { maskCnpj, maskPhone } from '../lib/masks';
@@ -11,6 +11,7 @@ import { desdeDe, PERIODO_PADRAO, PERIODOS, type PeriodoKey } from '../lib/perio
 import { AsyncButton, Badge, checkRange, EmptyState, ErrorBox, FieldInput, KpiRow, Loading, Modal, PageHead, notify } from './ui';
 import { confirmar, RefPicker, VariosRefPicker } from './pickers';
 import { api } from '../lib/api';
+import { enviarEmailChamado } from '../lib/emailChamado';
 import { fotoNoTamanho } from './Avatar';
 import { ContextMenu, type MenuPos } from './ContextMenu';
 import { colunasDe, exportarCsv, exportarExcel, exportarPdf } from '../lib/exportar';
@@ -97,7 +98,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   newDefaults?: Record<string, unknown>;
   filterRows?: (r: Row) => boolean;
 }) {
-  const { pode } = useSession();
+  const { pode, usuario } = useSession();
   // cada tela tem a própria permissão (ex.: só as despesas fixas); fora do menu, vale a do cadastro
   const { pathname } = useLocation();
   const perm = findModule(pathname)?.item.perm ?? def.area;
@@ -136,6 +137,16 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   const novo = () => { setModelo(null); setEditing('new'); };
   const duplicavel = canCreate && podeDuplicar(def);
   const duplicar = (r: Row) => { setModelo(r); setEditing('new'); };
+  // link direto para um registro (ex.: o botão do e-mail do chamado): ?abrir=<id> abre o formulário dele
+  const [params, setParams] = useSearchParams();
+  const abrir = params.get('abrir');
+  useEffect(() => {
+    if (!abrir || col.loading) return;
+    const r = col.rows.find((x) => x.id === abrir);
+    if (r) setEditing(r);
+    else notify('Registro não encontrado: pode ter sido excluído.', 'error');
+    setParams((p) => { p.delete('abrir'); return p; }, { replace: true });
+  }, [abrir, col.loading, col.rows, setParams]);
   const [refazendoFotos, setRefazendoFotos] = useState(false);
   const [lancando, setLancando] = useState<Row | null>(null);
   const [transferindo, setTransferindo] = useState<Row | null>(null);
@@ -665,6 +676,12 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
               const novo = await col.add(data);
               // nota de compra: já abre "Lançar despesa" preenchida (dá para fechar e lançar depois)
               if (def.lancarAoCriar && def.despesa && canEdit) setLancando(novo as Row);
+              // chamado de suporte: avisa por e-mail (sem segurar o formulário; uma falha só aparece no aviso)
+              if (def.emailAoCriar) {
+                enviarEmailChamado({ chamado: novo as Row, registradoPor: usuario?.nome })
+                  .then((enviado) => enviado && notify('E-mail do chamado enviado'))
+                  .catch((e) => notify(`O chamado foi salvo, mas o e-mail não saiu: ${e instanceof Error ? e.message : e}`, 'error'));
+              }
             } else await col.update(editing.id, data);
             notify(editing === 'new' ? (def.compra ? 'Nota lançada: as quantidades já entraram no estoque' : modelo ? 'Cópia criada' : 'Registro criado') : 'Alterações salvas');
             setEditing(null);

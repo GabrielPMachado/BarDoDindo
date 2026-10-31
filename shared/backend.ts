@@ -2237,6 +2237,24 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     return { ok: true };
   });
 
+  /* CRM: endereço do Google Apps Script que manda o e-mail dos chamados de suporte (scripts/email-chamados.gs).
+   * Fica no banco, legível só pela equipe logada; os destinatários ficam no próprio script. */
+  rota('GET', '/crm/email/chamados', async () => {
+    await requireUsuario();
+    return { url: (await getDoc(doc(db, 'segredos', 'email'))).data()?.url ?? '' };
+  });
+  rota('PUT', '/crm/email/chamados', async ({ b }) => {
+    const ctx = await requireUsuario();
+    requireAccess(ctx, 'parametros', 'editar');
+    const url = str(b.url, 300).trim();
+    if (url && !/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(url)) fail(400, 'Endereço inválido. Copie o "URL do app da Web" do Apps Script (termina em /exec).');
+    const lote = writeBatch(db);
+    lote.set(doc(db, 'segredos', 'email'), { url, atualizadoEm: now(), atualizadoPor: ctx.usuario.id });
+    registrar(lote, ctx, 'parametros', url ? 'configurou o e-mail dos chamados' : 'desligou o e-mail dos chamados');
+    await lote.commit();
+    return { ok: true };
+  });
+
   /* CRM: abrir um PDF anexado (junta as partes) */
   rota('GET', '/crm/anexos/:id', async ({ p }) => {
     const ctx = await requireUsuario();
