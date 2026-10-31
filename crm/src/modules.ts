@@ -90,7 +90,7 @@ export const AREAS: Area[] = [
   /* ---------- Departamento Administrativo (um setor = uma área) ---------- */
   {
     key: 'atd', label: 'Atendimento', icon: ConciergeBell,
-    description: 'Reservas, caixa, comandas, mapa de mesas, vouchers e o calendário da casa.',
+    description: 'Reservas, caixa, comandas, mapa de mesas, vouchers, conversas com os afilhados e o calendário da casa.',
     items: [
       { path: '/atendimento/reservas', perm: 'reservas', label: 'Reservas' },
       { path: '/atendimento/caixa', perm: 'caixas', label: 'Caixa' },
@@ -98,6 +98,7 @@ export const AREAS: Area[] = [
       { path: '/atendimento/mesas', perm: 'mesas', label: 'Mapa de mesas' },
       { path: '/atendimento/consumo', perm: 'consumos', label: 'Lançar consumo' },
       { path: '/atendimento/vouchers', perm: 'resgates', label: 'Validar vouchers' },
+      { path: '/atendimento/conversas', perm: 'conversas', label: 'Conversas' },
       { path: '/atendimento/calendario', perm: 'eventos', label: 'Calendário' },
     ],
   },

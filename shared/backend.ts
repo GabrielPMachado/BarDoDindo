@@ -9,8 +9,8 @@ import {
   reauthenticateWithCredential, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, updatePassword, type UserCredential,
 } from 'firebase/auth';
 import {
-  arrayRemove, arrayUnion, collection, connectFirestoreEmulator, doc, getDoc, getDocFromServer, getDocs, increment, initializeFirestore, limit, onSnapshot, orderBy, persistentLocalCache, persistentMultipleTabManager, query, runTransaction, where, writeBatch,
-  type DocumentReference, type Firestore, type Query, type WriteBatch,
+  arrayRemove, arrayUnion, collection, connectFirestoreEmulator, doc, getDoc, getDocFromServer, getDocs, increment, initializeFirestore, limit, onSnapshot, orderBy, persistentLocalCache, persistentMultipleTabManager, query, runTransaction, serverTimestamp, startAfter, updateDoc, where, writeBatch,
+  type DocumentReference, type DocumentSnapshot, type Firestore, type Query, type Timestamp, type WriteBatch,
 } from 'firebase/firestore';
 import { EMULADOR, EMULADOR_AUTH, EMULADOR_FIRESTORE, firebaseConfig } from './firebase-config';
 
@@ -22,6 +22,14 @@ export class ApiError extends Error {
     super(message);
   }
 }
+/** Mensagem do chat entre a equipe e um afilhado. */
+export interface Mensagem { id: string; texto: string; autor: 'afilhado' | 'equipe'; usuarioNome: string; criadaEm: string; pendente: boolean }
+/** Resumo da conversa de um afilhado (o id é o do afilhado). */
+export interface Conversa {
+  id: string; clienteNome: string; clienteNumero: number; ultimaMensagem: string; ultimaEm: string; ultimoAutor: 'afilhado' | 'equipe';
+  naoLidasEquipe: number; naoLidasAfilhado: number;
+}
+const MENSAGENS_POR_VEZ = 30;
 const fail = (status: number, message: string): never => {
   throw new ApiError(status, message);
 };
@@ -46,6 +54,7 @@ export const PAI_DO_MODULO: Record<string, string> = {
   consultoria: 'jur', trabalhista: 'jur', advogados: 'jur', advogados_trabalhista: 'jur', advogados_empresarial: 'jur',
   normas: 'jur', normas_trabalhista: 'jur', normas_empresarial: 'jur',
   logs: 'ti', chamados: 'ti', equipamentos: 'ti',
+  conversas: 'atd',
   usuarios: 'cfg', funcoes: 'cfg', parametros: 'cfg',
 };
 /**
@@ -443,6 +452,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   function pararVigias() {
     for (const v of vigias.values()) v.parar();
     vigias.clear();
+    for (const parar of ouvintes) parar();
+    ouvintes.clear();
   }
   async function sair() {
     if (!auth.currentUser) return;
@@ -1229,7 +1240,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
         const acumulados = Number(s.acumulados) || 0;
         return {
           // a equipe vê o CPF completo (nota fiscal com CPF, conferência do cadastro)
-          ...publicCliente(c), cpf: c.cpf ? String(c.cpf).replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : '', foto: undefined, pontos: acumulados - (Number(s.usados) || 0), acumulados, totalGasto: Math.round((Number(s.gasto) || 0) * 100) / 100,
+          ...publicCliente(c), uid: c.id, cpf: c.cpf ? String(c.cpf).replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : '', foto: undefined, pontos: acumulados - (Number(s.usados) || 0), acumulados, totalGasto: Math.round((Number(s.gasto) || 0) * 100) / 100,
           visitas: dias.length, ultimaVisita: dias.at(-1) ?? null, nivel: nivelDe(acumulados, cfg.niveis).atual?.nome ?? '',
         };
       })
@@ -1262,6 +1273,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       doc(db, 'clientes', c.id), doc(db, 'saldos', c.id), ...(c.cpf ? [doc(db, 'cpfs', String(c.cpf))] : []),
       ...consumos.flatMap((x) => [doc(db, 'consumos', x.id), ...(x.receitaId ? [doc(db, 'receitas', x.receitaId)] : [])]),
       ...resgates.map((x) => doc(db, 'resgates', x.id)), ...reservas.map((x) => doc(db, 'reservas', x.id)),
+      ...(await refsDaConversa(c.id)),
     ];
     await apagarEmLotes(refs, (lote) => registrar(lote, ctx, 'clientes', 'excluiu o afilhado', {
       colecao: 'clientes', alvo: `${c.nome} (#${pad3(c.numero)})`,
@@ -1363,6 +1375,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       ...saldos.map((x) => doc(db, 'saldos', x.id)),
       ...vendas.flatMap((x) => [doc(db, 'consumos', x.id), ...(x.receitaId ? [doc(db, 'receitas', x.receitaId)] : [])]),
       ...vouchers.map((x) => doc(db, 'resgates', x.id)), ...doApp.map((x) => doc(db, 'reservas', x.id)),
+      // as conversas (uma leitura por mensagem, só neste momento)
+      ...(await Promise.all((await getDocs(collection(db, 'conversas')).catch(() => null))?.docs.map((d) => refsDaConversa(d.id)) ?? [])).flat(),
     ];
     await apagarEmLotes(refs, (lote) => {
       // os números reservados continuam guardados (e livres de novo) para quem tem o link
@@ -2681,6 +2695,101 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
 
 
 
+  /* ---------- conversas (chat entre a equipe e cada afilhado) ----------
+   * Uma conversa por afilhado (conversas/<uid>), com o resumo para a lista (última mensagem e quantas não lidas de cada lado);
+   * as mensagens ficam em conversas/<uid>/mensagens. Para gastar poucas leituras, só a conversa aberta fica ao vivo, com as
+   * últimas mensagens (as anteriores vêm sob demanda), e a lista lê só o resumo de cada conversa. */
+  const ouvintes = new Set<() => void>();
+  /** Liga um onSnapshot que para sozinho ao sair da conta. */
+  function ouvir(iniciar: () => () => void) {
+    const parar = iniciar();
+    const desligar = () => { parar(); ouvintes.delete(desligar); };
+    ouvintes.add(desligar);
+    return desligar;
+  }
+  const quando = (v: unknown) => ((v as Timestamp | null)?.toDate?.() ?? new Date()).toISOString();
+  const lerConversa = (s: DocumentSnapshot): Conversa => {
+    const d = s.data({ serverTimestamps: 'estimate' }) ?? {};
+    return {
+      id: s.id, clienteNome: String(d.clienteNome ?? ''), clienteNumero: Number(d.clienteNumero) || 0,
+      ultimaMensagem: String(d.ultimaMensagem ?? ''), ultimaEm: quando(d.ultimaEm), ultimoAutor: d.ultimoAutor === 'equipe' ? 'equipe' : 'afilhado',
+      naoLidasEquipe: Number(d.naoLidasEquipe) || 0, naoLidasAfilhado: Number(d.naoLidasAfilhado) || 0,
+    };
+  };
+  const lerMensagem = (s: DocumentSnapshot): Mensagem => {
+    const d = s.data({ serverTimestamps: 'estimate' }) ?? {};
+    return {
+      id: s.id, texto: String(d.texto ?? ''), autor: d.autor === 'equipe' ? 'equipe' : 'afilhado', usuarioNome: String(d.usuarioNome ?? ''),
+      criadaEm: quando(d.criadaEm), pendente: s.metadata.hasPendingWrites,
+    };
+  };
+  const mensagensDe = (uid: string) => collection(db, 'conversas', uid, 'mensagens');
+  // a mensagem mais antiga já carregada de cada conversa: o ponto de partida para buscar as anteriores
+  const maisAntiga = new Map<string, DocumentSnapshot>();
+  const chat = {
+    MENSAGENS_POR_VEZ,
+    /** Resumo de uma conversa (no app, a do próprio afilhado: 1 leitura ao abrir e 1 a cada mensagem). */
+    ouvirConversa(uid: string, cb: (c: Conversa | null) => void) {
+      return ouvir(() => onSnapshot(doc(db, 'conversas', uid), (s) => cb(s.exists() ? lerConversa(s) : null), () => cb(null)));
+    },
+    /** As últimas mensagens da conversa aberta, ao vivo, da mais antiga para a mais nova. */
+    ouvirMensagens(uid: string, cb: (m: Mensagem[], temMais: boolean) => void, erro?: (e: Error) => void) {
+      return ouvir(() => onSnapshot(query(mensagensDe(uid), orderBy('criadaEm', 'desc'), limit(MENSAGENS_POR_VEZ)), { includeMetadataChanges: true }, (s) => {
+        if (s.docs.length) maisAntiga.set(uid, s.docs[s.docs.length - 1]);
+        cb(s.docs.map(lerMensagem).reverse(), s.docs.length === MENSAGENS_POR_VEZ);
+      }, (e) => erro?.(e)));
+    },
+    /** Mensagens anteriores às já carregadas (lidas uma vez, sem ficar ao vivo). */
+    async anteriores(uid: string): Promise<{ mensagens: Mensagem[]; temMais: boolean }> {
+      const ultima = maisAntiga.get(uid);
+      if (!ultima) return { mensagens: [], temMais: false };
+      const s = await getDocs(query(mensagensDe(uid), orderBy('criadaEm', 'desc'), startAfter(ultima), limit(MENSAGENS_POR_VEZ)));
+      if (s.docs.length) maisAntiga.set(uid, s.docs[s.docs.length - 1]);
+      return { mensagens: s.docs.map(lerMensagem).reverse(), temMais: s.docs.length === MENSAGENS_POR_VEZ };
+    },
+    /** CRM: as conversas mais recentes (só o resumo de cada uma). */
+    ouvirConversas(cb: (c: Conversa[]) => void, erro?: (e: Error) => void, quantas = 50) {
+      return ouvir(() => onSnapshot(query(collection(db, 'conversas'), orderBy('ultimaEm', 'desc'), limit(quantas)), (s) => cb(s.docs.map(lerConversa)), (e) => erro?.(e)));
+    },
+    /** CRM: quantas conversas têm mensagem do afilhado ainda não lida (só lê as que estão nessa situação). */
+    ouvirNaoLidas(cb: (n: number) => void) {
+      return ouvir(() => onSnapshot(query(collection(db, 'conversas'), where('naoLidasEquipe', '>', 0)), (s) => cb(s.size), () => cb(0)));
+    },
+    /** Envia uma mensagem: grava a mensagem e o resumo da conversa juntos (o outro lado ganha uma não lida). */
+    async enviar(uid: string, texto: string, afilhado: { nome: string; numero: number }) {
+      const t = texto.trim().slice(0, 1000);
+      if (!t) return;
+      const u = auth.currentUser;
+      if (!u) return fail(401, 'Sessão expirada. Entre novamente.');
+      const daEquipe = kind === 'crm';
+      const nome = daEquipe ? String((await documento(`usuarios/${u.uid}`))?.nome ?? '') : afilhado.nome;
+      const ref = doc(mensagensDe(uid));
+      const lote = writeBatch(db);
+      lote.set(ref, { texto: t, autor: daEquipe ? 'equipe' : 'afilhado', usuarioId: u.uid, usuarioNome: nome, criadaEm: serverTimestamp() });
+      lote.set(doc(db, 'conversas', uid), {
+        clienteNome: afilhado.nome.slice(0, 120), clienteNumero: afilhado.numero,
+        ultimaMensagem: t.slice(0, 200), ultimaEm: serverTimestamp(), ultimoAutor: daEquipe ? 'equipe' : 'afilhado', ultimaId: ref.id,
+        // quem escreve já leu tudo; o outro lado ganha uma não lida
+        [daEquipe ? 'naoLidasAfilhado' : 'naoLidasEquipe']: increment(1), [daEquipe ? 'naoLidasEquipe' : 'naoLidasAfilhado']: 0,
+      }, { merge: true });
+      try {
+        await lote.commit();
+      } catch (e) {
+        if (codigo(e) === 'permission-denied') fail(403, semPermissao);
+        throw e;
+      }
+    },
+    /** Zera as não lidas do próprio lado (ao abrir a conversa). */
+    async marcarLida(uid: string) {
+      await updateDoc(doc(db, 'conversas', uid), { [kind === 'crm' ? 'naoLidasEquipe' : 'naoLidasAfilhado']: 0 }).catch(() => undefined);
+    },
+  };
+  /** Conversa do afilhado com todas as mensagens, para apagar junto com ele. */
+  async function refsDaConversa(uid: string) {
+    const msgs = await getDocs(mensagensDe(uid)).catch(() => null);
+    return [...(msgs?.docs.map((d) => d.ref) ?? []), doc(db, 'conversas', uid)];
+  }
+
   /* ---------- entrada única ---------- */
   async function request<T>(path: string, options: { method?: string; body?: unknown } = {}): Promise<T> {
     const method = options.method ?? 'GET';
@@ -2719,6 +2828,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
 
   return {
     request,
+    chat,
     /** Identificador da sessão atual (só é confiável depois da primeira chamada a `request`). */
     uid: () => auth.currentUser?.uid ?? null,
     sair,

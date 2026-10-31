@@ -11,6 +11,7 @@ import Historico from './pages/Historico';
 import Cardapio from './pages/Cardapio';
 import Recompensas from './pages/Recompensas';
 import Perfil from './pages/Perfil';
+import Conversa from './pages/Conversa';
 import Entrar from './pages/Entrar';
 import CompletarCadastro from './components/CompletarCadastro';
 import './styles.css';
@@ -97,6 +98,7 @@ function Shell() {
           <Route path="/cardapio" element={<Cardapio />} />
           <Route path="/recompensas" element={<Recompensas />} />
           <Route path="/perfil" element={<Perfil />} />
+          <Route path="/conversa" element={<Conversa />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

@@ -2071,6 +2071,52 @@ td.nivel-col { min-width: 140px; }
 .links-compra a:hover, .links-compra a:focus-visible { background: var(--surface-3); }
 .varios__campo { flex: 1; min-width: 0; }
 
+/* ---------- Conversas com os afilhados (chat) ---------- */
+.nav__badge { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; display: inline-grid; place-items: center; background: var(--brand); color: var(--on-brand); font-size: 10.5px; font-weight: 700; flex-shrink: 0; }
+.nav__link .nav__badge { flex: 0 0 auto; }
+.nav__link.active .nav__badge { background: var(--on-brand); color: var(--brand-light); }
+/* lista à esquerda e conversa à direita, ocupando a altura da tela (no PC) */
+.conversas { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: 16px; height: calc(100vh - 220px); min-height: 460px; }
+.conversas__lista, .conversas__chat { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.conversas__lista .search { min-width: 0; flex: 1; }
+.conversas__itens { list-style: none; margin: 0; padding: 6px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.conversa-item { width: 100%; display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 8px; text-align: left; color: var(--text); }
+.conversa-item:hover { background: #ffffff08; }
+.conversa-item.is-active { background: var(--surface-3); box-shadow: inset 3px 0 0 var(--brand); }
+.conversa-item.has-new strong { color: var(--brand-light); }
+.conversa-item__topo, .conversa-item__linha { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.conversa-item__topo strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conversa-item__previa { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.conversas__cabeca { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.conversas__voltar { display: none; }
+.conversas__mensagens { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 6px; }
+.conversas__vazio { margin: auto; text-align: center; }
+.conversas__mais { align-self: center; margin-bottom: 6px; }
+.msg-linha { display: flex; flex-direction: column; }
+.msg-dia { align-self: center; margin: 10px 0 4px; padding: 3px 10px; border-radius: 10px; background: var(--surface-2); color: var(--muted); font-size: 12px; }
+.msg { align-self: flex-start; max-width: min(70%, 560px); padding: 8px 12px 6px; border-radius: 14px 14px 14px 4px; background: var(--surface-2); border: 1px solid var(--border); }
+.msg p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.4; }
+.msg--equipe { align-self: flex-end; border-radius: 14px 14px 4px 14px; background: #3a2116; border-color: var(--border-strong); }
+.msg__autor { display: block; color: var(--brand-light); font-weight: 600; font-size: 12px; margin-bottom: 2px; }
+.msg__hora { display: block; text-align: right; color: var(--muted); font-size: 11px; margin-top: 2px; }
+.conversas__form { padding: 12px 16px; border-top: 1px solid var(--border); }
+.conversas__campo { display: flex; gap: 8px; align-items: flex-end; }
+.conversas__campo .input { flex: 1; resize: none; height: auto; min-height: 40px; max-height: 140px; padding: 10px 12px; line-height: 1.35; }
+.conversas__enviar { width: 40px; height: 40px; padding: 0; flex-shrink: 0; }
+.conversas__erro { margin: 0 0 6px; color: var(--bad); font-size: 13px; }
+.conversas__escolha { padding: 6px 0 0; max-height: 50vh; }
+/* celular: uma coisa de cada vez (a lista ou a conversa aberta) */
+@media (max-width: 760px) {
+  .conversas { grid-template-columns: 1fr; height: calc(100dvh - 250px); min-height: 360px; }
+  /* conversa aberta: o título sai para a conversa ocupar a tela toda */
+  .page:has(.conversas--aberta) > .page-head { display: none; }
+  .conversas--aberta { height: calc(100dvh - 110px); }
+  .conversas:not(.conversas--aberta) .conversas__chat { display: none; }
+  .conversas--aberta .conversas__lista { display: none; }
+  .conversas__voltar { display: grid; }
+  .msg { max-width: 85%; }
+}
+
 /* ---------- resultado geral do questionário ---------- */
 .resultado__aviso { display: flex; align-items: center; gap: 6px; margin: -4px 0 14px; }
 .resultados { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }

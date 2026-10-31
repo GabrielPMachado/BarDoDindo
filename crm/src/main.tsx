@@ -23,6 +23,7 @@ import Monitoramento from './pages/Monitoramento';
 import { Clientes, Consumo, Reservas, Resgates } from './pages/Vendas';
 import { Funcoes, Parametros, Usuarios } from './pages/Config';
 import MeuPerfil from './pages/MeuPerfil';
+import Conversas from './pages/Conversas';
 import QrCodeAfilhados from './pages/QrCode';
 import ResultadoQuestionario from './pages/ResultadoQuestionario';
 import { CaixaPage, ComandasPage, MesasPage } from './pages/Salao';
@@ -116,6 +117,7 @@ const CUSTOM: Record<string, () => ReactNode> = {
   '/atendimento/comandas': () => <ComandasPage />,
   '/atendimento/mesas': () => <MesasPage />,
   '/atendimento/vouchers': () => <Resgates />,
+  '/atendimento/conversas': () => <Conversas />,
   '/monitoramento': () => <Monitoramento />,
   '/config/usuarios': () => <Usuarios />,
   '/config/funcoes': () => <Funcoes />,
