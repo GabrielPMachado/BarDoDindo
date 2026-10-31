@@ -25,3 +25,7 @@ export async function api<T>(path: string, options: { method?: string; body?: un
     throw e;
   }
 }
+
+/** Conversas com os afilhados (chat): só a conversa aberta e o resumo das conversas ficam ao vivo. */
+export const chat = backend.chat;
+export type { Conversa, Mensagem } from '../../../shared/backend';

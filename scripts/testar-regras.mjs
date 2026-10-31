@@ -5,7 +5,7 @@
 import { initializeApp } from 'firebase/app';
 import { connectAuthEmulator, createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import {
-  addDoc, arrayUnion, collection, connectFirestoreEmulator, deleteDoc, doc, getDoc, getDocs, getFirestore, increment, query, setDoc, updateDoc, where, writeBatch,
+  addDoc, arrayUnion, collection, connectFirestoreEmulator, deleteDoc, doc, getDoc, getDocs, getFirestore, increment, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch,
 } from 'firebase/firestore';
 
 const [senhaCliente, senhaAtendente, senhaMarketing, senhaAdministrativo, senhaModular, senhaCaixa, senhaParametros] = process.argv.slice(2);
@@ -460,6 +460,60 @@ if (senhaCaixa) {
   await negado('usar de novo um link de reserva já usado', () => cadastroReservado('codigo-teste', 900));
   await negado('criar reserva sem ser da equipe', () => setDoc(doc(db, 'reservados', 'meu'), { numero: 1, nome: 'eu', uid: null }));
   await signOut(auth);
+}
+
+console.log('— conversas (chat entre a equipe e o afilhado) —');
+{
+  // a mensagem e o resumo da conversa vão juntos, como faz o app
+  const enviar = async (dono, autor, texto, extra = {}) => {
+    const u = auth.currentUser;
+    const ref = doc(collection(db, 'conversas', dono, 'mensagens'));
+    const lote = writeBatch(db);
+    lote.set(ref, { texto, autor, usuarioId: u.uid, usuarioNome: extra.usuarioNome ?? 'Cliente Teste', criadaEm: serverTimestamp() });
+    lote.set(doc(db, 'conversas', dono), {
+      clienteNome: 'Cliente Teste', clienteNumero: extra.numero ?? 2, ultimaMensagem: texto, ultimaEm: serverTimestamp(), ultimoAutor: autor, ultimaId: ref.id,
+      [autor === 'equipe' ? 'naoLidasAfilhado' : 'naoLidasEquipe']: increment(extra.soma ?? 1), [autor === 'equipe' ? 'naoLidasEquipe' : 'naoLidasAfilhado']: 0,
+    }, { merge: true });
+    await lote.commit();
+  };
+  const { user: cli } = await signInWithEmailAndPassword(auth, 'cliente2@teste.local', senhaCliente);
+  await permitido('afilhado enviar mensagem na própria conversa', () => enviar(cli.uid, 'afilhado', 'Oi, tem mesa hoje?'));
+  await permitido('afilhado mandar outra mensagem', () => enviar(cli.uid, 'afilhado', 'Para 4 pessoas'));
+  await permitido('afilhado ler as próprias mensagens', () => getDocs(query(collection(db, 'conversas', cli.uid, 'mensagens'), orderBy('criadaEm', 'desc'))));
+  await negado('afilhado mandar mensagem como equipe', () => enviar(cli.uid, 'equipe', 'Sou o bar'));
+  await negado('afilhado trocar o número no resumo', () => enviar(cli.uid, 'afilhado', 'Oi', { numero: 1 }));
+  await negado('afilhado somar mais de uma não lida', () => enviar(cli.uid, 'afilhado', 'Oi', { soma: 5 }));
+  await negado('afilhado zerar as não lidas da equipe', () => updateDoc(doc(db, 'conversas', cli.uid), { naoLidasEquipe: 0 }));
+  await negado('afilhado gravar mensagem sem o resumo', () => setDoc(doc(collection(db, 'conversas', cli.uid, 'mensagens')), { texto: 'x', autor: 'afilhado', usuarioId: cli.uid, usuarioNome: 'x', criadaEm: serverTimestamp() }));
+  await negado('afilhado ler a conversa de outro afilhado', () => getDoc(doc(db, 'conversas', 'outro-afilhado')));
+  await negado('afilhado ler as mensagens de outro afilhado', () => getDocs(collection(db, 'conversas', 'outro-afilhado', 'mensagens')));
+  await negado('afilhado escrever na conversa de outro afilhado', () => enviar('equipe-antiga', 'afilhado', 'Oi', { numero: 3 }));
+  await negado('afilhado listar todas as conversas', () => getDocs(collection(db, 'conversas')));
+  await negado('afilhado apagar a própria conversa', () => deleteDoc(doc(db, 'conversas', cli.uid)));
+  await signOut(auth);
+
+  if (senhaAtendente) {
+    await signInWithEmailAndPassword(auth, 'atendente@teste.local', senhaAtendente);
+    await permitido('atendente listar as conversas', () => getDocs(query(collection(db, 'conversas'), orderBy('ultimaEm', 'desc'))));
+    await permitido('atendente ver as não lidas', () => getDocs(query(collection(db, 'conversas'), where('naoLidasEquipe', '>', 0))));
+    await permitido('atendente ler as mensagens do afilhado', () => getDocs(collection(db, 'conversas', cli.uid, 'mensagens')));
+    await permitido('atendente marcar a conversa como lida', () => updateDoc(doc(db, 'conversas', cli.uid), { naoLidasEquipe: 0 }));
+    await negado('atendente responder com o nome de outra pessoa', () => enviar(cli.uid, 'equipe', 'Temos sim', { usuarioNome: 'Presidente' }));
+    await permitido('atendente responder ao afilhado', () => enviar(cli.uid, 'equipe', 'Temos sim!', { usuarioNome: 'Atendente Teste' }));
+    await negado('atendente zerar as não lidas do afilhado', () => updateDoc(doc(db, 'conversas', cli.uid), { naoLidasAfilhado: 0 }));
+    await negado('atendente mandar mensagem como afilhado', () => enviar(cli.uid, 'afilhado', 'Quero desconto'));
+    await negado('atendente (sem excluir) apagar a conversa', () => deleteDoc(doc(db, 'conversas', cli.uid)));
+    await signOut(auth);
+    await signInWithEmailAndPassword(auth, 'cliente2@teste.local', senhaCliente);
+    await permitido('afilhado marcar a resposta como lida', () => updateDoc(doc(db, 'conversas', cli.uid), { naoLidasAfilhado: 0 }));
+    await signOut(auth);
+  }
+  if (senhaMarketing) {
+    await signInWithEmailAndPassword(auth, 'marketing@teste.local', senhaMarketing);
+    await negado('Marketing (sem Atendimento) listar as conversas', () => getDocs(collection(db, 'conversas')));
+    await negado('Marketing ler as mensagens de um afilhado', () => getDocs(collection(db, 'conversas', cli.uid, 'mensagens')));
+    await signOut(auth);
+  }
 }
 
 console.log(falhas ? `\n${falhas} verificação(ões) falharam.` : '\nTodas as verificações passaram.');

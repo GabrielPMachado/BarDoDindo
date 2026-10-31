@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { api, ApiError, getToken, setToken } from './api';
+import { api, ApiError, chat, getToken, setToken } from './api';
 
 interface Config {
   nomeEstabelecimento: string;
@@ -111,6 +111,8 @@ interface Store {
   cardapio: Produto[];
   recompensas: Recompensa[];
   error: string | null;
+  /** Mensagens da equipe ainda não lidas na conversa com o bar. */
+  naoLidasChat: number;
   login: (email: string, senha: string) => Promise<void>;
   cadastro: (dados: { nome: string; email: string; telefone: string; senha: string; cpf: string; nascimento: string; aceite: boolean; via?: string }) => Promise<void>;
   logout: () => Promise<void>;
@@ -130,6 +132,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [cardapio, setCardapio] = useState<Produto[]>([]);
   const [recompensas, setRecompensas] = useState<Recompensa[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [naoLidasChat, setNaoLidasChat] = useState(0);
 
   const loadPublic = useCallback(async () => {
     const [c, p, r] = await Promise.all([
@@ -189,8 +192,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   }, [refresh]);
 
+  // só o resumo da própria conversa fica ao vivo (1 leitura ao abrir e 1 por mensagem); as mensagens, só na tela da conversa
+  const logado = !!me;
+  useEffect(() => {
+    const uid = logado ? getToken() : null;
+    if (!uid) { setNaoLidasChat(0); return; }
+    return chat.ouvirConversa(uid, (c) => setNaoLidasChat(c?.naoLidasAfilhado ?? 0));
+  }, [logado]);
+
   const store: Store = {
     ready,
+    naoLidasChat,
     me,
     config,
     cardapio,

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { AppWindow, ChevronDown, LayoutDashboard, Menu, UserRound, Copy, ExternalLink, KeyRound, LogOut, MousePointerClick, Pin, PinOff, X } from 'lucide-react';
+import { AppWindow, ChevronDown, LayoutDashboard, Menu, MessageCircle, UserRound, Copy, ExternalLink, KeyRound, LogOut, MousePointerClick, Pin, PinOff, X } from 'lucide-react';
 import { AREAS, DEPARTAMENTOS, findModule, localDe, type Area, type AreaKey, type Setor } from '../modules';
 import { useSession } from '../lib/session';
 import { useLastSync } from '../lib/data';
+import { useNaoLidasConversas } from '../lib/conversas';
 import { usePins } from '../lib/pins';
 import { useToqueLongo } from '../lib/toque';
 import { alternarAtalho, usePainelPrefs } from '../lib/preferencias';
@@ -65,12 +66,15 @@ function PageMenu({ menu, pinned, onPin, paineis, onClose }: {
   );
 }
 
+const CONVERSAS = '/atendimento/conversas';
+
 export function Layout({ children }: { children: ReactNode }) {
   const { usuario, funcao, access, logout } = useSession();
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const current = findModule(pathname);
   const lastSync = useLastSync();
+  const naoLidas = useNaoLidasConversas(access('conversas') !== 'none');
   const { pins, isPinned, toggle, unpin } = usePins(usuario?.id);
   // atalhos de páginas: no painel próprio (todos) e no Painel executivo (quem acessa a Diretoria)
   const meuPainel = usePainelPrefs('meuPainel');
@@ -135,6 +139,7 @@ export function Layout({ children }: { children: ReactNode }) {
               {header && <div className="nav__group">{header}</div>}
               <NavLink to={i.path} end className="nav__link" {...menuProps(i.path)}>
                 <span>{i.label}</span>
+                {i.path === CONVERSAS && naoLidas > 0 && <span className="nav__badge" aria-label={`${naoLidas} com mensagem nova`}>{naoLidas}</span>}
                 {isPinned(i.path) && <Pin size={12} className="nav__pin" aria-label="Fixado" />}
               </NavLink>
             </div>
@@ -277,6 +282,12 @@ export function Layout({ children }: { children: ReactNode }) {
             <span className={`live__dot ${lastSync && Date.now() - lastSync.getTime() < 10000 ? 'is-on' : ''}`} />
             <span className="live__text">{lastSync ? `Ao vivo · ${lastSync.toLocaleTimeString('pt-BR')}` : 'Conectando…'}</span>
           </div>
+          {access('conversas') !== 'none' && (
+            <button className="topbar-btn" onClick={() => navigate(CONVERSAS)} aria-label="Conversas com os afilhados" title="Conversas com os afilhados">
+              <MessageCircle size={18} />
+              {naoLidas > 0 && <span className="topbar-btn__badge">{naoLidas > 99 ? '99+' : naoLidas}</span>}
+            </button>
+          )}
           <AtividadesButton onOpenPanel={painel.abrir} />
           <div className="user">
             <button className="user__btn" onClick={() => setMenu((m) => !m)} aria-expanded={menu}>

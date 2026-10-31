@@ -21,7 +21,7 @@ service cloud.firestore {
     // valem as da área a que ele pertence; e Vendas, separada de Marketing, herda as de Marketing.
     // Igual a PAI_DO_MODULO em shared/backend.ts.
     function pai(k) {
-      return k.matches('reservas|consumos|resgates|eventos|caixas|comandas|mesas') ? 'atd'
+      return k.matches('reservas|consumos|resgates|eventos|caixas|comandas|mesas|conversas') ? 'atd'
         : k.matches('produtos|fichas|guarnicoes|clientes|qrcode') ? 'vnd'
         : k.matches('recompensas|criacao|midias|publicidade') ? 'mkt'
         : k.matches('projetos|estoque|materiais|patrimonio|compras') ? 'dp'
@@ -372,6 +372,52 @@ service cloud.firestore {
           && n.matches('^[0-7]$') && int(n) < getAfter(caminho('anexos', id)).data.partes
           && anexaEm(getAfter(caminho('anexos', id)).data.colecao);
         allow delete: if apagaAnexo(get(caminho('anexos', id)).data);
+      }
+    }
+
+    /* ---------- conversas entre a equipe e cada afilhado (chat) ---------- */
+    // uma conversa por afilhado (o id é o dele), com o resumo para a lista; as mensagens ficam em conversas/<uid>/mensagens.
+    // O afilhado só vê e escreve a própria conversa; a equipe com Conversas vê todas e, com "criar", responde.
+    // Quem exclui afilhados (LGPD) lê e apaga a conversa junto com o cadastro.
+    function caminhoMensagem(uid, id) { return /databases/$(database)/documents/conversas/$(uid)/mensagens/$(id); }
+    function leConversa(uid) { return (logado() && request.auth.uid == uid) || pode('conversas', 'ver') || pode('clientes', 'excluir'); }
+    // o resumo aponta para a mensagem gravada no mesmo lote; quem escreve zera as próprias não lidas e soma uma para o outro lado
+    function resumoDeEnvio(uid, autor, meu, outro) {
+      let d = request.resource.data;
+      let antes = resource == null ? {} : resource.data;
+      return d.keys().hasOnly(['clienteNome', 'clienteNumero', 'ultimaMensagem', 'ultimaEm', 'ultimoAutor', 'ultimaId', 'naoLidasEquipe', 'naoLidasAfilhado'])
+        && textoAte(d.clienteNome, 120) && textoAte(d.ultimaMensagem, 200)
+        && d.ultimoAutor == autor && d.ultimaEm == request.time
+        && textoAte(d.ultimaId, 128) && d.ultimaId != antes.get('ultimaId', '')
+        && d[meu] == 0 && d[outro] == antes.get(outro, 0) + 1
+        && !exists(caminhoMensagem(uid, d.ultimaId)) && existsAfter(caminhoMensagem(uid, d.ultimaId))
+        && getAfter(caminhoMensagem(uid, d.ultimaId)).data.autor == autor
+        && d.clienteNumero == get(caminho('clientes', uid)).data.numero;
+    }
+    match /conversas/{uid} {
+      allow read: if leConversa(uid);
+      allow create, update: if (logado() && request.auth.uid == uid && resumoDeEnvio(uid, 'afilhado', 'naoLidasAfilhado', 'naoLidasEquipe'))
+        || (pode('conversas', 'criar') && resumoDeEnvio(uid, 'equipe', 'naoLidasEquipe', 'naoLidasAfilhado'));
+      // marcar como lida: cada lado só zera o próprio contador
+      allow update: if logado() && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['naoLidasAfilhado']) && request.resource.data.naoLidasAfilhado == 0;
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['naoLidasEquipe']) && request.resource.data.naoLidasEquipe == 0
+        && pode('conversas', 'ver');
+      allow delete: if pode('clientes', 'excluir') || pode('conversas', 'excluir');
+
+      match /mensagens/{id} {
+        allow read: if leConversa(uid);
+        // só junto com o resumo que aponta para ela; a data é a do servidor e o autor é quem está logado
+        allow create: if request.resource.data.keys().hasOnly(['texto', 'autor', 'usuarioId', 'usuarioNome', 'criadaEm'])
+          && textoAte(request.resource.data.texto, 1000) && request.resource.data.texto.size() > 0
+          && textoAte(request.resource.data.usuarioNome, 120)
+          && logado() && request.resource.data.usuarioId == request.auth.uid
+          && request.resource.data.criadaEm == request.time
+          && getAfter(caminho('conversas', uid)).data.ultimaId == id
+          && ((request.auth.uid == uid && request.resource.data.autor == 'afilhado' && exists(caminho('clientes', uid)))
+            || (request.resource.data.autor == 'equipe' && pode('conversas', 'criar')
+              && request.resource.data.usuarioNome == get(caminho('usuarios', request.auth.uid)).data.nome));
+        allow delete: if pode('clientes', 'excluir') || pode('conversas', 'excluir');
       }
     }
 

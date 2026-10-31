@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } fr
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import {
   AlertCircle, Bell, CalendarDays, CheckCircle2, ChevronRight, Clock, Gift, Home, Menu,
-  ReceiptText, Star, Ticket, User, Utensils, X, XCircle,
+  MessageCircle, ReceiptText, Star, Ticket, User, Utensils, X, XCircle,
 } from 'lucide-react';
 import { brl } from '../data';
 import { ItemIcon } from './ItemIcon';
@@ -30,11 +30,12 @@ const DRAWER = [
   { to: '/historico', label: 'Meu histórico', icon: ReceiptText },
   { to: '/cardapio', label: 'Cardápio', icon: Utensils },
   { to: '/recompensas', label: 'Minhas recompensas', icon: Gift },
+  { to: '/conversa', label: 'Fale com o bar', icon: MessageCircle },
   { to: '/perfil', label: 'Meu perfil', icon: User },
 ];
 /** Título de cada tela no topo, como no CRM. */
 const TITULOS: Record<string, string> = {
-  '/': 'Início', '/reservas': 'Reservas', '/historico': 'Histórico', '/cardapio': 'Cardápio', '/recompensas': 'Recompensas', '/perfil': 'Meu perfil',
+  '/': 'Início', '/reservas': 'Reservas', '/historico': 'Histórico', '/cardapio': 'Cardápio', '/recompensas': 'Recompensas', '/perfil': 'Meu perfil', '/conversa': 'Fale com o bar',
 };
 const iniciais = (nome: string) => nome.trim().split(/\s+/).filter(Boolean).map((p) => p[0]).slice(0, 2).join('').toUpperCase() || '?';
 
@@ -74,7 +75,7 @@ function useNotifications() {
 }
 
 export function TopBar() {
-  const { me } = useStore();
+  const { me, naoLidasChat } = useStore();
   const { pathname } = useLocation();
   const [drawer, setDrawer] = useState(false);
   const [notif, setNotif] = useState(false);
@@ -113,6 +114,10 @@ export function TopBar() {
           <img src={logoUrl} width={32} height={32} alt="" />
           <span className="topbar__title">{TITULOS[pathname] ?? 'Bar do Dindo'}</span>
         </Link>
+        <Link to="/conversa" className="topbar-btn" aria-label={naoLidasChat ? `Fale com o bar: ${naoLidasChat} mensagem(ns) nova(s)` : 'Fale com o bar'}>
+          <MessageCircle size={18} />
+          {naoLidasChat > 0 && <span className="dot" />}
+        </Link>
         <button className="topbar-btn" onClick={openNotif} aria-label="Notificações">
           <Bell size={18} />
           {unread && <span className="dot" />}
@@ -131,6 +136,7 @@ export function TopBar() {
               {DRAWER.map(({ to, label, icon: Icon }) => (
                 <NavLink key={to} to={to} end onClick={() => setDrawer(false)} className="drawer__link">
                   <Icon size={18} /> <span>{label}</span>
+                  {to === '/conversa' && naoLidasChat > 0 && <span className="drawer__badge">{naoLidasChat}</span>}
                 </NavLink>
               ))}
             </div>

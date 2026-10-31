@@ -16,3 +16,6 @@ export function setToken(token: string | null) {
 }
 
 export const api = backend.request;
+/** Conversa do afilhado com a equipe do bar (só a conversa aberta fica ao vivo). */
+export const chat = backend.chat;
+export type { Conversa, Mensagem } from '../shared/backend';
