@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Minus, Pencil, Plus, QrCode, Receipt, Search, Star, Target, Trash2, UserX, Users, X } from 'lucide-react';
+import { BarChart3, Check, Minus, Pencil, Plus, QrCode, Receipt, Search, Star, Target, Trash2, UserX, Users, X } from 'lucide-react';
 import { COLLECTIONS } from '../collections';
 import { CollectionPage } from '../components/CollectionPage';
 import { AsyncButton, Badge, EmptyState, ErrorBox, KpiRow, Loading, Modal, NumberInput, PageHead, notify } from '../components/ui';
@@ -204,7 +204,10 @@ export function Clientes() {
   return (
     <div className="page">
       <PageHead title="Clientes (afilhados)" description="Clientes cadastrados pelo aplicativo, com pontos, consumo e frequência."
-        actions={pode('qrcode', 'ver') && <button type="button" className="btn btn--ghost" onClick={() => navigate('/vendas/qrcode')}><QrCode size={16} /> QR Code Afilhie-se</button>} />
+        actions={<>
+          <button type="button" className="btn btn--ghost" onClick={() => navigate('/vendas/questionario')}><BarChart3 size={16} /> Resultado do questionário</button>
+          {pode('qrcode', 'ver') && <button type="button" className="btn btn--ghost" onClick={() => navigate('/vendas/qrcode')}><QrCode size={16} /> QR Code Afilhie-se</button>}
+        </>} />
       {!loading && <ContadorAfilhados total={afilhados.length} hoje={afilhados.filter((c) => String(c.desde).slice(0, 10) === hoje).length} meta={Number(config?.metaAfilhados) || 0} podeMeta={pode('parametros', 'editar')} />}
       {clientes.length > 0 && (
         <KpiRow items={[
