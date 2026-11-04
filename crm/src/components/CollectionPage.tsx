@@ -232,9 +232,12 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
         (!term || def.fields.some((f) => valoresDoCampo(r, f).some((x) => x.toLowerCase().includes(term)))),
     );
     const field = def.fields.find((f) => f.key === sort.key);
-    const numeric = field && ['number', 'money', 'percent'].includes(field.type);
+    // ordem por uma coluna calculada (ex.: preço por L): "#" + o rótulo dela
+    const calc = sort.key.startsWith('#') ? def.computed?.find((c) => c.ordenar && `#${c.label}` === sort.key) : undefined;
+    const numeric = !!calc || (field && ['number', 'money', 'percent'].includes(field.type));
+    const valor = (r: Row) => (calc ? calc.ordenar!(r, all, rel.rows) : r[sort.key]);
     return list.sort((a, b) => {
-      const av = a[sort.key], bv = b[sort.key];
+      const av = valor(a), bv = valor(b);
       const empty = (v: unknown) => v === undefined || v === null || v === '';
       if (empty(av) && empty(bv)) return def.desempate?.(a, b) ?? 0;
       if (empty(av)) return 1;
@@ -242,7 +245,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
       const c = numeric ? Number(av) - Number(bv) : String(av).localeCompare(String(bv), 'pt-BR', { numeric: true });
       return (sort.dir === 'asc' ? c : -c) || (def.desempate?.(a, b) ?? 0);
     });
-  }, [all, q, filter, filtros, sort, def]);
+  }, [all, q, filter, filtros, sort, def, rel.rows]);
 
   /* agrupamento: sem escolha manual, com algum filtro ativo agrupa pela primeira dimensão que não está filtrada
      (ex.: filtrou por destaque, agrupa por categoria) e que ainda tem mais de um valor na lista */
@@ -538,7 +541,16 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
                       </button>
                     </th>
                   ))}
-                  {def.computed?.map((c) => <th key={c.label} className={c.format === 'badge' || c.format === 'text' || c.format === 'nivel' || c.format === 'comparacao' || c.format === 'nota' ? '' : 'num'}>{c.label}</th>)}
+                  {def.computed?.map((c) => (
+                    <th key={c.label} className={c.format === 'badge' || c.format === 'text' || c.format === 'nivel' || c.format === 'comparacao' || c.format === 'nota' ? '' : 'num'}>
+                      {c.ordenar ? (
+                        <button onClick={() => toggleSort(`#${c.label}`)}>
+                          {c.label}
+                          {sort.key === `#${c.label}` && (sort.dir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+                        </button>
+                      ) : c.label}
+                    </th>
+                  ))}
                   <th className="actions-col" aria-label="Ações" />
                 </tr>
               </thead>
