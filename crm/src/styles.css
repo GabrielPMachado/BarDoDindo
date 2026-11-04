@@ -1335,10 +1335,45 @@ button.anexos__nome:hover { text-decoration: underline; }
 .calendario__grade { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
 .calendario__semana { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); text-align: center; padding: 2px 0 6px; font-weight: 600; }
 .calendario__dia {
-  min-height: 132px; display: flex; flex-direction: column; align-items: stretch; gap: 3px; padding: 6px; text-align: left;
-  border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); min-width: 0; overflow: hidden;
-  transition: border-color .12s, background .12s;
+  min-height: 150px; display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 8px; text-align: left;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); min-width: 0; overflow: hidden;
+  transition: border-color .12s, background .12s; cursor: pointer; color: var(--text);
 }
+.calendario__dia:focus-visible { outline: 2px solid var(--brand-light); outline-offset: 2px; }
+.calendario__dia > .calendario__n { align-self: flex-start; font-size: 15px; min-width: 28px; height: 28px; border-radius: 14px; }
+/* categorias: cada uma com cor própria (sem paletas de gênero) */
+.cat-aniv { --cat: #f2c14e; }
+.cat-rs { --cat: var(--info); }
+.cat-ev { --cat: var(--brand-light); }
+.cat-dir { --cat: #a99bdc; }
+.calendario__icones { display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start; }
+.cal-ico {
+  position: relative; display: inline-grid; place-items: center; width: 34px; height: 34px; padding: 0; border-radius: 10px;
+  color: var(--cat, var(--text)); background: color-mix(in srgb, var(--cat, var(--muted)) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cat, var(--muted)) 40%, transparent); cursor: pointer; transition: transform .12s, background .12s;
+}
+button.cal-ico:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--cat) 28%, transparent); }
+.cal-ico small {
+  position: absolute; top: -6px; right: -6px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; display: grid; place-items: center;
+  font-size: 10px; font-weight: 800; background: var(--cat); color: #0d0907; font-variant-numeric: tabular-nums;
+}
+.cal-ico.is-pendente::after { content: ''; position: absolute; left: -3px; bottom: -3px; width: 9px; height: 9px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 0 2px var(--surface-2); }
+.calendario__legenda { display: flex; flex-wrap: wrap; gap: 6px; margin: -4px 0 14px; }
+.cal-leg {
+  display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px 4px 4px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text); cursor: pointer;
+}
+.cal-leg .cal-ico { width: 26px; height: 26px; border-radius: 13px; cursor: inherit; }
+.cal-leg.is-off { opacity: .45; text-decoration: line-through; }
+.cal-sec { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--cat); }
+.cal-sec .cal-ico { width: 24px; height: 24px; border-radius: 8px; cursor: default; }
+.cal-card--aniv, .cal-card--dir, .cal-card--ev { align-items: flex-start; }
+.cal-card--aniv { border-color: color-mix(in srgb, #f2c14e 40%, var(--border)); }
+.cal-card--dir { border-color: color-mix(in srgb, #a99bdc 45%, var(--border)); }
+.cal-card--aniv > svg { color: #f2c14e; flex-shrink: 0; margin-top: 2px; }
+.cal-card--dir > svg { color: #a99bdc; flex-shrink: 0; margin-top: 2px; }
+.calendario__tudo { align-self: flex-start; }
+.calendario__detalhe { scroll-margin-top: 72px; }
 .calendario__dia:hover { border-color: var(--border-strong); background: var(--surface-3, var(--surface-2)); }
 .calendario__dia.is-fora { opacity: .35; }
 .calendario__dia.is-passado:not(.is-hoje) { opacity: .75; }
@@ -1395,7 +1430,13 @@ button.anexos__nome:hover { text-decoration: underline; }
   .calendario__topo .segmented { width: 100%; }
   .calendario__topo .segmented button { flex: 1; }
   .calendario__grade { gap: 3px; }
-  .calendario__dia { min-height: 58px; padding: 4px; border-radius: 8px; }
+  .calendario__dia { min-height: 84px; padding: 4px; gap: 4px; border-radius: 8px; }
+  .calendario__dia > .calendario__n { font-size: 12px; min-width: 22px; height: 22px; }
+  .calendario__icones { gap: 3px; }
+  .calendario__icones .cal-ico { width: 22px; height: 22px; border-radius: 6px; }
+  .calendario__icones .cal-ico svg { width: 13px; height: 13px; }
+  .calendario__icones .cal-ico small { top: -5px; right: -5px; min-width: 14px; height: 14px; font-size: 9px; padding: 0 3px; }
+  .cal-leg { font-size: 12px; padding-right: 10px; }
   .calendario__ev, .calendario__rs, .calendario__mais, .calendario__pessoas { display: none; }
   .calendario__n { font-size: 12px; min-width: 20px; height: 20px; }
   .calendario__pontos { display: flex; align-items: center; gap: 3px; margin-top: auto; }

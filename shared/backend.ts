@@ -1259,6 +1259,8 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
         return {
           // quem edita Clientes vê o CPF completo (nota fiscal com CPF, conferência do cadastro)
           ...publicCliente(c), uid: c.id, foto: undefined,
+          // dia e mês do aniversário (sem o ano) vão para todos: o calendário do Cérebro mostra os aniversariantes
+          aniversario: /^\d{4}-\d{2}-\d{2}$/.test(String(c.nascimento ?? '')) ? String(c.nascimento).slice(5) : '',
           ...(verDocumentos ? { cpf: c.cpf ? String(c.cpf).replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : '' } : { nascimento: '' }), pontos: acumulados - (Number(s.usados) || 0), acumulados, totalGasto: Math.round((Number(s.gasto) || 0) * 100) / 100,
           visitas: dias.length, ultimaVisita: dias.at(-1) ?? null, nivel: nivelDe(acumulados, cfg.niveis).atual?.nome ?? '',
         };
