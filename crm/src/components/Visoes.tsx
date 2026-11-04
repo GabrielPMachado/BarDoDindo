@@ -92,7 +92,7 @@ export function VisaoCartoes({ def, rows, onAbrir, titulo, sel, marcar, onAmplia
             </div>
             <div className="cartao__corpo">
               <b className="cartao__titulo">{titulo(r)}</b>
-              {nivel && nivel.get(r, rows) !== null && <BarraNivel fracao={Number(nivel.get(r, rows))} tone={nivel.tone?.(r, rows) ?? 'neutral'} detalhe={nivel.detalhe?.(r, rows)} />}
+              {nivel && nivel.get(r, rows, []) !== null && <BarraNivel fracao={Number(nivel.get(r, rows, []))} tone={nivel.tone?.(r, rows, []) ?? 'neutral'} detalhe={nivel.detalhe?.(r, rows, [])} />}
             </div>
           </article>
         );

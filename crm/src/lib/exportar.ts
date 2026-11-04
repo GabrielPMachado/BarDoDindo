@@ -17,7 +17,7 @@ export interface Coluna {
 }
 
 /** Colunas de um cadastro: foto (se houver), todos os campos e os valores calculados. */
-export function colunasDe(def: CollectionDef, todos: Row[] = []): Coluna[] {
+export function colunasDe(def: CollectionDef, todos: Row[] = [], rel: Row[] = []): Coluna[] {
   const cols: Coluna[] = [];
   if (def.comFoto) cols.push({ titulo: 'Foto', tipo: 'imagem', valor: (r) => r.foto });
   for (const f of def.fields) {
@@ -35,9 +35,9 @@ export function colunasDe(def: CollectionDef, todos: Row[] = []): Coluna[] {
   }
   for (const c of def.computed ?? []) {
     const fracao = c.format === 'percent' || c.format === 'nivel' || c.format === 'comparacao';
-    const tipo: TipoColuna = c.format === 'money' ? 'dinheiro' : c.format === 'number' ? 'numero' : fracao ? 'percentual' : c.format === 'badge' ? 'status' : 'texto';
+    const tipo: TipoColuna = c.format === 'money' ? 'dinheiro' : c.format === 'number' || c.format === 'nota' ? 'numero' : fracao ? 'percentual' : c.format === 'badge' ? 'status' : 'texto';
     // percentuais calculados vêm como fração (0,743 = 74,3%); nas exportações, como nos campos, vão de 0 a 100
-    const valor = fracao ? (r: Row) => { const v = c.get(r, todos); return v === null || v === undefined || v === '' ? v : Number(v) * 100; } : (r: Row) => c.get(r, todos);
+    const valor = fracao ? (r: Row) => { const v = c.get(r, todos, rel); return v === null || v === undefined || v === '' ? v : Number(v) * 100; } : (r: Row) => c.get(r, todos, rel);
     cols.push({ titulo: c.label, tipo, valor });
   }
   return cols;
