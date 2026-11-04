@@ -870,11 +870,11 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   /* ---------------- Atendimento: eventos do calendário ---------------- */
   eventos: {
     id: 'eventos', area: 'eventos', title: 'Calendário', singular: 'evento',
-    description: 'Shows, festas, jogos e eventos fechados. O calendário junta os eventos com as reservas.',
+    description: 'Shows, festas, jogos, eventos fechados e reuniões. O calendário junta os eventos com as reservas e os aniversários dos afilhados.',
     filterKey: 'tipo', filtros: ['status', 'responsavel'], sortKey: 'data', sortDir: 'asc',
     fields: [
       { key: 'titulo', label: 'Evento', type: 'text', required: true, wide: true, placeholder: 'Ex.: Samba de sexta' },
-      { key: 'tipo', label: 'Tipo', type: 'select', options: ['Show', 'Festa', 'Jogo / transmissão', 'Evento fechado', 'Degustação', 'Feriado', 'Outro'], required: true },
+      { key: 'tipo', label: 'Tipo', type: 'select', options: ['Show', 'Festa', 'Jogo / transmissão', 'Evento fechado', 'Degustação', 'Feriado', 'Reunião da diretoria', 'Reunião de equipe', 'Outro'], required: true },
       { key: 'data', label: 'Data', type: 'date', required: true },
       { key: 'horario', label: 'Horário', type: 'time' },
       { key: 'responsavel', label: 'Responsável', type: 'ref', ref: 'pessoas', refKey: 'responsavelId', livre: true, formOnly: true },

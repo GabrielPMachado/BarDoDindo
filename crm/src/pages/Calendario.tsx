@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, ChevronLeft, ChevronRight, Clock, MapPin, PartyPopper, Phone, Users, X } from 'lucide-react';
+import { Cake, CalendarCheck, Check, ChevronLeft, ChevronRight, Clock, Landmark, MapPin, PartyPopper, Phone, Users, X } from 'lucide-react';
 import { COLLECTIONS, toneOf } from '../collections';
 import { CollectionPage } from '../components/CollectionPage';
 import { Badge, notify } from '../components/ui';
-import { useCollection, type Row } from '../lib/data';
+import { useCollection, useResource, type Row } from '../lib/data';
 import { isoToday, num } from '../lib/format';
 import { maskPhone } from '../lib/masks';
 import { useSession } from '../lib/session';
@@ -13,19 +13,51 @@ const SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const reservaAtiva = (r: Row) => !['Recusada', 'Cancelada', 'Cancelada pelo cliente'].includes(String(r.status));
 const hora = (v: unknown) => String(v ?? '').slice(0, 5);
-const primeiro = (nome: unknown) => String(nome ?? '').trim().split(/\s+/)[0] || 'Cliente';
 const pessoasDe = (rs: Row[]) => rs.reduce((t, r) => t + (Number(r.pessoas) || 0), 0);
 const capitalizar = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
-type Filtro = 'tudo' | 'reservas' | 'eventos';
+const plural = (n: number, um: string, varios: string) => `${num(n)} ${n === 1 ? um : varios}`;
+/** Reuniões (diretoria ou equipe) ficam na categoria própria; os demais tipos são eventos. */
+const ehReuniao = (e: Row) => /reuni|diretoria/i.test(String(e.tipo ?? ''));
 
-/** O mês em grade, grande: em cada dia, os eventos e as reservas (horário, nome e pessoas); ao lado, o dia escolhido em detalhe. */
+type Cat = 'aniv' | 'rs' | 'ev' | 'dir';
+const CATS: { id: Cat; label: string; Icone: typeof Cake }[] = [
+  { id: 'aniv', label: 'Aniversários', Icone: Cake },
+  { id: 'rs', label: 'Reservas', Icone: CalendarCheck },
+  { id: 'ev', label: 'Eventos', Icone: PartyPopper },
+  { id: 'dir', label: 'Diretoria / reuniões', Icone: Landmark },
+];
+
+/** O que o calendário precisa de cada afilhado (vem de /crm/clientes, a lista que o Cérebro já vigia: nenhuma leitura a mais). */
+type Aniversariante = { uid: string; numero: number; nome: string; telefone?: string; origem?: string; nascimento?: string; aniversario?: string };
+/** MM-DD do aniversário; quem nasceu em 29/02 comemora em 28/02 nos anos que não são bissextos. */
+function diaDoAniversario(c: Aniversariante, ano: number) {
+  const md = c.aniversario || (/^\d{4}-\d{2}-\d{2}$/.test(c.nascimento ?? '') ? c.nascimento!.slice(5) : '');
+  if (!md) return '';
+  const bissexto = (ano % 4 === 0 && ano % 100 !== 0) || ano % 400 === 0;
+  return md === '02-29' && !bissexto ? '02-28' : md;
+}
+const numeroAfilhado = (n: number) => `#${n < 0 ? '-' : ''}${String(Math.abs(n)).padStart(3, '0')}`;
+const whatsapp = (tel?: string) => {
+  const d = String(tel ?? '').replace(/\D/g, '');
+  return d.length >= 10 ? `https://wa.me/${d.length <= 11 ? `55${d}` : d}` : '';
+};
+
+/**
+ * O mês em grade, com quadrados grandes. Cada dia mostra só os ícones das categorias que têm algo
+ * (aniversários, reservas, eventos, diretoria/reuniões); tocar no dia ou num ícone abre os detalhes ao lado (ou abaixo, no celular).
+ */
 function Mes({ eventos }: { eventos: Row[] }) {
-  const { pode } = useSession();
+  const { pode, access } = useSession();
   const col = useCollection('reservas');
   const reservas = col.rows.filter(reservaAtiva);
+  // os aniversários saem do cadastro dos afilhados (data de nascimento), para quem pode ver a lista de clientes
+  const podeClientes = ['clientes', 'reservas', 'consumos', 'resgates', 'recompensas', 'comandas'].some((k) => access(k) !== 'none');
+  const clientes = useResource<Aniversariante[]>(podeClientes ? '/crm/clientes' : null).data ?? [];
   const [base, setBase] = useState(() => { const d = new Date(); d.setDate(1); return d; });
   const [dia, setDia] = useState(isoToday());
-  const [filtro, setFiltro] = useState<Filtro>('tudo');
+  const [foco, setFoco] = useState<Cat | null>(null);
+  const [ocultas, setOcultas] = useState<Set<Cat>>(() => new Set());
+  const detalhe = useRef<HTMLElement>(null);
   const hoje = isoToday();
   const podeConfirmar = pode('reservas', 'editar');
 
@@ -36,19 +68,49 @@ function Mes({ eventos }: { eventos: Row[] }) {
     const semanas = Math.ceil((base.getDay() + fim.getDate()) / 7);
     return Array.from({ length: semanas * 7 }, (_, i) => { const d = new Date(ini); d.setDate(ini.getDate() + i); return d; });
   }, [base]);
-  const doDia = (d: string) => ({
-    ev: filtro === 'reservas' ? [] : eventos.filter((e) => e.data === d && e.status !== 'Cancelado'),
-    rs: filtro === 'eventos' ? [] : reservas.filter((r) => r.data === d).sort((a, b) => hora(a.hora).localeCompare(hora(b.hora))),
-  });
+  const aniversariantes = useMemo(() => {
+    const porDia = new Map<string, Aniversariante[]>();
+    for (const ano of new Set(celulas.map((d) => d.getFullYear()))) {
+      for (const c of clientes) {
+        const md = diaDoAniversario(c, ano);
+        if (!md) continue;
+        const k = `${ano}-${md}`;
+        porDia.set(k, [...(porDia.get(k) ?? []), c]);
+      }
+    }
+    for (const l of porDia.values()) l.sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
+    return porDia;
+  }, [clientes, celulas]);
+
+  const doDia = (d: string, todas = false) => {
+    const ver = (c: Cat) => todas || !ocultas.has(c);
+    const evs = eventos.filter((e) => e.data === d && e.status !== 'Cancelado').sort((a, b) => hora(a.horario).localeCompare(hora(b.horario)));
+    return {
+      aniv: ver('aniv') ? aniversariantes.get(d) ?? [] : [],
+      rs: ver('rs') ? reservas.filter((r) => r.data === d).sort((a, b) => hora(a.hora).localeCompare(hora(b.hora))) : [],
+      ev: ver('ev') ? evs.filter((e) => !ehReuniao(e)) : [],
+      dir: ver('dir') ? evs.filter(ehReuniao) : [],
+    };
+  };
   const mudar = (n: number) => setBase((b) => { const d = new Date(b); d.setMonth(b.getMonth() + n); return d; });
   const mesIso = iso(base).slice(0, 7);
   const doMes = reservas.filter((r) => String(r.data).slice(0, 7) === mesIso);
-  const sel = doDia(dia);
+  const anivMes = [...aniversariantes.entries()].filter(([k]) => k.slice(0, 7) === mesIso).reduce((t, [, l]) => t + l.length, 0);
+  const sel = doDia(dia, true);
   const titulo = capitalizar(base.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }));
   const status = async (r: Row, novo: string) => {
     try { await col.update(r.id, { status: novo }); notify(novo === 'Confirmada' ? 'Reserva confirmada.' : `Reserva marcada como ${novo.toLowerCase()}.`); }
     catch (e) { notify(e instanceof Error ? e.message : 'Não foi possível alterar.', 'error'); }
   };
+  const abrir = (k: string, cat: Cat | null) => {
+    setDia(k); setFoco(cat);
+    // no celular e em telas estreitas os detalhes ficam abaixo da grade: rola até eles
+    if (window.matchMedia('(max-width: 1180px)').matches) requestAnimationFrame(() => detalhe.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
+  const alternar = (c: Cat) => setOcultas((o) => { const n = new Set(o); if (n.has(c)) n.delete(c); else n.add(c); return n; });
+  const mostra = (c: Cat) => !foco || foco === c;
+  const anoSel = Number(dia.slice(0, 4));
+  const totalSel = sel.aniv.length + sel.rs.length + sel.ev.length + sel.dir.length;
 
   return (
     <section className="panel calendario">
@@ -57,19 +119,20 @@ function Mes({ eventos }: { eventos: Row[] }) {
           <button className="icon-btn" onClick={() => mudar(-1)} aria-label="Mês anterior"><ChevronLeft size={18} /></button>
           <h2>{titulo}</h2>
           <button className="icon-btn" onClick={() => mudar(1)} aria-label="Próximo mês"><ChevronRight size={18} /></button>
-          <button className="btn btn--ghost btn--sm" onClick={() => { const d = new Date(); d.setDate(1); setBase(d); setDia(hoje); }}>Hoje</button>
+          <button className="btn btn--ghost btn--sm" onClick={() => { const d = new Date(); d.setDate(1); setBase(d); setDia(hoje); setFoco(null); }}>Hoje</button>
         </div>
         <span className="calendario__resumo muted small">
-          <b>{num(doMes.length)}</b> {doMes.length === 1 ? 'reserva' : 'reservas'} · <b>{num(pessoasDe(doMes))}</b> {pessoasDe(doMes) === 1 ? 'pessoa' : 'pessoas'} no mês
+          <b>{num(doMes.length)}</b> {doMes.length === 1 ? 'reserva' : 'reservas'} · <b>{num(pessoasDe(doMes))}</b> {pessoasDe(doMes) === 1 ? 'pessoa' : 'pessoas'}
+          {podeClientes && <> · <b>{num(anivMes)}</b> {anivMes === 1 ? 'aniversário' : 'aniversários'}</>} no mês
           {doMes.some((r) => r.status === 'Pendente') && <> · <span className="text-warn">{num(doMes.filter((r) => r.status === 'Pendente').length)} aguardando</span></>}
         </span>
-        <div className="segmented" role="radiogroup" aria-label="Mostrar">
-          {(['tudo', 'reservas', 'eventos'] as Filtro[]).map((f) => (
-            <button key={f} role="radio" aria-checked={filtro === f} className={filtro === f ? 'is-active' : ''} onClick={() => setFiltro(f)}>
-              {f === 'tudo' ? 'Tudo' : f === 'reservas' ? 'Reservas' : 'Eventos'}
-            </button>
-          ))}
-        </div>
+      </div>
+      <div className="calendario__legenda" role="group" aria-label="Categorias mostradas">
+        {CATS.filter((c) => c.id !== 'aniv' || podeClientes).map(({ id, label, Icone }) => (
+          <button key={id} type="button" className={`cal-leg cat-${id} ${ocultas.has(id) ? 'is-off' : ''}`} aria-pressed={!ocultas.has(id)} onClick={() => alternar(id)} title={ocultas.has(id) ? `Mostrar ${label.toLowerCase()}` : `Esconder ${label.toLowerCase()}`}>
+            <span className="cal-ico"><Icone size={14} /></span> {label}
+          </button>
+        ))}
       </div>
 
       <div className="calendario__corpo">
@@ -77,56 +140,73 @@ function Mes({ eventos }: { eventos: Row[] }) {
           {SEMANA.map((s) => <div key={s} className="calendario__semana">{s}</div>)}
           {celulas.map((d) => {
             const k = iso(d);
-            const { ev, rs } = doDia(k);
-            const itens = [...ev.map((e) => ({ tipo: 'ev' as const, r: e })), ...rs.map((r) => ({ tipo: 'rs' as const, r }))];
-            const pessoas = pessoasDe(rs);
+            const doK = doDia(k);
+            const pendente = doK.rs.some((r) => r.status === 'Pendente');
+            const qtd: Record<Cat, number> = { aniv: doK.aniv.length, rs: doK.rs.length, ev: doK.ev.length, dir: doK.dir.length };
+            const resumoDia = CATS.filter((c) => qtd[c.id]).map((c) => `${qtd[c.id]} ${c.label.toLowerCase()}`).join(', ');
             return (
-              <button
-                key={k} role="gridcell" onClick={() => setDia(k)} aria-selected={dia === k}
+              <div
+                key={k} role="gridcell" tabIndex={0} aria-selected={dia === k}
+                aria-label={`${d.getDate()} de ${d.toLocaleDateString('pt-BR', { month: 'long' })}${resumoDia ? `: ${resumoDia}` : ''}`}
+                onClick={() => abrir(k, null)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrir(k, null); } }}
                 className={`calendario__dia ${d.getMonth() !== base.getMonth() ? 'is-fora' : ''} ${k === hoje ? 'is-hoje' : ''} ${dia === k ? 'is-sel' : ''} ${k < hoje ? 'is-passado' : ''}`}
               >
-                <span className="calendario__cab">
-                  <span className="calendario__n">{d.getDate()}</span>
-                  {pessoas > 0 && <span className="calendario__pessoas" title={`${rs.length} ${rs.length === 1 ? 'reserva' : 'reservas'} · ${pessoas} ${pessoas === 1 ? 'pessoa' : 'pessoas'}`}><Users size={11} /> {pessoas}</span>}
+                <span className="calendario__n">{d.getDate()}</span>
+                <span className="calendario__icones">
+                  {CATS.filter((c) => qtd[c.id] > 0).map(({ id, label, Icone }) => (
+                    <button
+                      key={id} type="button" tabIndex={-1}
+                      className={`cal-ico cat-${id} ${id === 'rs' && pendente ? 'is-pendente' : ''}`}
+                      title={`${label}: ${qtd[id]}${id === 'rs' && pendente ? ' (há reserva aguardando)' : ''}`}
+                      onClick={(e) => { e.stopPropagation(); abrir(k, id); }}
+                    >
+                      <Icone size={16} />
+                      {qtd[id] > 1 && <small>{qtd[id]}</small>}
+                    </button>
+                  ))}
                 </span>
-                {itens.slice(0, 4).map(({ tipo, r }) => tipo === 'ev' ? (
-                  <span key={r.id} className="calendario__ev" title={String(r.titulo)}><PartyPopper size={10} /> {String(r.titulo)}</span>
-                ) : (
-                  <span key={r.id} className={`calendario__rs tom-${toneOf(r.status)}`} title={`${hora(r.hora)} · ${r.clienteNome} · ${r.pessoas} ${Number(r.pessoas) === 1 ? 'pessoa' : 'pessoas'} · ${r.status}`}>
-                    <i /> <b>{hora(r.hora)}</b> {primeiro(r.clienteNome)} <small>{num(Number(r.pessoas) || 0)}p</small>
-                  </span>
-                ))}
-                {itens.length > 4 && <span className="calendario__mais">+{itens.length - 4} mais</span>}
-                {/* celular: só os pontinhos */}
-                {itens.length > 0 && (
-                  <span className="calendario__pontos" aria-hidden="true">
-                    {ev.length > 0 && <i className="ponto ponto--ev" />}
-                    {rs.length > 0 && <i className="ponto ponto--rs" />}
-                    {rs.length > 1 && <small>{rs.length}</small>}
-                  </span>
-                )}
-              </button>
+              </div>
             );
           })}
         </div>
 
-        <aside className="calendario__detalhe" aria-live="polite">
+        <aside className="calendario__detalhe" aria-live="polite" ref={detalhe}>
           <h3>{capitalizar(new Date(`${dia}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }))}</h3>
           <p className="muted small">
-            {num(sel.rs.length)} {sel.rs.length === 1 ? 'reserva' : 'reservas'} · {num(pessoasDe(sel.rs))} pessoas
-            {sel.ev.length > 0 && ` · ${sel.ev.length} ${sel.ev.length === 1 ? 'evento' : 'eventos'}`}
+            {[
+              sel.aniv.length ? plural(sel.aniv.length, 'aniversário', 'aniversários') : '',
+              `${plural(sel.rs.length, 'reserva', 'reservas')} · ${plural(pessoasDe(sel.rs), 'pessoa', 'pessoas')}`,
+              sel.ev.length ? plural(sel.ev.length, 'evento', 'eventos') : '',
+              sel.dir.length ? plural(sel.dir.length, 'reunião', 'reuniões') : '',
+            ].filter(Boolean).join(' · ')}
           </p>
-          {!sel.ev.length && !sel.rs.length && <p className="muted small calendario__vazio">Nada marcado neste dia.</p>}
-          {sel.ev.map((e) => (
-            <div key={e.id} className="cal-card cal-card--ev">
-              <PartyPopper size={16} />
-              <div>
-                <b>{String(e.titulo)}</b>
-                <span className="muted small">{[e.tipo, e.horario ? hora(e.horario) : '', e.publico ? `${e.publico} ${Number(e.publico) === 1 ? 'pessoa esperada' : 'pessoas esperadas'}` : ''].filter(Boolean).join(' · ')}</span>
+          {foco && totalSel > 0 && (
+            <button type="button" className="btn btn--ghost btn--sm calendario__tudo" onClick={() => setFoco(null)}>Ver tudo deste dia</button>
+          )}
+          {!totalSel && <p className="muted small calendario__vazio">Nada marcado neste dia.</p>}
+
+          {mostra('aniv') && sel.aniv.length > 0 && <h4 className="cal-sec cat-aniv"><span className="cal-ico"><Cake size={14} /></span> Aniversários</h4>}
+          {mostra('aniv') && sel.aniv.map((c) => {
+            const idade = /^\d{4}/.test(c.nascimento ?? '') ? anoSel - Number(c.nascimento!.slice(0, 4)) : null;
+            const wa = whatsapp(c.telefone);
+            return (
+              <div key={c.uid} className="cal-card cal-card--aniv">
+                <Cake size={16} />
+                <div className="cal-card__corpo">
+                  <div className="cal-card__linha"><b>{String(c.nome)}</b><span className="muted small">{numeroAfilhado(Number(c.numero))}</span></div>
+                  <span className="muted small cal-card__info">
+                    <span>{idade !== null && idade > 0 ? `Faz ${idade} anos` : 'Faz aniversário'}</span>
+                    {c.origem === 'Equipe' && <span>Equipe</span>}
+                    {wa && <a href={wa} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}><Phone size={12} /> Mandar parabéns</a>}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
-          {sel.rs.map((r) => (
+            );
+          })}
+
+          {mostra('rs') && sel.rs.length > 0 && <h4 className="cal-sec cat-rs"><span className="cal-ico"><CalendarCheck size={14} /></span> Reservas</h4>}
+          {mostra('rs') && sel.rs.map((r) => (
             <div key={r.id} className={`cal-card tom-${toneOf(r.status)}`}>
               <span className="cal-card__hora"><Clock size={12} /> {hora(r.hora)}</span>
               <div className="cal-card__corpo">
@@ -146,6 +226,22 @@ function Mes({ eventos }: { eventos: Row[] }) {
                 )}
               </div>
             </div>
+          ))}
+
+          {(['ev', 'dir'] as const).map((cat) => mostra(cat) && sel[cat].length > 0 && (
+            <Fragment key={cat}>
+              <h4 className={`cal-sec cat-${cat}`}><span className="cal-ico">{cat === 'ev' ? <PartyPopper size={14} /> : <Landmark size={14} />}</span> {cat === 'ev' ? 'Eventos' : 'Diretoria / reuniões'}</h4>
+              {sel[cat].map((e) => (
+                <div key={e.id} className={`cal-card cal-card--${cat}`}>
+                  {cat === 'ev' ? <PartyPopper size={16} /> : <Landmark size={16} />}
+                  <div className="cal-card__corpo">
+                    <b>{String(e.titulo)}</b>
+                    <span className="muted small">{[e.tipo, e.horario ? hora(e.horario) : '', e.responsavel ? `Resp.: ${e.responsavel}` : '', e.publico ? `${e.publico} ${Number(e.publico) === 1 ? 'pessoa esperada' : 'pessoas esperadas'}` : '', e.status].filter(Boolean).join(' · ')}</span>
+                    {e.descricao ? <span className="small cal-card__obs">{String(e.descricao)}</span> : null}
+                  </div>
+                </div>
+              ))}
+            </Fragment>
           ))}
           <Link to="/atendimento/reservas" className="small calendario__link">Abrir todas as reservas</Link>
         </aside>
