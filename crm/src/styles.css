@@ -334,6 +334,7 @@ a.nav__setor-link.active .nav__ico { background: linear-gradient(135deg, var(--b
 /* coluna de ações sempre visível, mesmo quando a tabela rola para os lados */
 .table td.actions-col, .table th.actions-col { position: sticky; right: 0; z-index: 1; background: var(--surface); box-shadow: -10px 0 12px -10px #000c; }
 .table tbody tr:hover td.actions-col { background: #181413; }
+@media (min-width: 641px) { .table tbody tr:hover td.actions-col { background: #e07a4c0d; } }
 .table td.nowrap { white-space: nowrap; }
 .table td.text { min-width: 110px; max-width: 220px; overflow-wrap: break-word; }
 .table td.text-wide { min-width: 170px; max-width: 300px; overflow-wrap: break-word; }
@@ -2346,7 +2347,7 @@ body::before {
 /* blocos de vidro: painéis, cartões de números, janelas, avisos e o contador.
    Sem backdrop-filter nos blocos da página: ele faria janelas e menus abertos dentro deles ficarem presos na caixa;
    o fundo atrás já é luz desfocada, então a transparência basta para o efeito. */
-.panel, .kpi, .modal, .toast, .contador, .calendario__dia, .cal-card {
+.panel, .kpi, .modal, .toast, .contador, .calendario__dia, .calendario__detalhe, .cal-card {
   background: var(--vidro-fundo);
   border-color: var(--vidro-borda);
   box-shadow: var(--vidro-brilho), var(--vidro-sombra);
@@ -2364,7 +2365,8 @@ body::before {
 .kpi:hover::after { opacity: 1; }
 /* tabelas: cabeçalho e coluna de ações transparentes por cima do vidro (só na tabela de verdade; no celular ela vira cartões) */
 .table th { background: #ffffff06; }
-@media (min-width: 641px) { .table td.actions-col, .table th.actions-col { background: #1a1513e6; } }
+/* coluna de ações fixa à direita: sem fundo próprio (não vira uma faixa de outra cor); o que rola por baixo dela fica desfocado */
+@media (min-width: 641px) { .table td.actions-col, .table th.actions-col { background: transparent; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); } }
 .calendario__dia.is-fora { opacity: .55; }
 
 /* janelas: fundo mais desfocado */
@@ -2401,8 +2403,6 @@ body::before {
 /* linha da tabela em destaque ao passar o mouse (só no PC; no toque o destaque ficaria preso na linha tocada) */
 @media (hover: hover) and (min-width: 641px) {
   .table tbody tr:hover td { background: #e07a4c0d; }
-  .table tbody tr:hover td.actions-col { background: #221813f0; }
-  .table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
 }
 
 /* cartões das fotos: vidro leve (sem desfoque, que pesaria com muitos cartões) e subida com brilho */
