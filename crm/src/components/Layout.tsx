@@ -12,6 +12,7 @@ import { AtividadesButton, PainelAtualizacoes, usePainelAoAbrir } from './Ativid
 import { notify } from './ui';
 import { ContextMenu, type MenuPos } from './ContextMenu';
 import { Avatar } from './Avatar';
+import { useEntradaDePagina } from '../lib/efeitos';
 import logoUrl from '../../../shared/assets/logo.webp';
 
 export function Brand({ large = false }: { large?: boolean }) {
@@ -87,6 +88,8 @@ export function Layout({ children }: { children: ReactNode }) {
   const { usuario, funcao, access, logout } = useSession();
   const { pathname } = useLocation();
   const navigate = useNavigate();
+  const conteudo = useRef<HTMLElement>(null);
+  useEntradaDePagina(conteudo, pathname);
   const current = findModule(pathname);
   const lastSync = useLastSync();
   const naoLidas = useNaoLidasConversas(access('conversas') !== 'none');
@@ -420,7 +423,7 @@ export function Layout({ children }: { children: ReactNode }) {
             )}
           </div>
         </header>
-        <main className="content">{children}</main>
+        <main className="content" ref={conteudo}>{children}</main>
       </div>
 
       {ctx && (
