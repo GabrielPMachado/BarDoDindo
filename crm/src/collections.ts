@@ -78,6 +78,8 @@ export interface Computed {
   format?: 'money' | 'number' | 'percent' | 'badge' | 'text' | 'nivel' | 'comparacao' | 'nota';
   /** `rel`: os registros do cadastro em `relacionada` (vazio se a pessoa não pode ver aquele cadastro). */
   tone?: (r: Row, todos: Row[], rel: Row[]) => Tone;
+  /** Valor para ordenar a tabela por esta coluna (clicando no título); a chave da ordem é `#` + o rótulo. */
+  ordenar?: (r: Row, todos: Row[], rel: Row[]) => number | null;
   detalhe?: (r: Row, todos: Row[], rel: Row[]) => string;
 }
 
@@ -108,6 +110,7 @@ export interface CollectionDef {
   filterKey?: string;
   /** Filtros extras acima da tabela, com os valores que existem nos registros (ex.: por insumo, por fornecedor). */
   filtros?: string[];
+  /** Campo da ordem inicial, ou `#` + o rótulo de uma coluna calculada com `ordenar` (ex.: '#Preço por L / kg / un'). */
   sortKey?: string;
   sortDir?: 'asc' | 'desc';
   /** Cada registro pode ter uma foto (miniatura na tabela, campo no formulário e imagem nas exportações). */
@@ -473,7 +476,8 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   precos: {
     id: 'precos', area: 'precos', title: 'Tabela de preços', singular: 'preço de fornecedor',
     description: 'Quanto cada fornecedor cobra por insumo. A ficha técnica dos produtos compara os preços e mostra o mais barato.',
-    filterKey: 'status', filtros: ['insumo', 'fornecedor'], sortKey: 'insumo',
+    // abre do mais barato ao mais caro (por L, kg ou un); dá para trocar clicando nos títulos
+    filterKey: 'status', filtros: ['insumo', 'fornecedor'], sortKey: '#Preço por L / kg / un',
     // dentro do mesmo insumo, sempre do mais barato ao mais caro (por L, kg ou un)
     desempate: (a, b) => (precoPorUnidade(a)?.valor ?? Infinity) - (precoPorUnidade(b)?.valor ?? Infinity),
     relacionada: 'qualidade',
@@ -492,18 +496,21 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     computed: [
       {
         label: 'Preço por L / kg / un', format: 'text', get: (r) => precoNormalizado(n(r.preco), n(r.conteudo), s(r.unidade)),
+        ordenar: (r) => precoPorUnidade(r)?.valor ?? null,
         // entre os fornecedores do mesmo insumo: verde o mais barato, vermelho os mais caros
         tone: (r, todos) => { const c = comparacaoDePreco(r, todos); return !c ? 'neutral' : c.acima === 0 ? 'good' : 'bad'; },
       },
       {
         label: 'Vs. mais barato', format: 'comparacao',
         get: (r, todos) => comparacaoDePreco(r, todos)?.acima ?? null,
+        ordenar: (r, todos) => comparacaoDePreco(r, todos)?.acima ?? null,
         detalhe: (r, todos) => comparacaoDePreco(r, todos)?.detalhe ?? '',
       },
       {
         // média das últimas inspeções do fornecedor no Controle de qualidade
         label: 'Qualidade (0 a 10)', format: 'nota',
         get: (r, _t, rel) => notaDeQualidade(r, rel)?.nota ?? null,
+        ordenar: (r, _t, rel) => notaDeQualidade(r, rel)?.nota ?? null,
         tone: (r, _t, rel) => { const q = notaDeQualidade(r, rel); return !q ? 'neutral' : q.nota >= 8 ? 'good' : q.nota >= 6 ? 'warn' : 'bad'; },
         detalhe: (r, _t, rel) => notaDeQualidade(r, rel)?.detalhe ?? '',
       },
