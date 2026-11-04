@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type RefObject } from 'react';
 export const semMovimento = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 /**
- * Troca de página: os blocos da página entram um depois do outro, saindo do desfoque e subindo um pouco.
+ * Troca de página: os blocos da página entram um depois do outro, aparecendo e subindo um pouco (sem desfoque, que pesa em máquinas mais fracas).
  * Usa a Web Animations API para não precisar remontar a página (o estado dela fica como está).
  */
 export function useEntradaDePagina(alvo: RefObject<HTMLElement | null>, chave: string) {
@@ -19,10 +19,10 @@ export function useEntradaDePagina(alvo: RefObject<HTMLElement | null>, chave: s
       blocos.forEach((el, i) => {
         el.animate(
           [
-            { opacity: 0, transform: 'translateY(14px) scale(.985)', filter: 'blur(8px)' },
-            { opacity: 1, transform: 'none', filter: 'blur(0)' },
+            { opacity: 0, transform: 'translateY(12px)' },
+            { opacity: 1, transform: 'none' },
           ],
-          { duration: 520, delay: Math.min(i, 8) * 60, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' },
+          { duration: 380, delay: Math.min(i, 6) * 45, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' },
         );
       });
     });
@@ -46,7 +46,7 @@ function lerNumero(texto: string) {
 }
 
 /** Valor que "conta" do anterior (ou de zero) até o novo, como nos cartões de números do vídeo. */
-export function useNumeroAnimado(texto: string, duracao = 900) {
+export function useNumeroAnimado(texto: string, duracao = 700) {
   const [mostrado, setMostrado] = useState(texto);
   const anterior = useRef<number>(0);
 

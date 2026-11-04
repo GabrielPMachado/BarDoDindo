@@ -25,7 +25,7 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; }
-body { background: radial-gradient(1100px 620px at 88% -12%, #c4572a1c, transparent 62%), radial-gradient(900px 640px at -6% 108%, #8e3b1a17, transparent 60%), var(--bg); background-attachment: fixed; min-height: 100vh; color: var(--text); font: 14px/1.45 var(--sans); -webkit-font-smoothing: antialiased; }
+body { background: var(--bg); min-height: 100vh; color: var(--text); font: 14px/1.45 var(--sans); -webkit-font-smoothing: antialiased; }
 a { color: inherit; text-decoration: none; }
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
 button:disabled { cursor: not-allowed; opacity: .5; }
@@ -54,7 +54,7 @@ h1, h2, h3, p { margin: 0; }
   position: fixed; z-index: 50; left: 12px; top: 12px; bottom: 12px; width: 68px; overflow-x: hidden; overflow-y: auto;
   padding: 12px; display: flex; flex-direction: column; gap: 12px; border-radius: 26px;
   background: linear-gradient(180deg, #221a17, #14100e); border: 1px solid #ffffff12;
-  backdrop-filter: blur(22px) saturate(1.3); -webkit-backdrop-filter: blur(22px) saturate(1.3);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
   box-shadow: inset 0 1px 0 #ffffff14, 0 18px 50px #0009;
   transition: width .3s cubic-bezier(.2, .8, .2, 1), box-shadow .3s;
   scrollbar-width: none;
@@ -334,7 +334,7 @@ a.nav__setor-link.active .nav__ico { background: linear-gradient(135deg, var(--b
 /* coluna de ações sempre visível, mesmo quando a tabela rola para os lados */
 .table td.actions-col, .table th.actions-col { position: sticky; right: 0; z-index: 1; background: var(--surface); box-shadow: -10px 0 12px -10px #000c; }
 .table tbody tr:hover td.actions-col { background: #181413; }
-@media (min-width: 641px) { .table tbody tr:hover td.actions-col { background: #e07a4c0d; } }
+@media (min-width: 641px) { .table tbody tr:hover td.actions-col { background: #1c1514; } }
 .table td.nowrap { white-space: nowrap; }
 .table td.text { min-width: 110px; max-width: 220px; overflow-wrap: break-word; }
 .table td.text-wide { min-width: 170px; max-width: 300px; overflow-wrap: break-word; }
@@ -766,7 +766,7 @@ select.input { appearance: none; padding-right: 30px; background-image: linear-g
 .profile-card__facts dt { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); }
 .profile-card__facts dt svg { color: var(--brand); }
 .profile-card__facts dd { margin: 2px 0 0; font-size: 13.5px; font-variant-numeric: tabular-nums; }
-.profile-actions { display: flex; justify-content: flex-end; }
+.profile-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 
 /* ---------- permissões por ação (ver, criar, editar, excluir) ---------- */
 .perm-checks { display: flex; align-items: center; gap: 6px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
@@ -2323,25 +2323,22 @@ td.nivel-col { min-width: 140px; }
 
 
 /* ================= Vidro líquido e movimento ================= */
-/* Fundo com manchas de luz da marca que derivam devagar: é o que dá para ver através do vidro */
+/* Fundo com manchas de luz da marca (fixas, sem filtro nem animação, para não pesar): é o que dá para ver através do vidro */
 body::before {
-  content: ''; position: fixed; inset: -20vmax; z-index: -1; pointer-events: none;
+  content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
   background:
     radial-gradient(32vmax 26vmax at 78% 18%, #e07a4c5c, transparent 70%),
     radial-gradient(28vmax 24vmax at 12% 82%, #c4572a52, transparent 70%),
     radial-gradient(24vmax 20vmax at 48% 55%, #f2c14e24, transparent 70%),
     radial-gradient(26vmax 22vmax at 92% 92%, #8e3b1a66, transparent 70%);
-  filter: blur(20px);
-  animation: fundo-deriva 48s ease-in-out infinite alternate;
 }
-@keyframes fundo-deriva { to { transform: translate3d(-4vmax, 3vmax, 0) rotate(8deg) scale(1.08); } }
 
 :root {
   --vidro-fundo: linear-gradient(150deg, #ffffff24 0%, #ffffff0b 36%, #ffffff04 60%, #ffffff12 100%), #1612105c;
   --vidro-borda: #ffffff2e;
   --vidro-brilho: inset 0 1px 0 #ffffff4d, inset 1px 0 0 #ffffff1a, inset 0 -1px 0 #00000059, inset 0 0 26px #ffffff0a;
   --vidro-sombra: 0 12px 34px #0000006b;
-  --vidro-blur: blur(22px) saturate(1.7) brightness(1.06);
+  --vidro-blur: blur(14px);
 }
 
 /* blocos de vidro: painéis, cartões de números, janelas, avisos e o contador.
@@ -2365,18 +2362,21 @@ body::before {
 .kpi:hover::after { opacity: 1; }
 /* tabelas: cabeçalho e coluna de ações transparentes por cima do vidro (só na tabela de verdade; no celular ela vira cartões) */
 .table th { background: #ffffff06; }
-/* coluna de ações fixa à direita: sem fundo próprio (não vira uma faixa de outra cor); o que rola por baixo dela fica desfocado */
-@media (min-width: 641px) { .table td.actions-col, .table th.actions-col { background: transparent; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); } }
+/* coluna de ações fixa à direita: fundo opaco no tom do vidro do painel, para os valores que rolam por baixo não aparecerem através dela */
+@media (min-width: 641px) {
+  .table td.actions-col { background: #151212; }
+  .table th.actions-col { background: #181515; }
+}
 .calendario__dia.is-fora { opacity: .55; }
 
 /* janelas: fundo mais desfocado */
-.modal-overlay { background: #00000080; backdrop-filter: blur(10px) saturate(1.2); -webkit-backdrop-filter: blur(10px) saturate(1.2); }
+.modal-overlay { background: #0000008c; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
 .modal { animation: janela-entra .32s cubic-bezier(.2, .9, .25, 1.15); }
-@keyframes janela-entra { from { opacity: 0; transform: translateY(16px) scale(.96); filter: blur(6px); } }
+@keyframes janela-entra { from { opacity: 0; transform: translateY(14px) scale(.97); } }
 
 /* avisos deslizam da direita */
 .toast { animation: aviso-entra .38s cubic-bezier(.2, .9, .25, 1.15); }
-@keyframes aviso-entra { from { opacity: 0; transform: translateX(40px) scale(.96); filter: blur(4px); } }
+@keyframes aviso-entra { from { opacity: 0; transform: translateX(40px); } }
 
 /* entradas em sequência: linhas das tabelas, cartões, atualizações e dias do calendário */
 .table tbody tr:nth-child(1), .cartoes > .cartao:nth-child(1), .activity-list > *:nth-child(1) { --i: 0; }
@@ -2398,7 +2398,7 @@ body::before {
 .table tbody tr, .activity-list > * { animation: linha-entra .42s cubic-bezier(.2, .8, .2, 1) backwards; animation-delay: calc(min(var(--i, 16), 16) * 28ms); }
 @keyframes linha-entra { from { opacity: 0; transform: translateY(8px); } }
 .cartoes > .cartao, .calendario__dia { animation: cartao-entra .55s cubic-bezier(.2, .8, .2, 1) backwards; animation-delay: calc(min(var(--i, 16), 41) * 22ms); }
-@keyframes cartao-entra { from { opacity: 0; transform: translateY(14px) scale(.96); filter: blur(6px); } }
+@keyframes cartao-entra { from { opacity: 0; transform: translateY(12px); } }
 
 /* linha da tabela em destaque ao passar o mouse (só no PC; no toque o destaque ficaria preso na linha tocada) */
 @media (hover: hover) and (min-width: 641px) {
@@ -2426,4 +2426,4 @@ body::before {
   .toast { background: linear-gradient(150deg, #ffffff12, #ffffff04), #161210f0; }
 }
 /* barra do topo também de vidro, deixando a luz do fundo passar */
-.topbar { background: #0a0909a8; backdrop-filter: blur(18px) saturate(1.5); -webkit-backdrop-filter: blur(18px) saturate(1.5); }
+.topbar { background: #0a0909bf; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
