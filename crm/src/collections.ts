@@ -1,6 +1,6 @@
 import type { Row } from './lib/data';
 import { brl, daysUntil, isoToday, num, pct } from './lib/format';
-import { calcularFicha, comparacaoDePreco, fichaDe, precoNormalizado } from './lib/ficha';
+import { calcularFicha, comparacaoDePreco, fichaDe, notaDeQualidade, precoNormalizado, precoPorUnidade } from './lib/ficha';
 import { locaisDe, locaisNoFormulario, resumoLocais } from './lib/locais';
 
 export type FieldType = 'text' | 'textarea' | 'number' | 'money' | 'date' | 'select' | 'email' | 'phone' | 'percent' | 'cnpj' | 'time' | 'ref' | 'url' | 'check';
@@ -71,12 +71,14 @@ export type Tone = 'good' | 'warn' | 'bad' | 'info' | 'neutral';
 export interface Computed {
   label: string;
   /** `todos`: todos os registros do cadastro (para comparar uma linha com as outras, ex.: fornecedores do mesmo insumo). */
-  get: (r: Row, todos: Row[]) => string | number | null;
+  get: (r: Row, todos: Row[], rel: Row[]) => string | number | null;
   /** "nivel": barra de 0 a 1 (o `get` devolve a fração), com o `detalhe` embaixo.
-   *  "comparacao": quanto a linha está acima da mais barata (0 = a mais barata), com seta e o `detalhe` embaixo. */
-  format?: 'money' | 'number' | 'percent' | 'badge' | 'text' | 'nivel' | 'comparacao';
-  tone?: (r: Row, todos: Row[]) => Tone;
-  detalhe?: (r: Row, todos: Row[]) => string;
+   *  "comparacao": quanto a linha está acima da mais barata (0 = a mais barata), com seta e o `detalhe` embaixo.
+   *  "nota": nota de 0 a 10, colorida pelo `tone`, com o `detalhe` embaixo. */
+  format?: 'money' | 'number' | 'percent' | 'badge' | 'text' | 'nivel' | 'comparacao' | 'nota';
+  /** `rel`: os registros do cadastro em `relacionada` (vazio se a pessoa não pode ver aquele cadastro). */
+  tone?: (r: Row, todos: Row[], rel: Row[]) => Tone;
+  detalhe?: (r: Row, todos: Row[], rel: Row[]) => string;
 }
 
 export interface Kpi {
@@ -97,6 +99,10 @@ export interface CollectionDef {
   feminino?: boolean;
   fields: Field[];
   computed?: Computed[];
+  /** Outro cadastro lido junto (se a pessoa pode vê-lo), entregue às colunas calculadas como `rel` (ex.: Tabela de preços lê o Controle de qualidade). */
+  relacionada?: string;
+  /** Desempate da ordem da tabela, sempre aplicado (ex.: dentro do mesmo insumo, do mais barato ao mais caro). */
+  desempate?: (a: Row, b: Row) => number;
   kpis?: (rows: Row[]) => Kpi[];
   /** Campo select usado como filtro rápido acima da tabela. */
   filterKey?: string;
@@ -468,6 +474,9 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     id: 'precos', area: 'precos', title: 'Tabela de preços', singular: 'preço de fornecedor',
     description: 'Quanto cada fornecedor cobra por insumo. A ficha técnica dos produtos compara os preços e mostra o mais barato.',
     filterKey: 'status', filtros: ['insumo', 'fornecedor'], sortKey: 'insumo',
+    // dentro do mesmo insumo, sempre do mais barato ao mais caro (por L, kg ou un)
+    desempate: (a, b) => (precoPorUnidade(a)?.valor ?? Infinity) - (precoPorUnidade(b)?.valor ?? Infinity),
+    relacionada: 'qualidade',
     fields: [
       { key: 'insumo', label: 'Insumo (do Estoque)', type: 'ref', ref: 'insumos', refKey: 'insumoId', required: true, wide: true },
       { key: 'fornecedor', label: 'Fornecedor', type: 'ref', ref: 'fornecedores', refKey: 'fornecedorId', required: true },
@@ -490,6 +499,13 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
         label: 'Vs. mais barato', format: 'comparacao',
         get: (r, todos) => comparacaoDePreco(r, todos)?.acima ?? null,
         detalhe: (r, todos) => comparacaoDePreco(r, todos)?.detalhe ?? '',
+      },
+      {
+        // média das últimas inspeções do fornecedor no Controle de qualidade
+        label: 'Qualidade (0 a 10)', format: 'nota',
+        get: (r, _t, rel) => notaDeQualidade(r, rel)?.nota ?? null,
+        tone: (r, _t, rel) => { const q = notaDeQualidade(r, rel); return !q ? 'neutral' : q.nota >= 8 ? 'good' : q.nota >= 6 ? 'warn' : 'bad'; },
+        detalhe: (r, _t, rel) => notaDeQualidade(r, rel)?.detalhe ?? '',
       },
     ],
     kpis: (rows) => {
@@ -838,8 +854,10 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     filterKey: 'area', filtros: ['resultado', 'responsavel'], sortKey: 'data', sortDir: 'desc',
     fields: [
       { key: 'data', label: 'Data', type: 'date', required: true },
-      { key: 'area', label: 'Área', type: 'select', options: ['Cozinha', 'Bar', 'Salão', 'Banheiros', 'Estoque', 'Área externa'], required: true },
+      { key: 'area', label: 'Área', type: 'select', options: ['Cozinha', 'Bar', 'Salão', 'Banheiros', 'Estoque', 'Área externa', 'Fornecedor'], required: true },
       { key: 'checklist', label: 'Inspeção', type: 'text', required: true, placeholder: 'Ex.: Higienização e temperatura' },
+      // nota do fornecedor (ex.: cervejaria): a média das últimas aparece na Tabela de preços
+      { key: 'fornecedor', label: 'Fornecedor avaliado', type: 'ref', ref: 'fornecedores', refKey: 'fornecedorId', placeholder: 'Ex.: a cervejaria do barril recebido' },
       { key: 'responsavel', label: 'Responsável', type: 'ref', ref: 'pessoas', refKey: 'responsavelId', livre: true },
       { key: 'nota', label: 'Nota (0 a 10)', type: 'number', required: true, decimals: 1, min: 0, max: 10 },
       { key: 'resultado', label: 'Resultado', type: 'select', options: ['Conforme', 'Conforme com ressalvas', 'Não conforme'], required: true },

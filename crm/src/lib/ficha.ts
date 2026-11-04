@@ -120,7 +120,7 @@ export function precoNormalizado(preco: number, conteudo: number, unidade: strin
 }
 
 /** Preço de 1 L, kg ou unidade da cotação, com a unidade grande (ml e g viram L e kg). */
-function precoPorUnidade(r: Record<string, unknown>) {
+export function precoPorUnidade(r: Record<string, unknown>) {
   const preco = Number(r.preco), conteudo = Number(r.conteudo), unidade = String(r.unidade ?? '');
   if (!(preco > 0) || !(conteudo > 0)) return null;
   const grande = unidade === 'ml' ? 'L' : unidade === 'g' ? 'kg' : unidade;
@@ -179,6 +179,39 @@ export function comparacaoDePreco(r: Record<string, unknown>, todos: Record<stri
     }
   }
   return cache.get(String(r.id)) ?? null;
+}
+
+/** Quantas inspeções mais recentes entram na nota de qualidade do fornecedor. */
+const INSPECOES_NA_NOTA = 5;
+const notas = new WeakMap<object[], Map<string, { nota: number; detalhe: string }>>();
+
+/**
+ * Nota de qualidade (0 a 10) do fornecedor da cotação: média das últimas inspeções dele no Controle de qualidade.
+ * Sem inspeção do fornecedor, devolve null.
+ */
+export function notaDeQualidade(r: Record<string, unknown>, inspecoes: Record<string, unknown>[]) {
+  let cache = notas.get(inspecoes);
+  if (!cache) {
+    cache = new Map();
+    notas.set(inspecoes, cache);
+    const porFornecedor = new Map<string, { data: string; nota: number }[]>();
+    for (const x of inspecoes) {
+      const chave = String(x.fornecedorId || '').trim() || String(x.fornecedor || '').trim().toLowerCase();
+      const nota = Number(x.nota);
+      if (!chave || x.nota === '' || x.nota == null || !Number.isFinite(nota)) continue;
+      const lista = porFornecedor.get(chave) ?? [];
+      lista.push({ data: String(x.data ?? ''), nota });
+      porFornecedor.set(chave, lista);
+    }
+    for (const [chave, lista] of porFornecedor) {
+      const ultimas = lista.sort((a, b) => b.data.localeCompare(a.data)).slice(0, INSPECOES_NA_NOTA);
+      const nota = Math.round((ultimas.reduce((s, x) => s + x.nota, 0) / ultimas.length) * 10) / 10;
+      const [a, m, d] = ultimas[0].data.split('-');
+      const ultima = d ? ` · última ${d}/${m}/${a}` : '';
+      cache.set(chave, { nota, detalhe: `${ultimas.length === 1 ? '1 inspeção' : `média de ${ultimas.length} inspeções`}${ultima}` });
+    }
+  }
+  return cache.get(String(r.fornecedorId || '').trim()) ?? cache.get(String(r.fornecedor || '').trim().toLowerCase()) ?? null;
 }
 
 /** Custo de compra legível: o que custa em ml ou g aparece por L ou kg (R$ 0,0693/ml → "R$ 69,33/L"). */
