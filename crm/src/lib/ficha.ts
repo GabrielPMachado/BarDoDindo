@@ -119,6 +119,68 @@ export function precoNormalizado(preco: number, conteudo: number, unidade: strin
   return `${v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/${grande}`;
 }
 
+/** Preço de 1 L, kg ou unidade da cotação, com a unidade grande (ml e g viram L e kg). */
+function precoPorUnidade(r: Record<string, unknown>) {
+  const preco = Number(r.preco), conteudo = Number(r.conteudo), unidade = String(r.unidade ?? '');
+  if (!(preco > 0) || !(conteudo > 0)) return null;
+  const grande = unidade === 'ml' ? 'L' : unidade === 'g' ? 'kg' : unidade;
+  return { valor: (preco / conteudo) * conversao(grande, unidade), grande };
+}
+
+export interface ComparacaoPreco {
+  /** Fração acima do mais barato do mesmo insumo (0 = é o mais barato; 0,1 = 10% mais caro). */
+  acima: number;
+  detalhe: string;
+}
+
+const comparacoes = new WeakMap<object[], Map<string, ComparacaoPreco | null>>();
+
+/**
+ * Compara a cotação com as dos outros fornecedores do mesmo insumo (só as ativas e na mesma unidade: L com L, kg com kg).
+ * Sem outra cotação para comparar, devolve null.
+ */
+export function comparacaoDePreco(r: Record<string, unknown>, todos: Record<string, unknown>[]): ComparacaoPreco | null {
+  let cache = comparacoes.get(todos);
+  if (!cache) {
+    cache = new Map();
+    comparacoes.set(todos, cache);
+    const grupos = new Map<string, { id: string; valor: number; grande: string; fornecedor: string }[]>();
+    for (const x of todos) {
+      if (x.status === 'Inativo') continue;
+      const p = precoPorUnidade(x);
+      const insumo = String(x.insumoId || x.insumo || '').trim().toLowerCase();
+      if (!p || !insumo) continue;
+      const chave = `${insumo}|${p.grande}`;
+      const lista = grupos.get(chave) ?? [];
+      lista.push({ id: String(x.id), ...p, fornecedor: String(x.fornecedor ?? '').trim() });
+      grupos.set(chave, lista);
+    }
+    const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const pct = (v: number) => v.toLocaleString('pt-BR', { style: 'percent', maximumFractionDigits: 1 });
+    for (const lista of grupos.values()) {
+      if (lista.length < 2) continue;
+      const min = Math.min(...lista.map((x) => x.valor));
+      const outros = lista.filter((x) => x.valor > min + 1e-9);
+      // o mais barato diz quanto economiza em relação ao próximo; os outros, quanto custam a mais
+      const proximo = outros.length ? Math.min(...outros.map((x) => x.valor)) : null;
+      const empatados = lista.length - outros.length;
+      for (const x of lista) {
+        const acima = x.valor / min - 1;
+        if (acima < 1e-9) {
+          cache.set(x.id, {
+            acima: 0,
+            detalhe: proximo === null ? 'Mesmo preço dos outros'
+              : `${pct(1 - min / proximo)} abaixo do próximo${empatados > 1 ? ' (empate)' : ''}`,
+          });
+        } else {
+          cache.set(x.id, { acima, detalhe: `+${brl(x.valor - min)}/${x.grande}` });
+        }
+      }
+    }
+  }
+  return cache.get(String(r.id)) ?? null;
+}
+
 /** Custo de compra legível: o que custa em ml ou g aparece por L ou kg (R$ 0,0693/ml → "R$ 69,33/L"). */
 export const custoBaseTxt = (i: Pick<ItemFicha, 'custoBase' | 'unidadeBase'>) =>
   precoNormalizado(Number(i.custoBase) || 0, 1, i.unidadeBase) ?? '—';

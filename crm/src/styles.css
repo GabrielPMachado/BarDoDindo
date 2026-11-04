@@ -2298,3 +2298,8 @@ td.nivel-col { min-width: 140px; }
 .revelar[aria-pressed="true"] { color: var(--brand-light); }
 .afi__cabecalho { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 22px 0 10px; }
 .afi__cabecalho .afi__titulo { margin: 0; }
+
+/* Tabela de preços: seta e % em relação ao fornecedor mais barato do mesmo insumo */
+.comparacao { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.comparacao .badge { display: inline-flex; align-items: center; gap: 3px; font-weight: 600; }
+.comparacao small { font-size: 11px; white-space: nowrap; }
