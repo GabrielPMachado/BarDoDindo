@@ -2319,3 +2319,110 @@ td.nivel-col { min-width: 140px; }
 .comparacao small { font-size: 11px; white-space: nowrap; }
 .nota-qualidade { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .nota-qualidade small { font-weight: 400; font-size: 11px; }
+
+
+/* ================= Vidro líquido e movimento ================= */
+/* Fundo com manchas de luz da marca que derivam devagar: é o que dá para ver através do vidro */
+body::before {
+  content: ''; position: fixed; inset: -20vmax; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(32vmax 26vmax at 78% 18%, #e07a4c5c, transparent 70%),
+    radial-gradient(28vmax 24vmax at 12% 82%, #c4572a52, transparent 70%),
+    radial-gradient(24vmax 20vmax at 48% 55%, #f2c14e24, transparent 70%),
+    radial-gradient(26vmax 22vmax at 92% 92%, #8e3b1a66, transparent 70%);
+  filter: blur(20px);
+  animation: fundo-deriva 48s ease-in-out infinite alternate;
+}
+@keyframes fundo-deriva { to { transform: translate3d(-4vmax, 3vmax, 0) rotate(8deg) scale(1.08); } }
+
+:root {
+  --vidro-fundo: linear-gradient(150deg, #ffffff24 0%, #ffffff0b 36%, #ffffff04 60%, #ffffff12 100%), #1612105c;
+  --vidro-borda: #ffffff2e;
+  --vidro-brilho: inset 0 1px 0 #ffffff4d, inset 1px 0 0 #ffffff1a, inset 0 -1px 0 #00000059, inset 0 0 26px #ffffff0a;
+  --vidro-sombra: 0 12px 34px #0000006b;
+  --vidro-blur: blur(22px) saturate(1.7) brightness(1.06);
+}
+
+/* blocos de vidro: painéis, cartões de números, janelas, avisos e o contador.
+   Sem backdrop-filter nos blocos da página: ele faria janelas e menus abertos dentro deles ficarem presos na caixa;
+   o fundo atrás já é luz desfocada, então a transparência basta para o efeito. */
+.panel, .kpi, .modal, .toast, .contador, .calendario__dia, .cal-card {
+  background: var(--vidro-fundo);
+  border-color: var(--vidro-borda);
+  box-shadow: var(--vidro-brilho), var(--vidro-sombra);
+}
+/* janelas ficam sobre a página desfocada: vidro mais denso, para o texto continuar legível */
+.modal { background: linear-gradient(180deg, #ffffff14 0%, transparent 22%), linear-gradient(150deg, #ffffff12, #ffffff04 45%), #161210d9; }
+.toast { background: linear-gradient(150deg, #ffffff1a, #ffffff06 50%), #1a1513b3; backdrop-filter: var(--vidro-blur); -webkit-backdrop-filter: var(--vidro-blur); }
+/* reflexo curvo no alto do vidro */
+.panel::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(180deg, #ffffff0f 0%, transparent 26%), radial-gradient(120% 60% at 15% -10%, #ffffff12, transparent 55%);
+}
+.contador { background: radial-gradient(90% 140% at 50% 0%, #e07a4c40 0%, transparent 60%), var(--vidro-fundo); border-color: #e07a4c55; }
+.kpi::after { background: radial-gradient(260px 130px at 100% 0%, #e07a4c33, transparent 70%), linear-gradient(180deg, #ffffff10, transparent 35%); opacity: .6; }
+.kpi:hover::after { opacity: 1; }
+/* tabelas: cabeçalho e coluna de ações transparentes por cima do vidro */
+.table th { background: #ffffff06; }
+.table td.actions-col, .table th.actions-col { background: #1a1513e6; }
+.calendario__dia.is-fora { opacity: .55; }
+
+/* janelas: fundo mais desfocado */
+.modal-overlay { background: #00000080; backdrop-filter: blur(10px) saturate(1.2); -webkit-backdrop-filter: blur(10px) saturate(1.2); }
+.modal { animation: janela-entra .32s cubic-bezier(.2, .9, .25, 1.15); }
+@keyframes janela-entra { from { opacity: 0; transform: translateY(16px) scale(.96); filter: blur(6px); } }
+
+/* avisos deslizam da direita */
+.toast { animation: aviso-entra .38s cubic-bezier(.2, .9, .25, 1.15); }
+@keyframes aviso-entra { from { opacity: 0; transform: translateX(40px) scale(.96); filter: blur(4px); } }
+
+/* entradas em sequência: linhas das tabelas, cartões, atualizações e dias do calendário */
+.table tbody tr:nth-child(1), .cartoes > .cartao:nth-child(1), .activity-list > *:nth-child(1) { --i: 0; }
+.table tbody tr:nth-child(2), .cartoes > .cartao:nth-child(2), .activity-list > *:nth-child(2) { --i: 1; }
+.table tbody tr:nth-child(3), .cartoes > .cartao:nth-child(3), .activity-list > *:nth-child(3) { --i: 2; }
+.table tbody tr:nth-child(4), .cartoes > .cartao:nth-child(4), .activity-list > *:nth-child(4) { --i: 3; }
+.table tbody tr:nth-child(5), .cartoes > .cartao:nth-child(5), .activity-list > *:nth-child(5) { --i: 4; }
+.table tbody tr:nth-child(6), .cartoes > .cartao:nth-child(6), .activity-list > *:nth-child(6) { --i: 5; }
+.table tbody tr:nth-child(7), .cartoes > .cartao:nth-child(7), .activity-list > *:nth-child(7) { --i: 6; }
+.table tbody tr:nth-child(8), .cartoes > .cartao:nth-child(8), .activity-list > *:nth-child(8) { --i: 7; }
+.table tbody tr:nth-child(9), .cartoes > .cartao:nth-child(9), .activity-list > *:nth-child(9) { --i: 8; }
+.table tbody tr:nth-child(10), .cartoes > .cartao:nth-child(10), .activity-list > *:nth-child(10) { --i: 9; }
+.table tbody tr:nth-child(11), .cartoes > .cartao:nth-child(11), .activity-list > *:nth-child(11) { --i: 10; }
+.table tbody tr:nth-child(12), .cartoes > .cartao:nth-child(12), .activity-list > *:nth-child(12) { --i: 11; }
+.table tbody tr:nth-child(13), .cartoes > .cartao:nth-child(13), .activity-list > *:nth-child(13) { --i: 12; }
+.table tbody tr:nth-child(14), .cartoes > .cartao:nth-child(14), .activity-list > *:nth-child(14) { --i: 13; }
+.table tbody tr:nth-child(15), .cartoes > .cartao:nth-child(15), .activity-list > *:nth-child(15) { --i: 14; }
+.table tbody tr:nth-child(16), .cartoes > .cartao:nth-child(16), .activity-list > *:nth-child(16) { --i: 15; }
+.table tbody tr, .activity-list > * { animation: linha-entra .42s cubic-bezier(.2, .8, .2, 1) backwards; animation-delay: calc(min(var(--i, 16), 16) * 28ms); }
+@keyframes linha-entra { from { opacity: 0; transform: translateY(8px); } }
+.cartoes > .cartao, .calendario__dia { animation: cartao-entra .55s cubic-bezier(.2, .8, .2, 1) backwards; animation-delay: calc(min(var(--i, 16), 41) * 22ms); }
+@keyframes cartao-entra { from { opacity: 0; transform: translateY(14px) scale(.96); filter: blur(6px); } }
+
+/* linha da tabela em destaque ao passar o mouse */
+.table tbody tr { transition: background .18s; }
+.table tbody tr:hover td { background: #e07a4c0d; }
+.table tbody tr:hover td.actions-col { background: #221813f0; }
+.table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
+
+/* cartões das fotos: vidro leve (sem desfoque, que pesaria com muitos cartões) e subida com brilho */
+.cartao { background: linear-gradient(160deg, #ffffff12, #ffffff04 45%), #18131180; border-color: var(--vidro-borda); box-shadow: inset 0 1px 0 #ffffff26, 0 8px 22px #0006; transition: transform .28s cubic-bezier(.2, .8, .2, 1), border-color .2s, box-shadow .28s; }
+.cartao:hover, .cartao:focus-visible { transform: translateY(-5px) scale(1.015); border-color: #e07a4caa; box-shadow: inset 0 1px 0 #ffffff33, 0 18px 40px #000a, 0 0 0 1px #e07a4c55, 0 0 30px #e07a4c22; }
+.cartao__foto img { transition: transform .5s cubic-bezier(.2, .8, .2, 1); }
+.cartao:hover .cartao__foto img { transform: scale(1.05); }
+
+/* dias do calendário sobem um pouco ao passar o mouse */
+@media (hover: hover) {
+  .calendario__dia { transition: transform .22s cubic-bezier(.2, .8, .2, 1), border-color .15s, box-shadow .22s; }
+  .calendario__dia:hover { transform: translateY(-2px); box-shadow: var(--vidro-brilho), 0 14px 30px #0008; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before, .modal, .toast, .table tbody tr, .activity-list > *, .cartoes > .cartao, .calendario__dia { animation: none; }
+  .cartao:hover, .cartao:hover .cartao__foto img, .calendario__dia:hover { transform: none; }
+}
+/* aparelhos sem suporte a desfoque de fundo: vidro mais opaco, para o texto continuar legível */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .toast { background: linear-gradient(150deg, #ffffff12, #ffffff04), #161210f0; }
+}
+/* barra do topo também de vidro, deixando a luz do fundo passar */
+.topbar { background: #0a0909a8; backdrop-filter: blur(18px) saturate(1.5); -webkit-backdrop-filter: blur(18px) saturate(1.5); }
