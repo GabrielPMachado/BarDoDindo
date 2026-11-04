@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { AppWindow, ChevronDown, LayoutDashboard, Menu, MessageCircle, UserRound, Copy, ExternalLink, KeyRound, LogOut, MousePointerClick, Pin, PinOff, X } from 'lucide-react';
+import { AppWindow, ChevronDown, LayoutDashboard, Menu, MessageCircle, UserRound, Copy, ExternalLink, KeyRound, LogOut, MousePointerClick, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Search, X, type LucideIcon } from 'lucide-react';
 import { AREAS, DEPARTAMENTOS, findModule, localDe, type Area, type AreaKey, type Setor } from '../modules';
 import { useSession } from '../lib/session';
 import { useLastSync } from '../lib/data';
@@ -68,6 +68,21 @@ function PageMenu({ menu, pinned, onPin, paineis, onClose }: {
 
 const CONVERSAS = '/atendimento/conversas';
 
+/** Texto sem acentos e em minúsculas, para a busca de páginas. */
+const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+const CHAVE_FIXO = 'crm:menuFixo';
+/** No PC o menu fica recolhido numa barra de ícones e abre ao passar o mouse; "fixo" mantém aberto. Sem mouse, começa fixo. */
+function lerFixo() {
+  try {
+    const v = localStorage.getItem(CHAVE_FIXO);
+    if (v !== null) return v === '1';
+  } catch { /* sem armazenamento */ }
+  return !window.matchMedia?.('(hover: hover)').matches;
+}
+
+interface PaginaBusca { path: string; label: string; meta: string; icon: LucideIcon }
+
 export function Layout({ children }: { children: ReactNode }) {
   const { usuario, funcao, access, logout } = useSession();
   const { pathname } = useLocation();
@@ -101,6 +116,44 @@ export function Layout({ children }: { children: ReactNode }) {
   const [gaveta, setGaveta] = useState(false);
   useEffect(() => setGaveta(false), [pathname]);
   const toqueLongo = useToqueLongo();
+
+  // PC: barra de ícones que se abre ao passar o mouse (ou fixa aberta, pelo botão no topo do menu)
+  const [fixo, setFixo] = useState(lerFixo);
+  const [aberto, setAberto] = useState(false);
+  const fechar = useRef<number | undefined>(undefined);
+  const alternarFixo = () => {
+    const v = !fixo;
+    setFixo(v);
+    setAberto(false);
+    try { localStorage.setItem(CHAVE_FIXO, v ? '1' : '0'); } catch { /* sem armazenamento */ }
+  };
+  const abrirMenu = () => { window.clearTimeout(fechar.current); setAberto(true); };
+  const fecharMenu = () => {
+    window.clearTimeout(fechar.current);
+    fechar.current = window.setTimeout(() => {
+      // com algo digitado na busca, o menu continua aberto até a pessoa sair dela
+      if (buscaRef.current && document.activeElement === buscaRef.current && buscaRef.current.value) return;
+      setAberto(false);
+    }, 220);
+  };
+  useEffect(() => () => window.clearTimeout(fechar.current), []);
+
+  // busca de páginas (Ctrl K / ⌘K)
+  const [busca, setBusca] = useState('');
+  const buscaRef = useRef<HTMLInputElement>(null);
+  useEffect(() => setBusca(''), [pathname]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        abrirMenu();
+        if (window.matchMedia('(max-width: 1024px)').matches) setGaveta(true);
+        requestAnimationFrame(() => buscaRef.current?.focus());
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // Meu perfil e Diretoria começam abertos; departamentos e setores, fechados, exceto os da página atual
   const [open, setOpen] = useState<Record<string, boolean>>(() => ({ 'g:eu': true, 'g:dir': true }));
@@ -160,7 +213,7 @@ export function Layout({ children }: { children: ReactNode }) {
       return (
         <div key={st.key} className="nav__area">
           <NavLink to={i.path} end className="nav__head nav__head--dept nav__setor-link" {...menuProps(i.path)}>
-            <st.icon size={16} strokeWidth={1.7} />
+            <span className="nav__ico"><st.icon size={15} strokeWidth={1.8} /></span>
             <span>{st.label}</span>
             {ro}
             {isPinned(i.path) && <Pin size={12} className="nav__pin" aria-label="Fixado" />}
@@ -172,9 +225,10 @@ export function Layout({ children }: { children: ReactNode }) {
     return (
       <div key={st.key} className="nav__area">
         <button className={`nav__head nav__head--dept ${local?.setor.key === st.key ? 'is-current' : ''}`} onClick={() => flip(`s:${st.key}`)} aria-expanded={sOpen}>
-          <st.icon size={16} strokeWidth={1.7} />
+          <span className="nav__ico"><st.icon size={15} strokeWidth={1.8} /></span>
           <span>{st.label}</span>
           {ro}
+          <span className="nav__chip" title={`${paginas.length} páginas`}>{paginas.length}</span>
           <ChevronDown size={13} className={`nav__chev ${sOpen ? '' : 'is-closed'}`} />
         </button>
         {sOpen && items({ ...st.area, items: paginas.map((i) => ({ ...i, group: undefined })) })}
@@ -186,13 +240,71 @@ export function Layout({ children }: { children: ReactNode }) {
     .map((p) => findModule(p))
     .filter((m): m is NonNullable<typeof m> => !!m && access(m.item.perm) !== 'none');
 
+  // todas as páginas que a pessoa acessa, para a busca
+  const paginas: PaginaBusca[] = [];
+  for (const k of ['eu', 'dir'] as AreaKey[]) {
+    const a = AREAS.find((x) => x.key === k)!;
+    for (const i of a.items) if (access(i.perm) !== 'none') paginas.push({ path: i.path, label: i.label, meta: a.label, icon: a.icon });
+  }
+  for (const d of DEPARTAMENTOS) for (const st of d.setores) for (const i of st.items) {
+    if (access(i.perm) !== 'none') paginas.push({ path: i.path, label: i.label, meta: st.items.length > 1 ? `${d.label} · ${st.label}` : d.label, icon: st.icon });
+  }
+  const termos = semAcento(busca).split(/\s+/).filter(Boolean);
+  const achadas = termos.length ? paginas.filter((p) => termos.every((t) => semAcento(`${p.label} ${p.meta}`).includes(t))) : [];
+  const irPara = (path: string) => {
+    setBusca('');
+    buscaRef.current?.blur();
+    setGaveta(false);
+    expand(path);
+    navigate(path);
+  };
+  const largo = fixo || aberto;
+
   return (
-    <div className="shell">
+    <div className={`shell ${fixo ? 'shell--fixo' : 'shell--rail'}`}>
       {gaveta && <div className="sidebar-backdrop" onClick={() => setGaveta(false)} aria-hidden="true" />}
-      <aside className={`sidebar ${gaveta ? 'is-open' : ''}`}>
-        <Brand />
+      <aside
+        className={`sidebar ${gaveta ? 'is-open' : ''} ${largo ? 'is-largo' : ''}`}
+        onMouseEnter={fixo ? undefined : abrirMenu}
+        onMouseLeave={fixo ? undefined : fecharMenu}
+        onFocus={fixo ? undefined : abrirMenu}
+        onBlur={fixo ? undefined : (e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) fecharMenu(); }}
+      >
+        <div className="side__top">
+          <img className="side__logo" src={logoUrl} alt="Bar do Dindo" width={40} height={40} />
+          <span className="side__name">Cérebro</span>
+          <button className="side__fixar" onClick={alternarFixo} title={fixo ? 'Recolher o menu (abre ao passar o mouse)' : 'Manter o menu aberto'} aria-label={fixo ? 'Recolher o menu' : 'Manter o menu aberto'}>
+            {fixo ? <PanelLeftClose size={17} /> : <PanelLeftOpen size={17} />}
+          </button>
+        </div>
+
+        <label className="side__busca" onClick={() => buscaRef.current?.focus()}>
+          <Search size={16} />
+          <input
+            ref={buscaRef} value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar página…" aria-label="Buscar página"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && achadas[0]) irPara(achadas[0].path);
+              if (e.key === 'Escape') { setBusca(''); e.currentTarget.blur(); }
+            }}
+          />
+          {busca ? (
+            <button className="side__limpar" onClick={() => setBusca('')} aria-label="Limpar busca"><X size={13} /></button>
+          ) : <kbd>{MAC ? '⌘K' : 'Ctrl K'}</kbd>}
+        </label>
+
+        {termos.length > 0 && (
+          <div className="nav nav--busca">
+            {achadas.length ? achadas.slice(0, 30).map((p, n) => (
+              <button key={p.path} className={`nav__res ${n === 0 ? 'is-first' : ''} ${current?.item.path === p.path ? 'is-current' : ''}`} onClick={() => irPara(p.path)}>
+                <span className="nav__ico"><p.icon size={15} strokeWidth={1.8} /></span>
+                <span className="nav__res-txt"><b>{p.label}</b><small>{p.meta}</small></span>
+              </button>
+            )) : <p className="nav__vazio">Nenhuma página encontrada.</p>}
+          </div>
+        )}
+
         {/* na gaveta (celular/tablet), escolher uma página fecha o menu — inclusive a página em que já se está */}
-        <nav className="nav" ref={navRef} onClick={(e) => (e.target as HTMLElement).closest('a, .nav__fixado-go') && setGaveta(false)}>
+        <nav className="nav" hidden={termos.length > 0} ref={navRef} onClick={(e) => (e.target as HTMLElement).closest('a, .nav__fixado-go') && setGaveta(false)}>
           {(['eu', 'dir'] as AreaKey[]).map((k) => {
             const todas = AREAS.find((x) => x.key === k)!;
             const area = { ...todas, items: todas.items.filter((i) => access(i.perm) !== 'none') };
@@ -201,7 +313,7 @@ export function Layout({ children }: { children: ReactNode }) {
             return (
               <div key={k} className="nav__block">
                 <button className={`nav__head nav__head--group ${current?.area.key === k ? 'is-current' : ''}`} onClick={() => flip(`g:${k}`)} aria-expanded={gOpen}>
-                  <area.icon size={18} strokeWidth={1.7} />
+                  <span className="nav__ico"><area.icon size={17} strokeWidth={1.8} /></span>
                   <span>{area.label}</span>
                   {area.items.every((i) => access(i.perm) === 'view') && <span className="nav__ro" title="Somente leitura">leitura</span>}
                   <ChevronDown size={14} className={`nav__chev ${gOpen ? '' : 'is-closed'}`} />
@@ -232,7 +344,7 @@ export function Layout({ children }: { children: ReactNode }) {
           })}
 
           {/* III - Departamentos → setores → páginas */}
-          {DEPARTAMENTOS.some((d) => d.setores.some(temAcesso)) && <div className="nav__secao">Departamentos</div>}
+          {DEPARTAMENTOS.some((d) => d.setores.some(temAcesso)) && <div className="nav__secao"><span>Departamentos</span></div>}
           {DEPARTAMENTOS.map((d) => {
             const setores = d.setores.filter(temAcesso);
             if (!setores.length) return null;
@@ -240,7 +352,7 @@ export function Layout({ children }: { children: ReactNode }) {
             return (
               <div key={d.key} className="nav__block">
                 <button className={`nav__head nav__head--group ${local?.departamento.key === d.key ? 'is-current' : ''}`} onClick={() => flip(`d:${d.key}`)} aria-expanded={dOpen}>
-                  <d.icon size={18} strokeWidth={1.7} />
+                  <span className="nav__ico"><d.icon size={17} strokeWidth={1.8} /></span>
                   <span>{d.label}</span>
                   <ChevronDown size={14} className={`nav__chev ${dOpen ? '' : 'is-closed'}`} />
                 </button>
