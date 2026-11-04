@@ -1,6 +1,6 @@
 import type { Row } from './lib/data';
 import { brl, daysUntil, isoToday, num, pct } from './lib/format';
-import { calcularFicha, fichaDe, precoNormalizado } from './lib/ficha';
+import { calcularFicha, comparacaoDePreco, fichaDe, precoNormalizado } from './lib/ficha';
 import { locaisDe, locaisNoFormulario, resumoLocais } from './lib/locais';
 
 export type FieldType = 'text' | 'textarea' | 'number' | 'money' | 'date' | 'select' | 'email' | 'phone' | 'percent' | 'cnpj' | 'time' | 'ref' | 'url' | 'check';
@@ -70,11 +70,13 @@ export type Tone = 'good' | 'warn' | 'bad' | 'info' | 'neutral';
 
 export interface Computed {
   label: string;
-  get: (r: Row) => string | number | null;
-  /** "nivel": barra de 0 a 1 (o `get` devolve a fração), com o `detalhe` embaixo. */
-  format?: 'money' | 'number' | 'percent' | 'badge' | 'text' | 'nivel';
-  tone?: (r: Row) => Tone;
-  detalhe?: (r: Row) => string;
+  /** `todos`: todos os registros do cadastro (para comparar uma linha com as outras, ex.: fornecedores do mesmo insumo). */
+  get: (r: Row, todos: Row[]) => string | number | null;
+  /** "nivel": barra de 0 a 1 (o `get` devolve a fração), com o `detalhe` embaixo.
+   *  "comparacao": quanto a linha está acima da mais barata (0 = a mais barata), com seta e o `detalhe` embaixo. */
+  format?: 'money' | 'number' | 'percent' | 'badge' | 'text' | 'nivel' | 'comparacao';
+  tone?: (r: Row, todos: Row[]) => Tone;
+  detalhe?: (r: Row, todos: Row[]) => string;
 }
 
 export interface Kpi {
@@ -479,7 +481,16 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'observacoes', label: 'Observações', type: 'textarea', formOnly: true, wide: true, placeholder: 'Prazo de entrega, pedido mínimo, condições de pagamento…' },
     ],
     computed: [
-      { label: 'Preço por L / kg / un', format: 'text', get: (r) => precoNormalizado(n(r.preco), n(r.conteudo), s(r.unidade)) },
+      {
+        label: 'Preço por L / kg / un', format: 'text', get: (r) => precoNormalizado(n(r.preco), n(r.conteudo), s(r.unidade)),
+        // entre os fornecedores do mesmo insumo: verde o mais barato, vermelho os mais caros
+        tone: (r, todos) => { const c = comparacaoDePreco(r, todos); return !c ? 'neutral' : c.acima === 0 ? 'good' : 'bad'; },
+      },
+      {
+        label: 'Vs. mais barato', format: 'comparacao',
+        get: (r, todos) => comparacaoDePreco(r, todos)?.acima ?? null,
+        detalhe: (r, todos) => comparacaoDePreco(r, todos)?.detalhe ?? '',
+      },
     ],
     kpis: (rows) => {
       const ativos = rows.filter((r) => r.status !== 'Inativo');

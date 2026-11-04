@@ -78,15 +78,30 @@ function cellClass(f: Field) {
   return f.wide ? 'text-wide' : 'text';
 }
 
-function formatComputed(c: Computed, r: Row): ReactNode {
-  const v = c.get(r);
+function formatComputed(c: Computed, r: Row, todos: Row[]): ReactNode {
+  const v = c.get(r, todos);
   if (v === null || v === undefined || v === '') return <span className="muted">—</span>;
-  const tone = c.tone?.(r);
-  if (c.format === 'nivel') return <BarraNivel fracao={Number(v)} tone={tone ?? 'neutral'} detalhe={c.detalhe?.(r) ?? ''} />;
+  const tone = c.tone?.(r, todos);
+  if (c.format === 'nivel') return <BarraNivel fracao={Number(v)} tone={tone ?? 'neutral'} detalhe={c.detalhe?.(r, todos) ?? ''} />;
+  if (c.format === 'comparacao') return <Comparacao acima={Number(v)} detalhe={c.detalhe?.(r, todos) ?? ''} />;
   const text =
     c.format === 'money' ? brl(Number(v)) : c.format === 'percent' ? pct(Number(v)) : c.format === 'number' ? num(Number(v)) : String(v);
   if (c.format === 'badge') return <Badge tone={tone ?? toneOf(v)}>{text}</Badge>;
   return tone && tone !== 'neutral' ? <span className={`text-${tone}`}>{text}</span> : text;
+}
+
+/** Seta e % em relação ao mais barato: verde "Mais barato", vermelho "+12,5%". */
+function Comparacao({ acima, detalhe }: { acima: number; detalhe: string }) {
+  const barato = acima === 0;
+  return (
+    <span className={`comparacao comparacao--${barato ? 'barato' : 'caro'}`}>
+      <Badge tone={barato ? 'good' : 'bad'}>
+        {barato ? <ArrowDown size={12} aria-hidden /> : <ArrowUp size={12} aria-hidden />}
+        {barato ? 'Mais barato' : `+${pct(acima)}`}
+      </Badge>
+      {detalhe && <small className="muted">{detalhe}</small>}
+    </span>
+  );
 }
 
 export function CollectionPage({ def, rowActions, before, newDefaults, filterRows }: {
@@ -342,7 +357,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   const exportar = async (formato: 'pdf' | 'xlsx') => {
     setExportando(true);
     try {
-      const colunas = colunasDe(def);
+      const colunas = colunasDe(def, all);
       const arquivo = `${def.id}-${new Date().toISOString().slice(0, 10)}`;
       if (formato === 'pdf') await exportarPdf(def.title, colunas, paraExportar(), arquivo);
       else await exportarExcel(def.title, colunas, paraExportar(), arquivo);
@@ -353,7 +368,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
       setExportando(false);
     }
   };
-  const exportCsv = () => exportarCsv(colunasDe(def), paraExportar(), `${def.id}-${new Date().toISOString().slice(0, 10)}`);
+  const exportCsv = () => exportarCsv(colunasDe(def, all), paraExportar(), `${def.id}-${new Date().toISOString().slice(0, 10)}`);
 
   const toggleSort = (key: string) =>
     setSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }));
@@ -514,7 +529,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
                       </button>
                     </th>
                   ))}
-                  {def.computed?.map((c) => <th key={c.label} className={c.format === 'badge' || c.format === 'text' || c.format === 'nivel' ? '' : 'num'}>{c.label}</th>)}
+                  {def.computed?.map((c) => <th key={c.label} className={c.format === 'badge' || c.format === 'text' || c.format === 'nivel' || c.format === 'comparacao' ? '' : 'num'}>{c.label}</th>)}
                   <th className="actions-col" aria-label="Ações" />
                 </tr>
               </thead>
@@ -555,7 +570,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
                       <td key={f.key} data-label={f.label} className={`${cellClass(f)} ${fi === 0 ? 'col-titulo' : ''}`}>{formatField(f, r[f.key])}</td>
                     ))}
                     {def.computed?.map((c) => (
-                      <td key={c.label} data-label={c.label} className={c.format === 'nivel' ? 'nivel-col' : c.format === 'badge' || c.format === 'text' ? 'nowrap' : 'num'}>{formatComputed(c, r)}</td>
+                      <td key={c.label} data-label={c.label} className={c.format === 'nivel' ? 'nivel-col' : c.format === 'badge' || c.format === 'text' || c.format === 'comparacao' ? 'nowrap' : 'num'}>{formatComputed(c, r, all)}</td>
                     ))}
                     <td className="actions-col" onClick={(e) => e.stopPropagation()}>
                       <div className="row-actions">
