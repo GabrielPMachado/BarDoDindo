@@ -138,7 +138,7 @@ function Mes({ eventos }: { eventos: Row[] }) {
       <div className="calendario__corpo">
         <div className="calendario__grade" role="grid" aria-label={`Calendário de ${titulo}`}>
           {SEMANA.map((s) => <div key={s} className="calendario__semana">{s}</div>)}
-          {celulas.map((d) => {
+          {celulas.map((d, i) => {
             const k = iso(d);
             const doK = doDia(k);
             const pendente = doK.rs.some((r) => r.status === 'Pendente');
@@ -146,7 +146,7 @@ function Mes({ eventos }: { eventos: Row[] }) {
             const resumoDia = CATS.filter((c) => qtd[c.id]).map((c) => `${qtd[c.id]} ${c.label.toLowerCase()}`).join(', ');
             return (
               <div
-                key={k} role="gridcell" tabIndex={0} aria-selected={dia === k}
+                key={k} role="gridcell" tabIndex={0} aria-selected={dia === k} style={{ ['--i' as string]: i }}
                 aria-label={`${d.getDate()} de ${d.toLocaleDateString('pt-BR', { month: 'long' })}${resumoDia ? `: ${resumoDia}` : ''}`}
                 onClick={() => abrir(k, null)}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrir(k, null); } }}
