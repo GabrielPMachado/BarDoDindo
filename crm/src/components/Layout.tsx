@@ -141,13 +141,14 @@ export function Layout({ children }: { children: ReactNode }) {
   };
   useEffect(() => () => window.clearTimeout(fechar.current), []);
 
-  // busca de páginas (Ctrl K / ⌘K)
+  // busca de páginas (Ctrl \ / ⌘\)
+  // e.key cobre teclado US e ABNT2; IntlBackslash é a tecla \ ao lado do Shift no ABNT2
   const [busca, setBusca] = useState('');
   const buscaRef = useRef<HTMLInputElement>(null);
   useEffect(() => setBusca(''), [pathname]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === '\\' || e.code === 'IntlBackslash')) {
         e.preventDefault();
         abrirMenu();
         if (window.matchMedia('(max-width: 1024px)').matches) setGaveta(true);
@@ -292,7 +293,7 @@ export function Layout({ children }: { children: ReactNode }) {
           />
           {busca ? (
             <button className="side__limpar" onClick={() => setBusca('')} aria-label="Limpar busca"><X size={13} /></button>
-          ) : <kbd>{MAC ? '⌘K' : 'Ctrl K'}</kbd>}
+          ) : <kbd>{MAC ? '⌘\\' : 'Ctrl \\'}</kbd>}
         </label>
 
         {termos.length > 0 && (
