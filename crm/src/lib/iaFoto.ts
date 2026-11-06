@@ -6,6 +6,7 @@
 import modeloUrl from '../assets/foto-modelo-dindo.jpg';
 import modeloEstoqueUrl from '../assets/foto-modelo-estoque.jpg';
 import modeloSalaoUrl from '../assets/foto-modelo-salao.jpg';
+import modeloChoppUrl from '../assets/foto-modelo-chopp.jpg';
 import { fotoNoTamanho } from '../components/Avatar';
 import { chaveDaIA } from './iaNota';
 
@@ -13,14 +14,31 @@ export const FOTO_MODELO_URL = modeloUrl;
 export const GEMINI_URL = 'https://gemini.google.com/app';
 
 /**
+ * Abre o Gemini numa janela sobreposta ao Cérebro (do lado direito da tela), em vez de uma guia nova: o Cérebro continua
+ * à vista para enviar a foto pronta. A janela tem nome, então os próximos pedidos reaproveitam a mesma e só a trazem para a frente.
+ */
+export function abrirGeminiSobreposto() {
+  const tela = window.screen;
+  const largura = Math.max(480, Math.min(960, Math.round((tela?.availWidth || 1280) * 0.5)));
+  const altura = Math.max(560, (tela?.availHeight || 800) - 40);
+  const esquerda = Math.max(0, (tela?.availWidth || 1280) - largura);
+  const janela = window.open(GEMINI_URL, 'gemini-dindo', `popup,width=${largura},height=${altura},left=${esquerda},top=0`);
+  // bloqueador de janelas: cai numa guia comum
+  if (!janela) { window.open(GEMINI_URL, '_blank', 'noopener'); return; }
+  try { janela.opener = null; } catch { /* outro domínio */ }
+  janela.focus();
+}
+
+/**
  * Padrões de foto: drinks na mesa do bar; itens do Estoque na bancada do depósito, com a lousa do Dindo ao fundo;
  * bens do Patrimônio no salão (a foto do canto gamer é a planta fixa do salão; cada canto continua a partir dela).
  */
-export type PadraoFoto = 'produto' | 'estoque' | 'patrimonio';
+export type PadraoFoto = 'produto' | 'estoque' | 'patrimonio' | 'chopp';
 export const MODELOS: Record<PadraoFoto, { url: string; arquivo: string; oQue: string; cenario?: string }> = {
   produto: { url: modeloUrl, arquivo: 'foto-modelo-bar-do-dindo.jpg', oQue: 'drink' },
   estoque: { url: modeloEstoqueUrl, arquivo: 'foto-modelo-estoque-bar-do-dindo.jpg', oQue: 'item', cenario: 'o depósito com a lousa do Dindo' },
   patrimonio: { url: modeloSalaoUrl, arquivo: 'foto-modelo-salao-bar-do-dindo.jpg', oQue: 'bem', cenario: 'o salão do Dindo com o canto gamer' },
+  chopp: { url: modeloChoppUrl, arquivo: 'foto-modelo-chopp-bar-do-dindo.jpg', oQue: 'chopp', cenario: 'a Pint APA no balcão do Dindo' },
 };
 
 /** Cantos do salão usados como cenário das fotos do Patrimônio; "Automático" escolhe pelo nome e pela categoria do bem. */
@@ -107,6 +125,88 @@ Não adicione textos, pessoas, mãos nem outros objetos na bancada. Mantenha o f
 A SEGUNDA imagem anexada é a foto antiga deste item, em baixa resolução: use-a só como referência de qual é o produto (embalagem, rótulo e cores). Recrie a cena inteira nítida e em alta resolução, com foco preciso no rótulo, sem borrões nem artefatos de compressão.` : ''}`;
 }
 
+/* ---------- chopes do cardápio: a Pint APA no balcão é a foto modelo; muda só o copo, a cor e a plaquinha ---------- */
+
+const semAcento = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+type Copo = 'Half-pint' | 'Pint' | 'Jarra';
+const COPOS: Record<Copo, { oQue: string; tamanho: string }> = {
+  'Half-pint': {
+    oQue: 'um copo half-pint de vidro (o mesmo formato do copo da foto, só que menor, de uns 300 ml)',
+    tamanho: 'Ele é MENOR que o copo atual: cerca de dois terços da altura, com a base exatamente na mesma linha da base do copo atual',
+  },
+  Pint: {
+    oQue: 'um copo pint de vidro (o mesmo copo da foto)',
+    tamanho: 'Mesma altura, largura e posição do copo atual, com a base exatamente na mesma linha',
+  },
+  Jarra: {
+    oQue: 'uma caneca-jarra de vidro de 1 litro, com alça grossa do lado direito',
+    tamanho: 'Ela é um pouco mais alta e bem mais larga que o copo atual, com a base exatamente na mesma linha da base do copo atual e a alça para a direita, sem encostar na plaquinha',
+  },
+};
+
+/** Copo do tamanho: pelo nome (Half-pint, Pint, Jarra) ou pelos ml (até 350 ml half-pint; até 700 ml pint; acima, jarra). */
+export function copoDoChopp(nome: string, tamanho = ''): Copo {
+  const n = semAcento(`${nome} ${tamanho}`);
+  if (/half|meio/.test(n)) return 'Half-pint';
+  if (/jarra|caneca/.test(n)) return 'Jarra';
+  if (/\bpint\b/.test(n)) return 'Pint';
+  const m = semAcento(tamanho || nome).match(/(\d+(?:[.,]\d+)?)\s*(ml|l\b|litro)/);
+  if (!m) return 'Pint';
+  const ml = Number(m[1].replace(',', '.')) * (m[2] === 'ml' ? 1 : 1000);
+  return ml <= 350 ? 'Half-pint' : ml <= 700 ? 'Pint' : 'Jarra';
+}
+
+/** Estilo da cerveja, sem "Chopp", tamanho e copo (ex.: "Chopp Black IPA 480 ml" → "Black IPA"). */
+export function estiloDoChopp(nome: string, tamanho = '') {
+  let e = nome;
+  if (tamanho.trim()) e = e.replace(tamanho.trim(), '');
+  return e
+    .replace(/\b(chopp?e?s?|chope)\b/gi, '')
+    .replace(/\b(half[- ]?pint|pint|jarra|caneca)\b/gi, '')
+    .replace(/\d+(?:[.,]\d+)?\s*(ml|l|litros?)\b/gi, '')
+    .replace(/[·\-–]+/g, ' ').replace(/\s+/g, ' ').trim() || nome.trim();
+}
+
+/** Cor e colarinho de cada estilo (a ordem importa: "Black IPA" antes de "IPA", "Dry Stout" antes de "Stout"). */
+const CORES: [RegExp, string][] = [
+  [/black ipa/, 'cerveja preta e opaca, com colarinho bege-claro firme'],
+  [/stout/, 'cerveja preta e opaca, com colarinho cremoso e denso cor de caramelo claro'],
+  [/porter/, 'cerveja marrom-escura quase preta, com reflexos rubi contra a luz e colarinho bege'],
+  [/red|vermelh/, 'cerveja vermelho-acobreada e límpida, com colarinho off-white'],
+  [/double|imperial|dipa/, 'cerveja âmbar intensa e levemente turva, com colarinho off-white denso'],
+  [/session/, 'cerveja dourado-clara e levemente turva, com colarinho branco'],
+  [/ipa/, 'cerveja dourado-alaranjada e levemente turva, com colarinho off-white'],
+  [/apa|pale ale/, 'cerveja dourado-âmbar e límpida, com colarinho branco'],
+  [/weiss|weizen|trigo|witbier/, 'cerveja amarelo-palha bem turva (de trigo), com colarinho branco alto e fofo'],
+  [/pilsen|pilsner|lager|puro malte/, 'cerveja dourado-clara e cristalina, com bolhinhas subindo e colarinho branco'],
+  [/vinho|wine/, 'cerveja rosada e límpida, com colarinho rosado claro'],
+];
+export const corDoChopp = (estilo: string) => CORES.find(([re]) => re.test(semAcento(estilo)))?.[1] ?? 'a cor, a transparência e o colarinho típicos desse estilo de cerveja';
+
+/** Texto da plaquinha de madeira, como nas fotos atuais (ex.: "PINT - APA"). */
+export const plaquinhaDoChopp = (copo: Copo, estilo: string) => `${copo} - ${estilo}`.toUpperCase();
+
+/**
+ * Pedido para a foto de um chopp do cardápio, no padrão das fotos atuais: a foto modelo é a Pint APA no balcão; muda só o
+ * copo (pelo tamanho), a cor da cerveja (pelo estilo) e o texto da plaquinha.
+ */
+export function promptDaFotoChopp(p: { nome: string; tamanho?: string }) {
+  const tamanho = p.tamanho?.trim() ?? '';
+  const copo = copoDoChopp(p.nome, tamanho);
+  const estilo = estiloDoChopp(p.nome, tamanho);
+  const c = COPOS[copo];
+  return `Edite a imagem anexada mantendo EXATAMENTE o mesmo cenário, enquadramento, ângulo de câmera, iluminação, cores e desfoque: o balcão de madeira escura em primeiro plano, a luminária pendente de cobre acesa no alto à esquerda, as plantas penduradas e as prateleiras com garrafas desfocadas ao fundo, a parede de tijolos com a placa redonda de madeira do Bar do Dindo à direita (idêntica, sem alterar o logo nem as letras) e a plaquinha de madeira apoiada no balcão à esquerda.
+
+Substitua SOMENTE o copo do centro por ${c.oQue}, cheio de chopp ${estilo}${tamanho ? ` (${tamanho})` : ''}: ${corDoChopp(estilo)}.
+
+${c.tamanho}, centralizado no mesmo ponto do balcão. O vidro tem o logo "BAR DO DINDO" gravado de frente, igual ao do copo atual (mesma fonte, cor e posição). Colarinho cremoso de uns dois dedos, gotículas de condensação no vidro gelado, a mesma sombra suave e o mesmo reflexo na madeira, com a mesma luz quente da luminária. Fotografia realista de bebida.
+
+Na plaquinha de madeira à esquerda, troque o texto por "${plaquinhaDoChopp(copo, estilo)}", nas mesmas letras serifadas, escuras e gravadas na madeira, centralizado; a plaquinha continua do mesmo tamanho e no mesmo lugar.
+
+Não adicione outros textos, pessoas, mãos nem objetos. Mantenha o formato horizontal 4:3.`;
+}
+
 export function promptDaFoto(p: { nome: string; resumo?: string; ingredientes?: string }) {
   const drink = [p.nome.trim(), p.resumo?.trim(), p.ingredientes?.trim() ? `ingredientes: ${p.ingredientes.trim()}` : ''].filter(Boolean).join('. ');
   return `Edite a imagem anexada mantendo EXATAMENTE o mesmo cenário, enquadramento, ângulo de câmera, iluminação, cores e desfoque: a luminária pendente acesa no canto superior esquerdo, as plantas, as prateleiras com garrafas à esquerda, a parede de tijolos com a placa redonda do Bar do Dindo à direita (idêntica, sem alterar o logo nem as letras) e a mesa de madeira envernizada em primeiro plano.
@@ -174,21 +274,10 @@ async function pedirImagem(chave: string, parts: unknown[], sinal?: AbortSignal)
   throw new Error(ultimoErro);
 }
 
-/**
- * Refaz a foto de um item do Estoque no padrão do depósito, direto pela API do Gemini: manda a foto modelo e a foto atual
- * (como referência do produto) e devolve a nova já no tamanho guardado no cadastro.
- */
-export async function gerarFotoEstoque(item: Record<string, unknown>, sinal?: AbortSignal): Promise<string> {
-  const nome = String(item.item ?? '').trim();
-  if (!nome) throw new Error('O item está sem nome.');
+/** Manda o pedido e as fotos para a IA e devolve a foto nova já no tamanho guardado no cadastro. */
+async function fotoDaIA(prompt: string, fotos: { mime: string; dados: string }[], sinal?: AbortSignal): Promise<string> {
   const { chave } = await chaveDaIA().catch((e) => { throw new ErroDaChave(e instanceof Error ? e.message : String(e)); });
-  const modelo = await base64DaUrl(modeloEstoqueUrl);
-  const atual = typeof item.foto === 'string' && item.foto.startsWith('data:image/') ? item.foto : '';
-  const prompt = promptDaFotoEstoque({
-    item: nome, categoria: String(item.categoria ?? ''), unidade: String(item.unidade ?? ''), conteudo: item.conteudo, conteudoUnidade: String(item.conteudoUnidade ?? ''),
-  }, !!atual);
-  const parts: unknown[] = [{ text: prompt }, { inline_data: { mime_type: modelo.mime, data: modelo.dados } }];
-  if (atual) parts.push({ inline_data: { mime_type: atual.slice(5, atual.indexOf(';')), data: atual.split(',')[1] ?? '' } });
+  const parts: unknown[] = [{ text: prompt }, ...fotos.map((f) => ({ inline_data: { mime_type: f.mime, data: f.dados } }))];
   const resp = await pedirImagem(chave, parts, sinal);
   const parte = resp.candidates?.[0]?.content?.parts?.find((x) => x.inlineData?.data || x.inline_data?.data);
   const dados = parte?.inlineData?.data ?? parte?.inline_data?.data;
@@ -196,4 +285,28 @@ export async function gerarFotoEstoque(item: Record<string, unknown>, sinal?: Ab
   if (!dados) throw new Error('A IA não devolveu uma imagem desta vez. Tente gerar de novo.');
   const blob = await (await fetch(`data:${mime};base64,${dados}`)).blob();
   return fotoNoTamanho(blob);
+}
+
+/**
+ * Refaz a foto de um item do Estoque no padrão do depósito, direto pela API do Gemini: manda a foto modelo e a foto atual
+ * (como referência do produto) e devolve a nova já no tamanho guardado no cadastro.
+ */
+export async function gerarFotoEstoque(item: Record<string, unknown>, sinal?: AbortSignal): Promise<string> {
+  const nome = String(item.item ?? '').trim();
+  if (!nome) throw new Error('O item está sem nome.');
+  const atual = typeof item.foto === 'string' && item.foto.startsWith('data:image/') ? item.foto : '';
+  const prompt = promptDaFotoEstoque({
+    item: nome, categoria: String(item.categoria ?? ''), unidade: String(item.unidade ?? ''), conteudo: item.conteudo, conteudoUnidade: String(item.conteudoUnidade ?? ''),
+  }, !!atual);
+  const fotos = [await base64DaUrl(modeloEstoqueUrl)];
+  if (atual) fotos.push({ mime: atual.slice(5, atual.indexOf(';')), dados: atual.split(',')[1] ?? '' });
+  return fotoDaIA(prompt, fotos, sinal);
+}
+
+/** Gera a foto de um chopp do cardápio (um tamanho) no padrão da Pint APA, direto pela API do Gemini. */
+export async function gerarFotoChopp(produto: Record<string, unknown>, sinal?: AbortSignal): Promise<string> {
+  const nome = String(produto.nome ?? '').trim();
+  if (!nome) throw new Error('O produto está sem nome.');
+  const prompt = promptDaFotoChopp({ nome, tamanho: String(produto.tamanho ?? '') });
+  return fotoDaIA(prompt, [await base64DaUrl(modeloChoppUrl)], sinal);
 }

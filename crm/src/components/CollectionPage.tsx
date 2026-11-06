@@ -139,6 +139,8 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   const col = useCollection(def.id, true, padraoPeriodo ? desdeDe(periodo) : undefined);
   // cadastro lido junto para as colunas calculadas (ex.: notas do Controle de qualidade na Tabela de preços)
   const rel = useCollection(def.relacionada ?? def.id, !!def.relacionada && pode(def.relacionada, 'ver'));
+  // Produtos: os chopes do cardápio que levam foto (cada tamanho; o item principal que os agrupa não tem foto própria)
+  const chopes = useMemo(() => (def.tamanhos ? col.rows.filter((r) => r.categoria === 'Chopes' && !temTamanhos(r)) : []), [def.tamanhos, col.rows]);
   const all = useMemo(() => {
     const lista = filterRows ? col.rows.filter(filterRows) : col.rows;
     // item com tamanhos: leva os tamanhos junto, para as colunas calculadas (ex.: "3 tamanhos: 300 ml, 500 ml, 1 litro")
@@ -410,6 +412,11 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
             {def.fotoPadrao === 'estoque' && canEdit && (
               <button className="btn btn--ghost" disabled={!all.length} onClick={() => setRefazendoFotos(true)}><Sparkles size={16} /> Refazer fotos em alta</button>
             )}
+            {def.tamanhos && canEdit && (
+              <button className="btn btn--ghost" disabled={!chopes.length} onClick={() => setRefazendoFotos(true)} title="Gera as fotos dos chopes no padrão da Pint APA, pelo Gemini">
+                <Sparkles size={16} /> Gerar fotos dos chopes
+              </button>
+            )}
             {canCreate && <button className="btn btn--primary" onClick={novo}><Plus size={16} /> {termos(def).novo}</button>}
           </>
         }
@@ -676,7 +683,8 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
 
       {refazendoFotos && (
         <RefazerFotos
-          rows={all}
+          tipo={def.tamanhos ? 'chopp' : 'estoque'}
+          rows={def.tamanhos ? chopes : all}
           onSalvar={(id, foto) => api(`/crm/c/${def.id}/${id}`, { method: 'PUT', body: { foto } })}
           onFim={col.reload}
           onClose={() => setRefazendoFotos(false)}
@@ -1022,7 +1030,7 @@ function RecordForm({ def, row, modelo, rows = [], canEdit, defaults, titulo, av
             valor={typeof data.fotoJunto === 'string' ? data.fotoJunto : ''} disabled={!canEdit} titulo={String(data[def.fields[0].key] ?? '')} onChange={(fotoJunto) => setData((d) => ({ ...d, fotoJunto }))}
           />
         )}
-        {(def.iaProduto || def.fotoPadrao) && canEdit && !comTamanhos && <GerarFotoIA data={data} padrao={def.fotoPadrao ?? 'produto'} onUsar={(foto) => setData((d) => ({ ...d, foto }))} />}
+        {(def.iaProduto || def.fotoPadrao) && canEdit && !comTamanhos && <GerarFotoIA data={data} padrao={def.fotoPadrao ?? (def.tamanhos && data.categoria === 'Chopes' ? 'chopp' : 'produto')} onUsar={(foto) => setData((d) => ({ ...d, foto }))} />}
         {pai && (
           <p className="tamanho-de form-field--wide">
             <span>Tamanho de <b>{String(pai.nome ?? '')}</b>: o nome, a categoria e os textos do cardápio acompanham o item principal.</span>
