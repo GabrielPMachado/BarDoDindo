@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Check, Copy, Download, ExternalLink, ImageOff, Sparkles, Upload } from 'lucide-react';
-import { cenarioDoBem, GEMINI_URL, MODELOS, promptDaFoto, promptDaFotoEstoque, promptDaFotoPatrimonio, type PadraoFoto } from '../lib/iaFoto';
+import { abrirGeminiSobreposto, cenarioDoBem, MODELOS, promptDaFoto, promptDaFotoChopp, promptDaFotoEstoque, promptDaFotoPatrimonio, type PadraoFoto } from '../lib/iaFoto';
 import { fotoNoTamanho } from './Avatar';
 import { notify } from './ui';
 
@@ -39,9 +39,11 @@ export function GerarFotoIA({ data, onUsar, padrao = 'produto' }: { data: Record
   const nome = String((padrao === 'estoque' ? data.item : data.nome) ?? '').trim();
   const prompt = () => padrao === 'estoque'
     ? promptDaFotoEstoque({ item: nome, categoria: String(data.categoria ?? ''), unidade: String(data.unidade ?? ''), conteudo: data.conteudo, conteudoUnidade: String(data.conteudoUnidade ?? '') })
-    : padrao === 'patrimonio'
-      ? promptDaFotoPatrimonio({ nome, categoria: String(data.categoria ?? ''), descricao: String(data.descricaoReserva ?? ''), cenario: String(data.cenarioFoto ?? '') })
-      : promptDaFoto({ nome, resumo: String(data.resumo ?? ''), ingredientes: String(data.ingredientes ?? '') });
+    : padrao === 'chopp'
+      ? promptDaFotoChopp({ nome, tamanho: String(data.tamanho ?? '') })
+      : padrao === 'patrimonio'
+        ? promptDaFotoPatrimonio({ nome, categoria: String(data.categoria ?? ''), descricao: String(data.descricaoReserva ?? ''), cenario: String(data.cenarioFoto ?? '') })
+        : promptDaFoto({ nome, resumo: String(data.resumo ?? ''), ingredientes: String(data.ingredientes ?? '') });
 
   /**
    * Um toque faz tudo: copia o pedido, baixa a foto modelo (e a foto atual, como referência) e abre o Gemini.
@@ -51,8 +53,8 @@ export function GerarFotoIA({ data, onUsar, padrao = 'produto' }: { data: Record
     if (!nome) { notify(padrao === 'estoque' ? 'Informe o nome do item antes.' : padrao === 'patrimonio' ? 'Informe o nome do bem antes.' : 'Informe o nome do produto antes.', 'error'); return; }
     const copiou = copiar(prompt());
     baixarModelo();
-    if (fotoAtual) baixar(fotoAtual, `referencia-${nomeArquivo(nome)}.jpg`);
-    window.open(GEMINI_URL, '_blank', 'noopener');
+    if (fotoAtual && padrao !== 'chopp') baixar(fotoAtual, `referencia-${nomeArquivo(nome)}.jpg`);
+    abrirGeminiSobreposto();
     setAberto(true);
     void copiou.then((ok) => notify(ok
       ? 'Pedido copiado e fotos baixadas! No Gemini: anexe a foto modelo, cole o pedido e envie.'
@@ -103,7 +105,7 @@ export function GerarFotoIA({ data, onUsar, padrao = 'produto' }: { data: Record
             <span className="muted small">Algo não funcionou?</span>
             <button type="button" className="btn btn--ghost btn--sm" onClick={async () => notify(await copiar(prompt()) ? 'Pedido copiado.' : 'Não foi possível copiar.')}><Copy size={14} /> Copiar pedido</button>
             <button type="button" className="btn btn--ghost btn--sm" onClick={baixarModelo}><Download size={14} /> Baixar foto modelo</button>
-            <a className="btn btn--ghost btn--sm" href={GEMINI_URL} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} /> Abrir o Gemini</a>
+            <button type="button" className="btn btn--ghost btn--sm" onClick={abrirGeminiSobreposto}><ExternalLink size={14} /> Abrir o Gemini</button>
           </div>
           {erro && <p className="error">{erro}</p>}
           <div className="gerar-foto__botoes"><button type="button" className="btn btn--ghost btn--sm" onClick={() => setAberto(false)}>Fechar</button></div>
