@@ -27,7 +27,10 @@ export const PLANTA = {
   bancada: {
     corredor: 0.92, corpo: 0.6, mureta: 0.14, alturaBancada: 0.95, alturaMureta: 1.06, balanco: 0.25,
     trave: { inicio: 0.35, comprimento: 1.2, altura: 0.45, torneiras: 10 },
-    pia: { comprimento: 0.65, cuba: [0.5, 0.4, 0.25] as const },
+    // módulo da pia: cuba de lavagem e, ao lado, a cuba redonda da pia de mãos
+    pia: { comprimento: 0.65, cuba: [0.34, 0.4, 0.25] as const, maos: 0.22 },
+    /** Estação de drinks na bancada sobre as 2 últimas portas da câmara, ao lado da pia. */
+    drinks: { portas: 2 },
     camara: { comprimento: 4.25, altura: 0.91, portas: 5, barris: 10, passoBarril: 0.405, primeiroBarril: 0.3 },
     caixa: { fundura: 0.5, tampoD: 0.75, portinha: 0.7 },
     banquetas: { n: 8, passo: 0.6, primeira: 0.35, assento: 0.78 },
