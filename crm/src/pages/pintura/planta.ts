@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { criarCotas, m as fm } from './cotas';
 
 /*
  * Plantas à mão do bar (escala 1:35): planta baixa com cotas, elétrica e hidráulica.
@@ -16,7 +17,21 @@ export const PLANTA = {
   /** Porta de 0,90 m na parede da frente, depois de 1,66 m a partir da parede do balcão. */
   porta: { t: 1.66, largura: 0.9 },
   /** Balcão de 4,90 × 1,66 m encostado na parede comprida, começando a 1,36 m da frente (8,70 − 7,34). */
-  balcao: { d: 1.36, comprimento: 4.84, profundidade: 1.66, alturaTampo: 1.1, larguraTampo: 0.6 },
+  balcao: { d: 1.3, comprimento: 4.9, profundidade: 1.66, alturaTampo: 1.1, larguraTampo: 0.4 },
+  /**
+   * Projeto da bancada (doc "Projeto da bancada do bar", opção A — câmara fria):
+   * corredor do bartender de 0,92, corpo de 0,60 com bancada de inox a 0,95, mureta de 0,14 até 1,06,
+   * tampo de granito de 0,40 a 1,10 avançando 0,25 para o cliente, trave de 10 torneiras, pia na ponta
+   * do fundo e caixa na lateral do lado da porta, com portinha de 0,70 colada na parede.
+   */
+  bancada: {
+    corredor: 0.92, corpo: 0.6, mureta: 0.14, alturaBancada: 0.95, alturaMureta: 1.06, balanco: 0.25,
+    trave: { inicio: 0.35, comprimento: 1.2, altura: 0.45, torneiras: 10 },
+    pia: { comprimento: 0.65, cuba: [0.5, 0.4, 0.25] as const },
+    camara: { comprimento: 4.25, altura: 0.91, portas: 5, barris: 10, passoBarril: 0.405, primeiroBarril: 0.3 },
+    caixa: { fundura: 0.5, tampoD: 0.75, portinha: 0.7 },
+    banquetas: { n: 8, passo: 0.6, primeira: 0.35, assento: 0.78 },
+  },
   /** Salão de 6,20 × 2,70 m e área VIP de 2,50 m no fundo, aberta, com uma separação baixa. */
   salao: { comprimento: 6.2, largura: 2.7 },
   fundo: 2.5,
@@ -26,7 +41,7 @@ export const PLANTA = {
   separacaoVip: { t0: 0, t1: 2.2, altura: 1.0 },
   /** Freezers encostados na frente, entre a parede do balcão e 0,92 m, com 0,75 m de fundura. */
   freezers: [{ t: 0, largura: 0.45 }, { t: 0.47, largura: 0.45 }],
-  freezerFundura: 0.72,
+  freezerFundura: 0.55,
   freezerAltura: 1.75,
   /** Pilares: canto da frente do lado do salão (0,70 × 0,50) e os dois do fundo (0,17 de saliência). */
   pilares: [
@@ -40,9 +55,11 @@ export const PLANTA = {
 const ALT_10A = 0.25;
 const ALT_20A = 0.25;
 
-export type Camada = 'areas' | 'eletrica' | 'iluminacao' | 'hidraulica';
+export type Camada = 'areas' | 'medidas' | 'pessoas' | 'eletrica' | 'iluminacao' | 'hidraulica';
 export const CAMADAS: { id: Camada; nome: string }[] = [
   { id: 'areas', nome: 'Áreas e balcão' },
+  { id: 'medidas', nome: 'Medidas' },
+  { id: 'pessoas', nome: 'Pessoas 1,75 m' },
   { id: 'eletrica', nome: 'Elétrica' },
   { id: 'iluminacao', nome: 'Iluminação' },
   { id: 'hidraulica', nome: 'Hidráulica' },
@@ -63,6 +80,8 @@ export const LEGENDA: Record<Camada, { cor: string; nome: string; forma?: 'linha
     { cor: '#d63d8c', nome: 'Eletroduto 3/4 antichama', forma: 'linha' },
     { cor: '#6b7480', nome: 'Disjuntor trifásico 50 A (entrada 4 × 10 mm²)', forma: 'ponto' },
   ],
+  pessoas: [{ cor: '#9aa3ad', nome: 'Bonecos de 1,75 m para sentir a escala (modo Decorado)', forma: 'ponto' }],
+  medidas: [{ cor: '#7fd1ff', nome: 'Cotas em metros (as dos móveis aparecem no modo Decorado)', forma: 'linha' }],
   iluminacao: [
     { cor: '#3b3d40', nome: 'Canaleta de ferro no teto', forma: 'linha' },
     { cor: '#ffd36b', nome: 'Fiação da iluminação 2,5 mm (dentro da canaleta)', forma: 'linha' },
@@ -167,6 +186,20 @@ export function criarCamadas(p: (d: number, t: number, y?: number) => THREE.Vect
   // porta de 0,90 m
   area(0, 0.3, PLANTA.porta.t, PLANTA.porta.t + PLANTA.porta.largura, '#d9d4cb', 'Porta 0,90');
 
+  // ---------- Medidas da sala ----------
+  const cotasSala = criarCotas();
+  grupos.medidas.add(cotasSala.grupo);
+  {
+    const { cota } = cotasSala;
+    const y = 0.02;
+    cota(p(0, 0.15, y), p(L, 0.15, y), `Parede do balcão ${fm(L)}`, 0.16);
+    cota(p(0.15, 0, y + 2.9), p(0.15, PLANTA.larguraFrente, y + 2.9), `Frente ${fm(PLANTA.larguraFrente)}`, 0.16);
+    cota(p(L - 0.15, 0, y + 2.9), p(L - 0.15, PLANTA.larguraFundo, y + 2.9), `Fundo ${fm(PLANTA.larguraFundo)}`, 0.16);
+    cota(p(0, PLANTA.larguraFrente - 0.15, y), p(PLANTA.salao.comprimento, PLANTA.larguraFrente - 0.15, y), `Salão ${fm(PLANTA.salao.comprimento)}`, 0.14);
+    cota(p(L - PLANTA.fundo, 2.6, y), p(L, 2.6, y), `Área VIP ${fm(PLANTA.fundo)}`, 0.14);
+    cota(p(L - 0.3, 0, PLANTA.altura - 0.05), p(L - 0.3, 0, 0.0), `Pé-direito ${fm(PLANTA.altura)}`, 0.14);
+  }
+
   // ---------- Elétrica ----------
   const placa = (pos: THREE.Vector3, normal: THREE.Vector3, amp: 10 | 20) => {
     const m = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.025), mat(amp === 20 ? '#e2a33b' : '#f4f1ea', { emissive: amp === 20 ? '#7a4a10' : '#3a3a3a', emissiveIntensity: 0.5 }));
@@ -193,7 +226,7 @@ export function criarCamadas(p: (d: number, t: number, y?: number) => THREE.Vect
   circuito([p(QUADRO.d, 0.03, QUADRO.y - 0.25), p(QUADRO.d, 0.03, altParede), p(TOMADAS_PAREDE_BALCAO.at(-1)!, 0.03, altParede)], fio4);
   for (const d of TOMADAS_PAREDE_BALCAO) placa(p(d, 0, altParede), paraSalao, 20);
   // 20 A na frente do balcão, pelo piso até a base do balcão (fio 4 mm)
-  const tBase = B.profundidade - B.larguraTampo; // face de dentro do balcão
+  const tBase = PLANTA.bancada.corredor; // face do balcão virada para o bartender
   const altBalcao = ALT_20A;
   circuito([p(QUADRO.d + 0.06, 0.03, QUADRO.y - 0.25), p(QUADRO.d + 0.06, 0.03, 0.03), p(B.d, 0.03, 0.03), p(B.d, tBase - 0.03, 0.03), p(TOMADAS_FRENTE_BALCAO.at(-1)!, tBase - 0.03, 0.03)], fio4);
   for (const d of TOMADAS_FRENTE_BALCAO) {
