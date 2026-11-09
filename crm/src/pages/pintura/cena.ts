@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PLANTA, criarCamadas, type Camada } from './planta';
+import { PLANTA, alturaPiso, criarCamadas, type Camada } from './planta';
 import { criarDecorado } from './decorado';
 
 /*
@@ -456,6 +456,9 @@ export function criarCena(container: HTMLElement): Cena {
     pos.z += (Math.sin(yaw) * lat - Math.cos(yaw) * f) * v;
     pos.x = Math.max(-W / 2 + FOLGA, Math.min(W / 2 - FOLGA, pos.x));
     pos.z = Math.max(-L / 2 + FOLGA + 0.16, Math.min(L / 2 - FOLGA - 0.2, pos.z));
+    // sobe no degrau e no palco de pallets da área VIP (só existem no modo Decorado)
+    const piso = decorado.grupo.visible ? alturaPiso(L / 2 - pos.z, pos.x + W / 2) : 0;
+    pos.y += (OLHO + piso - pos.y) * 0.25;
     camera.position.copy(pos);
     camera.rotation.set(0, 0, 0, 'YXZ');
     camera.rotation.y = -yaw;
