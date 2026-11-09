@@ -20,6 +20,9 @@ export const PLANTA = {
   /** Salão de 6,20 × 2,70 m e área VIP de 2,50 m no fundo, aberta, com uma separação baixa. */
   salao: { comprimento: 6.2, largura: 2.7 },
   fundo: 2.5,
+  /** Pé-direito e a canaleta de ferro da iluminação, presa por tirantes 30 cm abaixo do teto. */
+  altura: 3.6,
+  canaleta: { altura: 3.3, largura: 0.05 },
   separacaoVip: { t0: 0, t1: 2.2, altura: 1.0 },
   /** Freezers encostados na frente, entre a parede do balcão e 0,92 m, com 0,75 m de fundura. */
   freezers: [{ t: 0, largura: 0.45 }, { t: 0.47, largura: 0.45 }],
@@ -60,7 +63,10 @@ export const LEGENDA: Record<Camada, { cor: string; nome: string; forma?: 'linha
     { cor: '#d63d8c', nome: 'Eletroduto 3/4 antichama', forma: 'linha' },
     { cor: '#6b7480', nome: 'Disjuntor trifásico 50 A (entrada 4 × 10 mm²)', forma: 'ponto' },
   ],
-  iluminacao: [{ cor: '#ffd36b', nome: 'Rede aérea de iluminação 2,5 mm em dutos', forma: 'tracejado' }],
+  iluminacao: [
+    { cor: '#3b3d40', nome: 'Canaleta de ferro no teto', forma: 'linha' },
+    { cor: '#ffd36b', nome: 'Fiação da iluminação 2,5 mm (dentro da canaleta)', forma: 'linha' },
+  ],
   hidraulica: [
     { cor: '#3aa0e8', nome: 'Ponto de água', forma: 'ponto' },
     { cor: '#8a7a6a', nome: 'Retorno da pia', forma: 'ponto' },
@@ -105,16 +111,7 @@ export function criarCamadas(p: (d: number, t: number, y?: number) => THREE.Vect
       g.add(s);
     }
   };
-  const tracejado = (g: THREE.Group, pts: THREE.Vector3[], raio: number, m: THREE.Material) => {
-    for (let i = 0; i < pts.length - 1; i++) {
-      const a = pts[i], b = pts[i + 1];
-      const len = a.distanceTo(b);
-      const dir = b.clone().sub(a).normalize();
-      for (let s = 0; s < len; s += 0.4) {
-        linha(g, [a.clone().addScaledVector(dir, s), a.clone().addScaledVector(dir, Math.min(s + 0.25, len))], raio, m);
-      }
-    }
-  };
+
   /** Eletroduto rosa com o fio da cor da bitola por dentro (fica visível pelo tubo translúcido). */
   const eletroduto = mat('#d63d8c', { transparent: true, opacity: 0.35, depthWrite: false });
   const fio4 = mat('#3d6fd6', { emissive: '#1d3f8a', emissiveIntensity: 0.4 });
@@ -224,13 +221,44 @@ export function criarCamadas(p: (d: number, t: number, y?: number) => THREE.Vect
     placa(p(d, larguraEm(d), ALT_10A), paraBalcao, 10);
   }
 
-  // ---------- Iluminação: rede aérea em dutos, sob o forro ----------
-  const ilum = mat('#ffd36b', { emissive: '#ffb020', emissiveIntensity: 0.8 });
-  const yI = 3.3;
+  // ---------- Iluminação: canaleta de ferro presa no teto, por onde passa a fiação das luzes ----------
+  // A canaleta faz parte da loja (fica sempre à mostra); a camada só acende a fiação por dentro dela.
+  const fixos = new THREE.Group();
+  const ferro = mat('#3b3d40', { metalness: 0.75, roughness: 0.45 });
+  const yI = PLANTA.canaleta.altura;
+  const lado = PLANTA.canaleta.largura;
   const I = ILUMINACAO;
-  tracejado(grupos.iluminacao, [p(I.d0, I.t0, yI), p(I.d1, I.t0, yI), p(I.d1, I.t1, yI), p(I.d0, I.t1, yI), p(I.d0, I.t0, yI)], 0.02, ilum);
-  tracejado(grupos.iluminacao, [p(QUADRO.d, 0.05, QUADRO.y + 0.25), p(QUADRO.d, 0.05, yI), p(I.d0, I.t0, yI)], 0.015, ilum);
-  etiqueta(grupos.iluminacao, 'Iluminação aérea 2,5 mm', p(I.d1 - 1.1, I.t1, yI - 0.15), 0.14, '#ffe2a0');
+  const anel = [p(I.d0, I.t0, yI), p(I.d1, I.t0, yI), p(I.d1, I.t1, yI), p(I.d0, I.t1, yI), p(I.d0, I.t0, yI)];
+  const subida = [p(QUADRO.d, lado / 2 + 0.01, QUADRO.y + 0.25), p(QUADRO.d, lado / 2 + 0.01, yI), p(I.d0, I.t0, yI)];
+  /** Perfil quadrado de ferro entre dois pontos, com as pontas sobrepostas nos cantos. */
+  const perfil = (a: THREE.Vector3, b: THREE.Vector3) => {
+    const len = a.distanceTo(b) + lado;
+    const vertical = Math.abs(a.y - b.y) > 1e-3;
+    const m = new THREE.Mesh(vertical ? new THREE.BoxGeometry(lado, len, lado) : new THREE.BoxGeometry(lado, lado, len), ferro);
+    m.position.copy(a).add(b).multiplyScalar(0.5);
+    if (!vertical) m.lookAt(new THREE.Vector3(b.x, m.position.y, b.z));
+    fixos.add(m);
+  };
+  for (const trecho of [anel, subida]) for (let i = 0; i < trecho.length - 1; i++) perfil(trecho[i], trecho[i + 1]);
+  // tirantes que prendem a canaleta no teto, a cada 1,20 m mais ou menos
+  const tirante = new THREE.CylinderGeometry(0.005, 0.005, PLANTA.altura - yI, 6);
+  for (let i = 0; i < anel.length - 1; i++) {
+    const a = anel[i], b = anel[i + 1];
+    const n = Math.max(1, Math.round(a.distanceTo(b) / 1.2));
+    for (let k = 0; k < n; k++) {
+      const q = a.clone().lerp(b, (k + 0.5) / n);
+      const t = new THREE.Mesh(tirante, ferro);
+      t.position.set(q.x, (PLANTA.altura + yI) / 2, q.z);
+      fixos.add(t);
+    }
+  }
+  // fiação da iluminação aparecendo na face de baixo da canaleta
+  const ilum = mat('#ffd36b', { emissive: '#ffb020', emissiveIntensity: 0.9 });
+  const descer = (v: THREE.Vector3) => v.clone().add(new THREE.Vector3(0, -lado / 2 - 0.004, 0));
+  linha(grupos.iluminacao, anel.map(descer), 0.008, ilum);
+  linha(grupos.iluminacao, [subida[0], subida[1]].map((v) => v.clone().add(paraSalao.clone().multiplyScalar(lado / 2 + 0.004))), 0.008, ilum);
+  linha(grupos.iluminacao, [subida[1], subida[2]].map(descer), 0.008, ilum);
+  etiqueta(grupos.iluminacao, 'Canaleta de ferro com a fiação 2,5 mm', p(I.d1 - 1.4, I.t1, yI - 0.18), 0.14, '#ffe2a0');
 
   // ---------- Hidráulica: água entrando pela frente e retorno das pias saindo pela frente ----------
   const agua = mat('#3aa0e8', { roughness: 0.3 });
@@ -261,5 +289,5 @@ export function criarCamadas(p: (d: number, t: number, y?: number) => THREE.Vect
     seta(RETORNO_T, 0.04, retorno, false);
   }
 
-  return grupos;
+  return { camadas: grupos, fixos };
 }
