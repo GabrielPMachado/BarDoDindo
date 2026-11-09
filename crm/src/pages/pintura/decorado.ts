@@ -117,12 +117,37 @@ export function criarDecorado(p: P, scene: THREE.Scene, renderer: THREE.WebGLRen
     malha(new THREE.TorusGeometry(0.2, 0.012, 6, 24), barril, p(d, t, 0.59)).rotation.x = Math.PI / 2;
     cilindro(d, t, 0.69, 0.74, 0.04, ferroPreto, 0.04, 12); // válvula extratora
   }
-  // pia: cuba de inox embutida na bancada, com torneira
-  const dPia = d1 - BC.pia.comprimento / 2, tPia = (tC + tM) / 2;
-  caixa(dPia - BC.pia.cuba[0] / 2, dPia + BC.pia.cuba[0] / 2, tPia - BC.pia.cuba[1] / 2, tPia + BC.pia.cuba[1] / 2, BC.alturaBancada - 0.005, BC.alturaBancada + 0.002, m('#5f6469', { metalness: 1, roughness: 0.3 }), false);
-  cilindro(dPia, tM - 0.06, BC.alturaBancada, BC.alturaBancada + 0.32, 0.012, inox);
-  const bica = malha(new THREE.CylinderGeometry(0.01, 0.01, 0.2, 10), inox, p(dPia, tM - 0.15, BC.alturaBancada + 0.32));
-  bica.rotation.x = Math.PI / 2;
+  // pia: cuba de lavagem e, encostada na ponta do fundo, a cuba redonda da pia de mãos
+  const tPia = (tC + tM) / 2;
+  const dPia = dCam + 0.03 + BC.pia.cuba[0] / 2;
+  const dMaos = d1 - 0.05 - BC.pia.maos / 2;
+  const fundoCuba = m('#5f6469', { metalness: 1, roughness: 0.3 });
+  caixa(dPia - BC.pia.cuba[0] / 2, dPia + BC.pia.cuba[0] / 2, tPia - BC.pia.cuba[1] / 2, tPia + BC.pia.cuba[1] / 2, BC.alturaBancada - 0.005, BC.alturaBancada + 0.002, fundoCuba, false);
+  cilindro(dMaos, tPia - 0.05, BC.alturaBancada - 0.005, BC.alturaBancada + 0.002, BC.pia.maos / 2, fundoCuba, BC.pia.maos / 2, 28);
+  for (const [dd, tt, alt] of [[dPia, tM - 0.06, 0.32], [dMaos, tM - 0.06, 0.22]] as const) {
+    cilindro(dd, tt, BC.alturaBancada, BC.alturaBancada + alt, 0.012, inox);
+    const bica = malha(new THREE.CylinderGeometry(0.01, 0.01, 0.16, 10), inox, p(dd, tt - 0.08, BC.alturaBancada + alt));
+    bica.rotation.x = Math.PI / 2;
+  }
+  // saboneteira e papel na pia de mãos
+  cilindro(dMaos + 0.06, tM - 0.04, BC.alturaBancada, BC.alturaBancada + 0.16, 0.03, m('#f1efe9', { roughness: 0.4 }), 0.03, 12);
+
+  // estação de drinks na bancada, sobre as 2 últimas portas da câmara: cuba de gelo, tábua, tapete, coqueteleiras e xaropes
+  const dDr1 = dCam - 0.04, dDr0 = dCam - BC.drinks.portas * larguraPorta + 0.02;
+  const yB = BC.alturaBancada;
+  const gelo = m('#f2f9ff', { roughness: 0.25, emissive: new THREE.Color('#dfefff'), emissiveIntensity: 0.15 });
+  caixa(dDr1 - 0.55, dDr1 - 0.05, tC + 0.08, tC + 0.38, yB - 0.004, yB + 0.012, inox, false); // borda da cuba de gelo
+  caixa(dDr1 - 0.53, dDr1 - 0.07, tC + 0.1, tC + 0.36, yB - 0.004, yB + 0.008, gelo, false);
+  caixa(dDr0 + 0.05, dDr0 + 0.45, tC + 0.1, tC + 0.35, yB, yB + 0.02, carvalho); // tábua
+  caixa(dDr0 + 0.55, dDr0 + 1.0, tC + 0.06, tC + 0.36, yB, yB + 0.008, borracha, false); // tapete de bar
+  cilindro(dDr0 + 0.65, tC + 0.2, yB + 0.008, yB + 0.2, 0.045, inox, 0.04, 16); // coqueteleira
+  cilindro(dDr0 + 0.78, tC + 0.22, yB + 0.008, yB + 0.17, 0.042, inox, 0.036, 16);
+  cilindro(dDr0 + 0.9, tC + 0.18, yB + 0.008, yB + 0.06, 0.02, inox, 0.025, 10); // dosador
+  for (let k = 0; k < 5; k++) {
+    const d = dDr0 + 0.1 + k * 0.1, mt = vidrosCor[(k + 2) % vidrosCor.length];
+    cilindro(d, tM - 0.08, yB, yB + 0.22, 0.03, mt, 0.03, 12);
+    cilindro(d, tM - 0.08, yB + 0.22, yB + 0.3, 0.01, mt, 0.02, 10);
+  }
 
   // mureta de 0,14 até 1,06 (chapa cimentícia) com ripado de 4 × 2 cm, vão de 2 cm, na frente
   caixa(d0, d1, tM, tF, 0, BC.alturaMureta, cimenticia);
@@ -493,6 +518,8 @@ export function criarDecorado(p: P, scene: THREE.Scene, renderer: THREE.WebGLRen
     cota(p(d1 + 0.12, tC - 0.05, 0), p(d1 + 0.12, tC - 0.05, BC.alturaBancada), `Bancada ${fm(BC.alturaBancada)}`, 0.1);
     cota(p(dT0, tTrave, B.alturaTampo + tr.altura + 0.08), p(dT1, tTrave, B.alturaTampo + tr.altura + 0.08), `Trave ${fm(tr.comprimento)} · 10 torneiras`, 0.1);
     cota(p(dCam, tC - 0.12, 0.05), p(d1, tC - 0.12, 0.05), `Pia ${fm(BC.pia.comprimento)}`, 0.1);
+    rotulo(`Pia de mãos Ø ${fm(BC.pia.maos)}`, p(dMaos, tPia, BC.alturaBancada + 0.35), 0.1);
+    cota(p(dDr0, tC - 0.05, BC.alturaBancada + 0.03), p(dDr1, tC - 0.05, BC.alturaBancada + 0.03), `Estação de drinks ${fm(dDr1 - dDr0)}`, 0.1);
     cota(p(d0, tC - 0.12, 0.05), p(dCam, tC - 0.12, 0.05), `Câmara fria ${fm(BC.camara.comprimento)} · 10 barris`, 0.1);
     // caixa e portinha
     cota(p(dCx0, tF + 0.1, y), p(d0, tF + 0.1, y), `Caixa ${fm(CX.fundura)}`, 0.1);

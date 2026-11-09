@@ -190,14 +190,41 @@ export function criarCena(container: HTMLElement): Cena {
     const c = p(pl.d + pl.cd / 2, pl.t + pl.ct / 2, H / 2);
     add(new THREE.BoxGeometry(pl.ct, H, pl.cd), pl.d > L / 2 ? mat.fundo : mat.frente, [c.x, c.y, c.z]);
   }
-  // freezers verticais encostados na frente, do lado do balcão
+  // freezers verticais na entrada, como vitrine de bebidas: porta de vidro, luz por dentro e garrafas à mostra
   const branco = new THREE.MeshStandardMaterial({ color: '#e9e7e2', roughness: 0.35, metalness: 0.2 });
-  const portaFreezer = new THREE.MeshStandardMaterial({ color: '#2a2f33', roughness: 0.15, metalness: 0.5 });
+  const luzFreezer = new THREE.MeshStandardMaterial({ color: '#eef6ff', emissive: '#dcecff', emissiveIntensity: 0.8 });
+  const prateleira = new THREE.MeshStandardMaterial({ color: '#cfd8df', roughness: 0.2, metalness: 0.6 });
+  const vidroFreezer = new THREE.MeshStandardMaterial({ color: '#d6ecff', roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.18, depthWrite: false });
+  const ledFreezer = new THREE.MeshStandardMaterial({ color: '#9fd4ff', emissive: '#5fb6ff', emissiveIntensity: 1.6 });
+  const garrafasFreezer = ['#6b3a12', '#2f6b2a', '#b8761a', '#7a8a2a'].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.15, metalness: 0.1, emissive: c, emissiveIntensity: 0.12 }));
+  const garrafaGeo = new THREE.CylinderGeometry(0.028, 0.028, 0.16, 12);
+  const gargaloGeo = new THREE.CylinderGeometry(0.01, 0.022, 0.07, 10);
+  const FF = PLANTA.freezerFundura, FA = PLANTA.freezerAltura;
+  const fundoFz = 0.45; // até onde vai o corpo; o resto é a parte de dentro, iluminada
   for (const fz of PLANTA.freezers) {
-    const c = p(PLANTA.freezerFundura / 2 + 0.02, fz.t + fz.largura / 2 + 0.02, PLANTA.freezerAltura / 2);
-    add(new THREE.BoxGeometry(fz.largura, PLANTA.freezerAltura, PLANTA.freezerFundura), branco, [c.x, c.y, c.z]);
-    const v = p(PLANTA.freezerFundura + 0.025, fz.t + fz.largura / 2 + 0.02, PLANTA.freezerAltura / 2 + 0.08);
-    add(new THREE.BoxGeometry(fz.largura - 0.08, PLANTA.freezerAltura - 0.4, 0.015), portaFreezer, [v.x, v.y, v.z]);
+    const tc = fz.t + fz.largura / 2 + 0.02, w = fz.largura;
+    const em = (d: number, y: number) => { const v = p(d, tc, y); return [v.x, v.y, v.z] as [number, number, number]; };
+    add(new THREE.BoxGeometry(w, FA, fundoFz), branco, em(0.02 + fundoFz / 2, FA / 2));
+    const dDentro = FF + 0.02 - (0.02 + fundoFz); // fundura da parte iluminada
+    const dMeio = 0.02 + fundoFz + dDentro / 2;
+    for (const lado of [-1, 1]) { const v = p(dMeio, tc + lado * (w / 2 - 0.01), FA / 2); add(new THREE.BoxGeometry(0.02, FA, dDentro), branco, [v.x, v.y, v.z]); }
+    add(new THREE.BoxGeometry(w, 0.12, dDentro), branco, em(dMeio, 0.06)); // base
+    add(new THREE.BoxGeometry(w, 0.2, dDentro), branco, em(dMeio, FA - 0.1)); // topo
+    add(new THREE.BoxGeometry(w - 0.06, 0.03, 0.005), ledFreezer, em(FF + 0.02, FA - 0.1)); // faixa de luz azul no topo
+    add(new THREE.BoxGeometry(w - 0.04, FA - 0.32, 0.005), luzFreezer, em(0.02 + fundoFz + 0.003, 0.12 + (FA - 0.32) / 2));
+    for (const y of [0.12, 0.47, 0.82, 1.17]) {
+      if (y > 0.12) add(new THREE.BoxGeometry(w - 0.04, 0.01, dDentro), prateleira, em(dMeio, y));
+      for (let k = 0; k < 5; k++) {
+        const t = tc - w / 2 + 0.07 + k * ((w - 0.14) / 4);
+        const mt = garrafasFreezer[(k + Math.round(y * 10)) % garrafasFreezer.length];
+        const g1 = p(dMeio, t, y + 0.085), g2 = p(dMeio, t, y + 0.2);
+        add(garrafaGeo, mt, [g1.x, g1.y, g1.z]);
+        add(gargaloGeo, mt, [g2.x, g2.y, g2.z]);
+      }
+    }
+    add(new THREE.BoxGeometry(w - 0.02, FA - 0.32, 0.008), vidroFreezer, em(FF + 0.02, 0.12 + (FA - 0.32) / 2)); // porta de vidro
+    const pux = p(FF + 0.04, tc + w / 2 - 0.05, 0.9);
+    add(new THREE.BoxGeometry(0.015, 0.45, 0.02), prateleira, [pux.x, pux.y, pux.z]); // puxador
   }
   // separação baixa da área VIP (aberta), em ripas
   const sv = PLANTA.separacaoVip;
