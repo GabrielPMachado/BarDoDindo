@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { PLANTA, criarCamadas, type Camada } from './planta';
+import { criarDecorado } from './decorado';
 
 /*
  * A loja vazia em 3D. As medidas vêm da planta baixa à mão (8,70 m × 4,46 m na frente e 4,36 m no fundo),
@@ -121,6 +122,8 @@ export interface Cena {
   olharPara: (lado: 'fundo' | 'frente') => void;
   /** Movimento contínuo do joystick: x = lateral, y = frente/trás, de -1 a 1. */
   mover: (x: number, y: number) => void;
+  /** Modo Decorado: móveis, luminárias, sombras e reflexos. */
+  decorar: (ligado: boolean) => void;
   /** Liga ou desliga uma camada da planta. */
   camada: (id: Camada, visivel: boolean) => void;
   /** 'cima' mostra a planta vista de cima (sem forro); 'dentro' volta a andar pela loja. */
@@ -258,9 +261,12 @@ export function criarCena(container: HTMLElement): Cena {
   const B = PLANTA.balcao;
   const madeira = new THREE.MeshStandardMaterial({ color: '#5a3a26', roughness: 0.7, transparent: true });
   const tampo = new THREE.MeshStandardMaterial({ color: '#2b2622', roughness: 0.35, transparent: true });
-  const cb = p(B.d + B.comprimento / 2, B.profundidade - B.larguraTampo / 2, 0);
-  const corpo = add(new THREE.BoxGeometry(B.larguraTampo - 0.08, B.alturaTampo - 0.05, B.comprimento), madeira, [cb.x, (B.alturaTampo - 0.05) / 2, cb.z]);
-  const pedra = add(new THREE.BoxGeometry(B.larguraTampo, 0.05, B.comprimento + 0.04), tampo, [cb.x, B.alturaTampo - 0.025, cb.z]);
+  // volume simples do projeto da bancada: corpo + mureta (0,92 a 1,66 da parede) e o tampo de granito
+  const BC = PLANTA.bancada;
+  const cb = p(B.d + B.comprimento / 2, (BC.corredor + B.profundidade) / 2, 0);
+  const corpo = add(new THREE.BoxGeometry(B.profundidade - BC.corredor, BC.alturaMureta, B.comprimento), madeira, [cb.x, BC.alturaMureta / 2, cb.z]);
+  const ct = p(B.d + B.comprimento / 2, B.profundidade + BC.balanco - B.larguraTampo / 2, 0);
+  const pedra = add(new THREE.BoxGeometry(B.larguraTampo, B.alturaTampo - BC.alturaMureta, B.comprimento + 0.06), tampo, [ct.x, (B.alturaTampo + BC.alturaMureta) / 2, ct.z]);
 
   // camadas da planta (começam desligadas, menos áreas e balcão)
   const { camadas, fixos } = criarCamadas(p);
@@ -274,20 +280,29 @@ export function criarCena(container: HTMLElement): Cena {
     const infra = camadas.eletrica.visible || camadas.hidraulica.visible;
     madeira.opacity = tampo.opacity = infra ? 0.35 : 1;
     madeira.depthWrite = tampo.depthWrite = !infra;
-    corpo.visible = pedra.visible = camadas.areas.visible || infra;
+    // no Decorado o balcão detalhado do projeto toma o lugar deste volume simples
+    corpo.visible = pedra.visible = infra || (camadas.areas.visible && !decorando);
+    // as cadeiras e sofás atrapalham ver as instalações: somem enquanto elas estão ligadas
+    decorado.grupo.visible = decorando && !infra;
   };
 
   // luz: ambiente suave, claridade da rua entrando pela frente e luminárias no forro
-  scene.add(new THREE.HemisphereLight('#ffffff', '#7a7a7a', 2.1));
+  const hemi = new THREE.HemisphereLight('#ffffff', '#7a7a7a', 2.1);
+  scene.add(hemi);
+  const luzesBase: THREE.Light[] = [hemi];
   const rua = new THREE.DirectionalLight('#fff3e0', 1.4);
   rua.position.set(-1, 3, L);
   rua.target.position.set(0, 0, -2);
   scene.add(rua, rua.target);
+  luzesBase.push(rua);
   for (const z of [-2.8, 0, 2.8]) {
     const l = new THREE.PointLight('#fff6ec', 4, 10, 1.4);
     l.position.set(0, H - 0.9, z);
     scene.add(l);
+    luzesBase.push(l);
   }
+  const decorado = criarDecorado(p, scene, renderer, luzesBase);
+  let decorando = false;
 
   // câmera em primeira pessoa
   const pos = new THREE.Vector3(0, OLHO, L / 2 - 1.2);
@@ -295,6 +310,7 @@ export function criarCena(container: HTMLElement): Cena {
   let pitch = 0;
   // vista de cima: câmera alta olhando para baixo, frente à esquerda e balcão no alto, como no papel
   let deCima = false;
+  let ambienteGuardado: THREE.Texture | null = null;
   // câmera ortográfica: a vista de cima fica igual a uma planta, sem perspectiva
   const planta = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 40);
   /** Tela em pé (celular): a planta gira para o comprimento ficar na vertical, com a frente no alto. */
@@ -304,6 +320,14 @@ export function criarCena(container: HTMLElement): Cena {
   const vista = (v: 'cima' | 'dentro') => {
     deCima = v === 'cima';
     for (const o of doForro) o.visible = !deCima;
+    // de cima, os reflexos do ambiente deixam granito e inox brancos: some enquanto olha a planta
+    if (deCima && scene.environment) {
+      ambienteGuardado = scene.environment;
+      scene.environment = null;
+    } else if (!deCima && ambienteGuardado) {
+      scene.environment = ambienteGuardado;
+      ambienteGuardado = null;
+    }
     sanca.visible = !deCima;
     if (deCima) {
       alvoCima.set(0, 0, 0);
@@ -458,9 +482,20 @@ export function criarCena(container: HTMLElement): Cena {
     olharPara,
     camada: (id, visivel) => {
       camadas[id].visible = visivel;
+      if (id === 'medidas') decorado.medidas.visible = visivel;
+      if (id === 'pessoas') decorado.pessoas.visible = visivel;
       ajustarBalcao();
     },
     vista,
+    decorar: (ligado) => {
+      decorando = ligado;
+      decorado.ligar(ligado);
+      if (deCima) {
+        ambienteGuardado = scene.environment;
+        scene.environment = null;
+      }
+      ajustarBalcao();
+    },
     mover: (x, y) => {
       joy.x = x;
       joy.y = y;
@@ -472,6 +507,7 @@ export function criarCena(container: HTMLElement): Cena {
       window.removeEventListener('keyup', onKey);
       window.removeEventListener('blur', soltarTudo);
       el.removeEventListener('wheel', roda);
+      decorado.destruir();
       scene.traverse((o) => {
         if (o instanceof THREE.Mesh) o.geometry.dispose();
       });
