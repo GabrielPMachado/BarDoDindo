@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { PLANTA } from './planta';
 import { criarCotas, m as fm } from './cotas';
 
@@ -281,6 +282,47 @@ export function criarDecorado(p: P, scene: THREE.Scene, renderer: THREE.WebGLRen
     caixa(d - 0.2, d - 0.05, t - 0.1, t + 0.1, SAL.alturaMesa, SAL.alturaMesa + 0.005, couro, false);
   }
 
+  // ---------- palco da área VIP: 2 andares de pallets e degrau de 1 pallet na entrada ----------
+  const PC = PLANTA.palco, PL = PC.pallet;
+  const hVip = PC.andares * PL.altura;
+  const dPalco = L - PLANTA.fundo + PC.folga;
+  {
+    const pecas: THREE.BufferGeometry[] = [];
+    const tabua = (d0: number, d1: number, t0: number, t1: number, y0: number, y1: number) => {
+      const a = p(d0, t0, y0), b = p(d1, t1, y1);
+      const geo = new THREE.BoxGeometry(Math.abs(b.x - a.x), y1 - y0, Math.abs(b.z - a.z));
+      geo.translate((a.x + b.x) / 2, (y0 + y1) / 2, (a.z + b.z) / 2);
+      pecas.push(geo);
+    };
+    // pallet PBR: 3 tábuas de baixo, 9 blocos, 3 travessas e 7 tábuas de cima (as de cima no sentido do comprimento)
+    const pallet = (d0: number, t0: number, cd: number, ct: number, y: number) => {
+      const e = 0.022, bl = 0.1;
+      const ys = [y, y + e, y + PL.altura - 2 * e, y + PL.altura - e, y + PL.altura];
+      const linhas = [d0 + bl / 2, d0 + cd / 2, d0 + cd - bl / 2];
+      const colunas = [t0 + bl / 2, t0 + ct / 2, t0 + ct - bl / 2];
+      for (const c of colunas) tabua(d0, d0 + cd, c - bl / 2, c + bl / 2, ys[0], ys[1]);
+      for (const l of linhas) for (const c of colunas) tabua(l - bl / 2, l + bl / 2, c - bl / 2, c + bl / 2, ys[1], ys[2]);
+      for (const l of linhas) tabua(l - bl / 2, l + bl / 2, t0, t0 + ct, ys[2], ys[3]);
+      const n = Math.max(3, Math.round((ct / PL.t) * 7));
+      for (let k = 0; k < n; k++) {
+        const c = t0 + bl / 2 + (k * (ct - bl)) / (n - 1);
+        tabua(d0, d0 + cd, c - bl / 2 + 0.005, c + bl / 2 - 0.005, ys[3], ys[4]);
+      }
+    };
+    const tFim = PLANTA.larguraFundo;
+    for (let andar = 0; andar < PC.andares; andar++) {
+      for (let d = dPalco; d < L - 0.01; d += PL.d) {
+        for (let t = 0; t < tFim - 0.01; t += PL.t) pallet(d, t, Math.min(PL.d, L - d), Math.min(PL.t, tFim - t), andar * PL.altura);
+      }
+    }
+    pallet(dPalco - PL.d, PC.degrau.t0, PL.d, PL.t, 0); // degrau
+    const madeiraPallet = m('#c39a63', { roughness: 0.85 });
+    const geo = mergeGeometries(pecas);
+    pecas.forEach((x) => x.dispose());
+    malha(geo, madeiraPallet, new THREE.Vector3());
+  }
+
+  const nVip0 = g.children.length;
   // ---------- área VIP: sofá de 3 lugares de frente para a TV, mesa de centro, tapete ----------
   // medidas do sofá escolhido: 1,80 × 0,81 × 0,78; assento a 0,44 (1,20 × 0,52, espuma 0,13),
   // braços a 0,68, encosto 0,35 de altura e 0,20 de espessura, pés de madeira de 0,10
@@ -318,6 +360,9 @@ export function criarDecorado(p: P, scene: THREE.Scene, renderer: THREE.WebGLRen
   for (const [dd, tt, yy, r] of [[0, 0, 0.75, 0.28], [0.1, 0.08, 1.0, 0.22], [-0.08, -0.05, 1.15, 0.18]]) {
     malha(new THREE.IcosahedronGeometry(r, 1), folha, p(dV1 - 0.25 + dd, 0.3 + tt, yy));
   }
+  // tudo o que é da área VIP fica em cima do palco
+  for (const o of g.children.slice(nVip0)) o.position.y += hVip;
+
   // planta perto da porta
   cilindro(0.95, PLANTA.larguraFrente - 0.3, 0, 0.5, 0.14, vaso, 0.17, 24);
   malha(new THREE.IcosahedronGeometry(0.25, 1), folha, p(0.95, PLANTA.larguraFrente - 0.3, 0.8));
@@ -356,11 +401,11 @@ export function criarDecorado(p: P, scene: THREE.Scene, renderer: THREE.WebGLRen
   // pendente sobre a mesa de centro da área VIP
   {
     const d = dMc, t = tVip;
-    cilindro(d, t, 1.75, H, 0.004, ferroPreto, 0.004, 6);
-    malha(new THREE.SphereGeometry(0.2, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2), latao, p(d, t, 1.72), false).rotation.x = Math.PI;
-    malha(new THREE.SphereGeometry(0.05, 12, 8), lampada, p(d, t, 1.62), false);
+    cilindro(d, t, 1.75 + hVip, H, 0.004, ferroPreto, 0.004, 6);
+    malha(new THREE.SphereGeometry(0.2, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2), latao, p(d, t, 1.72 + hVip), false).rotation.x = Math.PI;
+    malha(new THREE.SphereGeometry(0.05, 12, 8), lampada, p(d, t, 1.62 + hVip), false);
     const l = new THREE.PointLight(LUZ_QUENTE, 2.5, 4, 1.8);
-    l.position.copy(p(d, t, 1.55));
+    l.position.copy(p(d, t, 1.55 + hVip));
     g.add(l);
   }
 
@@ -426,7 +471,7 @@ export function criarDecorado(p: P, scene: THREE.Scene, renderer: THREE.WebGLRen
   pessoa(d0 + 1.6, tC / 2); // bartender no corredor
   pessoa(2.5, (tF + 0.65 + tMesa0) / 2); // cliente na passagem
   pessoa(d0 - 0.3, 0.42, true, 0.75); // atendente do caixa sentado
-  pessoa(dEnc + 0.2, tVip - 0.3, true, 0.02); // cliente no sofá da área VIP, de frente para a TV
+  pessoa(dEnc + 0.2, tVip - 0.3, true, 0.02 + hVip); // cliente no sofá da área VIP, de frente para a TV
   pessoa(0.6, PLANTA.porta.t + 0.45); // chegando pela porta
 
   // ---------- medidas (camada "Medidas") ----------
@@ -476,10 +521,13 @@ export function criarDecorado(p: P, scene: THREE.Scene, renderer: THREE.WebGLRen
     cota(p(0.05, PLANTA.porta.t, y), p(0.05, PLANTA.porta.t + PLANTA.porta.largura, y), `Porta ${fm(PLANTA.porta.largura)}`, 0.1);
     cota(p(0, (tCx0 + tT) / 2, y), p(d0 - CX.tampoD, (tCx0 + tT) / 2, y), `Porta até o caixa ${fm(d0 - CX.tampoD)}`, 0.1);
     // área VIP
-    cota(p(dV0 - 0.03, tS0, SOFA.altura + 0.05), p(dV0 - 0.03, tS1, SOFA.altura + 0.05), `Sofá ${fm(SOFA.largura)} × ${fm(SOFA.fundura)}`, 0.1);
-    cota(p(dSf + 0.03, tS1 + 0.05, 0), p(dSf + 0.03, tS1 + 0.05, SOFA.assento), `Assento ${fm(SOFA.assento)}`, 0.1);
-    cota(p(dSf, tVip - 0.6, y), p(L, tVip - 0.6, y), `Sofá até a TV ${fm(L - dSf)}`, 0.1);
-    cota(p(MC.d0, tVip + MC.largura / 2 + 0.05, 0.47), p(MC.d0 + MC.fundura, tVip + MC.largura / 2 + 0.05, 0.47), `Mesa de centro ${fm(MC.largura)} × ${fm(MC.fundura)}`, 0.1);
+    cota(p(dV0 - 0.03, tS0, hVip + SOFA.altura + 0.05), p(dV0 - 0.03, tS1, hVip + SOFA.altura + 0.05), `Sofá ${fm(SOFA.largura)} × ${fm(SOFA.fundura)}`, 0.1);
+    cota(p(dSf + 0.03, tS1 + 0.05, hVip), p(dSf + 0.03, tS1 + 0.05, hVip + SOFA.assento), `Assento ${fm(SOFA.assento)}`, 0.1);
+    cota(p(dSf, tVip - 0.6, hVip + y), p(L, tVip - 0.6, hVip + y), `Sofá até a TV ${fm(L - dSf)}`, 0.1);
+    cota(p(MC.d0, tVip + MC.largura / 2 + 0.05, hVip + 0.47), p(MC.d0 + MC.fundura, tVip + MC.largura / 2 + 0.05, hVip + 0.47), `Mesa de centro ${fm(MC.largura)} × ${fm(MC.fundura)}`, 0.1);
+    cota(p(dPalco + 0.05, 2.25, 0), p(dPalco + 0.05, 2.25, hVip), `Palco ${fm(hVip)} · 2 pallets`, 0.1);
+    cota(p(dPalco - PL.d - 0.03, PC.degrau.t0 + PL.t, 0), p(dPalco - PL.d - 0.03, PC.degrau.t0 + PL.t, PL.altura), `Degrau ${fm(PL.altura)}`, 0.1);
+    cota(p(dPalco - PL.d, PC.degrau.t0 - 0.04, PL.altura + 0.02), p(dPalco, PC.degrau.t0 - 0.04, PL.altura + 0.02), `Pallet ${fm(PL.d)} × ${fm(PL.t)}`, 0.1);
     cota(p(L - 0.1, TV.t - TV.largura / 2, TV.topo + 0.08), p(L - 0.1, TV.t + TV.largura / 2, TV.topo + 0.08), `TV ${fm(TV.largura)} × ${fm(TV.altura)}`, 0.1);
     cota(p(L - 0.1, TV.t + TV.largura / 2 + 0.08, 0), p(L - 0.1, TV.t + TV.largura / 2 + 0.08, TV.topo - TV.altura), `Base da TV a ${fm(TV.topo - TV.altura)}`, 0.1);
     cota(p(d0 + 1.6 + 0.3, tC / 2, 0), p(d0 + 1.6 + 0.3, tC / 2, 1.75), 'Pessoa 1,75', 0.1);
