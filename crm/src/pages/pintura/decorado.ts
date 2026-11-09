@@ -64,7 +64,6 @@ export function criarDecorado(p: P, scene: THREE.Scene, renderer: THREE.WebGLRen
   const inox = m('#c8ccd0', { metalness: 1, roughness: 0.18 });
   const granito = m('#1f1d1c', { roughness: 0.18, clearcoat: 0.8, clearcoatRoughness: 0.1 });
   const couro = m('#5c2a22', { roughness: 0.45, sheen: 0.6, sheenColor: new THREE.Color('#a0574a') });
-  const veludo = m('#23443a', { roughness: 0.85, sheen: 1, sheenColor: new THREE.Color('#5f9a84') });
   const tapete = m('#7a3b2a', { roughness: 1 });
   const folha = m('#2f6b3a', { roughness: 0.8 });
   const vaso = m('#b8a48a', { roughness: 0.9 });
@@ -282,23 +281,38 @@ export function criarDecorado(p: P, scene: THREE.Scene, renderer: THREE.WebGLRen
     caixa(d - 0.2, d - 0.05, t - 0.1, t + 0.1, SAL.alturaMesa, SAL.alturaMesa + 0.005, couro, false);
   }
 
-  // ---------- área VIP: sofás em L, mesa de centro, tapete e planta ----------
-  const dV0 = L - PLANTA.fundo + 0.35, dV1 = L - 0.18;
-  const tV0 = 1.6, tV1 = PLANTA.larguraFundo - 0.05;
-  caixa(dV0 + 0.2, dV1 - 0.1, tV0 + 0.1, tV1 - 0.95, 0, 0.012, tapete, false);
-  // sofá encostado no fundo
-  caixa(dV1 - 0.75, dV1, tV0, tV1 - 0.15, 0, 0.42, couro);
-  caixa(dV1 - 0.2, dV1, tV0, tV1 - 0.15, 0.42, 0.85, couro);
-  // sofá na lateral
-  caixa(dV0, dV1 - 0.75, tV1 - 0.8, tV1, 0, 0.42, couro);
-  caixa(dV0, dV1, tV1 - 0.2, tV1, 0.42, 0.85, couro);
-  for (const t of [tV0 + 0.35, tV0 + 0.95]) caixa(dV1 - 0.32, dV1 - 0.2, t - 0.2, t + 0.2, 0.42, 0.78, veludo); // almofadas
+  // ---------- área VIP: sofá de 3 lugares de frente para a TV, mesa de centro, tapete ----------
+  // medidas do sofá escolhido: 1,80 × 0,81 × 0,78; assento a 0,44 (1,20 × 0,52, espuma 0,13),
+  // braços a 0,68, encosto 0,35 de altura e 0,20 de espessura, pés de madeira de 0,10
+  const SOFA = { largura: 1.8, fundura: 0.81, altura: 0.78, assento: 0.44, braco: 0.68, larguraAssento: 1.2, funduraAssento: 0.52, espuma: 0.13, encosto: 0.2, pe: 0.1 };
+  const dV1 = L - 0.18;
+  const tVip = PLANTA.larguraFundo / 2; // alinhado com a TV
+  const dV0 = L - PLANTA.fundo + 0.25; // costas do sofá
+  const dSf = dV0 + SOFA.fundura; // frente do sofá
+  const tS0 = tVip - SOFA.largura / 2, tS1 = tVip + SOFA.largura / 2;
+  const bracoL = (SOFA.largura - SOFA.larguraAssento) / 2;
+  const tecido = m('#e8e3d9', { roughness: 0.55, sheen: 0.4, sheenColor: new THREE.Color('#ffffff') });
+  const teca = m('#a5582b', { roughness: 0.45, clearcoat: 0.3 });
+  const MC = { d0: dSf + 0.4, fundura: 0.45, largura: 0.9 }; // mesa de centro
+  caixa(dV0 + 0.45, MC.d0 + MC.fundura + 0.35, tVip - 1.0, tVip + 1.0, 0, 0.012, tapete, false);
+  for (const [dd, tt] of [[dV0 + 0.06, tS0 + 0.06], [dV0 + 0.06, tS1 - 0.06], [dSf - 0.06, tS0 + 0.06], [dSf - 0.06, tS1 - 0.06]]) cilindro(dd, tt, 0, SOFA.pe, 0.018, teca, 0.026, 10);
+  caixa(dV0, dSf, tS0, tS1, SOFA.pe, SOFA.pe + 0.04, teca);
+  caixa(dV0 + 0.01, dSf - 0.01, tS0 + 0.01, tS1 - 0.01, SOFA.pe + 0.04, SOFA.assento - SOFA.espuma, tecido);
+  for (const [t0, t1] of [[tS0, tS0 + bracoL], [tS1 - bracoL, tS1]]) caixa(dV0, dSf, t0, t1, SOFA.pe + 0.04, SOFA.braco, tecido);
+  const dEnc = dSf - SOFA.funduraAssento; // onde começa o assento
+  caixa(dV0, dEnc - SOFA.encosto, tS0 + bracoL, tS1 - bracoL, SOFA.pe + 0.04, SOFA.braco, tecido);
+  for (const k of [0, 1]) {
+    const t0 = tS0 + bracoL + k * (SOFA.larguraAssento / 2) + 0.005, t1 = t0 + SOFA.larguraAssento / 2 - 0.01;
+    caixa(dEnc, dSf - 0.005, t0, t1, SOFA.assento - SOFA.espuma, SOFA.assento, tecido); // almofada do assento
+    caixa(dEnc - SOFA.encosto, dEnc - 0.01, t0, t1, SOFA.assento, SOFA.altura, tecido); // almofada do encosto
+  }
   // mesa de centro com tampo de granito
-  caixa(dV0 + 0.45, dV1 - 0.95, tV0 + 0.35, tV1 - 1.15, 0.4, 0.44, granito);
-  caixa(dV0 + 0.55, dV1 - 1.05, tV0 + 0.45, tV1 - 1.25, 0, 0.4, ferroPreto);
+  caixa(MC.d0, MC.d0 + MC.fundura, tVip - MC.largura / 2, tVip + MC.largura / 2, 0.4, 0.44, granito);
+  caixa(MC.d0 + 0.06, MC.d0 + MC.fundura - 0.06, tVip - MC.largura / 2 + 0.06, tVip + MC.largura / 2 - 0.06, 0, 0.4, ferroPreto);
   // balde de gelo com espumante
-  cilindro((dV0 + dV1 - 0.5) / 2, (tV0 + tV1 - 0.8) / 2, 0.44, 0.64, 0.09, inox, 0.11, 24);
-  cilindro((dV0 + dV1 - 0.5) / 2, (tV0 + tV1 - 0.8) / 2, 0.6, 0.78, 0.035, vidros[1], 0.035, 14);
+  const dMc = MC.d0 + MC.fundura / 2;
+  cilindro(dMc, tVip + 0.2, 0.44, 0.64, 0.09, inox, 0.11, 24);
+  cilindro(dMc, tVip + 0.2, 0.6, 0.78, 0.035, vidros[1], 0.035, 14);
   // planta no canto
   cilindro(dV1 - 0.25, 0.3, 0, 0.45, 0.16, vaso, 0.2, 24);
   for (const [dd, tt, yy, r] of [[0, 0, 0.75, 0.28], [0.1, 0.08, 1.0, 0.22], [-0.08, -0.05, 1.15, 0.18]]) {
@@ -341,7 +355,7 @@ export function criarDecorado(p: P, scene: THREE.Scene, renderer: THREE.WebGLRen
   }
   // pendente sobre a mesa de centro da área VIP
   {
-    const d = (dV0 + dV1 - 0.5) / 2, t = (tV0 + tV1 - 0.8) / 2;
+    const d = dMc, t = tVip;
     cilindro(d, t, 1.75, H, 0.004, ferroPreto, 0.004, 6);
     malha(new THREE.SphereGeometry(0.2, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2), latao, p(d, t, 1.72), false).rotation.x = Math.PI;
     malha(new THREE.SphereGeometry(0.05, 12, 8), lampada, p(d, t, 1.62), false);
@@ -412,7 +426,7 @@ export function criarDecorado(p: P, scene: THREE.Scene, renderer: THREE.WebGLRen
   pessoa(d0 + 1.6, tC / 2); // bartender no corredor
   pessoa(2.5, (tF + 0.65 + tMesa0) / 2); // cliente na passagem
   pessoa(d0 - 0.3, 0.42, true, 0.75); // atendente do caixa sentado
-  pessoa(dV0 + 0.4, tV1 - 0.4, true, 0); // cliente no sofá da área VIP
+  pessoa(dEnc + 0.2, tVip - 0.3, true, 0.02); // cliente no sofá da área VIP, de frente para a TV
   pessoa(0.6, PLANTA.porta.t + 0.45); // chegando pela porta
 
   // ---------- medidas (camada "Medidas") ----------
@@ -462,9 +476,10 @@ export function criarDecorado(p: P, scene: THREE.Scene, renderer: THREE.WebGLRen
     cota(p(0.05, PLANTA.porta.t, y), p(0.05, PLANTA.porta.t + PLANTA.porta.largura, y), `Porta ${fm(PLANTA.porta.largura)}`, 0.1);
     cota(p(0, (tCx0 + tT) / 2, y), p(d0 - CX.tampoD, (tCx0 + tT) / 2, y), `Porta até o caixa ${fm(d0 - CX.tampoD)}`, 0.1);
     // área VIP
-    cota(p(dV0, tV1 + 0.03, 0.9), p(dV1, tV1 + 0.03, 0.9), `Sofá ${fm(dV1 - dV0)}`, 0.1);
-    cota(p(dV1 + 0.03, tV0, 0.9), p(dV1 + 0.03, tV1 - 0.15, 0.9), `Sofá ${fm(tV1 - 0.15 - tV0)}`, 0.1);
-    cota(p(dV0 + 0.45, tV0 + 0.35, 0.47), p(dV1 - 0.95, tV0 + 0.35, 0.47), `Mesa de centro ${fm(dV1 - 0.95 - dV0 - 0.45)} × ${fm(tV1 - 1.15 - tV0 - 0.35)}`, 0.1);
+    cota(p(dV0 - 0.03, tS0, SOFA.altura + 0.05), p(dV0 - 0.03, tS1, SOFA.altura + 0.05), `Sofá ${fm(SOFA.largura)} × ${fm(SOFA.fundura)}`, 0.1);
+    cota(p(dSf + 0.03, tS1 + 0.05, 0), p(dSf + 0.03, tS1 + 0.05, SOFA.assento), `Assento ${fm(SOFA.assento)}`, 0.1);
+    cota(p(dSf, tVip - 0.6, y), p(L, tVip - 0.6, y), `Sofá até a TV ${fm(L - dSf)}`, 0.1);
+    cota(p(MC.d0, tVip + MC.largura / 2 + 0.05, 0.47), p(MC.d0 + MC.fundura, tVip + MC.largura / 2 + 0.05, 0.47), `Mesa de centro ${fm(MC.largura)} × ${fm(MC.fundura)}`, 0.1);
     cota(p(L - 0.1, TV.t - TV.largura / 2, TV.topo + 0.08), p(L - 0.1, TV.t + TV.largura / 2, TV.topo + 0.08), `TV ${fm(TV.largura)} × ${fm(TV.altura)}`, 0.1);
     cota(p(L - 0.1, TV.t + TV.largura / 2 + 0.08, 0), p(L - 0.1, TV.t + TV.largura / 2 + 0.08, TV.topo - TV.altura), `Base da TV a ${fm(TV.topo - TV.altura)}`, 0.1);
     cota(p(d0 + 1.6 + 0.3, tC / 2, 0), p(d0 + 1.6 + 0.3, tC / 2, 1.75), 'Pessoa 1,75', 0.1);
