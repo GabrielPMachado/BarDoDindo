@@ -12,7 +12,7 @@ import { PLANTA, criarCamadas, type Camada } from './planta';
 export const LARGURA = PLANTA.larguraFrente;
 export const COMPRIMENTO = PLANTA.comprimento;
 const LARGURA_FUNDO = PLANTA.larguraFundo;
-export const ALTURA = 3.6;
+export const ALTURA = PLANTA.altura;
 const OLHO = 1.65;
 const FOLGA = 0.3;
 
@@ -263,7 +263,8 @@ export function criarCena(container: HTMLElement): Cena {
   const pedra = add(new THREE.BoxGeometry(B.larguraTampo, 0.05, B.comprimento + 0.04), tampo, [cb.x, B.alturaTampo - 0.025, cb.z]);
 
   // camadas da planta (começam desligadas, menos áreas e balcão)
-  const camadas = criarCamadas(p);
+  const { camadas, fixos } = criarCamadas(p);
+  scene.add(fixos);
   for (const [id, g] of Object.entries(camadas)) {
     g.visible = id === 'areas';
     scene.add(g);
