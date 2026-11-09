@@ -152,7 +152,7 @@ export default function SimuladorPintura() {
           )}
           <p className="small muted">
             Medidas e pontos tirados das plantas à mão (escala 1:35). Onde o papel não tem cota, a posição é proporcional ao desenho.
-            Todas as tomadas ficam a 25 cm do chão. No modo Decorado, os móveis, as luminárias e as garrafas são sugestão de ambientação e não vêm da planta.
+            Todas as tomadas ficam a 25 cm do piso; na área VIP, 25 cm acima do palco de pallets (54 cm do chão). No modo Decorado, os móveis, as luminárias e as garrafas são sugestão de ambientação e não vêm da planta.
           </p>
 
           <h2 className="panel-title"><Paintbrush size={16} className="gold" /> Pintar</h2>
