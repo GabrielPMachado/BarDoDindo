@@ -44,7 +44,9 @@ export const PLANTA = {
     pallet: { d: 1.0, t: 1.2, altura: 0.144 },
     andares: 2,
     folga: 0.03, // atrás das ripas da separação
-    degrau: { fundura: 0.4 }, // faixa de 1 pallet de altura em toda a largura, na frente do palco
+    // faixa de 1 pallet de altura em toda a largura, na frente do palco; 0,47 deixa o palco com 2,00 m
+    // (2 pallets inteiros de fundo) e cada pallet cortado ao meio dá duas faixas do degrau
+    degrau: { fundura: 0.47 },
   },
   /** Freezers encostados na frente, entre a parede do balcão e 0,92 m, com 0,75 m de fundura. */
   freezers: [{ t: 0, largura: 0.45 }, { t: 0.47, largura: 0.45 }],
@@ -58,7 +60,7 @@ export const PLANTA = {
   ],
 };
 
-/** Todas as tomadas a 25 cm do chão. */
+/** Todas as tomadas a 25 cm do piso. Na área VIP, 25 cm acima do palco de pallets (0,54 do chão). */
 const ALT_10A = 0.25;
 const ALT_20A = 0.25;
 
@@ -253,12 +255,14 @@ export function criarCamadas(p: (d: number, t: number, y?: number) => THREE.Vect
     p(dFundo, tLateral(dFundo), 0.15), p(TOMADAS_LATERAL[0], tLateral(TOMADAS_LATERAL[0]), 0.15),
   ], fio25);
   for (const t of TOMADAS_FUNDO) {
-    circuito([p(dFundo, t, 0.15), p(dFundo, t, ALT_10A)], fio25);
-    placa(p(L, t, ALT_10A), paraFrente, 10);
+    const y = ALT_10A + alturaPiso(dFundo, t);
+    circuito([p(dFundo, t, 0.15), p(dFundo, t, y)], fio25);
+    placa(p(L, t, y), paraFrente, 10);
   }
   for (const d of TOMADAS_LATERAL) {
-    circuito([p(d, tLateral(d), 0.15), p(d, tLateral(d), ALT_10A)], fio25);
-    placa(p(d, larguraEm(d), ALT_10A), paraBalcao, 10);
+    const y = ALT_10A + alturaPiso(d, tLateral(d));
+    circuito([p(d, tLateral(d), 0.15), p(d, tLateral(d), y)], fio25);
+    placa(p(d, larguraEm(d), y), paraBalcao, 10);
   }
 
   // ---------- Iluminação: canaleta de ferro presa no teto, por onde passa a fiação das luzes ----------
