@@ -282,10 +282,11 @@ export function criarDecorado(p: P, scene: THREE.Scene, renderer: THREE.WebGLRen
     caixa(d - 0.2, d - 0.05, t - 0.1, t + 0.1, SAL.alturaMesa, SAL.alturaMesa + 0.005, couro, false);
   }
 
-  // ---------- palco da área VIP: 2 andares de pallets e degrau de 1 pallet na entrada ----------
+  // ---------- palco da área VIP: degrau de 1 pallet em toda a frente e 2 andares de pallets atrás ----------
   const PC = PLANTA.palco, PL = PC.pallet;
   const hVip = PC.andares * PL.altura;
-  const dPalco = L - PLANTA.fundo + PC.folga;
+  const dDegrau = L - PLANTA.fundo + PC.folga; // começo do degrau
+  const dPalco = dDegrau + PC.degrau.fundura; // começo dos 2 andares
   {
     const pecas: THREE.BufferGeometry[] = [];
     const tabua = (d0: number, d1: number, t0: number, t1: number, y0: number, y1: number) => {
@@ -315,7 +316,7 @@ export function criarDecorado(p: P, scene: THREE.Scene, renderer: THREE.WebGLRen
         for (let t = 0; t < tFim - 0.01; t += PL.t) pallet(d, t, Math.min(PL.d, L - d), Math.min(PL.t, tFim - t), andar * PL.altura);
       }
     }
-    pallet(dPalco - PL.d, PC.degrau.t0, PL.d, PL.t, 0); // degrau
+    for (let t = 0; t < tFim - 0.01; t += PL.t) pallet(dDegrau, t, PC.degrau.fundura, Math.min(PL.t, tFim - t), 0); // degrau
     const madeiraPallet = m('#c39a63', { roughness: 0.85 });
     const geo = mergeGeometries(pecas);
     pecas.forEach((x) => x.dispose());
@@ -329,14 +330,14 @@ export function criarDecorado(p: P, scene: THREE.Scene, renderer: THREE.WebGLRen
   const SOFA = { largura: 1.8, fundura: 0.81, altura: 0.78, assento: 0.44, braco: 0.68, larguraAssento: 1.2, funduraAssento: 0.52, espuma: 0.13, encosto: 0.2, pe: 0.1 };
   const dV1 = L - 0.18;
   const tVip = PLANTA.larguraFundo / 2; // alinhado com a TV
-  const dV0 = L - PLANTA.fundo + 0.25; // costas do sofá
+  const dV0 = dPalco + 0.1; // costas do sofá
   const dSf = dV0 + SOFA.fundura; // frente do sofá
   const tS0 = tVip - SOFA.largura / 2, tS1 = tVip + SOFA.largura / 2;
   const bracoL = (SOFA.largura - SOFA.larguraAssento) / 2;
   const tecido = m('#e8e3d9', { roughness: 0.55, sheen: 0.4, sheenColor: new THREE.Color('#ffffff') });
   const teca = m('#a5582b', { roughness: 0.45, clearcoat: 0.3 });
   const MC = { d0: dSf + 0.4, fundura: 0.45, largura: 0.9 }; // mesa de centro
-  caixa(dV0 + 0.45, MC.d0 + MC.fundura + 0.35, tVip - 1.0, tVip + 1.0, 0, 0.012, tapete, false);
+  caixa(dV0 + 0.45, Math.min(L - 0.05, MC.d0 + MC.fundura + 0.35), tVip - 1.0, tVip + 1.0, 0, 0.012, tapete, false);
   for (const [dd, tt] of [[dV0 + 0.06, tS0 + 0.06], [dV0 + 0.06, tS1 - 0.06], [dSf - 0.06, tS0 + 0.06], [dSf - 0.06, tS1 - 0.06]]) cilindro(dd, tt, 0, SOFA.pe, 0.018, teca, 0.026, 10);
   caixa(dV0, dSf, tS0, tS1, SOFA.pe, SOFA.pe + 0.04, teca);
   caixa(dV0 + 0.01, dSf - 0.01, tS0 + 0.01, tS1 - 0.01, SOFA.pe + 0.04, SOFA.assento - SOFA.espuma, tecido);
@@ -526,8 +527,8 @@ export function criarDecorado(p: P, scene: THREE.Scene, renderer: THREE.WebGLRen
     cota(p(dSf, tVip - 0.6, hVip + y), p(L, tVip - 0.6, hVip + y), `Sofá até a TV ${fm(L - dSf)}`, 0.1);
     cota(p(MC.d0, tVip + MC.largura / 2 + 0.05, hVip + 0.47), p(MC.d0 + MC.fundura, tVip + MC.largura / 2 + 0.05, hVip + 0.47), `Mesa de centro ${fm(MC.largura)} × ${fm(MC.fundura)}`, 0.1);
     cota(p(dPalco + 0.05, 2.25, 0), p(dPalco + 0.05, 2.25, hVip), `Palco ${fm(hVip)} · 2 pallets`, 0.1);
-    cota(p(dPalco - PL.d - 0.03, PC.degrau.t0 + PL.t, 0), p(dPalco - PL.d - 0.03, PC.degrau.t0 + PL.t, PL.altura), `Degrau ${fm(PL.altura)}`, 0.1);
-    cota(p(dPalco - PL.d, PC.degrau.t0 - 0.04, PL.altura + 0.02), p(dPalco, PC.degrau.t0 - 0.04, PL.altura + 0.02), `Pallet ${fm(PL.d)} × ${fm(PL.t)}`, 0.1);
+    cota(p(dDegrau - 0.03, 3.3, 0), p(dDegrau - 0.03, 3.3, PL.altura), `Degrau ${fm(PL.altura)}`, 0.1);
+    cota(p(dDegrau, 3.0, PL.altura + 0.02), p(dPalco, 3.0, PL.altura + 0.02), `Degrau ${fm(PC.degrau.fundura)}`, 0.1);
     cota(p(L - 0.1, TV.t - TV.largura / 2, TV.topo + 0.08), p(L - 0.1, TV.t + TV.largura / 2, TV.topo + 0.08), `TV ${fm(TV.largura)} × ${fm(TV.altura)}`, 0.1);
     cota(p(L - 0.1, TV.t + TV.largura / 2 + 0.08, 0), p(L - 0.1, TV.t + TV.largura / 2 + 0.08, TV.topo - TV.altura), `Base da TV a ${fm(TV.topo - TV.altura)}`, 0.1);
     cota(p(d0 + 1.6 + 0.3, tC / 2, 0), p(d0 + 1.6 + 0.3, tC / 2, 1.75), 'Pessoa 1,75', 0.1);

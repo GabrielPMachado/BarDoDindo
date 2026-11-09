@@ -39,12 +39,12 @@ export const PLANTA = {
   altura: 3.6,
   canaleta: { altura: 3.3, largura: 0.05 },
   separacaoVip: { t0: 0, t1: 2.2, altura: 1.0 },
-  /** Piso da área VIP em pallets PBR (1,00 × 1,20 × 0,144): 2 andares, com degrau de 1 pallet na entrada. */
+  /** Piso da área VIP em pallets PBR (1,00 × 1,20 × 0,144): 2 andares, com degrau de 1 pallet em toda a frente. */
   palco: {
     pallet: { d: 1.0, t: 1.2, altura: 0.144 },
     andares: 2,
     folga: 0.03, // atrás das ripas da separação
-    degrau: { t0: 2.35 }, // um pallet deitado na passagem, encostado no palco
+    degrau: { fundura: 0.4 }, // faixa de 1 pallet de altura em toda a largura, na frente do palco
   },
   /** Freezers encostados na frente, entre a parede do balcão e 0,92 m, com 0,75 m de fundura. */
   freezers: [{ t: 0, largura: 0.45 }, { t: 0.47, largura: 0.45 }],
@@ -336,7 +336,7 @@ export function criarCamadas(p: (d: number, t: number, y?: number) => THREE.Vect
 export function alturaPiso(d: number, t: number) {
   const P = PLANTA.palco;
   const inicio = PLANTA.comprimento - PLANTA.fundo + P.folga;
-  if (d >= inicio) return P.andares * P.pallet.altura;
-  if (d >= inicio - P.pallet.d && t >= P.degrau.t0 && t <= P.degrau.t0 + P.pallet.t) return P.pallet.altura;
+  if (d >= inicio + P.degrau.fundura) return P.andares * P.pallet.altura;
+  if (d >= inicio && t >= 0) return P.pallet.altura;
   return 0;
 }
