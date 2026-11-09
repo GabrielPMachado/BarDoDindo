@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ExternalLink, Layers, Map as MapaIcon, Maximize2, MapPin, Minimize2, Paintbrush, Phone, RotateCcw } from 'lucide-react';
+import { ExternalLink, Layers, Map as MapaIcon, Maximize2, MapPin, Minimize2, Paintbrush, Phone, RotateCcw, Sparkles } from 'lucide-react';
 import { PageHead } from '../../components/ui';
 import { criarCena, PAREDES, SUPERFICIES, type Cena, type Superficie } from './cena';
 import { CAMADAS, LEGENDA, type Camada } from './planta';
@@ -50,8 +50,15 @@ export default function SimuladorPintura() {
   const [cores, setCores] = useState<Record<Superficie, Tinta | null>>({ esquerda: null, direita: null, fundo: null, frente: null, teto: null, chao: null });
   const [escolhida, setEscolhida] = useState<Tinta | null>(null);
   const [cheia, setCheia] = useState(false);
-  const [camadas, setCamadas] = useState<Record<Camada, boolean>>({ areas: true, eletrica: false, iluminacao: false, hidraulica: false });
+  const [camadas, setCamadas] = useState<Record<Camada, boolean>>({ areas: false, eletrica: false, iluminacao: false, hidraulica: false });
   const [deCima, setDeCima] = useState(false);
+  // abre já decorado; as áreas da planta ficam para quando desligar o modo
+  const [decorado, setDecorado] = useState(true);
+  const decorar = (v: boolean) => {
+    cena.current?.decorar(v);
+    setDecorado(v);
+    if (!v && !camadas.areas) alternar('areas');
+  };
   const alternar = (id: Camada) => {
     const v = !camadas[id];
     cena.current?.camada(id, v);
@@ -66,6 +73,8 @@ export default function SimuladorPintura() {
     if (!palco.current) return;
     try {
       cena.current = criarCena(palco.current);
+      cena.current.camada('areas', false);
+      cena.current.decorar(true);
     } catch {
       setErro('Seu navegador não conseguiu abrir a visualização 3D (WebGL desativado).');
     }
@@ -105,6 +114,7 @@ export default function SimuladorPintura() {
           <div className="pintura__acoes">
             <button className="chip" onClick={() => { cena.current?.olharPara('fundo'); setDeCima(false); }}><RotateCcw size={13} /> Entrada</button>
             <button className="chip" onClick={() => { cena.current?.olharPara('frente'); setDeCima(false); }}>Ver a frente</button>
+            <button className={`chip${decorado ? ' is-on' : ''}`} onClick={() => decorar(!decorado)} aria-pressed={decorado}><Sparkles size={13} /> Decorado</button>
             <button className={`chip${deCima ? ' is-on' : ''}`} onClick={() => verDeCima(!deCima)} aria-pressed={deCima}><MapaIcon size={13} /> De cima</button>
             <button className="chip" onClick={() => setCheia((v) => !v)} aria-label={cheia ? 'Sair da tela cheia' : 'Tela cheia'}>
               {cheia ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
@@ -135,7 +145,7 @@ export default function SimuladorPintura() {
           )}
           <p className="small muted">
             Medidas e pontos tirados das plantas à mão (escala 1:35). Onde o papel não tem cota, a posição é proporcional ao desenho.
-            Todas as tomadas ficam a 25 cm do chão.
+            Todas as tomadas ficam a 25 cm do chão. No modo Decorado, os móveis, as luminárias e as garrafas são sugestão de ambientação e não vêm da planta.
           </p>
 
           <h2 className="panel-title"><Paintbrush size={16} className="gold" /> Pintar</h2>

@@ -2020,6 +2020,8 @@ button.cal-ico:hover { transform: translateY(-1px); background: color-mix(in srg
 .pintura__lado .panel-title { margin-bottom: 0; }
 .pintura__alvos { display: flex; flex-wrap: wrap; gap: 6px; }
 .pintura__alvos .chip.is-on { border-color: var(--brand); background: #c4572a1f; color: var(--brand-light); }
+.pintura__acoes { left: 10px; flex-wrap: wrap; justify-content: flex-end; pointer-events: none; }
+.pintura__acoes .chip { white-space: nowrap; pointer-events: auto; }
 .pintura__acoes .chip.is-on { border-color: var(--brand); color: var(--brand-light); }
 .pintura__legenda { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .pintura__legenda li { display: flex; align-items: center; gap: 8px; }
