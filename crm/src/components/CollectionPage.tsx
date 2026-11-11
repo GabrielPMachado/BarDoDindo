@@ -685,14 +685,14 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
       {refazendoFotos && (def.tamanhos ? (
         <GerarFotosChopes
           rows={chopes}
-          onSalvar={(id, foto) => api(`/crm/c/${def.id}/${id}`, { method: 'PUT', body: { foto } })}
+          onSalvar={(id, foto) => api(`/crm/c/${def.id}/${id}`, { method: 'PUT', body: { foto, fotoCardapio: new Date().toISOString() } })}
           onFim={col.reload}
           onClose={() => setRefazendoFotos(false)}
         />
       ) : (
         <RefazerFotos
           rows={all}
-          onSalvar={(id, foto) => api(`/crm/c/${def.id}/${id}`, { method: 'PUT', body: { foto } })}
+          onSalvar={(id, foto) => api(`/crm/c/${def.id}/${id}`, { method: 'PUT', body: { foto, fotoCardapio: new Date().toISOString() } })}
           onFim={col.reload}
           onClose={() => setRefazendoFotos(false)}
         />

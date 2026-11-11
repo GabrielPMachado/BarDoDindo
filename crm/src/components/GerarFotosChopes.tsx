@@ -48,7 +48,7 @@ export function GerarFotosChopes({ rows, onSalvar, onFim, onClose }: {
 }) {
   const grupos = useMemo(() => agrupar(rows), [rows]);
   const [modo, setModo] = useState<Modo>('gratis');
-  const [marcados, setMarcados] = useState<Set<string>>(() => new Set(grupos.map((g) => g.chave)));
+  const [marcados, setMarcados] = useState<Set<string>>(() => new Set(grupos.filter((g) => !g.membros.every((m) => !!m.row.fotoCardapio)).map((g) => g.chave)));
   const [estados, setEstados] = useState<Record<string, Estado>>({});
   const [rodando, setRodando] = useState(false);
   const [salvando, setSalvando] = useState(false);
@@ -58,7 +58,10 @@ export function GerarFotosChopes({ rows, onSalvar, onFim, onClose }: {
 
   const mudar = (chave: string, e: Estado) => setEstados((s) => ({ ...s, [chave]: e }));
   const est = (g: Grupo): Estado => estados[g.chave] ?? { st: 'fila' };
-  const itens = grupos.filter((g) => est(g).st !== 'salva');
+  /** Já trocado: salvo agora ou numa vez anterior (todos os chopes do grupo com `fotoCardapio`), e não reaberto com "Refazer". */
+  const trocado = (g: Grupo) => est(g).st === 'salva' || (!estados[g.chave] && g.membros.every((m) => !!m.row.fotoCardapio));
+  const itens = grupos.filter((g) => !trocado(g));
+  const trocados = grupos.filter(trocado);
   const prontos = itens.filter((g) => est(g).st === 'pronta');
   const fotosProntas = prontos.reduce((t, g) => t + g.membros.length, 0);
   const aFazer = itens.filter((g) => marcados.has(g.chave) && ['fila', 'erro'].includes(est(g).st));
@@ -132,7 +135,7 @@ export function GerarFotosChopes({ rows, onSalvar, onFim, onClose }: {
     }
   };
 
-  /** Troca as fotos de todos os chopes dos grupos prontos; o grupo trocado sai da lista. */
+  /** Troca as fotos de todos os chopes dos grupos prontos; o grupo trocado vai para "Já trocadas". */
   const salvar = async (lista: Grupo[] = prontos) => {
     setSalvando(true);
     let feitas = 0;
@@ -186,7 +189,7 @@ export function GerarFotosChopes({ rows, onSalvar, onFim, onClose }: {
           Chopes de cor parecida usam a mesma foto: {grupos.length} {grupos.length === 1 ? 'foto gera' : 'fotos geram'} os {rows.length} chopes. {modo === 'gratis'
             ? 'Toque em "Copiar pedido" num grupo: o pedido é copiado, a foto modelo do copo é baixada e o Gemini abre por cima do Cérebro. Lá, anexe a foto modelo, cole o pedido e envie; depois copie a imagem pronta e cole aqui (Ctrl+V).'
             : 'Cada grupo marcado vai para o Gemini com a foto modelo do copo. Usa a chave da IA de Configurações → Parâmetros, que precisa do faturamento ativo no Google AI Studio.'}
-          {' '}A foto do Gemini vem com a plaquinha em branco: ao colar aqui, o Cérebro realça contraste, nitidez e o logo e escreve a plaquinha de cada chopp; confira e toque em "Trocar".
+          {' '}O grupo trocado desce para "Já trocadas", e a lista de cima mostra só o que falta. A foto do Gemini vem com a plaquinha em branco: ao colar aqui, o Cérebro realça contraste, nitidez e o logo e escreve a plaquinha de cada chopp; confira e toque em "Trocar".
         </p>
         <div className="refazer-fotos__filtro">
           <span>{[...marcados].filter((k) => itens.some((g) => g.chave === k)).length} de {itens.length} grupos marcados</span>
@@ -254,6 +257,29 @@ export function GerarFotosChopes({ rows, onSalvar, onFim, onClose }: {
             );
           })}
         </ul>
+        {!itens.length && <p className="muted small">Todas as fotos dos chopes já foram trocadas.</p>}
+        {trocados.length > 0 && (
+          <>
+            <h3 className="fotos-chopes__titulo"><Check size={16} /> Já trocadas ({trocados.length})</h3>
+            <ul className="fotos-chopes__trocadas">
+              {trocados.map((g) => {
+                const atual = g.membros.find((m) => temFoto(m.row))?.row.foto as string | undefined;
+                return (
+                  <li key={g.chave}>
+                    {atual ? <img src={atual} alt="" loading="lazy" /> : <span className="gerar-foto__vazio"><ImageOff size={18} /></span>}
+                    <div>
+                      <strong>{g.grupo.nome} · {g.copo}</strong>
+                      <p className="muted small">{g.membros.map((m) => m.estilo).join(', ')}</p>
+                    </div>
+                    <button className="btn btn--ghost btn--sm" disabled={rodando || salvando} onClick={() => { mudar(g.chave, { st: 'fila' }); marcar(g.chave, true); }} title="Volta este grupo para a lista de cima para gerar a foto de novo">
+                      <RefreshCw size={13} /> Refazer
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
       </div>
     </Modal>
   );
