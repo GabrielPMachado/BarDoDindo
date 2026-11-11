@@ -7,6 +7,8 @@ import modeloUrl from '../assets/foto-modelo-dindo.jpg';
 import modeloEstoqueUrl from '../assets/foto-modelo-estoque.jpg';
 import modeloSalaoUrl from '../assets/foto-modelo-salao.jpg';
 import modeloChoppUrl from '../assets/foto-modelo-chopp.jpg';
+import modeloHalfPintUrl from '../assets/foto-modelo-chopp-half-pint.jpg';
+import modeloJarraUrl from '../assets/foto-modelo-chopp-jarra.jpg';
 import { fotoNoTamanho } from '../components/Avatar';
 import { chaveDaIA } from './iaNota';
 
@@ -14,15 +16,21 @@ export const FOTO_MODELO_URL = modeloUrl;
 export const GEMINI_URL = 'https://gemini.google.com/app';
 
 /**
- * Abre o Gemini numa janela sobreposta ao Cérebro (do lado direito da tela), em vez de uma guia nova: o Cérebro continua
- * à vista para enviar a foto pronta. A janela tem nome, então os próximos pedidos reaproveitam a mesma e só a trazem para a frente.
+ * Abre o Gemini numa janela por cima do Cérebro, cobrindo a parte direita da própria janela do Cérebro (a lista dos itens
+ * continua à vista à esquerda). A janela tem nome: cada pedido reaproveita a mesma, já com uma conversa nova do Gemini.
  */
 export function abrirGeminiSobreposto() {
   const tela = window.screen;
-  const largura = Math.max(480, Math.min(960, Math.round((tela?.availWidth || 1280) * 0.5)));
-  const altura = Math.max(560, (tela?.availHeight || 800) - 40);
-  const esquerda = Math.max(0, (tela?.availWidth || 1280) - largura);
-  const janela = window.open(GEMINI_URL, 'gemini-dindo', `popup,width=${largura},height=${altura},left=${esquerda},top=0`);
+  // a janela do Cérebro (no celular, ou quando o navegador não informa, usa a tela)
+  const baseL = Number.isFinite(window.screenX) ? window.screenX : 0;
+  const baseT = Number.isFinite(window.screenY) ? window.screenY : 0;
+  const baseW = window.outerWidth || tela?.availWidth || 1280;
+  const baseH = window.outerHeight || tela?.availHeight || 800;
+  const largura = Math.round(Math.max(480, Math.min(1000, baseW * 0.6)));
+  const altura = Math.round(Math.max(560, baseH - 20));
+  const esquerda = Math.round(baseL + Math.max(0, baseW - largura - 10));
+  const topo = Math.round(baseT + 10);
+  const janela = window.open(GEMINI_URL, 'gemini-dindo', `popup,width=${largura},height=${altura},left=${esquerda},top=${topo}`);
   // bloqueador de janelas: cai numa guia comum
   if (!janela) { window.open(GEMINI_URL, '_blank', 'noopener'); return; }
   try { janela.opener = null; } catch { /* outro domínio */ }
@@ -38,7 +46,7 @@ export const MODELOS: Record<PadraoFoto, { url: string; arquivo: string; oQue: s
   produto: { url: modeloUrl, arquivo: 'foto-modelo-bar-do-dindo.jpg', oQue: 'drink' },
   estoque: { url: modeloEstoqueUrl, arquivo: 'foto-modelo-estoque-bar-do-dindo.jpg', oQue: 'item', cenario: 'o depósito com a lousa do Dindo' },
   patrimonio: { url: modeloSalaoUrl, arquivo: 'foto-modelo-salao-bar-do-dindo.jpg', oQue: 'bem', cenario: 'o salão do Dindo com o canto gamer' },
-  chopp: { url: modeloChoppUrl, arquivo: 'foto-modelo-chopp-bar-do-dindo.jpg', oQue: 'chopp', cenario: 'a Pint APA no balcão do Dindo' },
+  chopp: { url: modeloChoppUrl, arquivo: 'foto-modelo-chopp-bar-do-dindo.jpg', oQue: 'chopp', cenario: 'a APA no mesmo copo, no balcão do Dindo' },
 };
 
 /** Cantos do salão usados como cenário das fotos do Patrimônio; "Automático" escolhe pelo nome e pela categoria do bem. */
@@ -129,20 +137,15 @@ A SEGUNDA imagem anexada é a foto antiga deste item, em baixa resolução: use-
 
 const semAcento = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
-type Copo = 'Half-pint' | 'Pint' | 'Jarra';
-const COPOS: Record<Copo, { oQue: string; tamanho: string }> = {
-  'Half-pint': {
-    oQue: 'um copo half-pint de vidro (o mesmo formato do copo da foto, só que menor, de uns 300 ml)',
-    tamanho: 'Ele é MENOR que o copo atual: cerca de dois terços da altura, com a base exatamente na mesma linha da base do copo atual',
-  },
-  Pint: {
-    oQue: 'um copo pint de vidro (o mesmo copo da foto)',
-    tamanho: 'Mesma altura, largura e posição do copo atual, com a base exatamente na mesma linha',
-  },
-  Jarra: {
-    oQue: 'uma caneca-jarra de vidro de 1 litro, com alça grossa do lado direito',
-    tamanho: 'Ela é um pouco mais alta e bem mais larga que o copo atual, com a base exatamente na mesma linha da base do copo atual e a alça para a direita, sem encostar na plaquinha',
-  },
+export type Copo = 'Half-pint' | 'Pint' | 'Jarra';
+/**
+ * Foto modelo de cada copo: a APA já aprovada no cardápio. Partir do mesmo copo deixa tamanho, formato e posição idênticos
+ * aos das fotos atuais; a IA só troca a cerveja e o texto da plaquinha.
+ */
+export const MODELOS_CHOPP: Record<Copo, { url: string; arquivo: string; descricao: string }> = {
+  'Half-pint': { url: modeloHalfPintUrl, arquivo: 'foto-modelo-chopp-half-pint-bar-do-dindo.jpg', descricao: 'o copo half-pint de vidro' },
+  Pint: { url: modeloChoppUrl, arquivo: 'foto-modelo-chopp-pint-bar-do-dindo.jpg', descricao: 'o copo pint de vidro' },
+  Jarra: { url: modeloJarraUrl, arquivo: 'foto-modelo-chopp-jarra-bar-do-dindo.jpg', descricao: 'a jarra de vidro com alça' },
 };
 
 /** Copo do tamanho: pelo nome (Half-pint, Pint, Jarra) ou pelos ml (até 350 ml half-pint; até 700 ml pint; acima, jarra). */
@@ -162,7 +165,7 @@ export function estiloDoChopp(nome: string, tamanho = '') {
   let e = nome;
   if (tamanho.trim()) e = e.replace(tamanho.trim(), '');
   return e
-    .replace(/\b(chopp?e?s?|chope)\b/gi, '')
+    .replace(/\b(chopp?e?s?|chope|cervejas?|artesana(l|is)|gelad[oa]s?|draft)\b/gi, '')
     .replace(/\b(half[- ]?pint|pint|jarra|caneca)\b/gi, '')
     .replace(/\d+(?:[.,]\d+)?\s*(ml|l|litros?)\b/gi, '')
     .replace(/[·\-–]+/g, ' ').replace(/\s+/g, ' ').trim() || nome.trim();
@@ -173,6 +176,11 @@ const CORES: [RegExp, string][] = [
   [/black ipa/, 'cerveja preta e opaca, com colarinho bege-claro firme'],
   [/stout/, 'cerveja preta e opaca, com colarinho cremoso e denso cor de caramelo claro'],
   [/porter/, 'cerveja marrom-escura quase preta, com reflexos rubi contra a luz e colarinho bege'],
+  [/amber|ambar|vienna|marzen/, 'cerveja âmbar-acobreada e límpida, com reflexos avermelhados contra a luz e colarinho off-white cremoso'],
+  [/bock/, 'cerveja marrom-avermelhada escura e límpida, com colarinho bege'],
+  [/tripel|golden strong|belgian blond|blond/, 'cerveja dourada brilhante e levemente turva, com colarinho branco alto e denso'],
+  [/dubbel|quadrupel|belgian dark/, 'cerveja marrom-rubi profunda, com colarinho bege denso'],
+  [/sour|catharina|fruit|frutas/, 'cerveja de cor viva da fruta do estilo, levemente turva, com colarinho rosado ou claro e fino'],
   [/red|vermelh/, 'cerveja vermelho-acobreada e límpida, com colarinho off-white'],
   [/double|imperial|dipa/, 'cerveja âmbar intensa e levemente turva, com colarinho off-white denso'],
   [/session/, 'cerveja dourado-clara e levemente turva, com colarinho branco'],
@@ -188,23 +196,29 @@ export const corDoChopp = (estilo: string) => CORES.find(([re]) => re.test(semAc
 export const plaquinhaDoChopp = (copo: Copo, estilo: string) => `${copo} - ${estilo}`.toUpperCase();
 
 /**
- * Pedido para a foto de um chopp do cardápio, no padrão das fotos atuais: a foto modelo é a Pint APA no balcão; muda só o
- * copo (pelo tamanho), a cor da cerveja (pelo estilo) e o texto da plaquinha.
+ * Pedido para a foto de um chopp do cardápio, no padrão das fotos atuais. A foto anexada é a APA aprovada no mesmo copo
+ * (ver `MODELOS_CHOPP`): a IA mantém cenário, copo e plaquinha e troca só a cerveja e o texto da plaquinha.
  */
 export function promptDaFotoChopp(p: { nome: string; tamanho?: string }) {
   const tamanho = p.tamanho?.trim() ?? '';
   const copo = copoDoChopp(p.nome, tamanho);
   const estilo = estiloDoChopp(p.nome, tamanho);
-  const c = COPOS[copo];
-  return `Edite a imagem anexada mantendo EXATAMENTE o mesmo cenário, enquadramento, ângulo de câmera, iluminação, cores e desfoque: o balcão de madeira escura em primeiro plano, a luminária pendente de cobre acesa no alto à esquerda, as plantas penduradas e as prateleiras com garrafas desfocadas ao fundo, a parede de tijolos com a placa redonda de madeira do Bar do Dindo à direita (idêntica, sem alterar o logo nem as letras) e a plaquinha de madeira apoiada no balcão à esquerda.
+  const placa = plaquinhaDoChopp(copo, estilo);
+  return `Fotografia publicitária para o cardápio do Bar do Dindo. Use a imagem anexada como base e edite SOMENTE o que está em "Alterar". O resultado precisa parecer a mesma foto, da mesma sessão, para ficar lado a lado com as outras do cardápio sem destoar.
 
-Substitua SOMENTE o copo do centro por ${c.oQue}, cheio de chopp ${estilo}${tamanho ? ` (${tamanho})` : ''}: ${corDoChopp(estilo)}.
+PRESERVAR, SEM NENHUMA ALTERAÇÃO
+- Formato 4:3, enquadramento, ângulo e altura da câmera, distância focal, profundidade de campo e desfoque do fundo.
+- Cenário: balcão de madeira escura em primeiro plano, luminária pendente de cobre acesa no alto à esquerda, plantas penduradas, prateleiras com garrafas, parede de tijolos e a placa redonda de madeira do Bar do Dindo (logo e letras idênticos).
+- ${MODELOS_CHOPP[copo].descricao[0].toUpperCase()}${MODELOS_CHOPP[copo].descricao.slice(1)}: mesmo formato, tamanho, posição no balcão, logo "BAR DO DINDO" gravado no vidro, reflexos e sombra.
+- A plaquinha de madeira à esquerda: mesmo tamanho, posição, textura e acabamento.
+- Iluminação: a mesma luz quente da luminária e o mesmo balanço de branco.
 
-${c.tamanho}, centralizado no mesmo ponto do balcão. O vidro tem o logo "BAR DO DINDO" gravado de frente, igual ao do copo atual (mesma fonte, cor e posição). Colarinho cremoso de uns dois dedos, gotículas de condensação no vidro gelado, a mesma sombra suave e o mesmo reflexo na madeira, com a mesma luz quente da luminária. Fotografia realista de bebida.
+ALTERAR
+1. A cerveja dentro do copo passa a ser chopp ${estilo}${tamanho ? ` (${tamanho})` : ''}: ${corDoChopp(estilo)}. Mesmo nível de enchimento do original, colarinho cremoso de microbolhas com cerca de dois dedos, condensação natural no vidro gelado e a luz quente atravessando o líquido para mostrar a cor.
+2. O texto da plaquinha passa a ser exatamente "${placa}": uma única linha, centralizada, em letras maiúsculas serifadas e grossas, marrom-escuras, como gravadas a fogo na madeira, no mesmo tamanho e estilo de letra do texto original. Escreva só esse texto, sem acrescentar nem traduzir palavras.
 
-Na plaquinha de madeira à esquerda, troque o texto por "${plaquinhaDoChopp(copo, estilo)}", nas mesmas letras serifadas, escuras e gravadas na madeira, centralizado; a plaquinha continua do mesmo tamanho e no mesmo lugar.
-
-Não adicione outros textos, pessoas, mãos nem objetos. Mantenha o formato horizontal 4:3.`;
+PADRÃO DE QUALIDADE
+Fotorrealismo de fotografia de produto profissional: foco nítido no copo e na plaquinha, cor da cerveja fiel ao estilo, alta definição, sem ruído, granulado, borrões ou artefatos. Sem marca-d'água, sem textos além da plaquinha e do logo, sem pessoas, mãos ou objetos novos.`;
 }
 
 export function promptDaFoto(p: { nome: string; resumo?: string; ingredientes?: string }) {
@@ -303,10 +317,11 @@ export async function gerarFotoEstoque(item: Record<string, unknown>, sinal?: Ab
   return fotoDaIA(prompt, fotos, sinal);
 }
 
-/** Gera a foto de um chopp do cardápio (um tamanho) no padrão da Pint APA, direto pela API do Gemini. */
+/** Gera a foto de um chopp do cardápio (um tamanho) a partir da APA no mesmo copo, direto pela API do Gemini. */
 export async function gerarFotoChopp(produto: Record<string, unknown>, sinal?: AbortSignal): Promise<string> {
   const nome = String(produto.nome ?? '').trim();
   if (!nome) throw new Error('O produto está sem nome.');
   const prompt = promptDaFotoChopp({ nome, tamanho: String(produto.tamanho ?? '') });
-  return fotoDaIA(prompt, [await base64DaUrl(modeloChoppUrl)], sinal);
+  const copo = copoDoChopp(nome, String(produto.tamanho ?? ''));
+  return fotoDaIA(prompt, [await base64DaUrl(MODELOS_CHOPP[copo].url)], sinal);
 }
