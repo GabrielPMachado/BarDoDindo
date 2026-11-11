@@ -2237,6 +2237,14 @@ td.nivel-col { min-width: 140px; }
 .conversas__enviar { width: 40px; height: 40px; padding: 0; flex-shrink: 0; }
 .conversas__erro { margin: 0 0 6px; color: var(--bad); font-size: 13px; }
 .conversas__escolha { padding: 6px 0 0; max-height: 50vh; }
+/* chat da equipe: foto (ou ícone do canal geral) ao lado do nome */
+.conversa-item--equipe { flex-direction: row; align-items: center; gap: 10px; }
+.conversa-item__corpo { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.chat-equipe__avatar { width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; overflow: hidden;
+  background: linear-gradient(135deg, var(--brand-light), var(--brand-dark)); color: var(--on-brand); font-weight: 700; font-size: 12px; }
+.chat-equipe__avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.chat-equipe__avatar--geral { background: var(--surface-3); color: var(--brand-light); border: 1px solid var(--border-strong); }
+.chat-equipe__dica { padding: 10px 12px; }
 /* celular: uma coisa de cada vez (a lista ou a conversa aberta) */
 @media (max-width: 760px) {
   .conversas { grid-template-columns: 1fr; height: calc(100dvh - 250px); min-height: 360px; }

@@ -519,6 +519,69 @@ console.log('— conversas (chat entre a equipe e o afilhado) —');
   }
 }
 
+if (senhaAtendente && senhaMarketing && senhaAdministrativo && senhaParametros) {
+  console.log('— chat interno da equipe (canal geral e conversas diretas) —');
+  // como o backend: a mensagem, o resumo e a marca de lida no mesmo lote
+  const enviarEquipe = async (cid, texto, extra = {}) => {
+    const u = auth.currentUser;
+    const ref = doc(collection(db, 'equipe_chat', cid, 'mensagens'));
+    const lote = writeBatch(db);
+    lote.set(ref, { texto, usuarioId: u.uid, usuarioNome: extra.usuarioNome ?? extra.nome, criadaEm: serverTimestamp() });
+    lote.set(doc(db, 'equipe_chat', cid), {
+      tipo: cid === 'geral' ? 'geral' : 'direta', membros: extra.membros ?? (cid === 'geral' ? [] : cid.slice(2).split('_')),
+      ultimaMensagem: texto, ultimaEm: serverTimestamp(), ultimoAutorId: extra.autorId ?? u.uid, ultimoAutorNome: extra.nome, ultimaId: ref.id,
+    });
+    lote.set(doc(db, 'equipe_lidas', u.uid), { lidas: { [cid]: serverTimestamp() } }, { merge: true });
+    await lote.commit();
+  };
+  const { user: at } = await signInWithEmailAndPassword(auth, 'atendente@teste.local', senhaAtendente);
+  const uidDe = async (email) => (await getDocs(query(collection(db, 'usuarios'), where('email', '==', email)))).docs[0].id;
+  const mk = await uidDe('marketing@teste.local'), adm = await uidDe('administrativo@teste.local');
+  const direta = `d_${[at.uid, mk].sort().join('_')}`;
+  const nome = 'Atendente Teste';
+  await permitido('equipe (função sem a permissão do chat) escrever no canal geral', () => enviarEquipe('geral', 'Bom dia, equipe!', { nome }));
+  await permitido('equipe ler o canal geral', () => getDocs(query(collection(db, 'equipe_chat', 'geral', 'mensagens'), orderBy('criadaEm', 'desc'))));
+  await permitido('equipe ler o resumo do canal geral', () => getDoc(doc(db, 'equipe_chat', 'geral')));
+  await permitido('mandar mensagem direta para um colega', () => enviarEquipe(direta, 'Pode cobrir meu turno?', { nome }));
+  await permitido('listar as próprias conversas diretas', () => getDocs(query(collection(db, 'equipe_chat'), where('membros', 'array-contains', at.uid))));
+  await permitido('marcar uma conversa como lida', () => setDoc(doc(db, 'equipe_lidas', at.uid), { lidas: { geral: serverTimestamp() } }, { merge: true }));
+  await negado('escrever com o nome de outra pessoa', () => enviarEquipe('geral', 'Sou o chefe', { nome, usuarioNome: 'Presidente' }));
+  await negado('resumo em nome de outra pessoa', () => enviarEquipe('geral', 'Oi', { nome, autorId: mk }));
+  await negado('incluir outra pessoa na conversa direta', () => enviarEquipe(direta, 'Oi', { nome, membros: [at.uid, mk, adm] }));
+  await negado('conversa direta com id fora de ordem', () => enviarEquipe(`d_${[at.uid, mk].sort().reverse().join('_')}`, 'Oi', { nome }));
+  await negado('conversa direta entre outras duas pessoas', () => enviarEquipe(`d_${[mk, adm].sort().join('_')}`, 'Oi', { nome }));
+  await negado('mensagem sem o resumo', () => setDoc(doc(collection(db, 'equipe_chat', 'geral', 'mensagens')), { texto: 'x', usuarioId: at.uid, usuarioNome: nome, criadaEm: serverTimestamp() }));
+  await negado('listar todas as conversas da equipe', () => getDocs(collection(db, 'equipe_chat')));
+  await negado('ler o que outra pessoa já leu', () => getDoc(doc(db, 'equipe_lidas', mk)));
+  await negado('gravar o que outra pessoa já leu', () => setDoc(doc(db, 'equipe_lidas', mk), { lidas: {} }));
+  await negado('apagar o canal geral', () => deleteDoc(doc(db, 'equipe_chat', 'geral')));
+  await signOut(auth);
+
+  await signInWithEmailAndPassword(auth, 'marketing@teste.local', senhaMarketing);
+  await permitido('o colega ler a conversa direta', () => getDocs(collection(db, 'equipe_chat', direta, 'mensagens')));
+  await permitido('o colega achar a conversa na lista', () => getDocs(query(collection(db, 'equipe_chat'), where('membros', 'array-contains', mk))));
+  await permitido('o colega responder', () => enviarEquipe(direta, 'Posso sim!', { nome: 'Marketing Teste' }));
+  await signOut(auth);
+
+  await signInWithEmailAndPassword(auth, 'administrativo@teste.local', senhaAdministrativo);
+  await negado('terceiro ler as mensagens da conversa direta', () => getDocs(collection(db, 'equipe_chat', direta, 'mensagens')));
+  await negado('terceiro ler o resumo da conversa direta', () => getDoc(doc(db, 'equipe_chat', direta)));
+  await negado('terceiro buscar conversas de outra pessoa', () => getDocs(query(collection(db, 'equipe_chat'), where('membros', 'array-contains', at.uid))));
+  await negado('terceiro escrever na conversa direta', () => enviarEquipe(direta, 'Oi', { nome: 'Administrativo Teste' }));
+  await permitido('terceiro ler o canal geral', () => getDocs(collection(db, 'equipe_chat', 'geral', 'mensagens')));
+  await signOut(auth);
+
+  await signInWithEmailAndPassword(auth, 'parametros@teste.local', senhaParametros);
+  await permitido('função com chat só "ver" ler o canal geral', () => getDocs(collection(db, 'equipe_chat', 'geral', 'mensagens')));
+  await negado('função com chat só "ver" escrever', () => enviarEquipe('geral', 'Oi', { nome: 'Parâmetros Teste' }));
+  await signOut(auth);
+
+  await signInWithEmailAndPassword(auth, 'cliente2@teste.local', senhaCliente);
+  await negado('afilhado ler o chat da equipe', () => getDocs(collection(db, 'equipe_chat', 'geral', 'mensagens')));
+  await negado('afilhado escrever no chat da equipe', () => enviarEquipe('geral', 'Oi', { nome: 'Cliente Teste' }));
+  await signOut(auth);
+}
+
 if (senhaFicha) {
   console.log('— ficha do afilhado no Cérebro (Clientes: editar) —');
   const ed = doc(db, 'clientes', 'editavel');

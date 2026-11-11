@@ -73,7 +73,7 @@ await gravar('produtos/chopp', { nome: 'Chopp', categoria: 'Chopes', preco: 12, 
 await gravar('funcoes/caixa', { nome: 'Caixa', descricao: '', permissoes: { atd: ['ver', 'criar', 'editar', 'excluir'] }, sistema: false, criadoEm: agora });
 await gravar(`usuarios/${caixa}`, { nome: 'Caixa Teste', email: 'caixa@teste.local', funcaoId: 'caixa', status: 'Ativo', criadoEm: agora });
 // quem ajusta a numeração (Parâmetros) e um afilhado da equipe de antes da numeração própria (número positivo)
-await gravar('funcoes/parametros', { nome: 'Parâmetros', descricao: '', permissoes: { parametros: ['ver', 'editar'], clientes: ['ver'] }, sistema: false, criadoEm: agora });
+await gravar('funcoes/parametros', { nome: 'Parâmetros', descricao: '', permissoes: { parametros: ['ver', 'editar'], clientes: ['ver'], chat: ['ver'] }, sistema: false, criadoEm: agora });
 await gravar(`usuarios/${parametros}`, { nome: 'Parâmetros Teste', email: 'parametros@teste.local', funcaoId: 'parametros', status: 'Ativo', criadoEm: agora });
 await gravar('clientes/equipe-antiga', { numero: 3, nome: 'Equipe Antiga', email: 'antiga@teste.local', telefone: '', criadoEm: agora, origem: 'Equipe' });
 await gravar(`usuarios/${atendente}`, { nome: 'Atendente Teste', email: 'atendente@teste.local', funcaoId: 'atendente', status: 'Ativo', criadoEm: agora });

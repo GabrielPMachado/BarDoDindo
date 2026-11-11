@@ -421,6 +421,59 @@ service cloud.firestore {
       }
     }
 
+    /* ---------- chat interno da equipe (CRM) ---------- */
+    // Permissão "chat" da função; funções sem ela (gravadas antes do chat) conversam (ver e enviar). Igual a PADRAO_DO_MODULO.
+    function chatNaFuncao(f, acao) {
+      let ps = f.get('permissoes', {});
+      return f.get('sistema', false) == true || ('chat' in ps ? temAcao(ps['chat'], acao) : acao in ['ver', 'criar', 'editar']);
+    }
+    function podeChat(acao) { return daEquipe() && chatNaFuncao(funcao(), acao); }
+    // canal geral (de todos) ou conversa direta d_<uid>_<uid>, com os dois em ordem: só os dois participam. Igual a idConversaDireta.
+    function membroDoChat(cid) {
+      return cid == 'geral' || (cid.matches('d_[A-Za-z0-9]+_[A-Za-z0-9]+') && cid.split('_')[1] < cid.split('_')[2]
+        && request.auth.uid in [cid.split('_')[1], cid.split('_')[2]]);
+    }
+    function caminhoMensagemEquipe(cid, id) { return /databases/$(database)/documents/equipe_chat/$(cid)/mensagens/$(id); }
+    // o resumo aponta para a mensagem gravada no mesmo lote, por quem está logado e com a data do servidor
+    function resumoDaEquipe(cid) {
+      let d = request.resource.data;
+      let antes = resource == null ? {} : resource.data;
+      return d.keys().hasOnly(['tipo', 'membros', 'ultimaMensagem', 'ultimaEm', 'ultimoAutorId', 'ultimoAutorNome', 'ultimaId'])
+        && d.tipo == (cid == 'geral' ? 'geral' : 'direta')
+        && d.membros == (cid == 'geral' ? [] : [cid.split('_')[1], cid.split('_')[2]])
+        && textoAte(d.ultimaMensagem, 200) && textoAte(d.ultimoAutorNome, 120)
+        && d.ultimoAutorId == request.auth.uid && d.ultimaEm == request.time
+        && textoAte(d.ultimaId, 128) && d.ultimaId != antes.get('ultimaId', '')
+        && !exists(caminhoMensagemEquipe(cid, d.ultimaId)) && existsAfter(caminhoMensagemEquipe(cid, d.ultimaId));
+    }
+    match /equipe_chat/{cid} {
+      // a lista de conversas diretas é consultada por "membros" (array-contains): o resumo diz quem participa
+      allow get: if podeChat('ver') && membroDoChat(cid);
+      allow list: if podeChat('ver') && request.auth.uid in resource.data.membros;
+      allow create, update: if podeChat('criar') && membroDoChat(cid) && resumoDaEquipe(cid);
+      allow delete: if sistema();
+
+      match /mensagens/{id} {
+        allow read: if podeChat('ver') && membroDoChat(cid);
+        allow create: if request.resource.data.keys().hasOnly(['texto', 'usuarioId', 'usuarioNome', 'criadaEm'])
+          && textoAte(request.resource.data.texto, 1000) && request.resource.data.texto.size() > 0
+          && textoAte(request.resource.data.usuarioNome, 120)
+          && logado() && request.resource.data.usuarioId == request.auth.uid
+          && request.resource.data.criadaEm == request.time
+          && podeChat('criar') && membroDoChat(cid)
+          && getAfter(/databases/$(database)/documents/equipe_chat/$(cid)).data.ultimaId == id
+          && request.resource.data.usuarioNome == get(caminho('usuarios', request.auth.uid)).data.nome;
+        allow delete: if sistema();
+      }
+    }
+    // quando cada pessoa abriu cada conversa (para saber o que é novo): só a própria pessoa lê e grava
+    match /equipe_lidas/{uid} {
+      allow read: if logado() && request.auth.uid == uid;
+      allow create, update: if daEquipe() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['lidas']) && request.resource.data.lidas is map && request.resource.data.lidas.size() <= 200;
+      allow delete: if logado() && request.auth.uid == uid || sistema();
+    }
+
     /* ---------- afilhados (aplicativo) ---------- */
     function novoCliente() {
       return logado() && !exists(caminho('clientes', request.auth.uid)) && existsAfter(caminho('clientes', request.auth.uid));

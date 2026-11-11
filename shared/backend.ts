@@ -9,7 +9,7 @@ import {
   reauthenticateWithCredential, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, updateCurrentUser, updatePassword, type UserCredential,
 } from 'firebase/auth';
 import {
-  arrayRemove, arrayUnion, collection, connectFirestoreEmulator, doc, getDoc, getDocFromServer, getDocs, increment, initializeFirestore, limit, onSnapshot, orderBy, persistentLocalCache, persistentMultipleTabManager, query, runTransaction, serverTimestamp, startAfter, updateDoc, where, writeBatch,
+  arrayRemove, arrayUnion, collection, connectFirestoreEmulator, doc, getDoc, getDocFromServer, getDocs, increment, initializeFirestore, limit, onSnapshot, orderBy, persistentLocalCache, persistentMultipleTabManager, query, runTransaction, serverTimestamp, setDoc, startAfter, updateDoc, where, writeBatch,
   type DocumentReference, type DocumentSnapshot, type Firestore, type Query, type Timestamp, type WriteBatch,
 } from 'firebase/firestore';
 import { EMULADOR, EMULADOR_AUTH, EMULADOR_FIRESTORE, firebaseConfig } from './firebase-config';
@@ -29,6 +29,16 @@ export interface Conversa {
   id: string; clienteNome: string; clienteNumero: number; ultimaMensagem: string; ultimaEm: string; ultimoAutor: 'afilhado' | 'equipe';
   naoLidasEquipe: number; naoLidasAfilhado: number;
 }
+/** Conversa do chat interno da equipe: o canal geral (id "geral") ou a conversa direta entre dois usuários do CRM. */
+export interface ConversaEquipe {
+  id: string; tipo: 'geral' | 'direta'; membros: string[]; ultimaMensagem: string; ultimaEm: string; ultimoAutorId: string; ultimoAutorNome: string;
+}
+/** Mensagem do chat interno da equipe. */
+export interface MensagemEquipe { id: string; texto: string; usuarioId: string; usuarioNome: string; criadaEm: string; pendente: boolean }
+/** Usuário ativo do CRM, para começar uma conversa direta. */
+export interface Colega { id: string; nome: string; foto: string | null }
+/** Id da conversa direta entre dois usuários: o mesmo para os dois lados. Igual a `membroDoChat()` em firestore.rules. */
+export const idConversaDireta = (a: string, b: string) => `d_${[a, b].sort().join('_')}`;
 const MENSAGENS_POR_VEZ = 30;
 const fail = (status: number, message: string): never => {
   throw new ApiError(status, message);
@@ -69,6 +79,11 @@ export const BASE_DA_PAGINA: Record<string, string> = {
 /** Telas de cada cadastro: quem tem alguma delas usa o cadastro (o banco libera o cadastro inteiro; cada tela mostra a sua parte). */
 export const PAGINAS_DA_COLECAO: Record<string, string[]> = Object.entries(BASE_DA_PAGINA)
   .reduce<Record<string, string[]>>((m, [pg, base]) => ((m[base] ??= [base]).push(pg), m), {});
+/**
+ * Módulos liberados para toda a equipe enquanto a função não marcar nada para eles (funções gravadas antes de o módulo existir):
+ * o chat interno começa liberado para conversar (nível Editar: ver e enviar). Igual a `chatNaFuncao()` em firestore.rules.
+ */
+export const PADRAO_DO_MODULO: Record<string, string[]> = { chat: ['ver', 'criar', 'editar'] };
 /** Áreas antigas que herdaram permissões de outra (Vendas foi separada de Marketing). */
 const LEGADO: Record<string, string> = { vnd: 'mkt' };
 export const MODULOS = Object.keys(PAI_DO_MODULO).concat('mon');
@@ -101,7 +116,7 @@ const AREAS = ['dir', 'atd', 'vnd', 'mkt', 'rh', 'dp', 'adm', 'fin', 'jur', 'fis
 export function permissaoDe(perm: Record<string, unknown>, k: string): unknown {
   const base = BASE_DA_PAGINA[k] ?? k;
   for (const chave of [k, IRMA_DA_PAGINA[k], base, PAI_DO_MODULO[base], LEGADO[PAI_DO_MODULO[base] ?? ''], LEGADO[k]]) if (chave && chave in perm) return perm[chave];
-  return undefined;
+  return PADRAO_DO_MODULO[k];
 }
 
 /** Nome da função de sistema (acesso total). Antes se chamava "Administrador": o nome gravado é trocado ao exibir. */
@@ -2805,6 +2820,106 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       await updateDoc(doc(db, 'conversas', uid), { [kind === 'crm' ? 'naoLidasEquipe' : 'naoLidasAfilhado']: 0 }).catch(() => undefined);
     },
   };
+  /* ---------- chat interno da equipe (CRM) ----------
+   * Canal geral (equipe_chat/geral) e conversas diretas entre dois usuários (equipe_chat/d_<uid>_<uid>), cada uma com o resumo
+   * (última mensagem) e as mensagens em equipe_chat/<id>/mensagens. O que cada pessoa já leu fica em equipe_lidas/<uid>
+   * (a data em que abriu cada conversa): há novidade quando a última mensagem é de outra pessoa e mais nova que essa data.
+   * Ao vivo ficam só o canal geral, as conversas diretas da pessoa (só o resumo) e a conversa aberta (30 mensagens). */
+  const lerConversaEquipe = (s: DocumentSnapshot): ConversaEquipe => {
+    const d = s.data({ serverTimestamps: 'estimate' }) ?? {};
+    return {
+      id: s.id, tipo: s.id === 'geral' ? 'geral' : 'direta', membros: Array.isArray(d.membros) ? d.membros.map(String) : [],
+      ultimaMensagem: String(d.ultimaMensagem ?? ''), ultimaEm: quando(d.ultimaEm),
+      ultimoAutorId: String(d.ultimoAutorId ?? ''), ultimoAutorNome: String(d.ultimoAutorNome ?? ''),
+    };
+  };
+  const lerMensagemEquipe = (s: DocumentSnapshot): MensagemEquipe => {
+    const d = s.data({ serverTimestamps: 'estimate' }) ?? {};
+    return {
+      id: s.id, texto: String(d.texto ?? ''), usuarioId: String(d.usuarioId ?? ''), usuarioNome: String(d.usuarioNome ?? ''),
+      criadaEm: quando(d.criadaEm), pendente: s.metadata.hasPendingWrites,
+    };
+  };
+  const mensagensDaEquipe = (id: string) => collection(db, 'equipe_chat', id, 'mensagens');
+  const maisAntigaEquipe = new Map<string, DocumentSnapshot>();
+  const chatEquipe = {
+    MENSAGENS_POR_VEZ,
+    /** Canal geral e conversas diretas da pessoa (só os resumos), da mais recente para a mais antiga. */
+    ouvirConversas(uid: string, cb: (c: ConversaEquipe[]) => void, erro?: (e: Error) => void) {
+      let geral: ConversaEquipe | null = null, diretas: ConversaEquipe[] = [];
+      let prontos = 0;
+      const avisar = () => { if (prontos === 3) cb([...(geral ? [geral] : []), ...diretas].sort((a, b) => b.ultimaEm.localeCompare(a.ultimaEm))); };
+      const pararGeral = ouvir(() => onSnapshot(doc(db, 'equipe_chat', 'geral'), (s) => {
+        if (!(prontos & 1)) prontos += 1;
+        geral = s.exists() ? lerConversaEquipe(s) : null;
+        avisar();
+      }, (e) => erro?.(e)));
+      const pararDiretas = ouvir(() => onSnapshot(query(collection(db, 'equipe_chat'), where('membros', 'array-contains', uid)), (s) => {
+        if (!(prontos & 2)) prontos += 2;
+        diretas = s.docs.map(lerConversaEquipe);
+        avisar();
+      }, (e) => erro?.(e)));
+      return () => { pararGeral(); pararDiretas(); };
+    },
+    /** Quando a pessoa abriu cada conversa pela última vez (id da conversa → data ISO). */
+    ouvirLidas(uid: string, cb: (lidas: Record<string, string>) => void) {
+      return ouvir(() => onSnapshot(doc(db, 'equipe_lidas', uid), (s) => {
+        const l = (s.data({ serverTimestamps: 'estimate' })?.lidas ?? {}) as Record<string, unknown>;
+        cb(Object.fromEntries(Object.entries(l).map(([k, v]) => [k, quando(v)])));
+      }, () => cb({})));
+    },
+    /** As últimas mensagens da conversa aberta, ao vivo, da mais antiga para a mais nova. */
+    ouvirMensagens(id: string, cb: (m: MensagemEquipe[], temMais: boolean) => void, erro?: (e: Error) => void) {
+      return ouvir(() => onSnapshot(query(mensagensDaEquipe(id), orderBy('criadaEm', 'desc'), limit(MENSAGENS_POR_VEZ)), { includeMetadataChanges: true }, (s) => {
+        if (s.docs.length) maisAntigaEquipe.set(id, s.docs[s.docs.length - 1]);
+        cb(s.docs.map(lerMensagemEquipe).reverse(), s.docs.length === MENSAGENS_POR_VEZ);
+      }, (e) => erro?.(e)));
+    },
+    /** Mensagens anteriores às já carregadas (lidas uma vez, sem ficar ao vivo). */
+    async anteriores(id: string): Promise<{ mensagens: MensagemEquipe[]; temMais: boolean }> {
+      const ultima = maisAntigaEquipe.get(id);
+      if (!ultima) return { mensagens: [], temMais: false };
+      const s = await getDocs(query(mensagensDaEquipe(id), orderBy('criadaEm', 'desc'), startAfter(ultima), limit(MENSAGENS_POR_VEZ)));
+      if (s.docs.length) maisAntigaEquipe.set(id, s.docs[s.docs.length - 1]);
+      return { mensagens: s.docs.map(lerMensagemEquipe).reverse(), temMais: s.docs.length === MENSAGENS_POR_VEZ };
+    },
+    /** Usuários ativos do CRM, para começar uma conversa direta (lidos uma vez, ao abrir a escolha). */
+    async colegas(): Promise<Colega[]> {
+      const s = await getDocs(collection(db, 'usuarios'));
+      return s.docs.map((d) => ({ id: d.id, ...d.data() }) as Dados).filter((u) => u.status === 'Ativo')
+        .map((u) => ({ id: String(u.id), nome: String(u.nome ?? ''), foto: typeof u.foto === 'string' && u.foto ? u.foto : null }))
+        .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    },
+    /** Envia uma mensagem: grava a mensagem e o resumo da conversa juntos. */
+    async enviar(id: string, texto: string) {
+      const t = texto.trim().slice(0, 1000);
+      if (!t) return;
+      const u = auth.currentUser;
+      if (!u) return fail(401, 'Sessão expirada. Entre novamente.');
+      const nome = String((await documento(`usuarios/${u.uid}`))?.nome ?? '');
+      const ref = doc(mensagensDaEquipe(id));
+      const lote = writeBatch(db);
+      lote.set(ref, { texto: t, usuarioId: u.uid, usuarioNome: nome, criadaEm: serverTimestamp() });
+      lote.set(doc(db, 'equipe_chat', id), {
+        tipo: id === 'geral' ? 'geral' : 'direta', membros: id === 'geral' ? [] : id.slice(2).split('_'),
+        ultimaMensagem: t.slice(0, 200), ultimaEm: serverTimestamp(), ultimoAutorId: u.uid, ultimoAutorNome: nome.slice(0, 120), ultimaId: ref.id,
+      });
+      // quem escreve já leu a conversa
+      lote.set(doc(db, 'equipe_lidas', u.uid), { lidas: { [id]: serverTimestamp() } }, { merge: true });
+      try {
+        await lote.commit();
+      } catch (e) {
+        if (codigo(e) === 'permission-denied') fail(403, semPermissao);
+        throw e;
+      }
+    },
+    /** Marca a conversa como lida agora (ao abrir, e quando chega mensagem com ela aberta). */
+    async marcarLida(id: string) {
+      const u = auth.currentUser;
+      if (u) await setDoc(doc(db, 'equipe_lidas', u.uid), { lidas: { [id]: serverTimestamp() } }, { merge: true }).catch(() => undefined);
+    },
+  };
+
   /** Conversa do afilhado com todas as mensagens, para apagar junto com ele. */
   async function refsDaConversa(uid: string) {
     const msgs = await getDocs(mensagensDe(uid)).catch(() => null);
@@ -2850,6 +2965,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   return {
     request,
     chat,
+    chatEquipe,
     /** Identificador da sessão atual (só é confiável depois da primeira chamada a `request`). */
     uid: () => auth.currentUser?.uid ?? null,
     sair,

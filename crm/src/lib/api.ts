@@ -29,3 +29,8 @@ export async function api<T>(path: string, options: { method?: string; body?: un
 /** Conversas com os afilhados (chat): só a conversa aberta e o resumo das conversas ficam ao vivo. */
 export const chat = backend.chat;
 export type { Conversa, Mensagem } from '../../../shared/backend';
+
+/** Chat interno da equipe: canal geral e conversas diretas entre usuários do CRM. */
+export const chatEquipe = backend.chatEquipe;
+export type { Colega, ConversaEquipe, MensagemEquipe } from '../../../shared/backend';
+export { idConversaDireta } from '../../../shared/backend';
