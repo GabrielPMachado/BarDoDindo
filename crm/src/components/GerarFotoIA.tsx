@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Check, Copy, Download, ExternalLink, ImageOff, Sparkles, Upload } from 'lucide-react';
-import { abrirGeminiSobreposto, cenarioDoBem, copoDoChopp, MODELOS, MODELOS_CHOPP, promptDaFoto, promptDaFotoChopp, promptDaFotoEstoque, promptDaFotoPatrimonio, type PadraoFoto } from '../lib/iaFoto';
+import { fotoComPlaquinha, realcarFoto } from '../lib/acabamentoChopp';
+import { abrirGeminiSobreposto, cenarioDoBem, copoDoChopp, estiloDoChopp, MODELOS, MODELOS_CHOPP, promptDaFoto, promptDaFotoChopp, promptDaFotoEstoque, promptDaFotoPatrimonio, type PadraoFoto } from '../lib/iaFoto';
 import { fotoNoTamanho } from './Avatar';
 import { notify } from './ui';
 
@@ -66,7 +67,12 @@ export function GerarFotoIA({ data, onUsar, padrao = 'produto' }: { data: Record
   const receber = async (arquivo?: File) => {
     if (!arquivo) return;
     setErro(null);
-    try { setNova(await fotoNoTamanho(arquivo)); } catch (e) { setErro(e instanceof Error ? e.message : 'Não foi possível ler a imagem.'); }
+    try {
+      // chopp: o Cérebro realça a foto e escreve a plaquinha deste chopp
+      setNova(padrao === 'chopp'
+        ? await fotoComPlaquinha(await realcarFoto(arquivo), copoDoChopp(nome, String(data.tamanho ?? '')), estiloDoChopp(nome, String(data.tamanho ?? '')))
+        : await fotoNoTamanho(arquivo));
+    } catch (e) { setErro(e instanceof Error ? e.message : 'Não foi possível ler a imagem.'); }
   };
 
   if (!aberto && !nova) {

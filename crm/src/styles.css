@@ -2061,6 +2061,9 @@ button.cal-ico:hover { transform: translateY(-1px); background: color-mix(in srg
 .refazer-fotos__nome { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .refazer-fotos__item.is-fora { opacity: .55; }
 .refazer-fotos__item.is-aberto { border-color: var(--brand-light); }
+.fotos-chopes__membros { margin: -4px 0 0; }
+.fotos-chopes__miniaturas { display: flex; gap: 6px; flex-wrap: wrap; }
+.fotos-chopes__miniaturas img { width: 72px; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); }
 .refazer-fotos__botoes { display: inline-flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
 .refazer-fotos__botoes label.btn { cursor: pointer; font-weight: 600; color: var(--text); font-size: 12.5px; }
 .refazer-fotos__lista { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
