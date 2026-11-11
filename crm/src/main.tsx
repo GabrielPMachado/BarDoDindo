@@ -25,6 +25,7 @@ import { Funcoes, Parametros, Usuarios } from './pages/Config';
 import MeuPerfil from './pages/MeuPerfil';
 import Conversas from './pages/Conversas';
 import ChatEquipe from './pages/ChatEquipe';
+import MinhasNotas from './pages/MinhasNotas';
 import QrCodeAfilhados from './pages/QrCode';
 import ResultadoQuestionario from './pages/ResultadoQuestionario';
 import { CaixaPage, ComandasPage, MesasPage } from './pages/Salao';
@@ -120,6 +121,7 @@ const CUSTOM: Record<string, () => ReactNode> = {
   '/atendimento/vouchers': () => <Resgates />,
   '/atendimento/conversas': () => <Conversas />,
   '/equipe/chat': () => <ChatEquipe />,
+  '/perfil/notas': () => <MinhasNotas />,
   '/monitoramento': () => <Monitoramento />,
   '/config/usuarios': () => <Usuarios />,
   '/config/funcoes': () => <Funcoes />,

@@ -1,5 +1,5 @@
-import { useEffect, useSyncExternalStore } from 'react';
-import { chatEquipe, type ConversaEquipe } from './api';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import { chatEquipe, type Colega, type ConversaEquipe } from './api';
 
 /*
  * Chat interno da equipe: um único conjunto de listeners por aba (canal geral, conversas diretas da pessoa e o que ela já leu),
@@ -39,3 +39,18 @@ export function useChatEquipe(uid: string | null | undefined, ligado: boolean) {
   const novas = uid ? (atual.conversas ?? []).filter((c) => temNovidade(c, uid, atual.lidas)).length : 0;
   return { ...atual, novas };
 }
+
+// os colegas (usuários ativos) são lidos uma vez por sessão: dão o nome e a foto de quem está do outro lado
+let colegasCache: Promise<Colega[]> | null = null;
+export function useColegas() {
+  const [colegas, setColegas] = useState<Colega[] | null>(null);
+  const [erro, setErro] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    (colegasCache ??= chatEquipe.colegas().catch((e) => { colegasCache = null; throw e; }))
+      .then((c) => vivo && setColegas(c)).catch(() => vivo && setErro(true));
+    return () => { vivo = false; };
+  }, []);
+  return { colegas, erro };
+}
+

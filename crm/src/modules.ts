@@ -75,6 +75,7 @@ export const AREAS: Area[] = [
     items: [
       { path: '/perfil', perm: 'eu', label: 'Meus dados' },
       { path: '/perfil/painel', perm: 'eu', label: 'Meu painel' },
+      { path: '/perfil/notas', perm: 'eu', label: 'Minhas notas' },
       // chat interno: permissão própria ("chat"), liberada para toda a equipe enquanto a função não marcar outra coisa
       { path: '/equipe/chat', perm: 'chat', label: 'Chat da equipe' },
       // temporário: será retirado depois

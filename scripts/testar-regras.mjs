@@ -526,13 +526,14 @@ if (senhaAtendente && senhaMarketing && senhaAdministrativo && senhaParametros) 
     const u = auth.currentUser;
     const ref = doc(collection(db, 'equipe_chat', cid, 'mensagens'));
     const lote = writeBatch(db);
-    lote.set(ref, { texto, usuarioId: u.uid, usuarioNome: extra.usuarioNome ?? extra.nome, criadaEm: serverTimestamp() });
+    lote.set(ref, { texto, usuarioId: u.uid, usuarioNome: extra.usuarioNome ?? extra.nome, criadaEm: serverTimestamp(), ...(extra.anexo ?? {}) });
     lote.set(doc(db, 'equipe_chat', cid), {
       tipo: cid === 'geral' ? 'geral' : 'direta', membros: extra.membros ?? (cid === 'geral' ? [] : cid.slice(2).split('_')),
       ultimaMensagem: texto, ultimaEm: serverTimestamp(), ultimoAutorId: extra.autorId ?? u.uid, ultimoAutorNome: extra.nome, ultimaId: ref.id,
     });
     lote.set(doc(db, 'equipe_lidas', u.uid), { lidas: { [cid]: serverTimestamp() } }, { merge: true });
     await lote.commit();
+    return ref.id;
   };
   const { user: at } = await signInWithEmailAndPassword(auth, 'atendente@teste.local', senhaAtendente);
   const uidDe = async (email) => (await getDocs(query(collection(db, 'usuarios'), where('email', '==', email)))).docs[0].id;
@@ -555,12 +556,35 @@ if (senhaAtendente && senhaMarketing && senhaAdministrativo && senhaParametros) 
   await negado('ler o que outra pessoa já leu', () => getDoc(doc(db, 'equipe_lidas', mk)));
   await negado('gravar o que outra pessoa já leu', () => setDoc(doc(db, 'equipe_lidas', mk), { lidas: {} }));
   await negado('apagar o canal geral', () => deleteDoc(doc(db, 'equipe_chat', 'geral')));
+  const foto = `data:image/jpeg;base64,${'A'.repeat(1000)}`;
+  await permitido('mandar foto/print no chat', () => enviarEquipe('geral', '', { nome, anexo: { imagem: foto } }));
+  await permitido('compartilhar uma nota no chat', () => enviarEquipe(direta, '', { nome, anexo: { nota: { titulo: 'Fechamento', texto: 'Contar o caixa' } } }));
+  await permitido('pingar uma página do Cérebro', () => enviarEquipe('geral', 'Feito!', { nome, anexo: { link: { caminho: '/estrutura/estoque', titulo: 'Atendente lançou a nota', detalhe: 'Estoque' } } }));
+  await negado('mensagem vazia sem anexo', () => enviarEquipe('geral', '', { nome }));
+  await negado('imagem que não é JPEG em data URL', () => enviarEquipe('geral', '', { nome, anexo: { imagem: `https://exemplo.com/${'a'.repeat(30)}.jpg` } }));
+  await negado('imagem grande demais', () => enviarEquipe('geral', '', { nome, anexo: { imagem: `data:image/jpeg;base64,${'A'.repeat(300001)}` } }));
+  await negado('link para fora do Cérebro', () => enviarEquipe('geral', '', { nome, anexo: { link: { caminho: 'javascript:alert(1)', titulo: 'x' } } }));
+  await negado('nota com campo a mais', () => enviarEquipe('geral', '', { nome, anexo: { nota: { titulo: 'x', texto: 'y', dono: 'z' } } }));
+  const minha = await enviarEquipe('geral', 'mensagem para apagar', { nome });
+  await permitido('apagar a própria mensagem', () => deleteDoc(doc(db, 'equipe_chat', 'geral', 'mensagens', minha)));
+  const daAtendente = await enviarEquipe('geral', 'esta fica', { nome });
+  // bloco de notas
+  const nota = doc(collection(db, 'notas', at.uid, 'itens'));
+  await permitido('criar nota no próprio bloco', () => setDoc(nota, { titulo: 'Lembrar', texto: 'Pedir gelo', criadaEm: serverTimestamp(), atualizadaEm: serverTimestamp() }));
+  await permitido('editar a própria nota', () => updateDoc(nota, { texto: 'Pedir gelo e limão', atualizadaEm: serverTimestamp() }));
+  await permitido('ler as próprias notas', () => getDocs(collection(db, 'notas', at.uid, 'itens')));
+  await negado('nota com campo a mais', () => setDoc(doc(collection(db, 'notas', at.uid, 'itens')), { titulo: 'x', texto: '', criadaEm: serverTimestamp(), atualizadaEm: serverTimestamp(), dono: 'x' }));
+  await negado('nota grande demais', () => setDoc(doc(collection(db, 'notas', at.uid, 'itens')), { titulo: 'x', texto: 'a'.repeat(5001), criadaEm: serverTimestamp(), atualizadaEm: serverTimestamp() }));
+  await negado('criar nota no bloco de outra pessoa', () => setDoc(doc(collection(db, 'notas', mk, 'itens')), { titulo: 'x', texto: '', criadaEm: serverTimestamp(), atualizadaEm: serverTimestamp() }));
+  await negado('ler as notas de outra pessoa', () => getDocs(collection(db, 'notas', mk, 'itens')));
   await signOut(auth);
 
   await signInWithEmailAndPassword(auth, 'marketing@teste.local', senhaMarketing);
   await permitido('o colega ler a conversa direta', () => getDocs(collection(db, 'equipe_chat', direta, 'mensagens')));
   await permitido('o colega achar a conversa na lista', () => getDocs(query(collection(db, 'equipe_chat'), where('membros', 'array-contains', mk))));
   await permitido('o colega responder', () => enviarEquipe(direta, 'Posso sim!', { nome: 'Marketing Teste' }));
+  await negado('apagar a mensagem de outra pessoa (sem Total no chat)', () => deleteDoc(doc(db, 'equipe_chat', 'geral', 'mensagens', daAtendente)));
+  await negado('ler a nota de outra pessoa', () => getDoc(nota));
   await signOut(auth);
 
   await signInWithEmailAndPassword(auth, 'administrativo@teste.local', senhaAdministrativo);
@@ -577,6 +601,7 @@ if (senhaAtendente && senhaMarketing && senhaAdministrativo && senhaParametros) 
   await signOut(auth);
 
   await signInWithEmailAndPassword(auth, 'cliente2@teste.local', senhaCliente);
+  await negado('afilhado criar nota', () => setDoc(doc(collection(db, 'notas', auth.currentUser.uid, 'itens')), { titulo: 'x', texto: '', criadaEm: serverTimestamp(), atualizadaEm: serverTimestamp() }));
   await negado('afilhado ler o chat da equipe', () => getDocs(collection(db, 'equipe_chat', 'geral', 'mensagens')));
   await negado('afilhado escrever no chat da equipe', () => enviarEquipe('geral', 'Oi', { nome: 'Cliente Teste' }));
   await signOut(auth);

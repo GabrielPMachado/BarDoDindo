@@ -7,6 +7,8 @@ import { useLastSync } from '../lib/data';
 import { useNaoLidasConversas } from '../lib/conversas';
 import { useChatEquipe } from '../lib/chatEquipe';
 import { AvisoChatEquipe } from './AvisoChatEquipe';
+import { EnviarAoChat } from './EnviarAoChat';
+import type { LinkDoCerebro } from '../lib/api';
 import { usePins } from '../lib/pins';
 import { useToqueLongo } from '../lib/toque';
 import { alternarAtalho, usePainelPrefs } from '../lib/preferencias';
@@ -38,8 +40,8 @@ interface MenuState extends MenuPos { path: string }
 /** Menu do botão direito sobre uma página: abrir em outra guia/janela, copiar o link e fixar no topo. */
 interface PainelOpcao { label: string; tem: boolean; alternar: () => void }
 
-function PageMenu({ menu, pinned, onPin, paineis, onClose }: {
-  menu: MenuState; pinned: boolean; onPin: () => void; paineis: PainelOpcao[]; onClose: () => void;
+function PageMenu({ menu, pinned, onPin, paineis, onEnviar, onClose }: {
+  menu: MenuState; pinned: boolean; onPin: () => void; paineis: PainelOpcao[]; onEnviar?: () => void; onClose: () => void;
 }) {
   const navigate = useNavigate();
   const copiar = async () => {
@@ -56,6 +58,7 @@ function PageMenu({ menu, pinned, onPin, paineis, onClose }: {
       <button role="menuitem" onClick={() => window.open(fullUrl(menu.path), '_blank')}><ExternalLink size={15} /> Abrir em nova guia</button>
       <button role="menuitem" onClick={() => window.open(fullUrl(menu.path), '_blank', 'popup,width=1320,height=860')}><AppWindow size={15} /> Abrir em nova janela</button>
       <button role="menuitem" onClick={copiar}><Copy size={15} /> Copiar link</button>
+      {onEnviar && <button role="menuitem" onClick={onEnviar}><MessagesSquare size={15} /> Mandar para o chat</button>}
       <div className="ctx__sep" />
       <button role="menuitem" onClick={onPin}>
         {pinned ? <><PinOff size={15} /> Desafixar</> : <><Pin size={15} /> Fixar</>}
@@ -117,6 +120,8 @@ export function Layout({ children }: { children: ReactNode }) {
   };
   const [menu, setMenu] = useState(false);
   const [ctx, setCtx] = useState<MenuState | null>(null);
+  // página mandada para o chat da equipe pelo botão direito do menu
+  const [enviarLink, setEnviarLink] = useState<LinkDoCerebro | null>(null);
   const painel = usePainelAoAbrir();
   const navRef = useRef<HTMLElement>(null);
   // celular e tablet: o menu lateral vira uma gaveta, aberta pelo botão ☰
@@ -442,9 +447,14 @@ export function Layout({ children }: { children: ReactNode }) {
         <PageMenu
           menu={ctx} pinned={isPinned(ctx.path)} onPin={() => toggle(ctx.path)}
           paineis={opcoesPainel(ctx.path)}
+          onEnviar={access('chat') !== 'none' ? () => {
+            const m = findModule(ctx.path);
+            setEnviarLink({ caminho: ctx.path, titulo: m?.item.label ?? 'Página do Cérebro', detalhe: m ? (localDe(ctx.path)?.departamento.label ?? m.area.label) : undefined });
+          } : undefined}
           onClose={() => setCtx(null)}
         />
       )}
+      {enviarLink && <EnviarAoChat link={enviarLink} onClose={() => setEnviarLink(null)} />}
       {painel.aberto && <PainelAtualizacoes piscar={painel.piscar} onClose={painel.fechar} />}
     </div>
   );
