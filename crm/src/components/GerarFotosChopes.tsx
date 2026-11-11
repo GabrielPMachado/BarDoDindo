@@ -186,7 +186,7 @@ export function GerarFotosChopes({ rows, onSalvar, onFim, onClose }: {
           Chopes de cor parecida usam a mesma foto: {grupos.length} {grupos.length === 1 ? 'foto gera' : 'fotos geram'} os {rows.length} chopes. {modo === 'gratis'
             ? 'Toque em "Copiar pedido" num grupo: o pedido é copiado, a foto modelo do copo é baixada e o Gemini abre por cima do Cérebro. Lá, anexe a foto modelo, cole o pedido e envie; depois copie a imagem pronta e cole aqui (Ctrl+V).'
             : 'Cada grupo marcado vai para o Gemini com a foto modelo do copo. Usa a chave da IA de Configurações → Parâmetros, que precisa do faturamento ativo no Google AI Studio.'}
-          {' '}O Cérebro realça contraste e nitidez e escreve a plaquinha de cada chopp; confira e toque em "Trocar".
+          {' '}A foto do Gemini vem com a plaquinha em branco: ao colar aqui, o Cérebro realça contraste, nitidez e o logo e escreve a plaquinha de cada chopp; confira e toque em "Trocar".
         </p>
         <div className="refazer-fotos__filtro">
           <span>{[...marcados].filter((k) => itens.some((g) => g.chave === k)).length} de {itens.length} grupos marcados</span>
