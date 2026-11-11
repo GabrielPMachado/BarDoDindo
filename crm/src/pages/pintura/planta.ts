@@ -108,7 +108,7 @@ export const LEGENDA: Record<Camada, { cor: string; nome: string; forma?: 'linha
 // as do balcão centradas nos 4,90 m dele; no fundo, 1 m de cada canto e uma no meio
 const TOMADAS_PAREDE_BALCAO = [1.5, 3.0, 4.5, 6.0];
 const TOMADAS_FRENTE_BALCAO = [1.5, 3.0, 4.5, 6.0];
-const TOMADAS_FUNDO = [1.0, PLANTA.larguraFundo / 2, PLANTA.larguraFundo - 1.0]; // t na parede do fundo
+const TOMADAS_FUNDO = [1.0, PLANTA.larguraFundo / 2, PLANTA.larguraFundo - 1.0]; // t na parede do fundo: 1 m dos cantos e o meio da parede
 const TOMADAS_LATERAL = [1.5, 3.0, 4.5, 6.0]; // d na lateral do salão
 const QUADRO = { d: 1.2, y: 1.6 };
 const ILUMINACAO = { d0: 1.12, d1: 7.61, t0: 0.53, t1: 3.1 };
@@ -247,7 +247,7 @@ export function criarCamadas(p: (d: number, t: number, y?: number) => THREE.Vect
     placa(p(d, tBase, altBalcao), paraBalcao, 20);
   }
   // 20 A dos freezers, na parede da frente ao lado deles, pelo alto da parede
-  const tFreezer = 1.2;
+  const tFreezer = 1.0; // planta cotada: 1 m da parede da esquerda de quem entra (a do balcão)
   circuito([p(QUADRO.d - 0.06, 0.03, QUADRO.y + 0.25), p(QUADRO.d - 0.06, 0.03, 2.6), p(0.03, 0.03, 2.6), p(0.03, tFreezer, 2.6), p(0.03, tFreezer, ALT_20A)], fio4);
   placa(p(0, tFreezer, ALT_20A), paraFrente.clone().negate(), 20);
 
