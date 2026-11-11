@@ -231,7 +231,7 @@ PRESERVAR, SEM NENHUMA ALTERAÇÃO
 - Formato 4:3, enquadramento, ângulo e altura da câmera, distância focal, profundidade de campo e desfoque do fundo.
 - Cenário: balcão de madeira escura em primeiro plano, luminária pendente de cobre acesa no alto à esquerda, plantas penduradas, prateleiras com garrafas, parede de tijolos e a placa redonda de madeira do Bar do Dindo (logo e letras idênticos).
 - ${d[0].toUpperCase()}${d.slice(1)}: mesmo formato, tamanho, posição no balcão, logo "BAR DO DINDO" gravado no vidro, reflexos e sombra.
-- A plaquinha de madeira à esquerda, com o texto que já está nela: não mexa (ela é trocada depois).
+- A plaquinha de madeira à esquerda fica lisa, SEM nenhum texto: não escreva nada nela (o nome do chopp é colocado depois).
 - Iluminação: a mesma luz quente da luminária e o mesmo balanço de branco.
 
 ALTERAR
