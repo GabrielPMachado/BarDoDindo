@@ -69,7 +69,7 @@ export function GerarFotosChopes({ rows, onSalvar, onFim, onClose }: {
   const acabar = async (g: Grupo, foto: Blob) => {
     mudar(g.chave, { st: 'acabando' });
     try {
-      const base = await realcarFoto(foto);
+      const base = await realcarFoto(foto, g.copo);
       const novas: Record<string, string> = {};
       for (const m of g.membros) novas[m.row.id] = await fotoComPlaquinha(base, g.copo, m.estilo);
       mudar(g.chave, { st: 'pronta', novas });

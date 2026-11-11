@@ -1,6 +1,7 @@
 /**
  * Acabamento das fotos dos chopes, feito no navegador depois que a foto volta do Gemini:
  * 1. realce: tira o véu (níveis e pretos mais fundos), dá clareza e nitidez — a foto modelo já vem suave e a IA copia isso;
+ *    depois põe em evidência a placa redonda da parede e o logo do copo (mais contraste local e nitidez só ali);
  * 2. plaquinha: cobre a plaquinha da foto com a madeira limpa e escreve o texto do chopp em Zilla Slab, sempre dentro da
  *    madeira (uma linha; se não couber, copo em cima e estilo embaixo).
  * As fotos do cardápio têm sempre o mesmo enquadramento (1024 × 764), então a plaquinha fica num lugar fixo.
@@ -15,6 +16,14 @@ const W = 1024, H = 764;
 const PLACA = { x: 40, y: 596, w: 332, h: 80 };
 const TEXTO = { x: 64, y: 606, w: 284, h: 60, margem: 14 };
 const FONTE = 'ZillaSlabDindo';
+type Area = { x: number; y: number; w: number; h: number };
+/** A placa redonda da parede (igual nos três copos) e o logo gravado em cada copo. */
+const PLACA_PAREDE: Area = { x: 700, y: 90, w: 250, h: 285 };
+const LOGO: Record<Copo, Area> = {
+  'Half-pint': { x: 410, y: 350, w: 200, h: 140 },
+  Pint: { x: 390, y: 250, w: 250, h: 170 },
+  Jarra: { x: 430, y: 280, w: 250, h: 140 },
+};
 /** Mesmo limite de `fotoNoTamanho` para as fotos de cadastro. */
 const LIMITE = 200_000;
 
@@ -48,8 +57,43 @@ function desfocada(origem: HTMLCanvasElement, raio: number) {
   return ctx.getImageData(0, 0, c.width, c.height).data;
 }
 
-/** Realce: níveis (corta 0,5% dos escuros e 0,3% dos claros), pretos um pouco mais fundos, clareza e nitidez. */
-export async function realcarFoto(fonte: Blob | string): Promise<HTMLCanvasElement> {
+/** Máscara unsharp nos dados: original + força × (original − desfocada), ignorando diferenças até o limiar. */
+function nitidez(c: HTMLCanvasElement, ctx: CanvasRenderingContext2D, raio: number, forca: number, limiar: number, brilho = 1) {
+  const base = ctx.getImageData(0, 0, c.width, c.height);
+  const b = base.data;
+  const d = desfocada(c, raio);
+  for (let i = 0; i < b.length; i += 4) {
+    for (let k = 0; k < 3; k++) {
+      const dif = b[i + k] - d[i + k];
+      const v = Math.abs(dif) > limiar ? b[i + k] + forca * dif : b[i + k];
+      b[i + k] = v * brilho;
+    }
+  }
+  ctx.putImageData(base, 0, 0);
+}
+
+/** Destaque local: mais clareza e nitidez numa área, misturada à foto por uma elipse de borda suave (sem emenda visível). */
+function destacar(foto: HTMLCanvasElement, a: Area, clareza: number, nit: number, brilho: number) {
+  const { c, ctx } = tela(a.w, a.h);
+  ctx.drawImage(foto, a.x, a.y, a.w, a.h, 0, 0, a.w, a.h);
+  nitidez(c, ctx, 12, clareza, 0);
+  nitidez(c, ctx, 1.2, nit, 1, brilho);
+  const m = tela(a.w, a.h);
+  const pena = Math.min(a.w, a.h) / 8;
+  m.ctx.filter = `blur(${pena}px)`;
+  m.ctx.beginPath();
+  m.ctx.ellipse(a.w / 2, a.h / 2, a.w / 2 - pena, a.h / 2 - pena, 0, 0, Math.PI * 2);
+  m.ctx.fill();
+  ctx.globalCompositeOperation = 'destination-in';
+  ctx.drawImage(m.c, 0, 0);
+  foto.getContext('2d')!.drawImage(c, a.x, a.y);
+}
+
+/**
+ * Realce: níveis (corta 0,5% dos escuros e 0,3% dos claros), pretos um pouco mais fundos, clareza e nitidez;
+ * com o copo, também põe em evidência a placa da parede e o logo do copo.
+ */
+export async function realcarFoto(fonte: Blob | string, copo?: Copo): Promise<HTMLCanvasElement> {
   const { c, ctx } = tela();
   ctx.drawImage(await imagem(fonte), 0, 0, W, H);
   const dados = ctx.getImageData(0, 0, W, H);
@@ -69,18 +113,10 @@ export async function realcarFoto(fonte: Blob | string): Promise<HTMLCanvasEleme
   ctx.putImageData(dados, 0, 0);
   if (!temFiltro(ctx)) return c;
   // clareza (contraste local) e nitidez: original + força × (original − desfocada)
-  for (const [raio, forca, limiar] of [[25, 0.22, 0], [1.4, 0.7, 2]] as const) {
-    const base = ctx.getImageData(0, 0, W, H);
-    const b = base.data;
-    const d = desfocada(c, raio);
-    for (let i = 0; i < b.length; i += 4) {
-      for (let k = 0; k < 3; k++) {
-        const dif = b[i + k] - d[i + k];
-        if (Math.abs(dif) > limiar) b[i + k] = b[i + k] + forca * dif;
-      }
-    }
-    ctx.putImageData(base, 0, 0);
-  }
+  nitidez(c, ctx, 25, 0.22, 0);
+  nitidez(c, ctx, 1.4, 0.7, 2);
+  destacar(c, PLACA_PAREDE, 0.6, 0.9, 1.06);
+  if (copo) destacar(c, LOGO[copo], 0.7, 1.1, 1);
   return c;
 }
 
@@ -95,7 +131,7 @@ let madeira: Promise<CanvasImageSource> | null = null;
 function gravar(ctx: CanvasRenderingContext2D, texto: string, x: number, y: number) {
   ctx.fillStyle = 'rgba(214, 176, 128, .9)';
   ctx.fillText(texto, x, y + 1);
-  ctx.fillStyle = 'rgb(48, 30, 18)';
+  ctx.fillStyle = 'rgb(36, 22, 12)';
   ctx.fillText(texto, x, y);
 }
 
@@ -116,16 +152,16 @@ export async function fotoComPlaquinha(base: HTMLCanvasElement, copo: Copo, esti
   ctx.textBaseline = 'middle';
   const medir = (t: string, px: number) => { ctx.font = `700 ${px}px ${FONTE}`; return ctx.measureText(t).width; };
   const linha = plaquinhaDoChopp(copo, estilo);
-  // uma linha, do tamanho das fotos aprovadas (20 px) até 17 px
-  let px = 20;
-  while (px > 17 && medir(linha, px) > largura) px--;
+  // uma linha, grande para ler de longe (24 px) até 19 px
+  let px = 24;
+  while (px > 19 && medir(linha, px) > largura) px--;
   if (medir(linha, px) <= largura) {
     gravar(ctx, linha, cx, cy);
   } else {
     // duas linhas: o copo em cima e o estilo embaixo, diminuindo até caber
     const [l1, l2] = [copo.toUpperCase(), estilo.toUpperCase()];
-    px = 19;
-    while (px > 10 && Math.max(medir(l1, px), medir(l2, px)) > largura) px--;
+    px = 22;
+    while (px > 11 && Math.max(medir(l1, px), medir(l2, px)) > largura) px--;
     ctx.font = `700 ${px}px ${FONTE}`;
     const passo = Math.round(px * 0.6) + 1;
     gravar(ctx, l1, cx, cy - passo);
