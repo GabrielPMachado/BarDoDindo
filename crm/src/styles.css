@@ -2065,6 +2065,12 @@ button.cal-ico:hover { transform: translateY(-1px); background: color-mix(in srg
 .fotos-chopes__membros { margin: -4px 0 0; }
 .fotos-chopes__miniaturas { display: flex; gap: 6px; flex-wrap: wrap; }
 .fotos-chopes__miniaturas img { width: 72px; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); }
+.fotos-chopes__titulo { display: flex; align-items: center; gap: 6px; margin: 18px 0 8px; font-size: 1rem; color: var(--good); }
+.fotos-chopes__trocadas { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; }
+.fotos-chopes__trocadas li { display: flex; align-items: center; gap: 10px; padding: 8px; border: 1px solid var(--border); border-radius: 10px; opacity: .85; }
+.fotos-chopes__trocadas li > div { flex: 1; min-width: 0; }
+.fotos-chopes__trocadas li p { margin: 2px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fotos-chopes__trocadas img, .fotos-chopes__trocadas .gerar-foto__vazio { width: 72px; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 6px; flex: none; }
 .refazer-fotos__botoes { display: inline-flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
 .refazer-fotos__botoes label.btn { cursor: pointer; font-weight: 600; color: var(--text); font-size: 12.5px; }
 .refazer-fotos__lista { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
