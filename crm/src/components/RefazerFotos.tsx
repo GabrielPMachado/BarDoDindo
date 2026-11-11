@@ -1,7 +1,7 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Check, Copy, Download, ExternalLink, ImageOff, Loader2, RefreshCw, Sparkles, Square, Upload } from 'lucide-react';
 import type { Row } from '../lib/data';
-import { ErroDaChave, MODELOS, abrirGeminiSobreposto, copoDoChopp, gerarFotoChopp, gerarFotoEstoque, promptDaFotoChopp, promptDaFotoEstoque } from '../lib/iaFoto';
+import { ErroDaChave, MODELOS, MODELOS_CHOPP, abrirGeminiSobreposto, copoDoChopp, gerarFotoChopp, gerarFotoEstoque, promptDaFotoChopp, promptDaFotoEstoque } from '../lib/iaFoto';
 import { fotoNoTamanho } from './Avatar';
 import { baixar, copiar, nomeArquivo } from './GerarFotoIA';
 import { Modal, notify } from './ui';
@@ -30,7 +30,7 @@ function baixarFoto(dataUrl: string, nome: string) {
   } catch { baixar(dataUrl, nome); }
 }
 
-/** estoque: itens do depósito (a foto atual vai de referência); chopp: os tamanhos dos chopes do cardápio, no padrão da Pint APA. */
+/** estoque: itens do depósito (a foto atual vai de referência); chopp: os tamanhos dos chopes do cardápio, a partir da APA no mesmo copo. */
 export type TipoRefazer = 'estoque' | 'chopp';
 const TIPOS: Record<TipoRefazer, {
   titulo: string; nome: (r: Row) => string; pedido: (r: Row) => string; gerar: (r: Row, s: AbortSignal) => Promise<string>;
@@ -45,7 +45,7 @@ const TIPOS: Record<TipoRefazer, {
     }, temFoto(r)),
     gerar: gerarFotoEstoque,
     referencia: true,
-    gratis: 'Marque os itens e toque em "Abrir o próximo no Gemini": o pedido do item é copiado, a foto modelo (na primeira vez) e a foto atual são baixadas e o Gemini abre numa janela ao lado do Cérebro. Lá, cole o pedido, anexe as fotos e envie. Salve a imagem criada e envie no cartão do item; depois toque em "Trocar".',
+    gratis: 'Marque os itens e toque em "Abrir o próximo no Gemini": o pedido do item é copiado, a foto modelo e a foto atual são baixadas e o Gemini abre numa janela por cima do Cérebro. Lá, cole o pedido, anexe as fotos e envie. Copie a imagem criada e cole aqui (Ctrl+V), ou envie no cartão do item; depois toque em "Trocar".',
     automatico: 'Cada item marcado vai para o Gemini com a foto modelo do depósito e a foto atual como referência; a nova sai em alta resolução. Usa a chave da IA de Configurações → Parâmetros, que precisa do faturamento ativo no Google AI Studio (o plano gratuito não gera imagens).',
   },
   chopp: {
@@ -54,8 +54,8 @@ const TIPOS: Record<TipoRefazer, {
     pedido: (r) => promptDaFotoChopp({ nome: String(r.nome ?? ''), tamanho: String(r.tamanho ?? '') }),
     gerar: gerarFotoChopp,
     referencia: false,
-    gratis: 'Marque os chopes e toque em "Abrir o próximo no Gemini": o pedido do chopp (copo pelo tamanho, cor pelo estilo e o texto da plaquinha) é copiado, a foto modelo (a Pint APA no balcão) é baixada na primeira vez e o Gemini abre numa janela ao lado do Cérebro. Lá, anexe a foto modelo, cole o pedido e envie. Salve a imagem criada e envie no cartão do chopp; depois toque em "Trocar".',
-    automatico: 'Cada chopp marcado vai para o Gemini com a foto modelo (a Pint APA no balcão); a nova sai no mesmo padrão. Usa a chave da IA de Configurações → Parâmetros, que precisa do faturamento ativo no Google AI Studio (o plano gratuito não gera imagens).',
+    gratis: 'Marque os chopes e toque em "Abrir o próximo no Gemini": o pedido do chopp (copo pelo tamanho, cor pelo estilo e o texto da plaquinha) é copiado, a foto modelo do copo (a APA aprovada em half-pint, pint ou jarra) é baixada e o Gemini abre numa janela por cima do Cérebro. Lá, anexe a foto modelo, cole o pedido e envie. Copie a imagem criada e cole aqui (Ctrl+V), ou envie no cartão do chopp; depois toque em "Trocar". O "Copiar pedido" de cada cartão faz o mesmo.',
+    automatico: 'Cada chopp marcado vai para o Gemini com a foto modelo do mesmo copo (a APA aprovada); a nova sai no mesmo padrão. Usa a chave da IA de Configurações → Parâmetros, que precisa do faturamento ativo no Google AI Studio (o plano gratuito não gera imagens).',
   },
 };
 
@@ -86,7 +86,6 @@ export function RefazerFotos({ tipo = 'estoque', rows, onSalvar, onFim, onClose 
   const [salvando, setSalvando] = useState(false);
   const [erroGeral, setErroGeral] = useState<string | null>(null);
   const parar = useRef<AbortController | null>(null);
-  const modeloBaixado = useRef(false);
 
   const mudar = (id: string, e: Estado) => setEstados((s) => ({ ...s, [id]: e }));
   const est = (r: Row): Estado => estados[r.id] ?? { st: 'fila' };
@@ -97,27 +96,47 @@ export function RefazerFotos({ tipo = 'estoque', rows, onSalvar, onFim, onClose 
   const proximo = itens.find((r) => marcados.has(r.id) && est(r).st === 'fila');
 
   /**
-   * Grátis: copia o pedido do item, baixa a foto modelo (só na primeira vez) e a foto atual, e abre o Gemini numa janela sobreposta.
+   * Grátis: um toque copia o pedido do item, baixa a foto modelo (e a atual, de referência) e abre o Gemini numa janela por
+   * cima do Cérebro. A foto pronta volta colando (Ctrl+V) aqui ou pelo "Enviar foto pronta" do cartão.
    * A cópia começa antes de abrir a aba: depois que o Gemini abre, a página perde o foco e o navegador não deixa copiar.
    */
   const abrirNoGemini = (r: Row) => {
     const copiou = copiar(t.pedido(r));
-    const modelo = MODELOS[tipo];
+    const modelo = tipo === 'chopp' ? MODELOS_CHOPP[copoDoChopp(t.nome(r), String(r.tamanho ?? ''))] : MODELOS[tipo];
     const comReferencia = t.referencia && temFoto(r);
     // a foto atual vai primeiro: o navegador costuma barrar o segundo download do mesmo clique, e a referência é a que importa
     if (comReferencia) baixarFoto(String(r.foto), nomeReferencia(r));
-    if (!modeloBaixado.current) { baixar(modelo.url, modelo.arquivo); modeloBaixado.current = true; }
+    // a foto modelo baixa a cada pedido: fica sempre à mão na pasta de downloads para anexar no Gemini
+    baixar(modelo.url, modelo.arquivo);
     abrirGeminiSobreposto();
+    ultimoAberto.current = r.id;
     mudar(r.id, { st: 'aberto' });
     void copiou.then((ok) => notify(ok
-      ? `Pedido de "${t.nome(r)}" copiado. No Gemini: cole o pedido, anexe a foto modelo${comReferencia ? ' e a foto de referência (se ela não baixou, use "Baixar foto atual" no cartão do item)' : ''} e envie.`
-      : 'Fotos baixadas, mas não deu para copiar o pedido: toque em "Abrir de novo" no cartão do item.', ok ? 'ok' : 'error'));
+      ? `Pedido de "${t.nome(r)}" copiado e foto modelo baixada. No Gemini: cole o pedido, anexe a foto modelo${comReferencia ? ' e a de referência' : ''} e envie. Depois copie a imagem pronta e cole aqui (Ctrl+V).`
+      : 'Foto modelo baixada, mas não deu para copiar o pedido: toque em "Copiar de novo" no cartão do item.', ok ? 'ok' : 'error'));
   };
+
+  // Ctrl+V com uma imagem (copiada no Gemini) vai para o último item aberto no Gemini
+  const ultimoAberto = useRef<string | null>(null);
+  const receberRef = useRef<(r: Row, arquivo?: File) => Promise<void>>(async () => undefined);
+  useEffect(() => {
+    const colar = (e: ClipboardEvent) => {
+      const arquivo = Array.from(e.clipboardData?.files ?? []).find((f) => f.type.startsWith('image/'));
+      if (!arquivo) return;
+      const r = todos.find((x) => x.id === ultimoAberto.current);
+      if (!r) { notify('Abra um item no Gemini antes de colar a foto pronta.', 'error'); return; }
+      e.preventDefault();
+      void receberRef.current(r, arquivo).then(() => notify(`Foto colada em "${t.nome(r)}". Confira e toque em "Trocar".`));
+    };
+    window.addEventListener('paste', colar);
+    return () => window.removeEventListener('paste', colar);
+  });
 
   const receber = async (r: Row, arquivo?: File) => {
     if (!arquivo) return;
     try { mudar(r.id, { st: 'pronta', nova: await fotoNoTamanho(arquivo), usar: true }); } catch (e) { mudar(r.id, { st: 'erro', erro: e instanceof Error ? e.message : 'Não foi possível ler a imagem.' }); }
   };
+  receberRef.current = receber;
 
   /** Automático: gera uma por vez (a cota da IA não aguenta muitas juntas); erro de chave para a fila inteira. */
   const gerar = async (lista: Row[]) => {
@@ -243,8 +262,7 @@ export function RefazerFotos({ tipo = 'estoque', rows, onSalvar, onFim, onClose 
                       {t.referencia && temFoto(r) && (
                         <button className="btn btn--ghost btn--sm" onClick={() => baixarFoto(String(r.foto), nomeReferencia(r))} title="Baixa a foto atual para anexar no Gemini"><Download size={13} /> Baixar foto atual</button>
                       )}
-                      <button className="btn btn--ghost btn--sm" onClick={async () => notify(await copiar(t.pedido(r)) ? 'Pedido copiado.' : 'Não foi possível copiar.', 'ok')} title="Copia só o pedido deste item"><Copy size={13} /> Copiar pedido</button>
-                      <button className="btn btn--ghost btn--sm" disabled={salvando} onClick={() => abrirNoGemini(r)} title="Copia o pedido, baixa as fotos e abre o Gemini"><ExternalLink size={13} /> {e.st === 'fila' ? 'Abrir no Gemini' : 'Abrir de novo'}</button>
+                      <button className="btn btn--ghost btn--sm" disabled={salvando} onClick={() => abrirNoGemini(r)} title="Copia o pedido, baixa a foto modelo e abre o Gemini por cima do Cérebro"><Copy size={13} /> {e.st === 'fila' ? 'Copiar pedido' : 'Copiar de novo'}</button>
                       <label className="btn btn--ghost btn--sm">
                         <Upload size={13} /> {e.nova ? 'Outra foto' : 'Enviar foto pronta'}
                         <input type="file" accept="image/*" hidden onChange={(ev) => { void receber(r, ev.target.files?.[0]); ev.target.value = ''; }} />

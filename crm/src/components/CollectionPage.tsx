@@ -413,7 +413,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
               <button className="btn btn--ghost" disabled={!all.length} onClick={() => setRefazendoFotos(true)}><Sparkles size={16} /> Refazer fotos em alta</button>
             )}
             {def.tamanhos && canEdit && (
-              <button className="btn btn--ghost" disabled={!chopes.length} onClick={() => setRefazendoFotos(true)} title="Gera as fotos dos chopes no padrão da Pint APA, pelo Gemini">
+              <button className="btn btn--ghost" disabled={!chopes.length} onClick={() => setRefazendoFotos(true)} title="Gera as fotos dos chopes no padrão do cardápio, pelo Gemini">
                 <Sparkles size={16} /> Gerar fotos dos chopes
               </button>
             )}

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Check, Copy, Download, ExternalLink, ImageOff, Sparkles, Upload } from 'lucide-react';
-import { abrirGeminiSobreposto, cenarioDoBem, MODELOS, promptDaFoto, promptDaFotoChopp, promptDaFotoEstoque, promptDaFotoPatrimonio, type PadraoFoto } from '../lib/iaFoto';
+import { abrirGeminiSobreposto, cenarioDoBem, copoDoChopp, MODELOS, MODELOS_CHOPP, promptDaFoto, promptDaFotoChopp, promptDaFotoEstoque, promptDaFotoPatrimonio, type PadraoFoto } from '../lib/iaFoto';
 import { fotoNoTamanho } from './Avatar';
 import { notify } from './ui';
 
@@ -35,8 +35,10 @@ export function GerarFotoIA({ data, onUsar, padrao = 'produto' }: { data: Record
   const fotoAtual = typeof data.foto === 'string' ? data.foto : '';
   const modelo = MODELOS[padrao];
   const oQue = modelo.oQue;
-  const baixarModelo = () => baixar(modelo.url, modelo.arquivo);
   const nome = String((padrao === 'estoque' ? data.item : data.nome) ?? '').trim();
+  // chopp: a foto modelo é a APA aprovada no mesmo copo do tamanho (half-pint, pint ou jarra)
+  const arquivoModelo = padrao === 'chopp' ? MODELOS_CHOPP[copoDoChopp(nome, String(data.tamanho ?? ''))] : modelo;
+  const baixarModelo = () => baixar(arquivoModelo.url, arquivoModelo.arquivo);
   const prompt = () => padrao === 'estoque'
     ? promptDaFotoEstoque({ item: nome, categoria: String(data.categoria ?? ''), unidade: String(data.unidade ?? ''), conteudo: data.conteudo, conteudoUnidade: String(data.conteudoUnidade ?? '') })
     : padrao === 'chopp'
@@ -103,7 +105,7 @@ export function GerarFotoIA({ data, onUsar, padrao = 'produto' }: { data: Record
           </ol>
           <div className="gerar-foto__extras">
             <span className="muted small">Algo não funcionou?</span>
-            <button type="button" className="btn btn--ghost btn--sm" onClick={async () => notify(await copiar(prompt()) ? 'Pedido copiado.' : 'Não foi possível copiar.')}><Copy size={14} /> Copiar pedido</button>
+            <button type="button" className="btn btn--ghost btn--sm" onClick={criarNoGemini} title="Copia o pedido, baixa a foto modelo e abre o Gemini por cima do Cérebro"><Copy size={14} /> Copiar pedido de novo</button>
             <button type="button" className="btn btn--ghost btn--sm" onClick={baixarModelo}><Download size={14} /> Baixar foto modelo</button>
             <button type="button" className="btn btn--ghost btn--sm" onClick={abrirGeminiSobreposto}><ExternalLink size={14} /> Abrir o Gemini</button>
           </div>
