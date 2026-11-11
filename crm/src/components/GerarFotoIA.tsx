@@ -69,8 +69,10 @@ export function GerarFotoIA({ data, onUsar, padrao = 'produto' }: { data: Record
     setErro(null);
     try {
       // chopp: o Cérebro realça a foto e escreve a plaquinha deste chopp
+      const tamanho = String(data.tamanho ?? '');
+      const copo = copoDoChopp(nome, tamanho);
       setNova(padrao === 'chopp'
-        ? await fotoComPlaquinha(await realcarFoto(arquivo), copoDoChopp(nome, String(data.tamanho ?? '')), estiloDoChopp(nome, String(data.tamanho ?? '')))
+        ? await fotoComPlaquinha(await realcarFoto(arquivo, copo), copo, estiloDoChopp(nome, tamanho))
         : await fotoNoTamanho(arquivo));
     } catch (e) { setErro(e instanceof Error ? e.message : 'Não foi possível ler a imagem.'); }
   };
