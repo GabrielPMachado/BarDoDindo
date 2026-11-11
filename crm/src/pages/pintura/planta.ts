@@ -104,11 +104,12 @@ export const LEGENDA: Record<Camada, { cor: string; nome: string; forma?: 'linha
   ],
 };
 
-// pontos tirados das plantas (d em metros a partir da frente)
-const TOMADAS_PAREDE_BALCAO = [2.09, 3.35, 4.47, 5.51];
-const TOMADAS_FRENTE_BALCAO = [2.13, 3.35, 4.33, 5.41];
-const TOMADAS_FUNDO = [0.49, 1.97, 3.44]; // t na parede do fundo
-const TOMADAS_LATERAL = [2.01, 3.7, 5.33, 7.26]; // d na lateral do salão
+// pontos da planta elétrica cotada (d em metros a partir da frente): tomadas a cada 1,50 m,
+// as do balcão centradas nos 4,90 m dele; no fundo, 1 m de cada canto e uma no meio
+const TOMADAS_PAREDE_BALCAO = [1.5, 3.0, 4.5, 6.0];
+const TOMADAS_FRENTE_BALCAO = [1.5, 3.0, 4.5, 6.0];
+const TOMADAS_FUNDO = [1.0, PLANTA.larguraFundo / 2, PLANTA.larguraFundo - 1.0]; // t na parede do fundo
+const TOMADAS_LATERAL = [1.5, 3.0, 4.5, 6.0]; // d na lateral do salão
 const QUADRO = { d: 1.2, y: 1.6 };
 const ILUMINACAO = { d0: 1.12, d1: 7.61, t0: 0.53, t1: 3.1 };
 const PONTOS_AGUA = [1.7, 3.39, 5.38];
