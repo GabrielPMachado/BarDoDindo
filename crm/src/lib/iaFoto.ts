@@ -241,8 +241,8 @@ PADRÃO DE QUALIDADE
 - Edite só a cerveja e o colarinho. O resto da imagem deve sair igual ao original: não regenere nem suavize o cenário.
 - Sem névoa, fumaça, vapor, véu leitoso, glow ou bloom; mantenha os pretos, o contraste e a saturação do original.
 - Foco crítico no copo: bordas do vidro bem definidas, gotas de condensação nítidas, bolhas do colarinho visíveis.
-- O logo "BAR DO DINDO" gravado no copo é o destaque da foto: letras nítidas, inteiras e com bom contraste sobre a cerveja, sem ficar escondido pela condensação ou pela cor escura do líquido.
-- A placa redonda da parede continua bem legível, com as letras e a borda de madeira definidas.
+- O logo "BAR DO DINDO" gravado no copo é o destaque da foto e tem sempre o mesmo estilo, em qualquer cor de cerveja: "BAR DO" em letras creme-douradas sólidas e "DINDO" em letras com contorno creme-dourado e miolo marrom-cobre, como uma gravação dourada no vidro. Letras nítidas, inteiras e com bom contraste sobre a cerveja, sem ficar escondidas pela condensação.
+- A placa redonda da parede fica nítida, sem desfoque: letras e borda de madeira bem definidas, mesmo com o resto do fundo desfocado.
 - Fotorrealismo de fotografia de produto profissional, sem ruído, borrões, artefatos, marca-d'água, pessoas, mãos ou objetos novos.`;
 }
 
