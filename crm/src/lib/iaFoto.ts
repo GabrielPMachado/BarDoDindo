@@ -215,10 +215,14 @@ PRESERVAR, SEM NENHUMA ALTERAÇÃO
 
 ALTERAR
 1. A cerveja dentro do copo passa a ser chopp ${estilo}${tamanho ? ` (${tamanho})` : ''}: ${corDoChopp(estilo)}. Mesmo nível de enchimento do original, colarinho cremoso de microbolhas com cerca de dois dedos, condensação natural no vidro gelado e a luz quente atravessando o líquido para mostrar a cor.
-2. O texto da plaquinha passa a ser exatamente "${placa}": uma única linha, centralizada, em letras maiúsculas serifadas e grossas, marrom-escuras, como gravadas a fogo na madeira, no mesmo tamanho e estilo de letra do texto original. Escreva só esse texto, sem acrescentar nem traduzir palavras.
+2. O texto da plaquinha passa a ser exatamente "${placa}": uma única linha, centralizada, em letras maiúsculas serifadas e grossas, marrom-escuras, como gravadas a fogo na madeira, no mesmo estilo de letra do texto original. ${placa.length > 16 ? 'O texto é mais comprido que o original: diminua o tamanho da letra até ele caber inteiro, ' : 'Use o mesmo tamanho de letra do original, '}com uma margem livre de madeira à esquerda e à direita de pelo menos a largura de duas letras: nenhuma letra pode encostar, passar ou ser cortada nas bordas da plaquinha. Escreva só esse texto, sem acrescentar nem traduzir palavras.
 
 PADRÃO DE QUALIDADE
-Fotorrealismo de fotografia de produto profissional: foco nítido no copo e na plaquinha, cor da cerveja fiel ao estilo, alta definição, sem ruído, granulado, borrões ou artefatos. Sem marca-d'água, sem textos além da plaquinha e do logo, sem pessoas, mãos ou objetos novos.`;
+- Edite só o copo, a cerveja e o texto da plaquinha. O resto da imagem deve sair igual ao original, pixel a pixel: não regenere, não suavize nem reprocesse o cenário.
+- Imagem limpa e cristalina: sem névoa, fumaça, vapor, neblina, véu leitoso, brilho difuso (glow) ou bloom. Mantenha os pretos profundos, o contraste, a saturação e a exposição exatamente como no original.
+- Foco crítico no copo, no logo gravado e nas letras da plaquinha: bordas do vidro bem definidas, gotas de condensação nítidas e individuais, bolhas do colarinho visíveis. Só o fundo continua desfocado, como no original.
+- Fotorrealismo de fotografia de produto profissional, alta definição, cor da cerveja fiel ao estilo, sem ruído, granulado, borrões ou artefatos.
+- Sem marca-d'água, sem textos além da plaquinha e do logo, sem pessoas, mãos ou objetos novos.`;
 }
 
 export function promptDaFoto(p: { nome: string; resumo?: string; ingredientes?: string }) {
