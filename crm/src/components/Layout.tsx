@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { AppWindow, ChevronDown, LayoutDashboard, Menu, MessageCircle, UserRound, Copy, ExternalLink, KeyRound, LogOut, MousePointerClick, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Search, X, type LucideIcon } from 'lucide-react';
+import { AppWindow, ChevronDown, LayoutDashboard, Menu, MessageCircle, MessagesSquare, UserRound, Copy, ExternalLink, KeyRound, LogOut, MousePointerClick, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Search, X, type LucideIcon } from 'lucide-react';
 import { AREAS, DEPARTAMENTOS, findModule, localDe, type Area, type AreaKey, type Setor } from '../modules';
 import { useSession } from '../lib/session';
 import { useLastSync } from '../lib/data';
 import { useNaoLidasConversas } from '../lib/conversas';
+import { useChatEquipe } from '../lib/chatEquipe';
 import { usePins } from '../lib/pins';
 import { useToqueLongo } from '../lib/toque';
 import { alternarAtalho, usePainelPrefs } from '../lib/preferencias';
@@ -68,6 +69,7 @@ function PageMenu({ menu, pinned, onPin, paineis, onClose }: {
 }
 
 const CONVERSAS = '/atendimento/conversas';
+const CHAT_EQUIPE = '/equipe/chat';
 
 /** Texto sem acentos e em minúsculas, para a busca de páginas. */
 const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -93,6 +95,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const current = findModule(pathname);
   const lastSync = useLastSync();
   const naoLidas = useNaoLidasConversas(access('conversas') !== 'none');
+  const chatEquipe = useChatEquipe(usuario?.id, access('chat') !== 'none');
   const { pins, isPinned, toggle, unpin } = usePins(usuario?.id);
   // atalhos de páginas: no painel próprio (todos) e no Painel executivo (quem acessa a Diretoria)
   const meuPainel = usePainelPrefs('meuPainel');
@@ -402,6 +405,12 @@ export function Layout({ children }: { children: ReactNode }) {
             <button className="topbar-btn" onClick={() => navigate(CONVERSAS)} aria-label="Conversas com os afilhados" title="Conversas com os afilhados">
               <MessageCircle size={18} />
               {naoLidas > 0 && <span className="topbar-btn__badge">{naoLidas > 99 ? '99+' : naoLidas}</span>}
+            </button>
+          )}
+          {access('chat') !== 'none' && (
+            <button className="topbar-btn" onClick={() => navigate(CHAT_EQUIPE)} aria-label="Chat da equipe" title="Chat da equipe">
+              <MessagesSquare size={18} />
+              {chatEquipe.novas > 0 && <span className="topbar-btn__badge">{chatEquipe.novas > 99 ? '99+' : chatEquipe.novas}</span>}
             </button>
           )}
           <AtividadesButton onOpenPanel={painel.abrir} />

@@ -24,6 +24,7 @@ import { Clientes, Consumo, Reservas, Resgates } from './pages/Vendas';
 import { Funcoes, Parametros, Usuarios } from './pages/Config';
 import MeuPerfil from './pages/MeuPerfil';
 import Conversas from './pages/Conversas';
+import ChatEquipe from './pages/ChatEquipe';
 import QrCodeAfilhados from './pages/QrCode';
 import ResultadoQuestionario from './pages/ResultadoQuestionario';
 import { CaixaPage, ComandasPage, MesasPage } from './pages/Salao';
@@ -118,6 +119,7 @@ const CUSTOM: Record<string, () => ReactNode> = {
   '/atendimento/mesas': () => <MesasPage />,
   '/atendimento/vouchers': () => <Resgates />,
   '/atendimento/conversas': () => <Conversas />,
+  '/equipe/chat': () => <ChatEquipe />,
   '/monitoramento': () => <Monitoramento />,
   '/config/usuarios': () => <Usuarios />,
   '/config/funcoes': () => <Funcoes />,

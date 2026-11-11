@@ -3,7 +3,7 @@ import {
   Library, LifeBuoy, Megaphone, MonitorSmartphone, Plane, Receipt, Scale, ScrollText, Settings, ShieldCheck, ShoppingBag, SlidersHorizontal, Truck, UserCog,
   UserRound, Users, Wallet, Warehouse, type LucideIcon,
 } from 'lucide-react';
-import { PAI_DO_MODULO, permissaoDe } from '../../shared/backend';
+import { PADRAO_DO_MODULO, PAI_DO_MODULO, permissaoDe } from '../../shared/backend';
 
 export type AreaKey = 'eu' | 'dir' | 'atd' | 'vnd' | 'afi' | 'mkt' | 'rh' | 'dp' | 'adm' | 'fin' | 'jur' | 'fis' | 'mon' | 'ti' | 'cfg';
 /** Resumo do acesso a uma área: sem acesso, só leitura ou com alguma permissão de alteração. */
@@ -75,6 +75,8 @@ export const AREAS: Area[] = [
     items: [
       { path: '/perfil', perm: 'eu', label: 'Meus dados' },
       { path: '/perfil/painel', perm: 'eu', label: 'Meu painel' },
+      // chat interno: permissão própria ("chat"), liberada para toda a equipe enquanto a função não marcar outra coisa
+      { path: '/equipe/chat', perm: 'chat', label: 'Chat da equipe' },
       // temporário: será retirado depois
       { path: '/perfil/pintura', perm: 'eu', label: 'Simular pintura (3D)' },
     ],
@@ -294,8 +296,9 @@ export const MODULOS: Modulo[] = (() => {
   const lista: Modulo[] = [];
   const setorDe = (path: string) => localDe(path)?.setor.label ?? AREAS.find((a) => a.items.some((i) => i.path === path))?.label ?? '';
   for (const a of AREAS) {
-    if (a.pessoal || a.oculta) continue;
-    for (const i of a.items) {
+    if (a.oculta) continue;
+    // de Meu perfil, só as telas com permissão própria (o chat da equipe); as demais são de todos
+    for (const i of a.items.filter((x) => !a.pessoal || x.perm !== 'eu')) {
       const m = lista.find((x) => x.key === i.perm);
       if (m) m.paginas.push(i.label);
       else lista.push({ key: i.perm, label: NOME_DO_MODULO[i.perm] ?? i.label, area: a.key, setor: setorDe(i.path), paginas: [i.label] });
@@ -305,6 +308,7 @@ export const MODULOS: Modulo[] = (() => {
 })();
 /** Grupos da tela de permissões: Diretoria e cada departamento, com os seus módulos. */
 export const GRUPOS_DE_PERMISSAO: { label: string; modulos: Modulo[] }[] = [
+  { label: 'Toda a equipe', modulos: MODULOS.filter((m) => m.area === 'eu') },
   { label: 'Diretoria', modulos: MODULOS.filter((m) => m.area === 'dir') },
   ...DEPARTAMENTOS.map((d) => {
     const areas = new Set(d.setores.map((st) => st.area.key));
@@ -356,7 +360,8 @@ const cargo = (nome: string, descricao: string, niveis: Partial<Record<AreaKey, 
   nome, descricao,
   permissoes: Object.fromEntries(MODULOS.map((m) => {
     const n = ajustes[m.key] ?? niveis[areaDoModulo(m.key) as AreaKey];
-    return [m.key, n && n !== 'none' ? ACOES_DO_NIVEL[n] : []];
+    // módulos de toda a equipe (chat) ficam com o padrão quando o cargo não diz nada
+    return [m.key, n && n !== 'none' ? ACOES_DO_NIVEL[n] : !n && PADRAO_DO_MODULO[m.key] ? [...PADRAO_DO_MODULO[m.key]] as Acao[] : []];
   })),
 });
 const OPERACAO: AreaKey[] = ['atd', 'vnd', 'mkt', 'dp', 'adm', 'fis'];
