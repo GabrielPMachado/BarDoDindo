@@ -6,6 +6,7 @@ import { useSession } from '../lib/session';
 import { useLastSync } from '../lib/data';
 import { useNaoLidasConversas } from '../lib/conversas';
 import { useChatEquipe } from '../lib/chatEquipe';
+import { AvisoChatEquipe } from './AvisoChatEquipe';
 import { usePins } from '../lib/pins';
 import { useToqueLongo } from '../lib/toque';
 import { alternarAtalho, usePainelPrefs } from '../lib/preferencias';
@@ -434,6 +435,7 @@ export function Layout({ children }: { children: ReactNode }) {
           </div>
         </header>
         <main className="content" ref={conteudo}>{children}</main>
+        <AvisoChatEquipe />
       </div>
 
       {ctx && (
