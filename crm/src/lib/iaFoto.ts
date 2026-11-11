@@ -192,37 +192,62 @@ const CORES: [RegExp, string][] = [
 ];
 export const corDoChopp = (estilo: string) => CORES.find(([re]) => re.test(semAcento(estilo)))?.[1] ?? 'a cor, a transparência e o colarinho típicos desse estilo de cerveja';
 
+/**
+ * Grupos de cor: chopes de cor parecida usam a mesma foto (uma por copo). A IA gera a cerveja do grupo e o Cérebro escreve
+ * a plaquinha de cada chopp por cima (ver `lib/acabamentoChopp.ts`). A ordem importa: "Black IPA" é escuro, não IPA.
+ */
+export type GrupoChopp = { id: string; nome: string; cor: string; exemplos: string };
+const GRUPOS: (GrupoChopp & { re: RegExp })[] = [
+  { id: 'escuro', nome: 'Escuro', re: /black|stout|porter|schwarz|escur|pret[ao]|dark|quadrupel|dubbel/, exemplos: 'Porter, Stout, Dry Stout, Black IPA',
+    cor: 'cerveja preta e opaca, com colarinho cremoso e denso cor de caramelo claro' },
+  { id: 'trigo', nome: 'Trigo turvo', re: /weiss|weizen|trigo|\bwit/, exemplos: 'Weiss',
+    cor: 'cerveja amarelo-palha bem turva (de trigo), com colarinho branco alto e fofo' },
+  { id: 'acobreado', nome: 'Acobreado', re: /red|vermelh|amber|ambar|vienna|marzen|bock/, exemplos: 'Red Ale, Amber Ale',
+    cor: 'cerveja âmbar-acobreada e límpida, com reflexos avermelhados contra a luz e colarinho off-white cremoso' },
+  { id: 'claro', nome: 'Dourado claro', re: /pilsen|pilsner|lager|puro malte|session|\bapa\b|pale ale|blond|golden|helles|kolsch/, exemplos: 'Pilsen, APA, Session IPA',
+    cor: 'cerveja dourado-clara e límpida, com colarinho branco' },
+  { id: 'alaranjado', nome: 'Dourado-alaranjado', re: /ipa|tripel/, exemplos: 'IPA, Double IPA',
+    cor: 'cerveja dourado-alaranjada e levemente turva, com colarinho off-white denso' },
+];
+/** Grupo de cor do estilo; um estilo fora dos grupos fica sozinho, com a cor pelo nome. */
+export function grupoDoChopp(estilo: string): GrupoChopp {
+  const g = GRUPOS.find(({ re }) => re.test(semAcento(estilo)));
+  if (g) return { id: g.id, nome: g.nome, cor: g.cor, exemplos: g.exemplos };
+  return { id: `estilo-${semAcento(estilo).replace(/[^a-z0-9]+/g, '-')}`, nome: estilo, cor: corDoChopp(estilo), exemplos: estilo };
+}
+
 /** Texto da plaquinha de madeira, como nas fotos atuais (ex.: "PINT - APA"). */
 export const plaquinhaDoChopp = (copo: Copo, estilo: string) => `${copo} - ${estilo}`.toUpperCase();
 
 /**
- * Pedido para a foto de um chopp do cardápio, no padrão das fotos atuais. A foto anexada é a APA aprovada no mesmo copo
- * (ver `MODELOS_CHOPP`): a IA mantém cenário, copo e plaquinha e troca só a cerveja e o texto da plaquinha.
+ * Pedido para a foto de um grupo de cor num copo. A foto anexada é a APA aprovada no mesmo copo (ver `MODELOS_CHOPP`):
+ * a IA troca só a cerveja; a plaquinha é escrita depois pelo Cérebro, que também realça contraste e nitidez.
  */
-export function promptDaFotoChopp(p: { nome: string; tamanho?: string }) {
-  const tamanho = p.tamanho?.trim() ?? '';
-  const copo = copoDoChopp(p.nome, tamanho);
-  const estilo = estiloDoChopp(p.nome, tamanho);
-  const placa = plaquinhaDoChopp(copo, estilo);
+export function promptDaFotoGrupo(grupo: GrupoChopp, copo: Copo) {
+  const d = MODELOS_CHOPP[copo].descricao;
   return `Fotografia publicitária para o cardápio do Bar do Dindo. Use a imagem anexada como base e edite SOMENTE o que está em "Alterar". O resultado precisa parecer a mesma foto, da mesma sessão, para ficar lado a lado com as outras do cardápio sem destoar.
 
 PRESERVAR, SEM NENHUMA ALTERAÇÃO
 - Formato 4:3, enquadramento, ângulo e altura da câmera, distância focal, profundidade de campo e desfoque do fundo.
 - Cenário: balcão de madeira escura em primeiro plano, luminária pendente de cobre acesa no alto à esquerda, plantas penduradas, prateleiras com garrafas, parede de tijolos e a placa redonda de madeira do Bar do Dindo (logo e letras idênticos).
-- ${MODELOS_CHOPP[copo].descricao[0].toUpperCase()}${MODELOS_CHOPP[copo].descricao.slice(1)}: mesmo formato, tamanho, posição no balcão, logo "BAR DO DINDO" gravado no vidro, reflexos e sombra.
-- A plaquinha de madeira à esquerda: mesmo tamanho, posição, textura e acabamento.
+- ${d[0].toUpperCase()}${d.slice(1)}: mesmo formato, tamanho, posição no balcão, logo "BAR DO DINDO" gravado no vidro, reflexos e sombra.
+- A plaquinha de madeira à esquerda, com o texto que já está nela: não mexa (ela é trocada depois).
 - Iluminação: a mesma luz quente da luminária e o mesmo balanço de branco.
 
 ALTERAR
-1. A cerveja dentro do copo passa a ser chopp ${estilo}${tamanho ? ` (${tamanho})` : ''}: ${corDoChopp(estilo)}. Mesmo nível de enchimento do original, colarinho cremoso de microbolhas com cerca de dois dedos, condensação natural no vidro gelado e a luz quente atravessando o líquido para mostrar a cor.
-2. O texto da plaquinha passa a ser exatamente "${placa}": uma única linha, centralizada, em letras maiúsculas serifadas e grossas, marrom-escuras, como gravadas a fogo na madeira, no mesmo estilo de letra do texto original. ${placa.length > 16 ? 'O texto é mais comprido que o original: diminua o tamanho da letra até ele caber inteiro, ' : 'Use o mesmo tamanho de letra do original, '}com uma margem livre de madeira à esquerda e à direita de pelo menos a largura de duas letras: nenhuma letra pode encostar, passar ou ser cortada nas bordas da plaquinha. Escreva só esse texto, sem acrescentar nem traduzir palavras.
+A cerveja dentro do copo passa a ser ${grupo.cor}. Mesmo nível de enchimento do original, colarinho cremoso de microbolhas com cerca de dois dedos, condensação natural no vidro gelado e a luz quente atravessando o líquido para mostrar a cor.
 
 PADRÃO DE QUALIDADE
-- Edite só o copo, a cerveja e o texto da plaquinha. O resto da imagem deve sair igual ao original, pixel a pixel: não regenere, não suavize nem reprocesse o cenário.
-- Imagem limpa e cristalina: sem névoa, fumaça, vapor, neblina, véu leitoso, brilho difuso (glow) ou bloom. Mantenha os pretos profundos, o contraste, a saturação e a exposição exatamente como no original.
-- Foco crítico no copo, no logo gravado e nas letras da plaquinha: bordas do vidro bem definidas, gotas de condensação nítidas e individuais, bolhas do colarinho visíveis. Só o fundo continua desfocado, como no original.
-- Fotorrealismo de fotografia de produto profissional, alta definição, cor da cerveja fiel ao estilo, sem ruído, granulado, borrões ou artefatos.
-- Sem marca-d'água, sem textos além da plaquinha e do logo, sem pessoas, mãos ou objetos novos.`;
+- Edite só a cerveja e o colarinho. O resto da imagem deve sair igual ao original: não regenere nem suavize o cenário.
+- Sem névoa, fumaça, vapor, véu leitoso, glow ou bloom; mantenha os pretos, o contraste e a saturação do original.
+- Foco crítico no copo: bordas do vidro bem definidas, gotas de condensação nítidas, bolhas do colarinho visíveis.
+- Fotorrealismo de fotografia de produto profissional, sem ruído, borrões, artefatos, marca-d'água, pessoas, mãos ou objetos novos.`;
+}
+
+/** Pedido para a foto de um chopp (o do seu grupo de cor, no copo do tamanho). */
+export function promptDaFotoChopp(p: { nome: string; tamanho?: string }) {
+  const tamanho = p.tamanho?.trim() ?? '';
+  return promptDaFotoGrupo(grupoDoChopp(estiloDoChopp(p.nome, tamanho)), copoDoChopp(p.nome, tamanho));
 }
 
 export function promptDaFoto(p: { nome: string; resumo?: string; ingredientes?: string }) {
@@ -292,8 +317,8 @@ async function pedirImagem(chave: string, parts: unknown[], sinal?: AbortSignal)
   throw new Error(ultimoErro);
 }
 
-/** Manda o pedido e as fotos para a IA e devolve a foto nova já no tamanho guardado no cadastro. */
-async function fotoDaIA(prompt: string, fotos: { mime: string; dados: string }[], sinal?: AbortSignal): Promise<string> {
+/** Manda o pedido e as fotos para a IA e devolve a imagem gerada, no tamanho em que veio. */
+async function imagemDaIA(prompt: string, fotos: { mime: string; dados: string }[], sinal?: AbortSignal): Promise<Blob> {
   const { chave } = await chaveDaIA().catch((e) => { throw new ErroDaChave(e instanceof Error ? e.message : String(e)); });
   const parts: unknown[] = [{ text: prompt }, ...fotos.map((f) => ({ inline_data: { mime_type: f.mime, data: f.dados } }))];
   const resp = await pedirImagem(chave, parts, sinal);
@@ -301,9 +326,10 @@ async function fotoDaIA(prompt: string, fotos: { mime: string; dados: string }[]
   const dados = parte?.inlineData?.data ?? parte?.inline_data?.data;
   const mime = parte?.inlineData?.mimeType ?? parte?.inline_data?.mime_type ?? 'image/png';
   if (!dados) throw new Error('A IA não devolveu uma imagem desta vez. Tente gerar de novo.');
-  const blob = await (await fetch(`data:${mime};base64,${dados}`)).blob();
-  return fotoNoTamanho(blob);
+  return (await fetch(`data:${mime};base64,${dados}`)).blob();
 }
+/** Igual a `imagemDaIA`, já no tamanho guardado no cadastro. */
+const fotoDaIA = async (prompt: string, fotos: { mime: string; dados: string }[], sinal?: AbortSignal) => fotoNoTamanho(await imagemDaIA(prompt, fotos, sinal));
 
 /**
  * Refaz a foto de um item do Estoque no padrão do depósito, direto pela API do Gemini: manda a foto modelo e a foto atual
@@ -321,11 +347,7 @@ export async function gerarFotoEstoque(item: Record<string, unknown>, sinal?: Ab
   return fotoDaIA(prompt, fotos, sinal);
 }
 
-/** Gera a foto de um chopp do cardápio (um tamanho) a partir da APA no mesmo copo, direto pela API do Gemini. */
-export async function gerarFotoChopp(produto: Record<string, unknown>, sinal?: AbortSignal): Promise<string> {
-  const nome = String(produto.nome ?? '').trim();
-  if (!nome) throw new Error('O produto está sem nome.');
-  const prompt = promptDaFotoChopp({ nome, tamanho: String(produto.tamanho ?? '') });
-  const copo = copoDoChopp(nome, String(produto.tamanho ?? ''));
-  return fotoDaIA(prompt, [await base64DaUrl(MODELOS_CHOPP[copo].url)], sinal);
+/** Gera pela API do Gemini a foto de um grupo de cor num copo (crua; o acabamento e a plaquinha vêm depois). */
+export async function gerarFotoGrupo(grupo: GrupoChopp, copo: Copo, sinal?: AbortSignal): Promise<Blob> {
+  return imagemDaIA(promptDaFotoGrupo(grupo, copo), [await base64DaUrl(MODELOS_CHOPP[copo].url)], sinal);
 }

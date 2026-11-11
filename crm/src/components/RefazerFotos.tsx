@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, Copy, Download, ExternalLink, ImageOff, Loader2, RefreshCw, Sparkles, Square, Upload } from 'lucide-react';
 import type { Row } from '../lib/data';
-import { ErroDaChave, MODELOS, MODELOS_CHOPP, abrirGeminiSobreposto, copoDoChopp, gerarFotoChopp, gerarFotoEstoque, promptDaFotoChopp, promptDaFotoEstoque } from '../lib/iaFoto';
+import { ErroDaChave, MODELOS, abrirGeminiSobreposto, gerarFotoEstoque, promptDaFotoEstoque } from '../lib/iaFoto';
 import { fotoNoTamanho } from './Avatar';
 import { baixar, copiar, nomeArquivo } from './GerarFotoIA';
 import { Modal, notify } from './ui';
@@ -30,8 +30,8 @@ function baixarFoto(dataUrl: string, nome: string) {
   } catch { baixar(dataUrl, nome); }
 }
 
-/** estoque: itens do depósito (a foto atual vai de referência); chopp: os tamanhos dos chopes do cardápio, a partir da APA no mesmo copo. */
-export type TipoRefazer = 'estoque' | 'chopp';
+/** estoque: itens do depósito (a foto atual vai de referência). Os chopes do cardápio têm janela própria (GerarFotosChopes). */
+export type TipoRefazer = 'estoque';
 const TIPOS: Record<TipoRefazer, {
   titulo: string; nome: (r: Row) => string; pedido: (r: Row) => string; gerar: (r: Row, s: AbortSignal) => Promise<string>;
   /** a foto atual vai junto como referência do produto */
@@ -47,15 +47,6 @@ const TIPOS: Record<TipoRefazer, {
     referencia: true,
     gratis: 'Marque os itens e toque em "Abrir o próximo no Gemini": o pedido do item é copiado, a foto modelo e a foto atual são baixadas e o Gemini abre numa janela por cima do Cérebro. Lá, cole o pedido, anexe as fotos e envie. Copie a imagem criada e cole aqui (Ctrl+V), ou envie no cartão do item; depois toque em "Trocar".',
     automatico: 'Cada item marcado vai para o Gemini com a foto modelo do depósito e a foto atual como referência; a nova sai em alta resolução. Usa a chave da IA de Configurações → Parâmetros, que precisa do faturamento ativo no Google AI Studio (o plano gratuito não gera imagens).',
-  },
-  chopp: {
-    titulo: 'Gerar fotos dos chopes do cardápio',
-    nome: (r) => String(r.nome ?? ''),
-    pedido: (r) => promptDaFotoChopp({ nome: String(r.nome ?? ''), tamanho: String(r.tamanho ?? '') }),
-    gerar: gerarFotoChopp,
-    referencia: false,
-    gratis: 'Marque os chopes e toque em "Abrir o próximo no Gemini": o pedido do chopp (copo pelo tamanho, cor pelo estilo e o texto da plaquinha) é copiado, a foto modelo do copo (a APA aprovada em half-pint, pint ou jarra) é baixada e o Gemini abre numa janela por cima do Cérebro. Lá, anexe a foto modelo, cole o pedido e envie. Copie a imagem criada e cole aqui (Ctrl+V), ou envie no cartão do chopp; depois toque em "Trocar". O "Copiar pedido" de cada cartão faz o mesmo.',
-    automatico: 'Cada chopp marcado vai para o Gemini com a foto modelo do mesmo copo (a APA aprovada); a nova sai no mesmo padrão. Usa a chave da IA de Configurações → Parâmetros, que precisa do faturamento ativo no Google AI Studio (o plano gratuito não gera imagens).',
   },
 };
 
@@ -74,11 +65,9 @@ export function RefazerFotos({ tipo = 'estoque', rows, onSalvar, onFim, onClose 
 }) {
   const t = TIPOS[tipo];
   const todos = [...rows].sort((a, b) => t.nome(a).localeCompare(t.nome(b), 'pt-BR', { numeric: true }));
-  /** a seleção rápida: no Estoque, os que já têm foto (a leva antiga); nos chopes, todos */
-  const sugeridos = (lista: Row[]) => (tipo === 'estoque' ? lista.filter(temFoto) : lista);
   const [modo, setModo] = useState<Modo>('gratis');
   // começam marcados os itens que já têm foto (a leva antiga, em baixa qualidade)
-  const [marcados, setMarcados] = useState<Set<string>>(() => new Set(sugeridos(todos).map((r) => r.id)));
+  const [marcados, setMarcados] = useState<Set<string>>(() => new Set(todos.filter(temFoto).map((r) => r.id)));
   const [estados, setEstados] = useState<Record<string, Estado>>({});
   // o item cuja foto já foi trocada sai da lista
   const itens = todos.filter((r) => estados[r.id]?.st !== 'salva');
@@ -102,7 +91,7 @@ export function RefazerFotos({ tipo = 'estoque', rows, onSalvar, onFim, onClose 
    */
   const abrirNoGemini = (r: Row) => {
     const copiou = copiar(t.pedido(r));
-    const modelo = tipo === 'chopp' ? MODELOS_CHOPP[copoDoChopp(t.nome(r), String(r.tamanho ?? ''))] : MODELOS[tipo];
+    const modelo = MODELOS[tipo];
     const comReferencia = t.referencia && temFoto(r);
     // a foto atual vai primeiro: o navegador costuma barrar o segundo download do mesmo clique, e a referência é a que importa
     if (comReferencia) baixarFoto(String(r.foto), nomeReferencia(r));
@@ -219,11 +208,7 @@ export function RefazerFotos({ tipo = 'estoque', rows, onSalvar, onFim, onClose 
         </p>
         <div className="refazer-fotos__filtro">
           <span>{marcados.size} de {itens.length} marcados</span>
-          {tipo === 'estoque'
-            ? <button className="btn btn--ghost btn--sm" disabled={rodando} onClick={() => setMarcados(new Set(itens.filter(temFoto).map((r) => r.id)))}>Os que têm foto</button>
-            : (['Half-pint', 'Pint', 'Jarra'] as const).map((c) => (
-              <button key={c} className="btn btn--ghost btn--sm" disabled={rodando} onClick={() => setMarcados(new Set(itens.filter((r) => copoDoChopp(t.nome(r), String(r.tamanho ?? '')) === c).map((r) => r.id)))}>Só {c}</button>
-            ))}
+          <button className="btn btn--ghost btn--sm" disabled={rodando} onClick={() => setMarcados(new Set(itens.filter(temFoto).map((r) => r.id)))}>Os que têm foto</button>
           <button className="btn btn--ghost btn--sm" disabled={rodando} onClick={() => setMarcados(new Set(itens.map((r) => r.id)))}>Todos</button>
           <button className="btn btn--ghost btn--sm" disabled={rodando} onClick={() => setMarcados(new Set())}>Nenhum</button>
         </div>

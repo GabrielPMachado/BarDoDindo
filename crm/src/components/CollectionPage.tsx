@@ -28,6 +28,7 @@ import { BarraNivel, LinksDeCompra, VariosLinks } from './Nivel';
 import { PreencherProdutoIA } from './PreencherProdutoIA';
 import { GerarFotoIA } from './GerarFotoIA';
 import { RefazerFotos } from './RefazerFotos';
+import { GerarFotosChopes } from './GerarFotosChopes';
 import { MoverVarios } from './MoverVarios';
 import { ProduzirModal } from './Producao';
 import { Ampliar } from './Ampliar';
@@ -681,15 +682,21 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
         <LancarDespesa def={def} row={lancando} sugestao={def.despesa(lancando)} onClose={() => setLancando(null)} onDone={col.reload} />
       )}
 
-      {refazendoFotos && (
-        <RefazerFotos
-          tipo={def.tamanhos ? 'chopp' : 'estoque'}
-          rows={def.tamanhos ? chopes : all}
+      {refazendoFotos && (def.tamanhos ? (
+        <GerarFotosChopes
+          rows={chopes}
           onSalvar={(id, foto) => api(`/crm/c/${def.id}/${id}`, { method: 'PUT', body: { foto } })}
           onFim={col.reload}
           onClose={() => setRefazendoFotos(false)}
         />
-      )}
+      ) : (
+        <RefazerFotos
+          rows={all}
+          onSalvar={(id, foto) => api(`/crm/c/${def.id}/${id}`, { method: 'PUT', body: { foto } })}
+          onFim={col.reload}
+          onClose={() => setRefazendoFotos(false)}
+        />
+      ))}
 
       {editing && (
         <RecordForm
