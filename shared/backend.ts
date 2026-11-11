@@ -32,6 +32,8 @@ export interface Conversa {
 /** Conversa do chat interno da equipe: o canal geral (id "geral") ou a conversa direta entre dois usuários do CRM. */
 export interface ConversaEquipe {
   id: string; tipo: 'geral' | 'direta'; membros: string[]; ultimaMensagem: string; ultimaEm: string; ultimoAutorId: string; ultimoAutorNome: string;
+  /** Id da última mensagem: muda a cada mensagem nova (usado para o aviso no canto da tela). */
+  ultimaId: string;
 }
 /** Mensagem do chat interno da equipe. */
 export interface MensagemEquipe { id: string; texto: string; usuarioId: string; usuarioNome: string; criadaEm: string; pendente: boolean }
@@ -2830,9 +2832,28 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     return {
       id: s.id, tipo: s.id === 'geral' ? 'geral' : 'direta', membros: Array.isArray(d.membros) ? d.membros.map(String) : [],
       ultimaMensagem: String(d.ultimaMensagem ?? ''), ultimaEm: quando(d.ultimaEm),
-      ultimoAutorId: String(d.ultimoAutorId ?? ''), ultimoAutorNome: String(d.ultimoAutorNome ?? ''),
+      ultimoAutorId: String(d.ultimoAutorId ?? ''), ultimoAutorNome: String(d.ultimoAutorNome ?? ''), ultimaId: String(d.ultimaId ?? ''),
     };
   };
+  /**
+   * Listener que se liga de novo quando o servidor o recusa: logo depois de publicar regras novas, elas levam alguns minutos para
+   * valer nos listeners (o envio já passava e a leitura ainda era negada). Só avisa o erro depois de 4 tentativas.
+   */
+  function persistente(iniciar: (falhou: (e: Error) => void) => () => void, erro?: (e: Error) => void) {
+    let parar = () => {};
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let tentativas = 0, vivo = true;
+    const ligar = () => {
+      parar = iniciar((e) => {
+        parar();
+        if (!vivo) return;
+        if (tentativas++ < 3) timer = setTimeout(ligar, 5000 * tentativas);
+        else erro?.(e);
+      });
+    };
+    ligar();
+    return () => { vivo = false; clearTimeout(timer); parar(); };
+  }
   const lerMensagemEquipe = (s: DocumentSnapshot): MensagemEquipe => {
     const d = s.data({ serverTimestamps: 'estimate' }) ?? {};
     return {
@@ -2849,31 +2870,31 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
       let geral: ConversaEquipe | null = null, diretas: ConversaEquipe[] = [];
       let prontos = 0;
       const avisar = () => { if (prontos === 3) cb([...(geral ? [geral] : []), ...diretas].sort((a, b) => b.ultimaEm.localeCompare(a.ultimaEm))); };
-      const pararGeral = ouvir(() => onSnapshot(doc(db, 'equipe_chat', 'geral'), (s) => {
+      const pararGeral = ouvir(() => persistente((falhou) => onSnapshot(doc(db, 'equipe_chat', 'geral'), (s) => {
         if (!(prontos & 1)) prontos += 1;
         geral = s.exists() ? lerConversaEquipe(s) : null;
         avisar();
-      }, (e) => erro?.(e)));
-      const pararDiretas = ouvir(() => onSnapshot(query(collection(db, 'equipe_chat'), where('membros', 'array-contains', uid)), (s) => {
+      }, falhou), erro));
+      const pararDiretas = ouvir(() => persistente((falhou) => onSnapshot(query(collection(db, 'equipe_chat'), where('membros', 'array-contains', uid)), (s) => {
         if (!(prontos & 2)) prontos += 2;
         diretas = s.docs.map(lerConversaEquipe);
         avisar();
-      }, (e) => erro?.(e)));
+      }, falhou), erro));
       return () => { pararGeral(); pararDiretas(); };
     },
     /** Quando a pessoa abriu cada conversa pela última vez (id da conversa → data ISO). */
     ouvirLidas(uid: string, cb: (lidas: Record<string, string>) => void) {
-      return ouvir(() => onSnapshot(doc(db, 'equipe_lidas', uid), (s) => {
+      return ouvir(() => persistente((falhou) => onSnapshot(doc(db, 'equipe_lidas', uid), (s) => {
         const l = (s.data({ serverTimestamps: 'estimate' })?.lidas ?? {}) as Record<string, unknown>;
         cb(Object.fromEntries(Object.entries(l).map(([k, v]) => [k, quando(v)])));
-      }, () => cb({})));
+      }, falhou), () => cb({})));
     },
     /** As últimas mensagens da conversa aberta, ao vivo, da mais antiga para a mais nova. */
     ouvirMensagens(id: string, cb: (m: MensagemEquipe[], temMais: boolean) => void, erro?: (e: Error) => void) {
-      return ouvir(() => onSnapshot(query(mensagensDaEquipe(id), orderBy('criadaEm', 'desc'), limit(MENSAGENS_POR_VEZ)), { includeMetadataChanges: true }, (s) => {
+      return ouvir(() => persistente((falhou) => onSnapshot(query(mensagensDaEquipe(id), orderBy('criadaEm', 'desc'), limit(MENSAGENS_POR_VEZ)), { includeMetadataChanges: true }, (s) => {
         if (s.docs.length) maisAntigaEquipe.set(id, s.docs[s.docs.length - 1]);
         cb(s.docs.map(lerMensagemEquipe).reverse(), s.docs.length === MENSAGENS_POR_VEZ);
-      }, (e) => erro?.(e)));
+      }, falhou), erro));
     },
     /** Mensagens anteriores às já carregadas (lidas uma vez, sem ficar ao vivo). */
     async anteriores(id: string): Promise<{ mensagens: MensagemEquipe[]; temMais: boolean }> {

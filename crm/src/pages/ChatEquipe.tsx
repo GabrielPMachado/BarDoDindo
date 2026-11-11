@@ -51,7 +51,7 @@ export default function ChatEquipe() {
   const nomeDe = (c: ConversaEquipe) => (c.tipo === 'geral' ? 'Geral (toda a equipe)' : colega(outroDe(c))?.nome || 'Colega');
 
   // o canal geral fica sempre no topo, mesmo antes da primeira mensagem
-  const geral = conversas?.find((c) => c.id === 'geral') ?? { id: 'geral', tipo: 'geral', membros: [], ultimaMensagem: '', ultimaEm: '', ultimoAutorId: '', ultimoAutorNome: '' } as ConversaEquipe;
+  const geral = conversas?.find((c) => c.id === 'geral') ?? { id: 'geral', tipo: 'geral', membros: [], ultimaMensagem: '', ultimaEm: '', ultimoAutorId: '', ultimoAutorNome: '', ultimaId: '' } as ConversaEquipe;
   const diretas = (conversas ?? []).filter((c) => c.tipo === 'direta');
   const term = q.trim().toLowerCase();
   const lista = [geral, ...diretas].filter((c) => !term || nomeDe(c).toLowerCase().includes(term));
