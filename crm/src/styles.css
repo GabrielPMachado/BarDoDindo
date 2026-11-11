@@ -2268,6 +2268,46 @@ td.nivel-col { min-width: 140px; }
   50% { box-shadow: 0 12px 30px #000a, 0 0 0 4px color-mix(in srgb, var(--brand) 45%, transparent); border-color: var(--brand-light); }
 }
 @media (prefers-reduced-motion: reduce) { .aviso-chat__item { animation: none; } }
+/* anexos do chat da equipe: fotos/prints, notas e páginas do Cérebro */
+.msg--imagem { padding-top: 6px; }
+.msg__foto { display: block; padding: 0; margin: 2px 0 4px; border-radius: 10px; overflow: hidden; max-width: 300px; cursor: zoom-in; }
+.msg__foto img { display: block; width: 100%; max-height: 320px; object-fit: cover; }
+.msg__hora { display: flex; justify-content: flex-end; align-items: center; gap: 6px; }
+.msg__apagar { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 4px; color: var(--muted); opacity: 0; transition: opacity .15s; }
+.msg:hover .msg__apagar, .msg__apagar:focus-visible { opacity: 1; }
+.msg__apagar:hover { color: var(--bad); background: #ffffff10; }
+@media (hover: none) { .msg__apagar { opacity: .7; } }
+.msg__url { color: var(--brand-light); text-decoration: underline; overflow-wrap: anywhere; }
+.msg-nota { display: flex; flex-direction: column; gap: 6px; margin: 2px 0 4px; padding: 10px 12px; border-radius: 10px; background: #ffffff08; border: 1px dashed var(--border-strong); min-width: 220px; }
+.msg-nota__topo { display: flex; align-items: center; gap: 6px; color: var(--brand-light); }
+.msg-nota__texto { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13.5px; max-height: 220px; overflow-y: auto; }
+.msg-nota .btn { align-self: flex-start; }
+.msg-link { display: flex; align-items: center; gap: 10px; margin: 2px 0 4px; padding: 10px 12px; border-radius: 10px; background: #ffffff08; border: 1px solid var(--border-strong); color: var(--text); text-decoration: none; min-width: 220px; }
+.msg-link:hover { border-color: var(--brand); }
+.msg-link svg { color: var(--brand-light); flex-shrink: 0; }
+.msg-link__texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.chat-anexo { position: relative; display: inline-block; margin-bottom: 8px; }
+.chat-anexo img { display: block; max-height: 120px; max-width: 220px; border-radius: 8px; border: 1px solid var(--border-strong); }
+.chat-anexo__tirar { position: absolute; top: -8px; right: -8px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-3); border: 1px solid var(--border-strong); color: var(--text); }
+.foto-ampliada { position: fixed; inset: 0; z-index: 120; background: #000d; display: grid; place-items: center; padding: 24px; cursor: zoom-out; }
+.foto-ampliada img { max-width: 100%; max-height: 100%; border-radius: 8px; }
+.foto-ampliada__fechar { position: absolute; top: 16px; right: 16px; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: #ffffff1a; color: #fff; }
+.enviar-chat__anexo { display: flex; align-items: center; gap: 8px; padding: 10px 12px; margin-bottom: 10px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); }
+.enviar-chat__anexo svg { color: var(--brand-light); flex-shrink: 0; }
+.enviar-chat__comentario { width: 100%; resize: vertical; margin-bottom: 10px; height: auto; padding: 8px 12px; }
+.activity-linha { position: relative; }
+.activity__chat { position: absolute; right: 36px; top: 10px; width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); opacity: 0; transition: opacity .15s; }
+.activity-linha:hover .activity__chat, .activity__chat:focus-visible { opacity: 1; }
+.activity__chat:hover { color: var(--brand-light); border-color: var(--brand); }
+@media (hover: none) { .activity__chat { opacity: 1; } }
+/* bloco de notas */
+.notas__cabeca { gap: 8px; }
+.notas__estado { margin-left: 2px; }
+.notas__editor { flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 16px; gap: 8px; }
+.notas__titulo { font: inherit; font-size: 20px; font-weight: 700; color: var(--text); background: transparent; border: 0; border-bottom: 1px solid var(--border); padding: 4px 0 10px; outline: none; }
+.notas__titulo:focus { border-bottom-color: var(--brand); }
+.notas__texto { flex: 1; min-height: 240px; font: inherit; font-size: 15px; line-height: 1.55; color: var(--text); background: transparent; border: 0; resize: none; outline: none; padding: 4px 0; }
+.notas__conta { align-self: flex-end; }
 /* celular: uma coisa de cada vez (a lista ou a conversa aberta) */
 @media (max-width: 760px) {
   .conversas { grid-template-columns: 1fr; height: calc(100dvh - 250px); min-height: 360px; }

@@ -9,7 +9,7 @@ import {
   reauthenticateWithCredential, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, updateCurrentUser, updatePassword, type UserCredential,
 } from 'firebase/auth';
 import {
-  arrayRemove, arrayUnion, collection, connectFirestoreEmulator, doc, getDoc, getDocFromServer, getDocs, increment, initializeFirestore, limit, onSnapshot, orderBy, persistentLocalCache, persistentMultipleTabManager, query, runTransaction, serverTimestamp, setDoc, startAfter, updateDoc, where, writeBatch,
+  arrayRemove, arrayUnion, collection, connectFirestoreEmulator, deleteDoc, doc, getDoc, getDocFromServer, getDocs, increment, initializeFirestore, limit, onSnapshot, orderBy, persistentLocalCache, persistentMultipleTabManager, query, runTransaction, serverTimestamp, setDoc, startAfter, updateDoc, where, writeBatch,
   type DocumentReference, type DocumentSnapshot, type Firestore, type Query, type Timestamp, type WriteBatch,
 } from 'firebase/firestore';
 import { EMULADOR, EMULADOR_AUTH, EMULADOR_FIRESTORE, firebaseConfig } from './firebase-config';
@@ -36,7 +36,19 @@ export interface ConversaEquipe {
   ultimaId: string;
 }
 /** Mensagem do chat interno da equipe. */
-export interface MensagemEquipe { id: string; texto: string; usuarioId: string; usuarioNome: string; criadaEm: string; pendente: boolean }
+export interface MensagemEquipe {
+  id: string; texto: string; usuarioId: string; usuarioNome: string; criadaEm: string; pendente: boolean;
+  /** Anexos (no máximo um de cada): foto ou print (data URL JPEG), cópia de uma nota e link para uma página do Cérebro. */
+  imagem?: string; nota?: NotaCompartilhada; link?: LinkDoCerebro;
+}
+/** Cópia de uma nota do bloco de notas enviada no chat. */
+export interface NotaCompartilhada { titulo: string; texto: string }
+/** Página do Cérebro citada no chat ("pingar" o que foi feito): o endereço dentro do Cérebro e um título. */
+export interface LinkDoCerebro { caminho: string; titulo: string; detalhe?: string }
+/** Nota do bloco de notas pessoal (Meu perfil > Minhas notas). */
+export interface Nota { id: string; titulo: string; texto: string; criadaEm: string; atualizadaEm: string }
+/** Limites dos anexos do chat e das notas. Iguais a firestore.rules. */
+export const LIMITES_CHAT = { imagem: 300_000, notaTitulo: 120, notaTexto: 5000, notaNoChat: 4000, linkTitulo: 160 };
 /** Usuário ativo do CRM, para começar uma conversa direta. */
 export interface Colega { id: string; nome: string; foto: string | null }
 /** Id da conversa direta entre dois usuários: o mesmo para os dois lados. Igual a `membroDoChat()` em firestore.rules. */
@@ -2859,6 +2871,9 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     return {
       id: s.id, texto: String(d.texto ?? ''), usuarioId: String(d.usuarioId ?? ''), usuarioNome: String(d.usuarioNome ?? ''),
       criadaEm: quando(d.criadaEm), pendente: s.metadata.hasPendingWrites,
+      ...(typeof d.imagem === 'string' ? { imagem: d.imagem } : {}),
+      ...(d.nota ? { nota: { titulo: String(d.nota.titulo ?? ''), texto: String(d.nota.texto ?? '') } } : {}),
+      ...(d.link ? { link: { caminho: String(d.link.caminho ?? ''), titulo: String(d.link.titulo ?? ''), ...(d.link.detalhe ? { detalhe: String(d.link.detalhe) } : {}) } } : {}),
     };
   };
   const mensagensDaEquipe = (id: string) => collection(db, 'equipe_chat', id, 'mensagens');
@@ -2912,18 +2927,30 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
         .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     },
     /** Envia uma mensagem: grava a mensagem e o resumo da conversa juntos. */
-    async enviar(id: string, texto: string) {
+    async enviar(id: string, texto: string, anexo: { imagem?: string; nota?: NotaCompartilhada; link?: LinkDoCerebro } = {}) {
       const t = texto.trim().slice(0, 1000);
-      if (!t) return;
+      const extra: Dados = {};
+      if (anexo.imagem) {
+        if (!anexo.imagem.startsWith('data:image/jpeg;base64,') || anexo.imagem.length > LIMITES_CHAT.imagem) fail(400, 'Imagem grande demais para o chat.');
+        extra.imagem = anexo.imagem;
+      }
+      if (anexo.nota) extra.nota = { titulo: anexo.nota.titulo.trim().slice(0, LIMITES_CHAT.notaTitulo), texto: anexo.nota.texto.slice(0, LIMITES_CHAT.notaNoChat) };
+      if (anexo.link) {
+        extra.link = { caminho: anexo.link.caminho.slice(0, 300), titulo: anexo.link.titulo.trim().slice(0, LIMITES_CHAT.linkTitulo) };
+        if (anexo.link.detalhe) extra.link.detalhe = anexo.link.detalhe.slice(0, LIMITES_CHAT.linkTitulo);
+      }
+      if (!t && !Object.keys(extra).length) return;
+      // a prévia na lista de conversas: o texto, ou o que foi anexado
+      const previa = t || (extra.imagem ? '📷 Foto' : extra.nota ? `📝 Nota: ${extra.nota.titulo || 'sem título'}` : `🔗 ${extra.link.titulo}`);
       const u = auth.currentUser;
       if (!u) return fail(401, 'Sessão expirada. Entre novamente.');
       const nome = String((await documento(`usuarios/${u.uid}`))?.nome ?? '');
       const ref = doc(mensagensDaEquipe(id));
       const lote = writeBatch(db);
-      lote.set(ref, { texto: t, usuarioId: u.uid, usuarioNome: nome, criadaEm: serverTimestamp() });
+      lote.set(ref, { texto: t, usuarioId: u.uid, usuarioNome: nome, criadaEm: serverTimestamp(), ...extra });
       lote.set(doc(db, 'equipe_chat', id), {
         tipo: id === 'geral' ? 'geral' : 'direta', membros: id === 'geral' ? [] : id.slice(2).split('_'),
-        ultimaMensagem: t.slice(0, 200), ultimaEm: serverTimestamp(), ultimoAutorId: u.uid, ultimoAutorNome: nome.slice(0, 120), ultimaId: ref.id,
+        ultimaMensagem: previa.slice(0, 200), ultimaEm: serverTimestamp(), ultimoAutorId: u.uid, ultimoAutorNome: nome.slice(0, 120), ultimaId: ref.id,
       });
       // quem escreve já leu a conversa
       lote.set(doc(db, 'equipe_lidas', u.uid), { lidas: { [id]: serverTimestamp() } }, { merge: true });
@@ -2934,10 +2961,52 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
         throw e;
       }
     },
+    /** Apaga uma mensagem (a própria, ou qualquer uma com "Total" no chat). O resumo da conversa fica como estava. */
+    async apagar(id: string, mensagemId: string) {
+      try {
+        await deleteDoc(doc(mensagensDaEquipe(id), mensagemId));
+      } catch (e) {
+        if (codigo(e) === 'permission-denied') fail(403, semPermissao);
+        throw e;
+      }
+    },
     /** Marca a conversa como lida agora (ao abrir, e quando chega mensagem com ela aberta). */
     async marcarLida(id: string) {
       const u = auth.currentUser;
       if (u) await setDoc(doc(db, 'equipe_lidas', u.uid), { lidas: { [id]: serverTimestamp() } }, { merge: true }).catch(() => undefined);
+    },
+  };
+
+  /* ---------- bloco de notas pessoal (CRM) ----------
+   * notas/<uid>/itens/<id>: só a própria pessoa lê e grava. Lidas uma vez ao abrir a tela (e de novo só o que mudar). */
+  const notasDe = (uid: string) => collection(db, 'notas', uid, 'itens');
+  const lerNota = (s: DocumentSnapshot): Nota => {
+    const d = s.data({ serverTimestamps: 'estimate' }) ?? {};
+    return { id: s.id, titulo: String(d.titulo ?? ''), texto: String(d.texto ?? ''), criadaEm: quando(d.criadaEm), atualizadaEm: quando(d.atualizadaEm) };
+  };
+  const meuUid = () => auth.currentUser?.uid ?? fail(401, 'Sessão expirada. Entre novamente.');
+  const notas = {
+    /** As notas da pessoa, da mais recente para a mais antiga, ao vivo enquanto a tela estiver aberta. */
+    ouvir(cb: (n: Nota[]) => void, erro?: (e: Error) => void) {
+      const uid = meuUid();
+      return ouvir(() => persistente((falhou) => onSnapshot(query(notasDe(uid), orderBy('atualizadaEm', 'desc')), (s) => cb(s.docs.map(lerNota)), falhou), erro));
+    },
+    /** Cria uma nota e devolve o id. */
+    async criar(n: { titulo?: string; texto?: string } = {}) {
+      const ref = doc(notasDe(meuUid()));
+      await setDoc(ref, {
+        titulo: (n.titulo ?? '').slice(0, LIMITES_CHAT.notaTitulo), texto: (n.texto ?? '').slice(0, LIMITES_CHAT.notaTexto),
+        criadaEm: serverTimestamp(), atualizadaEm: serverTimestamp(),
+      });
+      return ref.id;
+    },
+    async salvar(id: string, n: { titulo: string; texto: string }) {
+      await updateDoc(doc(notasDe(meuUid()), id), {
+        titulo: n.titulo.slice(0, LIMITES_CHAT.notaTitulo), texto: n.texto.slice(0, LIMITES_CHAT.notaTexto), atualizadaEm: serverTimestamp(),
+      });
+    },
+    async apagar(id: string) {
+      await deleteDoc(doc(notasDe(meuUid()), id));
     },
   };
 
@@ -2987,6 +3056,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     request,
     chat,
     chatEquipe,
+    notas,
     /** Identificador da sessão atual (só é confiável depois da primeira chamada a `request`). */
     uid: () => auth.currentUser?.uid ?? null,
     sair,

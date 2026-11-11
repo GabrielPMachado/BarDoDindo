@@ -455,16 +455,37 @@ service cloud.firestore {
 
       match /mensagens/{id} {
         allow read: if podeChat('ver') && membroDoChat(cid);
-        allow create: if request.resource.data.keys().hasOnly(['texto', 'usuarioId', 'usuarioNome', 'criadaEm'])
-          && textoAte(request.resource.data.texto, 1000) && request.resource.data.texto.size() > 0
+        allow create: if request.resource.data.keys().hasOnly(['texto', 'usuarioId', 'usuarioNome', 'criadaEm', 'imagem', 'nota', 'link'])
+          && textoAte(request.resource.data.texto, 1000)
+          && (request.resource.data.texto.size() > 0 || request.resource.data.keys().hasAny(['imagem', 'nota', 'link']))
+          && anexosDoChat(request.resource.data)
           && textoAte(request.resource.data.usuarioNome, 120)
           && logado() && request.resource.data.usuarioId == request.auth.uid
           && request.resource.data.criadaEm == request.time
           && podeChat('criar') && membroDoChat(cid)
           && getAfter(/databases/$(database)/documents/equipe_chat/$(cid)).data.ultimaId == id
           && request.resource.data.usuarioNome == get(caminho('usuarios', request.auth.uid)).data.nome;
-        allow delete: if sistema();
+        // cada um apaga as próprias mensagens; quem tem "Total" no chat apaga qualquer uma
+        allow delete: if (podeChat('ver') && membroDoChat(cid) && resource.data.usuarioId == request.auth.uid) || podeChat('excluir');
       }
+    }
+    // anexos de uma mensagem: foto/print em JPEG (data URL), cópia de uma nota e link para uma página do Cérebro. Igual a LIMITES_CHAT.
+    function anexosDoChat(d) {
+      return (!('imagem' in d) || (d.imagem is string && d.imagem.size() <= 300000 && d.imagem.size() > 23
+          && d.imagem[0:23] == 'data:image/jpeg;base64,'))
+        && (!('nota' in d) || (d.nota is map && d.nota.keys().hasOnly(['titulo', 'texto'])
+          && textoAte(d.nota.titulo, 120) && textoAte(d.nota.texto, 4000)))
+        && (!('link' in d) || (d.link is map && d.link.keys().hasOnly(['caminho', 'titulo', 'detalhe'])
+          && textoAte(d.link.caminho, 300) && d.link.caminho.matches('/[^:]*')
+          && textoAte(d.link.titulo, 160) && textoAte(d.link.get('detalhe', ''), 160)));
+    }
+    // bloco de notas pessoal: só a própria pessoa (da equipe) lê e grava as suas notas
+    match /notas/{uid}/itens/{id} {
+      allow read, delete: if logado() && request.auth.uid == uid;
+      allow create, update: if daEquipe() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['titulo', 'texto', 'criadaEm', 'atualizadaEm'])
+        && textoAte(request.resource.data.titulo, 120) && textoAte(request.resource.data.texto, 5000)
+        && request.resource.data.atualizadaEm == request.time;
     }
     // quando cada pessoa abriu cada conversa (para saber o que é novo): só a própria pessoa lê e grava
     match /equipe_lidas/{uid} {

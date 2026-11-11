@@ -34,3 +34,7 @@ export type { Conversa, Mensagem } from '../../../shared/backend';
 export const chatEquipe = backend.chatEquipe;
 export type { Colega, ConversaEquipe, MensagemEquipe } from '../../../shared/backend';
 export { idConversaDireta } from '../../../shared/backend';
+/** Bloco de notas pessoal de cada usuário do CRM. */
+export const notas = backend.notas;
+export type { LinkDoCerebro, Nota, NotaCompartilhada } from '../../../shared/backend';
+export { LIMITES_CHAT } from '../../../shared/backend';

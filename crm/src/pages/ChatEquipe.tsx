@@ -1,10 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { ArrowLeft, MessageCirclePlus, Search, SendHorizontal, Users } from 'lucide-react';
-import { EmptyState, ErrorBox, Loading, Modal, PageHead } from '../components/ui';
-import { Avatar } from '../components/Avatar';
-import { chatEquipe, idConversaDireta, type Colega, type ConversaEquipe, type MensagemEquipe } from '../lib/api';
-import { temNovidade, useChatEquipe } from '../lib/chatEquipe';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, ArrowUpRight, ImagePlus, MessageCirclePlus, NotebookPen, Search, SendHorizontal, Trash2, Users, X } from 'lucide-react';
+import { EmptyState, ErrorBox, Loading, Modal, PageHead, notify } from '../components/ui';
+import { confirmar } from '../components/pickers';
+import { Avatar, fotoNoTamanho } from '../components/Avatar';
+import { LIMITES_CHAT, chatEquipe, idConversaDireta, notas, type Colega, type ConversaEquipe, type MensagemEquipe } from '../lib/api';
+import { temNovidade, useChatEquipe, useColegas } from '../lib/chatEquipe';
 import { useSession } from '../lib/session';
 
 const hora = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -16,20 +17,6 @@ function diaDe(iso: string) {
 }
 const quandoCurto = (iso: string) => (diaDe(iso) === 'Hoje' ? hora(iso) : new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }));
 const primeiroNome = (n: string) => n.trim().split(/\s+/)[0] || n;
-
-// os colegas (usuários ativos) são lidos uma vez por sessão: dão o nome e a foto de quem está do outro lado
-let colegasCache: Promise<Colega[]> | null = null;
-function useColegas() {
-  const [colegas, setColegas] = useState<Colega[] | null>(null);
-  const [erro, setErro] = useState(false);
-  useEffect(() => {
-    let vivo = true;
-    (colegasCache ??= chatEquipe.colegas().catch((e) => { colegasCache = null; throw e; }))
-      .then((c) => vivo && setColegas(c)).catch(() => vivo && setErro(true));
-    return () => { vivo = false; };
-  }, []);
-  return { colegas, erro };
-}
 
 /**
  * Chat interno da equipe: o canal geral (todos os usuários com acesso ao chat) e conversas diretas entre duas pessoas.
@@ -132,6 +119,11 @@ function ConversaAberta({ id, titulo, resumo, novidade, colegas, onVoltar }: {
   const [carregando, setCarregando] = useState(false);
   const [texto, setTexto] = useState('');
   const [erro, setErro] = useState<string | null>(null);
+  // foto ou print escolhido (ou colado com Ctrl+V), já reduzido, esperando o envio
+  const [imagem, setImagem] = useState<string | null>(null);
+  const [preparando, setPreparando] = useState(false);
+  const [ampliada, setAmpliada] = useState<string | null>(null);
+  const arquivo = useRef<HTMLInputElement>(null);
   const caixa = useRef<HTMLDivElement>(null);
   const segurarRolagem = useRef(false);
   const buscouAnteriores = useRef(false);
@@ -176,19 +168,47 @@ function ConversaAberta({ id, titulo, resumo, novidade, colegas, onVoltar }: {
     }
   }
 
-  async function enviar(e: FormEvent) {
-    e.preventDefault();
-    const t = texto.trim();
-    if (!t) return;
-    setTexto('');
+  async function anexar(f: Blob | null | undefined) {
+    if (!f || !f.type.startsWith('image/')) return;
+    setPreparando(true);
     setErro(null);
     try {
-      await chatEquipe.enviar(id, t);
+      const foto = await fotoNoTamanho(f);
+      if (foto.length > LIMITES_CHAT.imagem) throw new Error('Imagem grande demais para o chat.');
+      setImagem(foto);
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : 'Não foi possível ler a imagem.');
+    } finally {
+      setPreparando(false);
+    }
+  }
+
+  async function enviar(e: FormEvent) {
+    e.preventDefault();
+    const t = texto.trim(), img = imagem;
+    if (!t && !img) return;
+    setTexto('');
+    setImagem(null);
+    setErro(null);
+    try {
+      await chatEquipe.enviar(id, t, img ? { imagem: img } : {});
     } catch (err) {
       setTexto(t);
+      setImagem(img);
       setErro(err instanceof Error ? err.message : 'Não foi possível enviar.');
     }
   }
+
+  async function apagar(m: MensagemEquipe) {
+    if (!(await confirmar({ title: 'Apagar esta mensagem?', message: 'Ela some do chat para todos.', confirmLabel: 'Apagar', danger: true }))) return;
+    try {
+      await chatEquipe.apagar(id, m.id);
+      setAntigas((a) => a.filter((x) => x.id !== m.id));
+    } catch (err) {
+      notify(err instanceof Error ? err.message : 'Não foi possível apagar.', 'error');
+    }
+  }
+  const podeApagarTodas = pode('chat', 'excluir');
 
   const todas = [...antigas.filter((a) => !recentes?.some((r) => r.id === a.id)), ...(recentes ?? [])];
   let diaAnterior = '';
@@ -227,10 +247,22 @@ function ConversaAberta({ id, titulo, resumo, novidade, colegas, onVoltar }: {
               return (
                 <div key={m.id} className="msg-linha">
                   {mostrarDia && <div className="msg-dia">{dia}</div>}
-                  <div className={`msg ${minha ? 'msg--equipe' : ''}`}>
+                  <div className={`msg ${minha ? 'msg--equipe' : ''} ${m.imagem ? 'msg--imagem' : ''}`}>
                     {mostrarAutor && <small className="msg__autor">{m.usuarioNome || 'Colega'}</small>}
-                    <p>{m.texto}</p>
-                    <small className="msg__hora">{m.pendente ? 'Enviando…' : hora(m.criadaEm)}</small>
+                    {m.imagem && (
+                      <button type="button" className="msg__foto" onClick={() => setAmpliada(m.imagem!)} aria-label="Ver a imagem maior">
+                        <img src={m.imagem} alt="" loading="lazy" />
+                      </button>
+                    )}
+                    {m.nota && <NotaNoChat nota={m.nota} />}
+                    {m.link && <LinkNoChat link={m.link} />}
+                    {m.texto && <p><TextoComLinks texto={m.texto} /></p>}
+                    <small className="msg__hora">
+                      {(minha || podeApagarTodas) && !m.pendente && (
+                        <button type="button" className="msg__apagar" onClick={() => apagar(m)} aria-label="Apagar mensagem" title="Apagar mensagem"><Trash2 size={12} /></button>
+                      )}
+                      {m.pendente ? 'Enviando…' : hora(m.criadaEm)}
+                    </small>
                   </div>
                 </div>
               );
@@ -241,17 +273,86 @@ function ConversaAberta({ id, titulo, resumo, novidade, colegas, onVoltar }: {
       {pode('chat', 'criar') ? (
         <form className="conversas__form" onSubmit={enviar}>
           {erro && <p className="conversas__erro">{erro}</p>}
+          {(imagem || preparando) && (
+            <div className="chat-anexo">
+              {imagem ? <img src={imagem} alt="Imagem a enviar" /> : <span className="muted small">Preparando a imagem…</span>}
+              {imagem && <button type="button" className="chat-anexo__tirar" onClick={() => setImagem(null)} aria-label="Tirar a imagem"><X size={14} /></button>}
+            </div>
+          )}
           <div className="conversas__campo">
+            <input ref={arquivo} type="file" accept="image/*" hidden onChange={(e) => { void anexar(e.target.files?.[0]); e.target.value = ''; }} />
+            <button type="button" className="btn btn--ghost conversas__enviar" onClick={() => arquivo.current?.click()} aria-label="Mandar foto ou print" title="Mandar foto ou print (ou cole com Ctrl+V)"><ImagePlus size={18} /></button>
             <textarea
               className="input" rows={1} maxLength={1000} value={texto}
-              placeholder={geral ? 'Mensagem para toda a equipe' : `Mensagem para ${primeiroNome(titulo)}`}
+              placeholder={imagem ? 'Legenda (opcional)' : geral ? 'Mensagem para toda a equipe' : `Mensagem para ${primeiroNome(titulo)}`}
               onChange={(e) => setTexto(e.target.value)}
+              onPaste={(e) => {
+                const img = [...e.clipboardData.items].find((i) => i.type.startsWith('image/'));
+                if (img) { e.preventDefault(); void anexar(img.getAsFile()); }
+              }}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }}
             />
-            <button className="btn btn--primary conversas__enviar" disabled={!texto.trim()} aria-label="Enviar"><SendHorizontal size={18} /></button>
+            <button className="btn btn--primary conversas__enviar" disabled={(!texto.trim() && !imagem) || preparando} aria-label="Enviar"><SendHorizontal size={18} /></button>
           </div>
         </form>
       ) : <p className="muted small conversas__form">Sua função só permite ler o chat.</p>}
+      {ampliada && (
+        <div className="foto-ampliada" onClick={() => setAmpliada(null)} role="dialog" aria-label="Imagem ampliada">
+          <img src={ampliada} alt="" />
+          <button type="button" className="foto-ampliada__fechar" aria-label="Fechar"><X size={20} /></button>
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Nota do bloco de notas mandada no chat: dá para ler aqui e salvar uma cópia nas próprias notas. */
+function NotaNoChat({ nota }: { nota: { titulo: string; texto: string } }) {
+  const navigate = useNavigate();
+  const [salvando, setSalvando] = useState(false);
+  const salvar = async () => {
+    setSalvando(true);
+    try {
+      const id = await notas.criar(nota);
+      notify('Nota salva em Minhas notas.');
+      navigate(`/perfil/notas?n=${id}`);
+    } catch {
+      notify('Não foi possível salvar a nota.', 'error');
+      setSalvando(false);
+    }
+  };
+  return (
+    <div className="msg-nota">
+      <div className="msg-nota__topo"><NotebookPen size={14} /><strong>{nota.titulo || 'Nota'}</strong></div>
+      {nota.texto && <p className="msg-nota__texto">{nota.texto}</p>}
+      <button type="button" className="btn btn--ghost btn--sm" onClick={salvar} disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar nas minhas notas'}</button>
+    </div>
+  );
+}
+
+/** Página do Cérebro citada no chat: um clique abre a página. */
+function LinkNoChat({ link }: { link: { caminho: string; titulo: string; detalhe?: string } }) {
+  return (
+    <Link to={link.caminho} className="msg-link">
+      <span className="msg-link__texto"><strong>{link.titulo}</strong>{link.detalhe && <small className="muted">{link.detalhe}</small>}</span>
+      <ArrowUpRight size={16} />
+    </Link>
+  );
+}
+
+// links do próprio Cérebro (…/crm/#/página) abrem aqui dentro; os demais, em outra guia
+const URL_RE = /(https?:\/\/[^\s]+)/g;
+function TextoComLinks({ texto }: { texto: string }) {
+  const partes = texto.split(URL_RE);
+  return (
+    <>
+      {partes.map((p, i) => {
+        if (i % 2 === 0) return p;
+        const interno = p.match(/\/crm\/?#(\/[^\s]*)/);
+        return interno
+          ? <Link key={i} to={interno[1]} className="msg__url">{p}</Link>
+          : <a key={i} href={p} target="_blank" rel="noopener noreferrer" className="msg__url">{p}</a>;
+      })}
     </>
   );
 }
