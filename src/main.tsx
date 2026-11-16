@@ -128,7 +128,7 @@ const redirecionar = !APP_LIBERADO && !testeDoApp && !Capacitor.isNativePlatform
   && !location.hash.startsWith('#/demo/'); // demonstrações abrem sem login e não gravam nada
 if (redirecionar) location.replace('/queroserafilhado');
 
-// HashRouter funciona igual na web e dentro do Capacitor (Android/iOS)
+// HashRouter funciona igual na web e dentro do Capacitor (iPhone)
 // reaproveita a raiz se o módulo for reexecutado (atualização em desenvolvimento)
 const container = document.getElementById('root') as HTMLElement & { __root?: Root };
 container.__root ??= createRoot(container);
