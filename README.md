@@ -3,7 +3,7 @@
 Sistema completo para um bar: app de fidelidade, CRM da equipe e página de pré-cadastro, tudo em um único projeto Firebase, sem servidor próprio.
 
 <p align="center">
-  <img src="docs/app.gif" alt="O app do afilhado numa tela de iPhone: entrada, cardápio e reserva de mesa." width="320" />
+  <img src="docs/app-v2.gif" alt="O app do afilhado numa tela de iPhone: entrada, cardápio e reserva de mesa." width="320" />
   <br />
   <sub>O app do afilhado numa tela de iPhone: entrada, cardápio e reserva de mesa. Gravado do app real no navegador; o cardápio vem do Firestore e a reserva é a tela de demonstração, que não grava nada.</sub>
 </p>
