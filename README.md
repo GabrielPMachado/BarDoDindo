@@ -1,14 +1,16 @@
 # Bar do Dindo
 
-Três partes que compartilham **um único projeto Firebase** (Authentication + Firestore), sem servidor próprio:
+Sistema completo para um bar: app de fidelidade, CRM da equipe e página de pré-cadastro, tudo em um único projeto Firebase, sem servidor próprio.
+
+São três partes que compartilham **um único projeto Firebase** (Authentication + Firestore), sem servidor próprio:
 
 | Parte | Pasta | Para quem | Endereço publicado |
 | --- | --- | --- | --- |
-| **App do afilhado** (celular, PWA / Android / iOS) | raiz (`src/`) | Clientes | `/` |
+| **App do afilhado** (celular, PWA / iPhone) | raiz (`src/`) | Clientes | `/` |
 | **CRM / Gestão** (computador) | `crm/` | Equipe do bar | `/crm` |
 | **Pré-cadastro** | `precadastro/` | Clientes, antes do lançamento | `/queroserafilhado` (o antigo `/afilhado` continua abrindo) |
 
-Até o lançamento, o app do afilhado fica fechado na web: quem abre `/` vai para o pré-cadastro (`APP_LIBERADO` em `src/main.tsx`; para testar o app, abra `/?app=1`). O app instalado pelo Android/iOS não é afetado.
+Até o lançamento, o app do afilhado fica fechado na web: quem abre `/` vai para o pré-cadastro (`APP_LIBERADO` em `src/main.tsx`; para testar o app, abra `/?app=1`). O app instalado no iPhone não é afetado.
 
 As telas chamam `api('/app/...')` e `api('/crm/...')` como antes; quem atende essas rotas é `shared/backend.ts`, no próprio navegador, lendo e gravando no Firestore. O que cada pessoa pode ler ou gravar é decidido em `firestore.rules`.
 
@@ -98,7 +100,7 @@ npm run build:all
 
 `scripts/testar-regras.mjs` confere que as regras barram o que não pode passar (cliente creditando pontos, criando voucher sem saldo, lendo salários, virando administrador etc.).
 
-## App Android / iOS (Capacitor)
+## App para iPhone (Capacitor)
 
 Com `shared/firebase-config.ts` preenchido:
 
@@ -106,7 +108,7 @@ Com `shared/firebase-config.ts` preenchido:
 npm run cap:sync
 ```
 
-Depois `npx cap open android` (Android Studio) ou `npx cap add ios` / `npx cap open ios` (Xcode, macOS). O app fala direto com o Firebase, sem endereço de servidor para configurar.
+Na primeira vez, `npm install @capacitor/ios` e `npx cap add ios`; depois `npx cap open ios` abre o projeto no Xcode (macOS). O app fala direto com o Firebase, sem endereço de servidor para configurar.
 
 ## Segurança e limites do modelo sem servidor
 
