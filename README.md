@@ -3,9 +3,9 @@
 Sistema completo para um bar: app de fidelidade, CRM da equipe e página de pré-cadastro, tudo em um único projeto Firebase, sem servidor próprio.
 
 <p align="center">
-  <img src="docs/demo.gif" alt="Demonstração animada do projeto: a equipe lança o consumo no CRM e os pontos aparecem no app do afilhado" width="640" />
+  <img src="docs/app.gif" alt="O app do afilhado numa tela de iPhone: entrada, cardápio e reserva de mesa." width="320" />
   <br />
-  <sub>A equipe lança o consumo no CRM e os pontos aparecem no app do afilhado. Demonstração ilustrativa, a mesma do <a href="https://portfolio-financy1.vercel.app">portfólio</a>.</sub>
+  <sub>O app do afilhado numa tela de iPhone: entrada, cardápio e reserva de mesa. Gravado do app real no navegador; o cardápio vem do Firestore e a reserva é a tela de demonstração, que não grava nada.</sub>
 </p>
 
 São três partes que compartilham **um único projeto Firebase** (Authentication + Firestore), sem servidor próprio:
