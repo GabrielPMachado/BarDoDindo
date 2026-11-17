@@ -1,0 +1,48 @@
+# Checagem de tipos e build do app, do pré-cadastro e do CRM, e testes das regras do Firestore
+# nos emuladores, em todo push na main e em todo pull request. Não publica nada.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verificar:
+    name: Build e testes das regras
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            crm/package-lock.json
+
+      - name: Instalar dependências
+        run: |
+          npm ci
+          npm --prefix crm ci
+
+      - name: Tipos e build (app, pré-cadastro e CRM)
+        run: npm run build:all
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Testar regras do Firestore
+        run: npm run testar:regras
