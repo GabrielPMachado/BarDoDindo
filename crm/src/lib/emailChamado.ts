@@ -126,8 +126,9 @@ export async function enviarEmailChamado(dados: DadosDoEmail) {
   if (!url) return false;
   // text/plain evita a consulta prévia (CORS) que o Apps Script não responde
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(montarEmailChamado(dados)) })
-    // o Google devolve uma página de erro sem liberar a leitura (CORS) quando o script não está publicado do jeito certo
-    .catch(() => { throw new Error(ERRO_DE_PUBLICACAO); });
+    // o Google devolve uma página de erro sem liberar a leitura (CORS) quando o script não está publicado do jeito certo;
+    // sem internet o navegador dá o mesmo "Failed to fetch", então separa os dois casos
+    .catch(() => { throw new Error(navigator.onLine ? ERRO_DE_PUBLICACAO : 'Sem internet. Tente de novo quando a conexão voltar.'); });
   const r = await res.json().catch(() => null) as { ok?: boolean; erro?: string } | null;
   if (!res.ok || !r?.ok) throw new Error(r?.erro || 'O script do e-mail não respondeu. Confira o endereço em Configurações.');
   return true;
