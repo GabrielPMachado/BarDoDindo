@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type DragEvent, type ReactNode, Fragment } from 'react';
-import { ArrowDown, ArrowLeftRight, ArrowUp, Camera, ChefHat, ChevronDown, ChevronRight, CopyPlus, Download, FileSpreadsheet, FileText, Globe, ImageOff, Maximize2, Paperclip, Pencil, Plus, Receipt, Search, Sheet, ShoppingCart, Sparkles, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowLeftRight, ArrowUp, Camera, ChefHat, ChevronDown, ChevronRight, CopyPlus, Download, FileSpreadsheet, FileText, Globe, ImageOff, Maximize2, Paperclip, Pencil, Plus, Receipt, Search, Sheet, ShoppingCart, Star, Sparkles, Trash2, X } from 'lucide-react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { findModule } from '../modules';
 import { copiaDe, ehProducao, linksDe, numberSpec, podeDuplicar, STATUS_KEYS, temTamanhos, termos, toneOf, vinculosDe, type CollectionDef, type Computed, type Field } from '../collections';
@@ -28,6 +28,7 @@ import { BarraNivel, LinksDeCompra, VariosLinks } from './Nivel';
 import { PreencherProdutoIA } from './PreencherProdutoIA';
 import { GerarFotoIA } from './GerarFotoIA';
 import { RefazerFotos } from './RefazerFotos';
+import { GerarFotosChopes } from './GerarFotosChopes';
 import { MoverVarios } from './MoverVarios';
 import { ProduzirModal } from './Producao';
 import { Ampliar } from './Ampliar';
@@ -78,15 +79,37 @@ function cellClass(f: Field) {
   return f.wide ? 'text-wide' : 'text';
 }
 
-function formatComputed(c: Computed, r: Row): ReactNode {
-  const v = c.get(r);
+function formatComputed(c: Computed, r: Row, todos: Row[], rel: Row[]): ReactNode {
+  const v = c.get(r, todos, rel);
   if (v === null || v === undefined || v === '') return <span className="muted">—</span>;
-  const tone = c.tone?.(r);
-  if (c.format === 'nivel') return <BarraNivel fracao={Number(v)} tone={tone ?? 'neutral'} detalhe={c.detalhe?.(r) ?? ''} />;
+  const tone = c.tone?.(r, todos, rel);
+  const detalhe = c.detalhe?.(r, todos, rel) ?? '';
+  if (c.format === 'nivel') return <BarraNivel fracao={Number(v)} tone={tone ?? 'neutral'} detalhe={detalhe} />;
+  if (c.format === 'comparacao') return <Comparacao acima={Number(v)} detalhe={detalhe} />;
+  if (c.format === 'nota') return (
+    <span className="comparacao">
+      <span className={`nota-qualidade text-${tone ?? 'neutral'}`}><Star size={13} aria-hidden /> {num(Number(v), 1)}<small className="muted">/10</small></span>
+      {detalhe && <small className="muted">{detalhe}</small>}
+    </span>
+  );
   const text =
     c.format === 'money' ? brl(Number(v)) : c.format === 'percent' ? pct(Number(v)) : c.format === 'number' ? num(Number(v)) : String(v);
   if (c.format === 'badge') return <Badge tone={tone ?? toneOf(v)}>{text}</Badge>;
   return tone && tone !== 'neutral' ? <span className={`text-${tone}`}>{text}</span> : text;
+}
+
+/** Seta e % em relação ao mais barato: verde "Mais barato", vermelho "+12,5%". */
+function Comparacao({ acima, detalhe }: { acima: number; detalhe: string }) {
+  const barato = acima === 0;
+  return (
+    <span className={`comparacao comparacao--${barato ? 'barato' : 'caro'}`}>
+      <Badge tone={barato ? 'good' : 'bad'}>
+        {barato ? <ArrowDown size={12} aria-hidden /> : <ArrowUp size={12} aria-hidden />}
+        {barato ? 'Mais barato' : `+${pct(acima)}`}
+      </Badge>
+      {detalhe && <small className="muted">{detalhe}</small>}
+    </span>
+  );
 }
 
 export function CollectionPage({ def, rowActions, before, newDefaults, filterRows }: {
@@ -115,6 +138,10 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   const padraoPeriodo = PERIODO_PADRAO[def.id];
   const [periodo, setPeriodo] = useState<PeriodoKey>(padraoPeriodo ?? 'tudo');
   const col = useCollection(def.id, true, padraoPeriodo ? desdeDe(periodo) : undefined);
+  // cadastro lido junto para as colunas calculadas (ex.: notas do Controle de qualidade na Tabela de preços)
+  const rel = useCollection(def.relacionada ?? def.id, !!def.relacionada && pode(def.relacionada, 'ver'));
+  // Produtos: os chopes do cardápio que levam foto (cada tamanho; o item principal que os agrupa não tem foto própria)
+  const chopes = useMemo(() => (def.tamanhos ? col.rows.filter((r) => r.categoria === 'Chopes' && !temTamanhos(r)) : []), [def.tamanhos, col.rows]);
   const all = useMemo(() => {
     const lista = filterRows ? col.rows.filter(filterRows) : col.rows;
     // item com tamanhos: leva os tamanhos junto, para as colunas calculadas (ex.: "3 tamanhos: 300 ml, 500 ml, 1 litro")
@@ -208,17 +235,20 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
         (!term || def.fields.some((f) => valoresDoCampo(r, f).some((x) => x.toLowerCase().includes(term)))),
     );
     const field = def.fields.find((f) => f.key === sort.key);
-    const numeric = field && ['number', 'money', 'percent'].includes(field.type);
+    // ordem por uma coluna calculada (ex.: preço por L): "#" + o rótulo dela
+    const calc = sort.key.startsWith('#') ? def.computed?.find((c) => c.ordenar && `#${c.label}` === sort.key) : undefined;
+    const numeric = !!calc || (field && ['number', 'money', 'percent'].includes(field.type));
+    const valor = (r: Row) => (calc ? calc.ordenar!(r, all, rel.rows) : r[sort.key]);
     return list.sort((a, b) => {
-      const av = a[sort.key], bv = b[sort.key];
+      const av = valor(a), bv = valor(b);
       const empty = (v: unknown) => v === undefined || v === null || v === '';
-      if (empty(av) && empty(bv)) return 0;
+      if (empty(av) && empty(bv)) return def.desempate?.(a, b) ?? 0;
       if (empty(av)) return 1;
       if (empty(bv)) return -1;
       const c = numeric ? Number(av) - Number(bv) : String(av).localeCompare(String(bv), 'pt-BR', { numeric: true });
-      return sort.dir === 'asc' ? c : -c;
+      return (sort.dir === 'asc' ? c : -c) || (def.desempate?.(a, b) ?? 0);
     });
-  }, [all, q, filter, filtros, sort, def]);
+  }, [all, q, filter, filtros, sort, def, rel.rows]);
 
   /* agrupamento: sem escolha manual, com algum filtro ativo agrupa pela primeira dimensão que não está filtrada
      (ex.: filtrou por destaque, agrupa por categoria) e que ainda tem mais de um valor na lista */
@@ -342,7 +372,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
   const exportar = async (formato: 'pdf' | 'xlsx') => {
     setExportando(true);
     try {
-      const colunas = colunasDe(def);
+      const colunas = colunasDe(def, all, rel.rows);
       const arquivo = `${def.id}-${new Date().toISOString().slice(0, 10)}`;
       if (formato === 'pdf') await exportarPdf(def.title, colunas, paraExportar(), arquivo);
       else await exportarExcel(def.title, colunas, paraExportar(), arquivo);
@@ -353,7 +383,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
       setExportando(false);
     }
   };
-  const exportCsv = () => exportarCsv(colunasDe(def), paraExportar(), `${def.id}-${new Date().toISOString().slice(0, 10)}`);
+  const exportCsv = () => exportarCsv(colunasDe(def, all, rel.rows), paraExportar(), `${def.id}-${new Date().toISOString().slice(0, 10)}`);
 
   const toggleSort = (key: string) =>
     setSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }));
@@ -382,6 +412,11 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
             </button>
             {def.fotoPadrao === 'estoque' && canEdit && (
               <button className="btn btn--ghost" disabled={!all.length} onClick={() => setRefazendoFotos(true)}><Sparkles size={16} /> Refazer fotos em alta</button>
+            )}
+            {def.tamanhos && canEdit && (
+              <button className="btn btn--ghost" disabled={!chopes.length} onClick={() => setRefazendoFotos(true)} title="Gera as fotos dos chopes no padrão do cardápio, pelo Gemini">
+                <Sparkles size={16} /> Gerar fotos dos chopes
+              </button>
             )}
             {canCreate && <button className="btn btn--primary" onClick={novo}><Plus size={16} /> {termos(def).novo}</button>}
           </>
@@ -514,7 +549,16 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
                       </button>
                     </th>
                   ))}
-                  {def.computed?.map((c) => <th key={c.label} className={c.format === 'badge' || c.format === 'text' || c.format === 'nivel' ? '' : 'num'}>{c.label}</th>)}
+                  {def.computed?.map((c) => (
+                    <th key={c.label} className={c.format === 'badge' || c.format === 'text' || c.format === 'nivel' || c.format === 'comparacao' || c.format === 'nota' ? '' : 'num'}>
+                      {c.ordenar ? (
+                        <button onClick={() => toggleSort(`#${c.label}`)}>
+                          {c.label}
+                          {sort.key === `#${c.label}` && (sort.dir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+                        </button>
+                      ) : c.label}
+                    </th>
+                  ))}
                   <th className="actions-col" aria-label="Ações" />
                 </tr>
               </thead>
@@ -555,7 +599,7 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
                       <td key={f.key} data-label={f.label} className={`${cellClass(f)} ${fi === 0 ? 'col-titulo' : ''}`}>{formatField(f, r[f.key])}</td>
                     ))}
                     {def.computed?.map((c) => (
-                      <td key={c.label} data-label={c.label} className={c.format === 'nivel' ? 'nivel-col' : c.format === 'badge' || c.format === 'text' ? 'nowrap' : 'num'}>{formatComputed(c, r)}</td>
+                      <td key={c.label} data-label={c.label} className={c.format === 'nivel' ? 'nivel-col' : c.format === 'badge' || c.format === 'text' || c.format === 'comparacao' || c.format === 'nota' ? 'nowrap' : 'num'}>{formatComputed(c, r, all, rel.rows)}</td>
                     ))}
                     <td className="actions-col" onClick={(e) => e.stopPropagation()}>
                       <div className="row-actions">
@@ -638,14 +682,21 @@ export function CollectionPage({ def, rowActions, before, newDefaults, filterRow
         <LancarDespesa def={def} row={lancando} sugestao={def.despesa(lancando)} onClose={() => setLancando(null)} onDone={col.reload} />
       )}
 
-      {refazendoFotos && (
-        <RefazerFotos
-          rows={all}
-          onSalvar={(id, foto) => api(`/crm/c/${def.id}/${id}`, { method: 'PUT', body: { foto } })}
+      {refazendoFotos && (def.tamanhos ? (
+        <GerarFotosChopes
+          rows={chopes}
+          onSalvar={(id, foto) => api(`/crm/c/${def.id}/${id}`, { method: 'PUT', body: { foto, fotoCardapio: new Date().toISOString() } })}
           onFim={col.reload}
           onClose={() => setRefazendoFotos(false)}
         />
-      )}
+      ) : (
+        <RefazerFotos
+          rows={all}
+          onSalvar={(id, foto) => api(`/crm/c/${def.id}/${id}`, { method: 'PUT', body: { foto, fotoCardapio: new Date().toISOString() } })}
+          onFim={col.reload}
+          onClose={() => setRefazendoFotos(false)}
+        />
+      ))}
 
       {editing && (
         <RecordForm
@@ -986,7 +1037,7 @@ function RecordForm({ def, row, modelo, rows = [], canEdit, defaults, titulo, av
             valor={typeof data.fotoJunto === 'string' ? data.fotoJunto : ''} disabled={!canEdit} titulo={String(data[def.fields[0].key] ?? '')} onChange={(fotoJunto) => setData((d) => ({ ...d, fotoJunto }))}
           />
         )}
-        {(def.iaProduto || def.fotoPadrao) && canEdit && !comTamanhos && <GerarFotoIA data={data} padrao={def.fotoPadrao ?? 'produto'} onUsar={(foto) => setData((d) => ({ ...d, foto }))} />}
+        {(def.iaProduto || def.fotoPadrao) && canEdit && !comTamanhos && <GerarFotoIA data={data} padrao={def.fotoPadrao ?? (def.tamanhos && data.categoria === 'Chopes' ? 'chopp' : 'produto')} onUsar={(foto) => setData((d) => ({ ...d, foto }))} />}
         {pai && (
           <p className="tamanho-de form-field--wide">
             <span>Tamanho de <b>{String(pai.nome ?? '')}</b>: o nome, a categoria e os textos do cardápio acompanham o item principal.</span>

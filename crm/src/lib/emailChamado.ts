@@ -117,18 +117,18 @@ export function montarEmailChamado({ chamado: c, registradoPor, teste }: DadosDo
   return { assunto, html, texto };
 }
 
-const SCRIPT_BLOQUEADO = 'O Google recusou a chamada ao script. No Apps Script, abra Implantar → Gerenciar implantações e confira: '
-  + 'tipo "App da Web", Executar como "Eu", Quem pode acessar "Qualquer pessoa" (não "Qualquer pessoa com Conta do Google"). '
-  + 'Se mudar algo, publique uma nova versão e autorize o Gmail quando pedir.';
+export const ERRO_DE_PUBLICACAO = 'O Google não deixou o Cérebro falar com o script. Abra o endereço do script numa aba nova: '
+  + 'se não aparecer "funcionando", salve o código, publique uma nova versão com "Quem pode acessar: Qualquer pessoa" e conclua a autorização do Gmail.';
 
 /** Manda o e-mail pelo script. Sem endereço configurado, não faz nada (devolve false). */
 export async function enviarEmailChamado(dados: DadosDoEmail) {
   const { url } = await api<{ url: string }>('/crm/email/chamados');
   if (!url) return false;
   // text/plain evita a consulta prévia (CORS) que o Apps Script não responde
-  // quando o Google não deixa o Cérebro chamar o script (acesso restrito, Gmail não autorizado), o navegador só diz "Failed to fetch"
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(montarEmailChamado(dados)) })
-    .catch(() => { throw new Error(navigator.onLine ? SCRIPT_BLOQUEADO : 'Sem internet. Tente de novo quando a conexão voltar.'); });
+    // o Google devolve uma página de erro sem liberar a leitura (CORS) quando o script não está publicado do jeito certo;
+    // sem internet o navegador dá o mesmo "Failed to fetch", então separa os dois casos
+    .catch(() => { throw new Error(navigator.onLine ? ERRO_DE_PUBLICACAO : 'Sem internet. Tente de novo quando a conexão voltar.'); });
   const r = await res.json().catch(() => null) as { ok?: boolean; erro?: string } | null;
   if (!res.ok || !r?.ok) throw new Error(r?.erro || 'O script do e-mail não respondeu. Confira o endereço em Configurações.');
   return true;

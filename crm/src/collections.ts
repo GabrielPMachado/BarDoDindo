@@ -1,6 +1,6 @@
 import type { Row } from './lib/data';
 import { brl, daysUntil, isoToday, num, pct } from './lib/format';
-import { calcularFicha, fichaDe, precoNormalizado } from './lib/ficha';
+import { calcularFicha, comparacaoDePreco, fichaDe, notaDeQualidade, precoNormalizado, precoPorUnidade } from './lib/ficha';
 import { locaisDe, locaisNoFormulario, resumoLocais } from './lib/locais';
 
 export type FieldType = 'text' | 'textarea' | 'number' | 'money' | 'date' | 'select' | 'email' | 'phone' | 'percent' | 'cnpj' | 'time' | 'ref' | 'url' | 'check';
@@ -70,11 +70,17 @@ export type Tone = 'good' | 'warn' | 'bad' | 'info' | 'neutral';
 
 export interface Computed {
   label: string;
-  get: (r: Row) => string | number | null;
-  /** "nivel": barra de 0 a 1 (o `get` devolve a fração), com o `detalhe` embaixo. */
-  format?: 'money' | 'number' | 'percent' | 'badge' | 'text' | 'nivel';
-  tone?: (r: Row) => Tone;
-  detalhe?: (r: Row) => string;
+  /** `todos`: todos os registros do cadastro (para comparar uma linha com as outras, ex.: fornecedores do mesmo insumo). */
+  get: (r: Row, todos: Row[], rel: Row[]) => string | number | null;
+  /** "nivel": barra de 0 a 1 (o `get` devolve a fração), com o `detalhe` embaixo.
+   *  "comparacao": quanto a linha está acima da mais barata (0 = a mais barata), com seta e o `detalhe` embaixo.
+   *  "nota": nota de 0 a 10, colorida pelo `tone`, com o `detalhe` embaixo. */
+  format?: 'money' | 'number' | 'percent' | 'badge' | 'text' | 'nivel' | 'comparacao' | 'nota';
+  /** `rel`: os registros do cadastro em `relacionada` (vazio se a pessoa não pode ver aquele cadastro). */
+  tone?: (r: Row, todos: Row[], rel: Row[]) => Tone;
+  /** Valor para ordenar a tabela por esta coluna (clicando no título); a chave da ordem é `#` + o rótulo. */
+  ordenar?: (r: Row, todos: Row[], rel: Row[]) => number | null;
+  detalhe?: (r: Row, todos: Row[], rel: Row[]) => string;
 }
 
 export interface Kpi {
@@ -95,11 +101,16 @@ export interface CollectionDef {
   feminino?: boolean;
   fields: Field[];
   computed?: Computed[];
+  /** Outro cadastro lido junto (se a pessoa pode vê-lo), entregue às colunas calculadas como `rel` (ex.: Tabela de preços lê o Controle de qualidade). */
+  relacionada?: string;
+  /** Desempate da ordem da tabela, sempre aplicado (ex.: dentro do mesmo insumo, do mais barato ao mais caro). */
+  desempate?: (a: Row, b: Row) => number;
   kpis?: (rows: Row[]) => Kpi[];
   /** Campo select usado como filtro rápido acima da tabela. */
   filterKey?: string;
   /** Filtros extras acima da tabela, com os valores que existem nos registros (ex.: por insumo, por fornecedor). */
   filtros?: string[];
+  /** Campo da ordem inicial, ou `#` + o rótulo de uma coluna calculada com `ordenar` (ex.: '#Preço por L / kg / un'). */
   sortKey?: string;
   sortDir?: 'asc' | 'desc';
   /** Cada registro pode ter uma foto (miniatura na tabela, campo no formulário e imagem nas exportações). */
@@ -465,7 +476,11 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   precos: {
     id: 'precos', area: 'precos', title: 'Tabela de preços', singular: 'preço de fornecedor',
     description: 'Quanto cada fornecedor cobra por insumo. A ficha técnica dos produtos compara os preços e mostra o mais barato.',
-    filterKey: 'status', filtros: ['insumo', 'fornecedor'], sortKey: 'insumo',
+    // abre do mais barato ao mais caro (por L, kg ou un); dá para trocar clicando nos títulos
+    filterKey: 'status', filtros: ['insumo', 'fornecedor'], sortKey: '#Preço por L / kg / un',
+    // dentro do mesmo insumo, sempre do mais barato ao mais caro (por L, kg ou un)
+    desempate: (a, b) => (precoPorUnidade(a)?.valor ?? Infinity) - (precoPorUnidade(b)?.valor ?? Infinity),
+    relacionada: 'qualidade',
     fields: [
       { key: 'insumo', label: 'Insumo (do Estoque)', type: 'ref', ref: 'insumos', refKey: 'insumoId', required: true, wide: true },
       { key: 'fornecedor', label: 'Fornecedor', type: 'ref', ref: 'fornecedores', refKey: 'fornecedorId', required: true },
@@ -479,7 +494,26 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
       { key: 'observacoes', label: 'Observações', type: 'textarea', formOnly: true, wide: true, placeholder: 'Prazo de entrega, pedido mínimo, condições de pagamento…' },
     ],
     computed: [
-      { label: 'Preço por L / kg / un', format: 'text', get: (r) => precoNormalizado(n(r.preco), n(r.conteudo), s(r.unidade)) },
+      {
+        label: 'Preço por L / kg / un', format: 'text', get: (r) => precoNormalizado(n(r.preco), n(r.conteudo), s(r.unidade)),
+        ordenar: (r) => precoPorUnidade(r)?.valor ?? null,
+        // entre os fornecedores do mesmo insumo: verde o mais barato, vermelho os mais caros
+        tone: (r, todos) => { const c = comparacaoDePreco(r, todos); return !c ? 'neutral' : c.acima === 0 ? 'good' : 'bad'; },
+      },
+      {
+        label: 'Vs. mais barato', format: 'comparacao',
+        get: (r, todos) => comparacaoDePreco(r, todos)?.acima ?? null,
+        ordenar: (r, todos) => comparacaoDePreco(r, todos)?.acima ?? null,
+        detalhe: (r, todos) => comparacaoDePreco(r, todos)?.detalhe ?? '',
+      },
+      {
+        // média das últimas inspeções do fornecedor no Controle de qualidade
+        label: 'Qualidade (0 a 10)', format: 'nota',
+        get: (r, _t, rel) => notaDeQualidade(r, rel)?.nota ?? null,
+        ordenar: (r, _t, rel) => notaDeQualidade(r, rel)?.nota ?? null,
+        tone: (r, _t, rel) => { const q = notaDeQualidade(r, rel); return !q ? 'neutral' : q.nota >= 8 ? 'good' : q.nota >= 6 ? 'warn' : 'bad'; },
+        detalhe: (r, _t, rel) => notaDeQualidade(r, rel)?.detalhe ?? '',
+      },
     ],
     kpis: (rows) => {
       const ativos = rows.filter((r) => r.status !== 'Inativo');
@@ -827,8 +861,10 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
     filterKey: 'area', filtros: ['resultado', 'responsavel'], sortKey: 'data', sortDir: 'desc',
     fields: [
       { key: 'data', label: 'Data', type: 'date', required: true },
-      { key: 'area', label: 'Área', type: 'select', options: ['Cozinha', 'Bar', 'Salão', 'Banheiros', 'Estoque', 'Área externa'], required: true },
+      { key: 'area', label: 'Área', type: 'select', options: ['Cozinha', 'Bar', 'Salão', 'Banheiros', 'Estoque', 'Área externa', 'Fornecedor'], required: true },
       { key: 'checklist', label: 'Inspeção', type: 'text', required: true, placeholder: 'Ex.: Higienização e temperatura' },
+      // nota do fornecedor (ex.: cervejaria): a média das últimas aparece na Tabela de preços
+      { key: 'fornecedor', label: 'Fornecedor avaliado', type: 'ref', ref: 'fornecedores', refKey: 'fornecedorId', placeholder: 'Ex.: a cervejaria do barril recebido' },
       { key: 'responsavel', label: 'Responsável', type: 'ref', ref: 'pessoas', refKey: 'responsavelId', livre: true },
       { key: 'nota', label: 'Nota (0 a 10)', type: 'number', required: true, decimals: 1, min: 0, max: 10 },
       { key: 'resultado', label: 'Resultado', type: 'select', options: ['Conforme', 'Conforme com ressalvas', 'Não conforme'], required: true },
@@ -870,11 +906,11 @@ export const COLLECTIONS: Record<string, CollectionDef> = {
   /* ---------------- Atendimento: eventos do calendário ---------------- */
   eventos: {
     id: 'eventos', area: 'eventos', title: 'Calendário', singular: 'evento',
-    description: 'Shows, festas, jogos e eventos fechados. O calendário junta os eventos com as reservas.',
+    description: 'Shows, festas, jogos, eventos fechados e reuniões. O calendário junta os eventos com as reservas e os aniversários dos afilhados.',
     filterKey: 'tipo', filtros: ['status', 'responsavel'], sortKey: 'data', sortDir: 'asc',
     fields: [
       { key: 'titulo', label: 'Evento', type: 'text', required: true, wide: true, placeholder: 'Ex.: Samba de sexta' },
-      { key: 'tipo', label: 'Tipo', type: 'select', options: ['Show', 'Festa', 'Jogo / transmissão', 'Evento fechado', 'Degustação', 'Feriado', 'Outro'], required: true },
+      { key: 'tipo', label: 'Tipo', type: 'select', options: ['Show', 'Festa', 'Jogo / transmissão', 'Evento fechado', 'Degustação', 'Feriado', 'Reunião da diretoria', 'Reunião de equipe', 'Outro'], required: true },
       { key: 'data', label: 'Data', type: 'date', required: true },
       { key: 'horario', label: 'Horário', type: 'time' },
       { key: 'responsavel', label: 'Responsável', type: 'ref', ref: 'pessoas', refKey: 'responsavelId', livre: true, formOnly: true },

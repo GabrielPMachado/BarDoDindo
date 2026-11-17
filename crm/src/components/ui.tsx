@@ -4,6 +4,7 @@ import { linkSeguro } from '../lib/links';
 import { numberSpec, type Field, type Kpi, type Tone } from '../collections';
 import { applyNumberMask, formatNumber, maskCnpj, maskPhone, type NumberSpec } from '../lib/masks';
 import { confirmar, DatePicker, SelectPicker, TimePicker, type ConfirmOptions } from './pickers';
+import { useNumeroAnimado } from '../lib/efeitos';
 
 export function Badge({ tone = 'neutral', children }: { tone?: Tone; children: ReactNode }) {
   return <span className={`badge badge--${tone}`}>{children}</span>;
@@ -16,12 +17,18 @@ export function KpiRow({ items }: { items: Kpi[] }) {
       {items.map((k) => (
         <div key={k.label} className={`kpi ${k.tone ? `kpi--${k.tone}` : ''}`}>
           <span className="kpi__label">{k.label}</span>
-          <strong className="kpi__value">{k.value}</strong>
+          <KpiValor value={k.value} />
           {k.hint && <span className="kpi__hint">{k.hint}</span>}
         </div>
       ))}
     </div>
   );
+}
+
+/** Número de um cartão de indicador, que conta até o valor ao aparecer ou mudar. */
+export function KpiValor({ value }: { value: string }) {
+  const mostrado = useNumeroAnimado(value);
+  return <strong className="kpi__value" aria-label={value}>{mostrado}</strong>;
 }
 
 export function PageHead({ title, description, actions }: { title: string; description?: string; actions?: ReactNode }) {

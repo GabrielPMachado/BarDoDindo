@@ -1,10 +1,16 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { Link } from 'react-router-dom';
-import { CalendarDays, ChevronRight, Gift, LogOut, ReceiptText, Save } from 'lucide-react';
+import { BriefcaseBusiness, CalendarDays, ChevronRight, ExternalLink, Gift, LogOut, ReceiptText, Save } from 'lucide-react';
 import { confirmar, PageHeader, Toast } from '../components/ui';
 import { memberNumber, useMe, useStore } from '../store';
 import { Avatar } from './Home';
 import { maskPhone, phoneOk } from '../masks';
+import { api } from '../api';
+import { SITE_OFICIAL } from '../../shared/firebase-config';
+
+// na web o Cérebro fica no mesmo site e já abre com a sessão do app; no app instalado, abre no site oficial (pede o login)
+const enderecoCerebro = () => (Capacitor.isNativePlatform() ? `${SITE_OFICIAL}/crm/` : `${location.origin}/crm/?equipe=1`);
 
 export default function Perfil() {
   const me = useMe();
@@ -13,6 +19,8 @@ export default function Perfil() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<{ msg: string; tone: 'ok' | 'error' } | null>(null);
   const clearToast = useCallback(() => setToast(null), []);
+  const [equipe, setEquipe] = useState(false);
+  useEffect(() => { api<{ equipe: boolean }>('/app/equipe').then((r) => setEquipe(r.equipe), () => {}); }, []);
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,6 +73,14 @@ export default function Perfil() {
         </div>
         <button className="btn btn--primary" disabled={busy}><Save size={18} /> Salvar alterações</button>
       </form>
+
+      {equipe && (
+        <div className="card list">
+          <a href={enderecoCerebro()} target="_blank" rel="noopener" className="link-row">
+            <BriefcaseBusiness size={20} /> Área da equipe (Cérebro) <ExternalLink size={18} />
+          </a>
+        </div>
+      )}
 
       <div className="card list">
         <Link to="/reservas" className="link-row"><CalendarDays size={20} /> Minhas reservas <ChevronRight size={18} /></Link>

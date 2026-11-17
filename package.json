@@ -17,7 +17,6 @@
     "testar:regras": "npx -y firebase-tools@15 emulators:exec --only auth,firestore --project demo-bardodindo \"node scripts/semear-testes.mjs && node scripts/testar-regras.mjs senha-cliente-123 senha-atendente-123 senha-marketing-123 senha-administrativo-123 senha-modular-123 senha-caixa-123 senha-parametros-123 senha-ficha-123\""
   },
   "dependencies": {
-    "@capacitor/android": "^8.5.2",
     "@capacitor/core": "^8.5.2",
     "firebase": "^12.19.0",
     "lucide-react": "^1.49.0",

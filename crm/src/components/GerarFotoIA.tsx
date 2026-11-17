@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Check, Copy, Download, ExternalLink, ImageOff, Sparkles, Upload } from 'lucide-react';
-import { cenarioDoBem, GEMINI_URL, MODELOS, promptDaFoto, promptDaFotoEstoque, promptDaFotoPatrimonio, type PadraoFoto } from '../lib/iaFoto';
+import { fotoComPlaquinha, realcarFoto } from '../lib/acabamentoChopp';
+import { abrirGeminiSobreposto, cenarioDoBem, copoDoChopp, estiloDoChopp, MODELOS, MODELOS_CHOPP, promptDaFoto, promptDaFotoChopp, promptDaFotoEstoque, promptDaFotoPatrimonio, type PadraoFoto } from '../lib/iaFoto';
 import { fotoNoTamanho } from './Avatar';
 import { notify } from './ui';
 
@@ -35,13 +36,17 @@ export function GerarFotoIA({ data, onUsar, padrao = 'produto' }: { data: Record
   const fotoAtual = typeof data.foto === 'string' ? data.foto : '';
   const modelo = MODELOS[padrao];
   const oQue = modelo.oQue;
-  const baixarModelo = () => baixar(modelo.url, modelo.arquivo);
   const nome = String((padrao === 'estoque' ? data.item : data.nome) ?? '').trim();
+  // chopp: a foto modelo é a APA aprovada no mesmo copo do tamanho (half-pint, pint ou jarra)
+  const arquivoModelo = padrao === 'chopp' ? MODELOS_CHOPP[copoDoChopp(nome, String(data.tamanho ?? ''))] : modelo;
+  const baixarModelo = () => baixar(arquivoModelo.url, arquivoModelo.arquivo);
   const prompt = () => padrao === 'estoque'
     ? promptDaFotoEstoque({ item: nome, categoria: String(data.categoria ?? ''), unidade: String(data.unidade ?? ''), conteudo: data.conteudo, conteudoUnidade: String(data.conteudoUnidade ?? '') })
-    : padrao === 'patrimonio'
-      ? promptDaFotoPatrimonio({ nome, categoria: String(data.categoria ?? ''), descricao: String(data.descricaoReserva ?? ''), cenario: String(data.cenarioFoto ?? '') })
-      : promptDaFoto({ nome, resumo: String(data.resumo ?? ''), ingredientes: String(data.ingredientes ?? '') });
+    : padrao === 'chopp'
+      ? promptDaFotoChopp({ nome, tamanho: String(data.tamanho ?? '') })
+      : padrao === 'patrimonio'
+        ? promptDaFotoPatrimonio({ nome, categoria: String(data.categoria ?? ''), descricao: String(data.descricaoReserva ?? ''), cenario: String(data.cenarioFoto ?? '') })
+        : promptDaFoto({ nome, resumo: String(data.resumo ?? ''), ingredientes: String(data.ingredientes ?? '') });
 
   /**
    * Um toque faz tudo: copia o pedido, baixa a foto modelo (e a foto atual, como referência) e abre o Gemini.
@@ -51,8 +56,8 @@ export function GerarFotoIA({ data, onUsar, padrao = 'produto' }: { data: Record
     if (!nome) { notify(padrao === 'estoque' ? 'Informe o nome do item antes.' : padrao === 'patrimonio' ? 'Informe o nome do bem antes.' : 'Informe o nome do produto antes.', 'error'); return; }
     const copiou = copiar(prompt());
     baixarModelo();
-    if (fotoAtual) baixar(fotoAtual, `referencia-${nomeArquivo(nome)}.jpg`);
-    window.open(GEMINI_URL, '_blank', 'noopener');
+    if (fotoAtual && padrao !== 'chopp') baixar(fotoAtual, `referencia-${nomeArquivo(nome)}.jpg`);
+    abrirGeminiSobreposto();
     setAberto(true);
     void copiou.then((ok) => notify(ok
       ? 'Pedido copiado e fotos baixadas! No Gemini: anexe a foto modelo, cole o pedido e envie.'
@@ -62,7 +67,14 @@ export function GerarFotoIA({ data, onUsar, padrao = 'produto' }: { data: Record
   const receber = async (arquivo?: File) => {
     if (!arquivo) return;
     setErro(null);
-    try { setNova(await fotoNoTamanho(arquivo)); } catch (e) { setErro(e instanceof Error ? e.message : 'Não foi possível ler a imagem.'); }
+    try {
+      // chopp: o Cérebro realça a foto e escreve a plaquinha deste chopp
+      const tamanho = String(data.tamanho ?? '');
+      const copo = copoDoChopp(nome, tamanho);
+      setNova(padrao === 'chopp'
+        ? await fotoComPlaquinha(await realcarFoto(arquivo, copo), copo, estiloDoChopp(nome, tamanho))
+        : await fotoNoTamanho(arquivo));
+    } catch (e) { setErro(e instanceof Error ? e.message : 'Não foi possível ler a imagem.'); }
   };
 
   if (!aberto && !nova) {
@@ -101,9 +113,9 @@ export function GerarFotoIA({ data, onUsar, padrao = 'produto' }: { data: Record
           </ol>
           <div className="gerar-foto__extras">
             <span className="muted small">Algo não funcionou?</span>
-            <button type="button" className="btn btn--ghost btn--sm" onClick={async () => notify(await copiar(prompt()) ? 'Pedido copiado.' : 'Não foi possível copiar.')}><Copy size={14} /> Copiar pedido</button>
+            <button type="button" className="btn btn--ghost btn--sm" onClick={criarNoGemini} title="Copia o pedido, baixa a foto modelo e abre o Gemini por cima do Cérebro"><Copy size={14} /> Copiar pedido de novo</button>
             <button type="button" className="btn btn--ghost btn--sm" onClick={baixarModelo}><Download size={14} /> Baixar foto modelo</button>
-            <a className="btn btn--ghost btn--sm" href={GEMINI_URL} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} /> Abrir o Gemini</a>
+            <button type="button" className="btn btn--ghost btn--sm" onClick={abrirGeminiSobreposto}><ExternalLink size={14} /> Abrir o Gemini</button>
           </div>
           {erro && <p className="error">{erro}</p>}
           <div className="gerar-foto__botoes"><button type="button" className="btn btn--ghost btn--sm" onClick={() => setAberto(false)}>Fechar</button></div>

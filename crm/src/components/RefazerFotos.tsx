@@ -1,7 +1,7 @@
-import { useRef, useState } from 'react';
-import { Check, Download, ExternalLink, ImageOff, Loader2, RefreshCw, Sparkles, Square, Upload } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Check, Copy, Download, ExternalLink, ImageOff, Loader2, RefreshCw, Sparkles, Square, Upload } from 'lucide-react';
 import type { Row } from '../lib/data';
-import { ErroDaChave, GEMINI_URL, MODELOS, gerarFotoEstoque, promptDaFotoEstoque } from '../lib/iaFoto';
+import { ErroDaChave, MODELOS, abrirGeminiSobreposto, gerarFotoEstoque, promptDaFotoEstoque } from '../lib/iaFoto';
 import { fotoNoTamanho } from './Avatar';
 import { baixar, copiar, nomeArquivo } from './GerarFotoIA';
 import { Modal, notify } from './ui';
@@ -13,7 +13,7 @@ type Modo = 'gratis' | 'automatico';
 const temFoto = (r: Row) => typeof r.foto === 'string' && !!r.foto;
 /** extensão do arquivo pelo tipo da data URL (a foto atual pode ser JPEG, PNG ou WebP) */
 const extensao = (dataUrl: string) => ({ 'image/png': 'png', 'image/webp': 'webp' } as Record<string, string>)[dataUrl.slice(5, dataUrl.indexOf(';'))] ?? 'jpg';
-const nomeReferencia = (r: Row) => `referencia-${nomeArquivo(String(r.item ?? ''))}.${extensao(String(r.foto))}`;
+const nomeReferencia = (r: Row) => `referencia-${nomeArquivo(String(r.item ?? r.nome ?? ''))}.${extensao(String(r.foto))}`;
 /**
  * Baixa a foto atual por um endereço blob: data URLs grandes no href falham em parte dos navegadores (o download sai vazio
  * ou nem começa). O endereço é liberado depois, quando o download já começou.
@@ -29,23 +29,42 @@ function baixarFoto(dataUrl: string, nome: string) {
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   } catch { baixar(dataUrl, nome); }
 }
-const pedidoDe = (r: Row) => promptDaFotoEstoque({
-  item: String(r.item ?? ''), categoria: String(r.categoria ?? ''), unidade: String(r.unidade ?? ''), conteudo: r.conteudo, conteudoUnidade: String(r.conteudoUnidade ?? ''),
-}, temFoto(r));
+
+/** estoque: itens do depósito (a foto atual vai de referência). Os chopes do cardápio têm janela própria (GerarFotosChopes). */
+export type TipoRefazer = 'estoque';
+const TIPOS: Record<TipoRefazer, {
+  titulo: string; nome: (r: Row) => string; pedido: (r: Row) => string; gerar: (r: Row, s: AbortSignal) => Promise<string>;
+  /** a foto atual vai junto como referência do produto */
+  referencia: boolean; gratis: string; automatico: string;
+}> = {
+  estoque: {
+    titulo: 'Refazer fotos em alta qualidade',
+    nome: (r) => String(r.item ?? ''),
+    pedido: (r) => promptDaFotoEstoque({
+      item: String(r.item ?? ''), categoria: String(r.categoria ?? ''), unidade: String(r.unidade ?? ''), conteudo: r.conteudo, conteudoUnidade: String(r.conteudoUnidade ?? ''),
+    }, temFoto(r)),
+    gerar: gerarFotoEstoque,
+    referencia: true,
+    gratis: 'Marque os itens e toque em "Abrir o próximo no Gemini": o pedido do item é copiado, a foto modelo e a foto atual são baixadas e o Gemini abre numa janela por cima do Cérebro. Lá, cole o pedido, anexe as fotos e envie. Copie a imagem criada e cole aqui (Ctrl+V), ou envie no cartão do item; depois toque em "Trocar".',
+    automatico: 'Cada item marcado vai para o Gemini com a foto modelo do depósito e a foto atual como referência; a nova sai em alta resolução. Usa a chave da IA de Configurações → Parâmetros, que precisa do faturamento ativo no Google AI Studio (o plano gratuito não gera imagens).',
+  },
+};
 
 /**
  * Refaz de uma vez as fotos dos itens do Estoque no padrão do depósito. A pessoa marca os itens; no modo grátis cada clique
  * copia o pedido do próximo, baixa as fotos e abre o Gemini, e a foto pronta volta no cartão do item; no automático o Cérebro
  * gera uma por vez pela API. Nos dois, a atual fica ao lado da nova e só as marcadas são trocadas.
  */
-export function RefazerFotos({ rows, onSalvar, onFim, onClose }: {
+export function RefazerFotos({ tipo = 'estoque', rows, onSalvar, onFim, onClose }: {
+  tipo?: TipoRefazer;
   rows: Row[];
   onSalvar: (id: string, foto: string) => Promise<unknown>;
   /** depois de salvar: recarrega a lista */
   onFim: () => Promise<unknown> | void;
   onClose: () => void;
 }) {
-  const todos = [...rows].sort((a, b) => String(a.item ?? '').localeCompare(String(b.item ?? ''), 'pt-BR'));
+  const t = TIPOS[tipo];
+  const todos = [...rows].sort((a, b) => t.nome(a).localeCompare(t.nome(b), 'pt-BR', { numeric: true }));
   const [modo, setModo] = useState<Modo>('gratis');
   // começam marcados os itens que já têm foto (a leva antiga, em baixa qualidade)
   const [marcados, setMarcados] = useState<Set<string>>(() => new Set(todos.filter(temFoto).map((r) => r.id)));
@@ -56,7 +75,6 @@ export function RefazerFotos({ rows, onSalvar, onFim, onClose }: {
   const [salvando, setSalvando] = useState(false);
   const [erroGeral, setErroGeral] = useState<string | null>(null);
   const parar = useRef<AbortController | null>(null);
-  const modeloBaixado = useRef(false);
 
   const mudar = (id: string, e: Estado) => setEstados((s) => ({ ...s, [id]: e }));
   const est = (r: Row): Estado => estados[r.id] ?? { st: 'fila' };
@@ -67,26 +85,47 @@ export function RefazerFotos({ rows, onSalvar, onFim, onClose }: {
   const proximo = itens.find((r) => marcados.has(r.id) && est(r).st === 'fila');
 
   /**
-   * Grátis: copia o pedido do item, baixa a foto modelo (só na primeira vez) e a foto atual, e abre o Gemini numa aba.
+   * Grátis: um toque copia o pedido do item, baixa a foto modelo (e a atual, de referência) e abre o Gemini numa janela por
+   * cima do Cérebro. A foto pronta volta colando (Ctrl+V) aqui ou pelo "Enviar foto pronta" do cartão.
    * A cópia começa antes de abrir a aba: depois que o Gemini abre, a página perde o foco e o navegador não deixa copiar.
    */
   const abrirNoGemini = (r: Row) => {
-    const copiou = copiar(pedidoDe(r));
-    const modelo = MODELOS.estoque;
+    const copiou = copiar(t.pedido(r));
+    const modelo = MODELOS[tipo];
+    const comReferencia = t.referencia && temFoto(r);
     // a foto atual vai primeiro: o navegador costuma barrar o segundo download do mesmo clique, e a referência é a que importa
-    if (temFoto(r)) baixarFoto(String(r.foto), nomeReferencia(r));
-    if (!modeloBaixado.current) { baixar(modelo.url, modelo.arquivo); modeloBaixado.current = true; }
-    window.open(GEMINI_URL, '_blank', 'noopener');
+    if (comReferencia) baixarFoto(String(r.foto), nomeReferencia(r));
+    // a foto modelo baixa a cada pedido: fica sempre à mão na pasta de downloads para anexar no Gemini
+    baixar(modelo.url, modelo.arquivo);
+    abrirGeminiSobreposto();
+    ultimoAberto.current = r.id;
     mudar(r.id, { st: 'aberto' });
     void copiou.then((ok) => notify(ok
-      ? `Pedido de "${String(r.item ?? '')}" copiado. No Gemini: cole o pedido, anexe a foto modelo${temFoto(r) ? ' e a foto de referência (se ela não baixou, use "Baixar foto atual" no cartão do item)' : ''} e envie.`
-      : 'Fotos baixadas, mas não deu para copiar o pedido: toque em "Abrir de novo" no cartão do item.', ok ? 'ok' : 'error'));
+      ? `Pedido de "${t.nome(r)}" copiado e foto modelo baixada. No Gemini: cole o pedido, anexe a foto modelo${comReferencia ? ' e a de referência' : ''} e envie. Depois copie a imagem pronta e cole aqui (Ctrl+V).`
+      : 'Foto modelo baixada, mas não deu para copiar o pedido: toque em "Copiar de novo" no cartão do item.', ok ? 'ok' : 'error'));
   };
+
+  // Ctrl+V com uma imagem (copiada no Gemini) vai para o último item aberto no Gemini
+  const ultimoAberto = useRef<string | null>(null);
+  const receberRef = useRef<(r: Row, arquivo?: File) => Promise<void>>(async () => undefined);
+  useEffect(() => {
+    const colar = (e: ClipboardEvent) => {
+      const arquivo = Array.from(e.clipboardData?.files ?? []).find((f) => f.type.startsWith('image/'));
+      if (!arquivo) return;
+      const r = todos.find((x) => x.id === ultimoAberto.current);
+      if (!r) { notify('Abra um item no Gemini antes de colar a foto pronta.', 'error'); return; }
+      e.preventDefault();
+      void receberRef.current(r, arquivo).then(() => notify(`Foto colada em "${t.nome(r)}". Confira e toque em "Trocar".`));
+    };
+    window.addEventListener('paste', colar);
+    return () => window.removeEventListener('paste', colar);
+  });
 
   const receber = async (r: Row, arquivo?: File) => {
     if (!arquivo) return;
     try { mudar(r.id, { st: 'pronta', nova: await fotoNoTamanho(arquivo), usar: true }); } catch (e) { mudar(r.id, { st: 'erro', erro: e instanceof Error ? e.message : 'Não foi possível ler a imagem.' }); }
   };
+  receberRef.current = receber;
 
   /** Automático: gera uma por vez (a cota da IA não aguenta muitas juntas); erro de chave para a fila inteira. */
   const gerar = async (lista: Row[]) => {
@@ -99,7 +138,7 @@ export function RefazerFotos({ rows, onSalvar, onFim, onClose }: {
         if (ctl.signal.aborted) break;
         mudar(r.id, { st: 'gerando' });
         try {
-          mudar(r.id, { st: 'pronta', nova: await gerarFotoEstoque(r, ctl.signal), usar: true });
+          mudar(r.id, { st: 'pronta', nova: await t.gerar(r, ctl.signal), usar: true });
         } catch (e) {
           if (ctl.signal.aborted) { mudar(r.id, { st: 'fila' }); break; }
           const msg = e instanceof Error ? e.message : 'Não foi possível gerar.';
@@ -140,7 +179,7 @@ export function RefazerFotos({ rows, onSalvar, onFim, onClose }: {
 
   return (
     <Modal
-      title="Refazer fotos em alta qualidade"
+      title={t.titulo}
       onClose={fechar}
       width={1100}
       footer={
@@ -165,9 +204,7 @@ export function RefazerFotos({ rows, onSalvar, onFim, onClose }: {
           <button role="tab" aria-selected={modo === 'automatico'} className={modo === 'automatico' ? 'is-on' : ''} disabled={rodando} onClick={() => setModo('automatico')}>Automático (chave com faturamento)</button>
         </div>
         <p className="muted small">
-          {modo === 'gratis'
-            ? 'Marque os itens e toque em "Abrir o próximo no Gemini": o pedido do item é copiado, a foto modelo (na primeira vez) e a foto atual são baixadas e o Gemini abre numa aba. Lá, cole o pedido, anexe as fotos e envie. Salve a imagem criada e envie no cartão do item; depois toque em "Trocar".'
-            : 'Cada item marcado vai para o Gemini com a foto modelo do depósito e a foto atual como referência; a nova sai em alta resolução. Usa a chave da IA de Configurações → Parâmetros, que precisa do faturamento ativo no Google AI Studio (o plano gratuito não gera imagens).'}
+          {modo === 'gratis' ? t.gratis : t.automatico}
         </p>
         <div className="refazer-fotos__filtro">
           <span>{marcados.size} de {itens.length} marcados</span>
@@ -184,7 +221,7 @@ export function RefazerFotos({ rows, onSalvar, onFim, onClose }: {
               <li key={r.id} className={`refazer-fotos__item is-${e.st}${marcado ? '' : ' is-fora'}`}>
                 <label className="refazer-fotos__nome">
                   <input type="checkbox" checked={marcado} disabled={rodando || e.st === 'salva'} onChange={(ev) => marcar(r.id, ev.target.checked)} />
-                  <strong>{String(r.item ?? '—')}</strong>
+                  <strong>{t.nome(r) || '—'}</strong>
                 </label>
                 <div className="gerar-foto__comparar">
                   <figure>
@@ -207,10 +244,10 @@ export function RefazerFotos({ rows, onSalvar, onFim, onClose }: {
                   )}
                   {modo === 'gratis' && marcado && e.st !== 'salva' && (
                     <span className="refazer-fotos__botoes">
-                      {temFoto(r) && (
+                      {t.referencia && temFoto(r) && (
                         <button className="btn btn--ghost btn--sm" onClick={() => baixarFoto(String(r.foto), nomeReferencia(r))} title="Baixa a foto atual para anexar no Gemini"><Download size={13} /> Baixar foto atual</button>
                       )}
-                      <button className="btn btn--ghost btn--sm" disabled={salvando} onClick={() => abrirNoGemini(r)} title="Copia o pedido, baixa as fotos e abre o Gemini"><ExternalLink size={13} /> {e.st === 'fila' ? 'Abrir no Gemini' : 'Abrir de novo'}</button>
+                      <button className="btn btn--ghost btn--sm" disabled={salvando} onClick={() => abrirNoGemini(r)} title="Copia o pedido, baixa a foto modelo e abre o Gemini por cima do Cérebro"><Copy size={13} /> {e.st === 'fila' ? 'Copiar pedido' : 'Copiar de novo'}</button>
                       <label className="btn btn--ghost btn--sm">
                         <Upload size={13} /> {e.nova ? 'Outra foto' : 'Enviar foto pronta'}
                         <input type="file" accept="image/*" hidden onChange={(ev) => { void receber(r, ev.target.files?.[0]); ev.target.value = ''; }} />

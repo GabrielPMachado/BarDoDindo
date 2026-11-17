@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { ExternalLink, Maximize2, MapPin, Minimize2, Paintbrush, Phone, RotateCcw } from 'lucide-react';
+import { ExternalLink, Layers, Map as MapaIcon, Maximize2, MapPin, Minimize2, Paintbrush, Phone, RotateCcw, Sparkles } from 'lucide-react';
 import { PageHead } from '../../components/ui';
 import { criarCena, PAREDES, SUPERFICIES, type Cena, type Superficie } from './cena';
+import { CAMADAS, LEGENDA, type Camada } from './planta';
 import { TINTAS, lojasDa, linkMapa, type Marca, type Tinta } from './tintas';
 
 const MARCAS: Marca[] = ['Suvinil', 'Coral', 'Sherwin-Williams'];
@@ -49,11 +50,33 @@ export default function SimuladorPintura() {
   const [cores, setCores] = useState<Record<Superficie, Tinta | null>>({ esquerda: null, direita: null, fundo: null, frente: null, teto: null, chao: null });
   const [escolhida, setEscolhida] = useState<Tinta | null>(null);
   const [cheia, setCheia] = useState(false);
+  const [camadas, setCamadas] = useState<Record<Camada, boolean>>({ areas: false, medidas: false, pessoas: true, eletrica: false, iluminacao: false, hidraulica: false });
+  const [deCima, setDeCima] = useState(false);
+  const [vista, setVista] = useState<'entrada' | 'frente' | 'cima'>('entrada');
+  // abre já decorado; as áreas da planta ficam para quando desligar o modo
+  const [decorado, setDecorado] = useState(true);
+  const decorar = (v: boolean) => {
+    cena.current?.decorar(v);
+    setDecorado(v);
+    if (!v && !camadas.areas) alternar('areas');
+  };
+  const alternar = (id: Camada) => {
+    const v = !camadas[id];
+    cena.current?.camada(id, v);
+    setCamadas((c) => ({ ...c, [id]: v }));
+  };
+  const verDeCima = (v: boolean) => {
+    cena.current?.vista(v ? 'cima' : 'dentro');
+    setDeCima(v);
+  };
 
   useEffect(() => {
     if (!palco.current) return;
     try {
       cena.current = criarCena(palco.current);
+      cena.current.camada('areas', false);
+      cena.current.camada('pessoas', true);
+      cena.current.decorar(true);
     } catch {
       setErro('Seu navegador não conseguiu abrir a visualização 3D (WebGL desativado).');
     }
@@ -83,7 +106,7 @@ export default function SimuladorPintura() {
     <div className="page">
       <PageHead
         title="Simular pintura"
-        description="A loja em 3D (cerca de 4,1 m × 10 m ≈ 41 m², medidas estimadas pelas fotos). Escolha uma cor e as paredes, o teto ou o chão mudam na hora. Recurso temporário."
+        description="A loja em 3D com as medidas da planta (8,70 m × 4,46 m, cerca de 38 m²). Ligue as camadas de elétrica, iluminação e hidráulica, veja de cima ou escolha uma cor para as paredes, o teto e o chão. Recurso temporário."
       />
 
       <div className="pintura">
@@ -91,20 +114,47 @@ export default function SimuladorPintura() {
           <div ref={palco} className="pintura__canvas" />
           {erro && <div className="pintura__erro">{erro}</div>}
           <div className="pintura__acoes">
-            <button className="chip" onClick={() => cena.current?.olharPara('fundo')}><RotateCcw size={13} /> Entrada</button>
-            <button className="chip" onClick={() => cena.current?.olharPara('frente')}>Ver a frente</button>
-            <button className="chip" onClick={() => setCheia((v) => !v)} aria-label={cheia ? 'Sair da tela cheia' : 'Tela cheia'}>
-              {cheia ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
-            </button>
+            <div className="pintura__grupo" role="group" aria-label="Vistas">
+              <span className="pintura__rotulo">Vista</span>
+              <button className={`chip${vista === 'entrada' ? ' is-on' : ''}`} onClick={() => { cena.current?.olharPara('fundo'); setDeCima(false); setVista('entrada'); }}><RotateCcw size={13} /> Entrada</button>
+              <button className={`chip${vista === 'frente' ? ' is-on' : ''}`} onClick={() => { cena.current?.olharPara('frente'); setDeCima(false); setVista('frente'); }}>Frente</button>
+              <button className={`chip${deCima ? ' is-on' : ''}`} onClick={() => { verDeCima(!deCima); setVista(deCima ? 'entrada' : 'cima'); }} aria-pressed={deCima}><MapaIcon size={13} /> De cima</button>
+            </div>
+            <div className="pintura__grupo" role="group" aria-label="Modo">
+              <button className={`chip${decorado ? ' is-on' : ''}`} onClick={() => decorar(!decorado)} aria-pressed={decorado}><Sparkles size={13} /> Decorado</button>
+              <button className="chip" onClick={() => setCheia((v) => !v)} aria-label={cheia ? 'Sair da tela cheia' : 'Tela cheia'}>
+                {cheia ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+              </button>
+            </div>
           </div>
           <p className="pintura__dica small">
-            <span className="so-pc">Arraste para olhar · W A S D ou setas para andar</span>
-            <span className="so-toque">Arraste para olhar · joystick para andar</span>
+            <span className="so-pc">{deCima ? 'Arraste para mover · roda do mouse para aproximar' : 'Arraste para olhar · W A S D ou setas para andar'}</span>
+            <span className="so-toque">{deCima ? 'Arraste para mover a planta' : 'Arraste para olhar · joystick para andar'}</span>
           </p>
           <Joystick onMove={(x, y) => cena.current?.mover(x, y)} />
         </section>
 
         <aside className="panel pad-lg pintura__lado">
+          <h2 className="panel-title"><Layers size={16} className="gold" /> Plantas</h2>
+          <div className="pintura__alvos" role="group" aria-label="Camadas da planta">
+            {CAMADAS.map((c) => (
+              <button key={c.id} aria-pressed={camadas[c.id]} className={`chip${camadas[c.id] ? ' is-on' : ''}`} onClick={() => alternar(c.id)}>
+                {c.nome}
+              </button>
+            ))}
+          </div>
+          {CAMADAS.some((c) => camadas[c.id]) && (
+            <ul className="pintura__legenda small">
+              {CAMADAS.filter((c) => camadas[c.id]).flatMap((c) => LEGENDA[c.id]).map((l) => (
+                <li key={l.nome}><i className={`is-${l.forma ?? 'linha'}`} style={{ background: l.forma === 'tracejado' ? undefined : l.cor, borderColor: l.cor }} />{l.nome}</li>
+              ))}
+            </ul>
+          )}
+          <p className="small muted">
+            Medidas e pontos tirados das plantas à mão (escala 1:35). Onde o papel não tem cota, a posição é proporcional ao desenho.
+            Todas as tomadas ficam a 25 cm do piso; na área VIP, 25 cm acima do palco de pallets (54 cm do chão). No modo Decorado, os móveis, as luminárias e as garrafas são sugestão de ambientação e não vêm da planta.
+          </p>
+
           <h2 className="panel-title"><Paintbrush size={16} className="gold" /> Pintar</h2>
           <div className="pintura__alvos" role="radiogroup" aria-label="Qual parede">
             {([{ id: 'todas', nome: 'Todas as paredes' }, ...SUPERFICIES] as { id: Alvo; nome: string }[]).map((p) => (

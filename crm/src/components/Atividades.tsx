@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowUpRight, BellRing, History } from 'lucide-react';
+import { ArrowUpRight, BellRing, History, MessagesSquare } from 'lucide-react';
 import { AREAS, COLLECTION_PAGE, MODULOS } from '../modules';
 import { useResource } from '../lib/data';
 import { useSession } from '../lib/session';
 import { initials } from '../lib/format';
 import { Modal } from './ui';
+import { EnviarAoChat } from './EnviarAoChat';
 
 export interface Atividade {
   id: string;
@@ -98,9 +99,11 @@ export function useAtividades() {
   return { items, loading, seen, novas, marcarVistas };
 }
 
-function Linha({ a, nova, piscar, onOpen }: { a: Atividade; nova: boolean; piscar: boolean; onOpen: (a: Atividade) => void }) {
+function Linha({ a, nova, piscar, onOpen, onEnviar }: {
+  a: Atividade; nova: boolean; piscar: boolean; onOpen: (a: Atividade) => void; onEnviar?: (a: Atividade) => void;
+}) {
   return (
-    <li>
+    <li className="activity-linha">
       <button className={`activity ${nova ? 'is-new' : ''} ${nova && piscar ? 'is-blink' : ''}`} onClick={() => onOpen(a)} title="Abrir a página deste registro">
         <span className="activity__avatar">{initials(a.usuarioNome)}</span>
         <span className="activity__body">
@@ -115,12 +118,17 @@ function Linha({ a, nova, piscar, onOpen }: { a: Atividade; nova: boolean; pisca
         </span>
         <ArrowUpRight size={15} className="activity__go" />
       </button>
+      {onEnviar && pageOf(a) && (
+        <button type="button" className="activity__chat" onClick={() => onEnviar(a)} aria-label="Mandar para o chat da equipe" title="Mandar para o chat da equipe">
+          <MessagesSquare size={14} />
+        </button>
+      )}
     </li>
   );
 }
 
-function Lista({ items, seen, onOpen, empty, piscar = false }: {
-  items: Atividade[]; seen: string; onOpen: (a: Atividade) => void; empty: string; piscar?: boolean;
+function Lista({ items, seen, onOpen, onEnviar, empty, piscar = false }: {
+  items: Atividade[]; seen: string; onOpen: (a: Atividade) => void; onEnviar?: (a: Atividade) => void; empty: string; piscar?: boolean;
 }) {
   const { usuario } = useSession();
   if (!items.length) return <p className="activity-empty muted">{empty}</p>;
@@ -130,7 +138,7 @@ function Lista({ items, seen, onOpen, empty, piscar = false }: {
         <section key={g.dia}>
           <h3 className="activity-day">{g.dia}</h3>
           <ul className="activity-list">
-            {g.items.map((a) => <Linha key={a.id} a={a} nova={a.criadoEm > seen && a.usuarioId !== usuario?.id} piscar={piscar} onOpen={onOpen} />)}
+            {g.items.map((a) => <Linha key={a.id} a={a} nova={a.criadoEm > seen && a.usuarioId !== usuario?.id} piscar={piscar} onOpen={onOpen} onEnviar={onEnviar} />)}
           </ul>
         </section>
       ))}
@@ -145,6 +153,9 @@ function Lista({ items, seen, onOpen, empty, piscar = false }: {
 export function PainelAtualizacoes({ onClose, piscar = false }: { onClose: () => void; piscar?: boolean }) {
   const { items, seen, novas, marcarVistas } = useAtividades();
   const navigate = useNavigate();
+  const { access } = useSession();
+  // "pingar" no chat da equipe o que foi feito: o link da página do registro, com quem fez e o quê
+  const [enviar, setEnviar] = useState<Atividade | null>(null);
   const [area, setArea] = useState('');
   const [pessoa, setPessoa] = useState('');
   // o que era novidade ao abrir continua destacado enquanto o painel estiver aberto
@@ -186,8 +197,13 @@ export function PainelAtualizacoes({ onClose, piscar = false }: { onClose: () =>
         </div>
       </div>
       <div className="activity-scroll">
-        <Lista items={filtradas} seen={destaque} onOpen={abrir} piscar={piscar} empty="Nenhuma atualização registrada ainda." />
+        <Lista items={filtradas} seen={destaque} onOpen={abrir} onEnviar={access('chat') !== 'none' ? setEnviar : undefined} piscar={piscar} empty="Nenhuma atualização registrada ainda." />
       </div>
+      {enviar && (
+        <EnviarAoChat
+          link={{ caminho: pageOf(enviar)!, titulo: `${enviar.usuarioNome} ${enviar.acao}${enviar.alvo ? ` ${enviar.alvo}` : ''}`.slice(0, 160), detalhe: `${areaLabel(enviar.area)} · ${new Date(enviar.criadoEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` }}
+          onClose={() => setEnviar(null)} onEnviado={onClose} />
+      )}
     </Modal>
   );
 }

@@ -795,6 +795,7 @@ function EmailChamados() {
         <li>Crie um <b>Novo projeto</b>, cole o código e troque <b>seu-email@exemplo.com</b> pelos e-mails que vão receber os avisos.</li>
         <li>Clique em <b>Implantar → Nova implantação → App da Web</b>, com "Executar como: Eu" e "Quem pode acessar: Qualquer pessoa". Autorize o Gmail.</li>
         <li>Copie o <b>URL do app da Web</b> (termina em /exec), cole aqui, salve e envie um teste.</li>
+        <li>Deu erro? Toque em <b>Conferir o script</b>: deve abrir uma página com "funcionando". Se não abrir, salve o código no Apps Script e publique de novo em <b>Implantar → Gerenciar implantações → editar → Nova versão</b>.</li>
       </ol>
       <div className="profile-actions" style={{ justifyContent: 'flex-start' }}>
         <AsyncButton className="btn btn--ghost" onClick={copiar}><Copy size={15} /> Copiar código do script</AsyncButton>
@@ -807,6 +808,7 @@ function EmailChamados() {
       </div>
       <div className="profile-actions">
         {configurado && <AsyncButton className="btn btn--ghost" onClick={() => salvar(true)} confirm={{ title: 'Desligar o e-mail dos chamados?', message: 'Os chamados novos deixam de ser avisados por e-mail.', confirmLabel: 'Desligar', danger: true }}>Desligar</AsyncButton>}
+        {configurado && <a className="btn btn--ghost" href={atual.data!.url} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Conferir o script</a>}
         {configurado && <AsyncButton className="btn btn--ghost" onClick={testar}><Send size={15} /> Enviar teste</AsyncButton>}
         <AsyncButton className="btn btn--primary" onClick={() => { if (!url.trim()) throw new Error('Cole o URL do app da Web.'); return salvar(); }}><Save size={16} /> Salvar</AsyncButton>
       </div>

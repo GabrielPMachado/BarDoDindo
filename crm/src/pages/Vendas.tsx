@@ -14,6 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import { AvisoCaixa, Segmentos, useCaixa } from './Salao';
 import { EscolherProdutos, type ProdutoVenda } from '../components/EscolherProdutos';
 import { FichaAfilhado } from '../components/FichaAfilhado';
+import { BotaoRevelar, DATA_OCULTA, ocultarCpf, ocultarEmail, ocultarTelefone } from '../components/DadosOcultos';
 
 interface Cliente {
   id: number;
@@ -177,6 +178,11 @@ export function Clientes() {
   // excluir apaga também consumos, vouchers e reservas do afilhado, por isso exige as duas permissões
   const podeExcluir = pode('clientes', 'excluir') && pode('consumos', 'excluir');
   const podeEditar = pode('clientes', 'editar');
+  // dados pessoais ficam ocultos; quem edita Clientes revela um afilhado (olho na linha) ou todos (botão na barra)
+  const [revelados, setRevelados] = useState<Set<number>>(new Set());
+  const [todosVisiveis, setTodosVisiveis] = useState(false);
+  const visivel = (c: Cliente) => podeEditar && (todosVisiveis || revelados.has(c.numero));
+  const alternarRevelado = (c: Cliente) => setRevelados((r) => { const n = new Set(r); if (n.has(c.numero)) n.delete(c.numero); else n.add(c.numero); return n; });
   const excluir = async (c: Cliente) => {
     await api(`/crm/clientes/${c.numero}`, { method: 'DELETE' });
     await reload('/crm/clientes');
@@ -197,7 +203,8 @@ export function Clientes() {
     await reload('/crm/config');
     notify(liga ? `${c.nome} ganhou estrela.` : `Estrela de ${c.nome} removida.`);
   };
-  const list = clientes.filter((c) => !term || `${c.nome} ${c.email} ${c.telefone} ${c.cpf ?? ''} ${numero(c.numero)}`.toLowerCase().includes(term))
+  // buscar por e-mail, celular ou CPF só para quem pode ver esses dados (senão a busca os revelaria)
+  const list = clientes.filter((c) => !term || (podeEditar ? `${c.nome} ${c.email} ${c.telefone} ${c.cpf ?? ''} ${numero(c.numero)}` : `${c.nome} ${numero(c.numero)}`).toLowerCase().includes(term))
     // depois os afilhados em ordem crescente de número; a equipe vem junta, por último (#000, #-001, #-002...)
     .sort((a, b) => Number(comEstrela(b)) - Number(comEstrela(a)) || Number(daEquipe(a)) - Number(daEquipe(b))
       || (daEquipe(a) ? b.numero - a.numero : a.numero - b.numero));
@@ -227,7 +234,8 @@ export function Clientes() {
       )}
       <div className="panel">
         <div className="toolbar">
-          <label className="search"><Search size={16} /><input placeholder="Buscar por nome, e-mail, telefone, CPF ou número" value={q} onChange={(e) => setQ(e.target.value)} /></label>
+          <label className="search"><Search size={16} /><input placeholder={podeEditar ? 'Buscar por nome, e-mail, telefone, CPF ou número' : 'Buscar por nome ou número'} value={q} onChange={(e) => setQ(e.target.value)} /></label>
+          {podeEditar && <BotaoRevelar visivel={todosVisiveis} onClick={() => { setTodosVisiveis((v) => !v); setRevelados(new Set()); }} rotulo="os dados de todos" />}
           <span className="muted toolbar__count">{num(list.length)} {list.length === 1 ? 'cliente' : 'clientes'}</span>
         </div>
         {error && <ErrorBox>{error}</ErrorBox>}
@@ -251,9 +259,20 @@ export function Clientes() {
                         <Star size={14} className={comEstrela(c) ? 'gold' : 'muted'} fill={comEstrela(c) ? 'currentColor' : 'none'} />
                       </button>
                     ) : comEstrela(c) && <Star size={14} className="gold" fill="currentColor" aria-label="Com estrela" style={{ verticalAlign: '-2px', marginRight: 4 }} />}<button type="button" className="link cliente-nome" onClick={() => setFichaDe(c.numero)} title="Abrir a ficha (editar, relatório e cartão)"><strong>{c.nome}</strong></button><div className="muted small">{numero(c.numero)}{c.origem === 'Pré-cadastro' && <> · <span className="gold">Pré-cadastro</span></>}{c.origem === 'Equipe' && <> · Equipe</>}{c.via === 'QR Code' && <> · <span className="gold">QR Code</span></>}</div></div></td>
-                    <td data-label="Contato" className="text"><div className="small">{c.email}</div><div className="muted small nowrap">{c.telefone ? maskPhone(c.telefone) : '—'}</div></td>
+                    <td data-label="Contato" className="text"><div className="dados-pessoais">
+                      <div className={visivel(c) ? undefined : 'oculto'}>
+                        <div className="small">{visivel(c) ? c.email : ocultarEmail(c.email)}</div>
+                        <div className="muted small nowrap">{c.telefone ? (visivel(c) ? maskPhone(c.telefone) : ocultarTelefone(c.telefone)) : '—'}</div>
+                      </div>
+                      {podeEditar && !todosVisiveis && <BotaoRevelar compacto visivel={visivel(c)} onClick={() => alternarRevelado(c)} rotulo={`os dados de ${c.nome}`} />}
+                    </div></td>
                     <td data-label="Documento" className="text">
-                      {c.cpf ? <><div className="small nowrap">{c.cpf}</div><div className="muted small nowrap">{c.nascimento ? `${dateBR(c.nascimento)} · ${idade(c.nascimento)} anos` : ''}</div></> : <Badge tone="warn">Sem CPF</Badge>}
+                      {c.cpf ? (
+                        <div className={visivel(c) ? undefined : 'oculto'}>
+                          <div className="small nowrap">{visivel(c) ? c.cpf : ocultarCpf(c.cpf)}</div>
+                          <div className="muted small nowrap">{visivel(c) ? (c.nascimento ? `${dateBR(c.nascimento)} · ${idade(c.nascimento)} anos` : '') : DATA_OCULTA}</div>
+                        </div>
+                      ) : <Badge tone="warn">Sem CPF</Badge>}
                       {c.respostas && <button type="button" className="link small" onClick={() => setFichaDe(c.numero)}>Ver respostas</button>}
                     </td>
                     <td data-label="Pontos" className="num">{num(c.pontos)}</td>
@@ -404,7 +423,7 @@ export function Consumo() {
                   <ul className="autocomplete__list">
                     {sugestoes.map((c) => (
                       <li key={c.id}><button onClick={() => { setClienteId(c.id); setClienteQ(''); }}>
-                        <strong>{numero(c.numero)}</strong> {c.nome} <span className="muted small">{c.email}</span>
+                        <strong>{numero(c.numero)}</strong> {c.nome} <span className="muted small">{pode('clientes', 'editar') ? c.email : ocultarEmail(c.email)}</span>
                       </button></li>
                     ))}
                   </ul>

@@ -55,7 +55,7 @@ export function BarChart({ data, format, height = 240, ariaLabel }: {
           return (
             <g key={d.label} onMouseEnter={() => setHover(i)}>
               <rect x={padL + band * i} y={padT} width={band} height={H - padT - padB} fill="transparent" />
-              <path d={path} className={`chart__bar ${d.value < 0 ? 'chart__bar--neg' : ''} ${hover === i ? 'is-hover' : ''}`} />
+              <path d={path} className={`chart__bar ${d.value < 0 ? 'chart__bar--neg' : ''} ${hover === i ? 'is-hover' : ''}`} style={{ animationDelay: `${i * 45}ms` }} />
               <text x={padL + band * i + band / 2} y={H - 8} className="chart__tick" textAnchor="middle">{d.label}</text>
             </g>
           );
@@ -77,8 +77,8 @@ export function HBarList({ data, format }: { data: Datum[]; format: (v: number) 
   const max = Math.max(1, ...data.map((d) => d.value));
   return (
     <div className="hbars">
-      {data.map((d) => (
-        <div key={d.label} className="hbar" title={`${d.label}: ${format(d.value)}`}>
+      {data.map((d, i) => (
+        <div key={d.label} className="hbar" title={`${d.label}: ${format(d.value)}`} style={{ ["--i" as string]: i }}>
           <span className="hbar__label">{d.label}</span>
           <div className="hbar__track"><div className="hbar__fill" style={{ width: `${(d.value / max) * 100}%` }} /></div>
           <span className="hbar__value">{format(d.value)}</span>

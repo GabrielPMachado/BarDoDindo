@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { AlertTriangle, ArrowDown, ArrowRight, ArrowUp, Check, ChevronsDown, ChevronsUp, Eye, EyeOff, GripVertical, LayoutDashboard, Pin, PinOff, Plus, RotateCcw, Scaling, SlidersHorizontal, X } from 'lucide-react';
 import { BarChart, HBarList } from '../components/Charts';
 import { ContextMenu, type MenuPos } from '../components/ContextMenu';
-import { Modal, notify, PageHead } from '../components/ui';
+import { KpiValor, Modal, notify, PageHead } from '../components/ui';
 import { useAtividades } from '../components/Atividades';
 import { useCollection, useResource, type Row } from '../lib/data';
 import { brl, dateBR, daysUntil, isoToday, monthLabel, num, pct } from '../lib/format';
@@ -149,7 +149,7 @@ function PainelDeBlocos(info: PainelInfo) {
   const kpi = (k: Kpi) => () => (
     <div className={`kpi ${k.tone ? `kpi--${k.tone}` : ''}`}>
       <span className="kpi__label">{k.label}</span>
-      <strong className="kpi__value">{k.value}</strong>
+      <KpiValor value={k.value} />
       {k.hint && <span className="kpi__hint">{k.hint}</span>}
     </div>
   );

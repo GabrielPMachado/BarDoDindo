@@ -1,15 +1,19 @@
 import * as THREE from 'three';
+import { PLANTA, alturaPiso, criarCamadas, type Camada } from './planta';
+import { criarDecorado } from './decorado';
 
 /*
- * A loja vazia em 3D, montada a partir das duas fotos: salão estreito e comprido (~4,1 m × 10 m ≈ 41 m²),
+ * A loja vazia em 3D. As medidas vêm da planta baixa à mão (8,70 m × 4,46 m na frente e 4,36 m no fundo),
+ * com as camadas de elétrica, iluminação e hidráulica em planta.ts. O acabamento veio das fotos:
  * pé-direito alto com forro de gesso, parede do fundo de concreto com dois pilares e, na frente,
  * a vitrine com porta de esquadria preta e a janela estreita vertical.
  * Eixos: x = largura, y = altura, z = comprimento (frente em +z, fundo em -z).
  */
 
-export const LARGURA = 4.1;
-export const COMPRIMENTO = 10;
-export const ALTURA = 3.6;
+export const LARGURA = PLANTA.larguraFrente;
+export const COMPRIMENTO = PLANTA.comprimento;
+const LARGURA_FUNDO = PLANTA.larguraFundo;
+export const ALTURA = PLANTA.altura;
 const OLHO = 1.65;
 const FOLGA = 0.3;
 
@@ -118,6 +122,12 @@ export interface Cena {
   olharPara: (lado: 'fundo' | 'frente') => void;
   /** Movimento contínuo do joystick: x = lateral, y = frente/trás, de -1 a 1. */
   mover: (x: number, y: number) => void;
+  /** Modo Decorado: móveis, luminárias, sombras e reflexos. */
+  decorar: (ligado: boolean) => void;
+  /** Liga ou desliga uma camada da planta. */
+  camada: (id: Camada, visivel: boolean) => void;
+  /** 'cima' mostra a planta vista de cima (sem forro); 'dentro' volta a andar pela loja. */
+  vista: (v: 'cima' | 'dentro') => void;
   destruir: () => void;
 }
 
@@ -166,15 +176,67 @@ export function criarCena(container: HTMLElement): Cena {
 
   // laterais (de quem entra pela frente olhando o fundo: esquerda em -x)
   add(plano(L, H), mat.esquerda, [-W / 2, 0, L / 2], Math.PI / 2);
-  add(plano(L, H), mat.direita, [W / 2, 0, -L / 2], -Math.PI / 2);
+  // a lateral do salão abre 10 cm: 4,46 m na frente e 4,36 m no fundo
+  const recuo = LARGURA - LARGURA_FUNDO;
+  add(plano(Math.hypot(L, recuo), H), mat.direita, [W / 2 - recuo, 0, -L / 2], -Math.atan2(L, recuo));
 
-  // fundo: parede de concreto com dois pilares encostados nos cantos
-  add(plano(W, H), mat.fundo, [-W / 2, 0, -L / 2]);
-  for (const x of [-W / 2 + 0.55, W / 2 - 0.55]) add(new THREE.BoxGeometry(0.42, H, 0.16), mat.fundo, [x, H / 2, -L / 2 + 0.08]);
+  // fundo de concreto
+  add(plano(LARGURA_FUNDO, H), mat.fundo, [-W / 2, 0, -L / 2]);
+
+  /** Converte um ponto da planta (d a partir da frente, t a partir da parede do balcão) para a cena. */
+  const p = (d: number, t: number, y = 0) => new THREE.Vector3(-W / 2 + t, y, L / 2 - d);
+  // pilares da planta: canto da frente do lado do salão e os dois do fundo
+  for (const pl of PLANTA.pilares) {
+    const c = p(pl.d + pl.cd / 2, pl.t + pl.ct / 2, H / 2);
+    add(new THREE.BoxGeometry(pl.ct, H, pl.cd), pl.d > L / 2 ? mat.fundo : mat.frente, [c.x, c.y, c.z]);
+  }
+  // freezers verticais na entrada, como vitrine de bebidas: porta de vidro, luz por dentro e garrafas à mostra
+  const branco = new THREE.MeshStandardMaterial({ color: '#e9e7e2', roughness: 0.35, metalness: 0.2 });
+  const luzFreezer = new THREE.MeshStandardMaterial({ color: '#eef6ff', emissive: '#dcecff', emissiveIntensity: 0.8 });
+  const prateleira = new THREE.MeshStandardMaterial({ color: '#cfd8df', roughness: 0.2, metalness: 0.6 });
+  const vidroFreezer = new THREE.MeshStandardMaterial({ color: '#d6ecff', roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.18, depthWrite: false });
+  const ledFreezer = new THREE.MeshStandardMaterial({ color: '#9fd4ff', emissive: '#5fb6ff', emissiveIntensity: 1.6 });
+  const garrafasFreezer = ['#6b3a12', '#2f6b2a', '#b8761a', '#7a8a2a'].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.15, metalness: 0.1, emissive: c, emissiveIntensity: 0.12 }));
+  const garrafaGeo = new THREE.CylinderGeometry(0.028, 0.028, 0.16, 12);
+  const gargaloGeo = new THREE.CylinderGeometry(0.01, 0.022, 0.07, 10);
+  const FF = PLANTA.freezerFundura, FA = PLANTA.freezerAltura;
+  const fundoFz = 0.45; // até onde vai o corpo; o resto é a parte de dentro, iluminada
+  for (const fz of PLANTA.freezers) {
+    const tc = fz.t + fz.largura / 2 + 0.02, w = fz.largura;
+    const em = (d: number, y: number) => { const v = p(d, tc, y); return [v.x, v.y, v.z] as [number, number, number]; };
+    add(new THREE.BoxGeometry(w, FA, fundoFz), branco, em(0.02 + fundoFz / 2, FA / 2));
+    const dDentro = FF + 0.02 - (0.02 + fundoFz); // fundura da parte iluminada
+    const dMeio = 0.02 + fundoFz + dDentro / 2;
+    for (const lado of [-1, 1]) { const v = p(dMeio, tc + lado * (w / 2 - 0.01), FA / 2); add(new THREE.BoxGeometry(0.02, FA, dDentro), branco, [v.x, v.y, v.z]); }
+    add(new THREE.BoxGeometry(w, 0.12, dDentro), branco, em(dMeio, 0.06)); // base
+    add(new THREE.BoxGeometry(w, 0.2, dDentro), branco, em(dMeio, FA - 0.1)); // topo
+    add(new THREE.BoxGeometry(w - 0.06, 0.03, 0.005), ledFreezer, em(FF + 0.02, FA - 0.1)); // faixa de luz azul no topo
+    add(new THREE.BoxGeometry(w - 0.04, FA - 0.32, 0.005), luzFreezer, em(0.02 + fundoFz + 0.003, 0.12 + (FA - 0.32) / 2));
+    for (const y of [0.12, 0.47, 0.82, 1.17]) {
+      if (y > 0.12) add(new THREE.BoxGeometry(w - 0.04, 0.01, dDentro), prateleira, em(dMeio, y));
+      for (let k = 0; k < 5; k++) {
+        const t = tc - w / 2 + 0.07 + k * ((w - 0.14) / 4);
+        const mt = garrafasFreezer[(k + Math.round(y * 10)) % garrafasFreezer.length];
+        const g1 = p(dMeio, t, y + 0.085), g2 = p(dMeio, t, y + 0.2);
+        add(garrafaGeo, mt, [g1.x, g1.y, g1.z]);
+        add(gargaloGeo, mt, [g2.x, g2.y, g2.z]);
+      }
+    }
+    add(new THREE.BoxGeometry(w - 0.02, FA - 0.32, 0.008), vidroFreezer, em(FF + 0.02, 0.12 + (FA - 0.32) / 2)); // porta de vidro
+    const pux = p(FF + 0.04, tc + w / 2 - 0.05, 0.9);
+    add(new THREE.BoxGeometry(0.015, 0.45, 0.02), prateleira, [pux.x, pux.y, pux.z]); // puxador
+  }
+  // separação baixa da área VIP (aberta), em ripas
+  const sv = PLANTA.separacaoVip;
+  const ripa = new THREE.MeshStandardMaterial({ color: '#6b4a32', roughness: 0.75 });
+  for (let t = sv.t0 + 0.05; t <= sv.t1; t += 0.12) {
+    const c = p(L - PLANTA.fundo, t, sv.altura / 2);
+    add(new THREE.BoxGeometry(0.05, sv.altura, 0.04), ripa, [c.x, c.y, c.z]);
+  }
 
   // frente, vista de dentro: u vai da direita (+x) para a esquerda (-x) de quem está olhando para a rua
-  const vitrine = { u: 0.55, w: 2.4, h: 2.25, faixa: 0.5 };
-  const janela = { u: 3.45, w: 0.36, h: 3.35 };
+  const vitrine = { u: 0.5, w: 2.4, h: 2.25, faixa: 0.5 };
+  const janela = { u: 3.6, w: 0.36, h: 3.35 };
   const frente = plano(W, H, [
     [vitrine.u, 0, vitrine.w, vitrine.h + vitrine.faixa],
     [janela.u, 0, janela.w, janela.h],
@@ -182,7 +244,7 @@ export function criarCena(container: HTMLElement): Cena {
   add(frente, mat.frente, [W / 2, 0, L / 2], Math.PI);
   const ux = (u: number) => W / 2 - u; // posição x de um ponto u da frente
   // pilar de concreto entre a vitrine e a janela
-  add(new THREE.BoxGeometry(0.4, H, 0.2), mat.frente, [ux(3.17), H / 2, L / 2 - 0.1]);
+  add(new THREE.BoxGeometry(0.4, H, 0.2), mat.frente, [ux(3.32), H / 2, L / 2 - 0.1]);
 
   const preto = new THREE.MeshStandardMaterial({ color: '#141516', roughness: 0.5, metalness: 0.4 });
   const vidro = new THREE.MeshStandardMaterial({ color: '#dfe8ef', emissive: '#cfd8df', emissiveIntensity: 0.9, roughness: 0.1 });
@@ -207,38 +269,103 @@ export function criarCena(container: HTMLElement): Cena {
 
   // tubulação aparente do sprinkler no forro
   const cano = new THREE.MeshStandardMaterial({ color: '#b9bcbf', roughness: 0.35, metalness: 0.8 });
+  const doForro: THREE.Object3D[] = [forro];
   const tubo = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, W - 0.2, 12), cano);
   tubo.rotation.z = Math.PI / 2;
   for (const z of [-L / 2 + 1.3, L / 2 - 1.2]) {
     const t = tubo.clone();
     t.position.set(0, H - 0.12, z);
     scene.add(t);
+    doForro.push(t);
   }
   const longo = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, L - 2.5, 12), cano);
   longo.rotation.x = Math.PI / 2;
   longo.position.set(-W / 2 + 0.35, H - 0.12, 0.05);
   scene.add(longo);
+  doForro.push(longo);
+
+  // balcão de 4,90 m: tampo de 0,60 m na borda da área de 1,66 m, de frente para o salão
+  const B = PLANTA.balcao;
+  const madeira = new THREE.MeshStandardMaterial({ color: '#5a3a26', roughness: 0.7, transparent: true });
+  const tampo = new THREE.MeshStandardMaterial({ color: '#2b2622', roughness: 0.35, transparent: true });
+  // volume simples do projeto da bancada: corpo + mureta (0,92 a 1,66 da parede) e o tampo de granito
+  const BC = PLANTA.bancada;
+  const cb = p(B.d + B.comprimento / 2, (BC.corredor + B.profundidade) / 2, 0);
+  const corpo = add(new THREE.BoxGeometry(B.profundidade - BC.corredor, BC.alturaMureta, B.comprimento), madeira, [cb.x, BC.alturaMureta / 2, cb.z]);
+  const ct = p(B.d + B.comprimento / 2, B.profundidade + BC.balanco - B.larguraTampo / 2, 0);
+  const pedra = add(new THREE.BoxGeometry(B.larguraTampo, B.alturaTampo - BC.alturaMureta, B.comprimento + 0.06), tampo, [ct.x, (B.alturaTampo + BC.alturaMureta) / 2, ct.z]);
+
+  // camadas da planta (começam desligadas, menos áreas e balcão)
+  const { camadas, fixos } = criarCamadas(p);
+  scene.add(fixos);
+  for (const [id, g] of Object.entries(camadas)) {
+    g.visible = id === 'areas';
+    scene.add(g);
+  }
+  const ajustarBalcao = () => {
+    // com instalações à mostra o balcão fica translúcido para ver os canos e fios por baixo
+    const infra = camadas.eletrica.visible || camadas.hidraulica.visible;
+    madeira.opacity = tampo.opacity = infra ? 0.35 : 1;
+    madeira.depthWrite = tampo.depthWrite = !infra;
+    // no Decorado o balcão detalhado do projeto toma o lugar deste volume simples
+    corpo.visible = pedra.visible = infra || (camadas.areas.visible && !decorando);
+    // as cadeiras e sofás atrapalham ver as instalações: somem enquanto elas estão ligadas
+    decorado.grupo.visible = decorando && !infra;
+  };
 
   // luz: ambiente suave, claridade da rua entrando pela frente e luminárias no forro
-  scene.add(new THREE.HemisphereLight('#ffffff', '#7a7a7a', 2.1));
+  const hemi = new THREE.HemisphereLight('#ffffff', '#7a7a7a', 2.1);
+  scene.add(hemi);
+  const luzesBase: THREE.Light[] = [hemi];
   const rua = new THREE.DirectionalLight('#fff3e0', 1.4);
   rua.position.set(-1, 3, L);
   rua.target.position.set(0, 0, -2);
   scene.add(rua, rua.target);
-  for (const z of [-3.2, 0, 3.2]) {
+  luzesBase.push(rua);
+  for (const z of [-2.8, 0, 2.8]) {
     const l = new THREE.PointLight('#fff6ec', 4, 10, 1.4);
     l.position.set(0, H - 0.9, z);
     scene.add(l);
+    luzesBase.push(l);
   }
+  const decorado = criarDecorado(p, scene, renderer, luzesBase);
+  let decorando = false;
 
   // câmera em primeira pessoa
   const pos = new THREE.Vector3(0, OLHO, L / 2 - 1.2);
   let yaw = 0; // 0 = olhando o fundo (-z)
   let pitch = 0;
+  // vista de cima: câmera alta olhando para baixo, frente à esquerda e balcão no alto, como no papel
+  let deCima = false;
+  let ambienteGuardado: THREE.Texture | null = null;
+  // câmera ortográfica: a vista de cima fica igual a uma planta, sem perspectiva
+  const planta = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 40);
+  /** Tela em pé (celular): a planta gira para o comprimento ficar na vertical, com a frente no alto. */
+  const empe = () => camera.aspect < 1;
+  const alvoCima = new THREE.Vector3();
+  let zoom = 1;
+  const vista = (v: 'cima' | 'dentro') => {
+    deCima = v === 'cima';
+    for (const o of doForro) o.visible = !deCima;
+    // de cima, os reflexos do ambiente deixam granito e inox brancos: some enquanto olha a planta
+    if (deCima && scene.environment) {
+      ambienteGuardado = scene.environment;
+      scene.environment = null;
+    } else if (!deCima && ambienteGuardado) {
+      scene.environment = ambienteGuardado;
+      ambienteGuardado = null;
+    }
+    sanca.visible = !deCima;
+    if (deCima) {
+      alvoCima.set(0, 0, 0);
+      zoom = 1;
+    }
+  };
   const olharPara = (lado: 'fundo' | 'frente') => {
+    vista('dentro');
     yaw = lado === 'fundo' ? 0 : Math.PI;
     pitch = 0;
-    pos.set(0, OLHO, lado === 'fundo' ? L / 2 - 1.2 : -L / 2 + 1.2);
+    pos.set(0, OLHO, lado === 'fundo' ? L / 2 - 1.2 : -L / 2 + PLANTA.fundo + 0.3);
   };
 
   const teclas = new Set<string>();
@@ -269,6 +396,21 @@ export function criarCena(container: HTMLElement): Cena {
   };
   const move = (e: PointerEvent) => {
     if (!arrasto || arrasto.id !== e.pointerId) return;
+    if (deCima) {
+      // arrastar desliza a planta
+      const k = (planta.top - planta.bottom) / Math.max(1, el.clientHeight);
+      const dx = (e.clientX - arrasto.x) * k, dy = (e.clientY - arrasto.y) * k;
+      if (empe()) {
+        alvoCima.x += dx;
+        alvoCima.z += dy;
+      } else {
+        alvoCima.x -= dy;
+        alvoCima.z += dx;
+      }
+      arrasto.x = e.clientX;
+      arrasto.y = e.clientY;
+      return;
+    }
     const s = e.pointerType === 'touch' ? 0.006 : 0.004;
     yaw += (e.clientX - arrasto.x) * s;
     pitch = Math.max(-1.2, Math.min(1.2, pitch + (e.clientY - arrasto.y) * s));
@@ -282,6 +424,12 @@ export function criarCena(container: HTMLElement): Cena {
   el.addEventListener('pointermove', move);
   el.addEventListener('pointerup', up);
   el.addEventListener('pointercancel', up);
+  const roda = (e: WheelEvent) => {
+    if (!deCima) return;
+    e.preventDefault();
+    zoom = Math.max(0.35, Math.min(2.5, zoom * (e.deltaY > 0 ? 1.1 : 0.9)));
+  };
+  el.addEventListener('wheel', roda, { passive: false });
 
   const resize = () => {
     const w = container.clientWidth, h = container.clientHeight;
@@ -308,10 +456,36 @@ export function criarCena(container: HTMLElement): Cena {
     if (teclas.has('arrowleft')) yaw -= 1.8 * dt;
     if (teclas.has('arrowright')) yaw += 1.8 * dt;
     const v = 1.6 * dt;
+    if (deCima) {
+      // cabe a planta inteira (8,70 × 4,46 m) na tela, com margem
+      const deitada = !empe();
+      planta.up.set(deitada ? -1 : 0, 0, deitada ? 0 : 1);
+      const [mv, mh] = deitada ? [W / 2 + 0.5, L / 2 + 0.5] : [L / 2 + 0.5, W / 2 + 0.5];
+      const meiaAltura = Math.max(mv, mh / camera.aspect) * zoom;
+      planta.top = meiaAltura;
+      planta.bottom = -meiaAltura;
+      planta.left = -meiaAltura * camera.aspect;
+      planta.right = meiaAltura * camera.aspect;
+      planta.updateProjectionMatrix();
+      if (deitada) {
+        alvoCima.x -= f * v * 2;
+        alvoCima.z -= lat * v * 2;
+      } else {
+        alvoCima.z += f * v * 2;
+        alvoCima.x -= lat * v * 2;
+      }
+      planta.position.set(alvoCima.x, 20, alvoCima.z);
+      planta.lookAt(alvoCima);
+      renderer.render(scene, planta);
+      return;
+    }
     pos.x += (Math.cos(yaw) * lat + Math.sin(yaw) * f) * v;
     pos.z += (Math.sin(yaw) * lat - Math.cos(yaw) * f) * v;
     pos.x = Math.max(-W / 2 + FOLGA, Math.min(W / 2 - FOLGA, pos.x));
     pos.z = Math.max(-L / 2 + FOLGA + 0.16, Math.min(L / 2 - FOLGA - 0.2, pos.z));
+    // sobe no degrau e no palco de pallets da área VIP (só existem no modo Decorado)
+    const piso = decorado.grupo.visible ? alturaPiso(L / 2 - pos.z, pos.x + W / 2) : 0;
+    pos.y += (OLHO + piso - pos.y) * 0.25;
     camera.position.copy(pos);
     camera.rotation.set(0, 0, 0, 'YXZ');
     camera.rotation.y = -yaw;
@@ -336,6 +510,22 @@ export function criarCena(container: HTMLElement): Cena {
   return {
     pintar,
     olharPara,
+    camada: (id, visivel) => {
+      camadas[id].visible = visivel;
+      if (id === 'medidas') decorado.medidas.visible = visivel;
+      if (id === 'pessoas') decorado.pessoas.visible = visivel;
+      ajustarBalcao();
+    },
+    vista,
+    decorar: (ligado) => {
+      decorando = ligado;
+      decorado.ligar(ligado);
+      if (deCima) {
+        ambienteGuardado = scene.environment;
+        scene.environment = null;
+      }
+      ajustarBalcao();
+    },
     mover: (x, y) => {
       joy.x = x;
       joy.y = y;
@@ -346,6 +536,8 @@ export function criarCena(container: HTMLElement): Cena {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('keyup', onKey);
       window.removeEventListener('blur', soltarTudo);
+      el.removeEventListener('wheel', roda);
+      decorado.destruir();
       scene.traverse((o) => {
         if (o instanceof THREE.Mesh) o.geometry.dispose();
       });
