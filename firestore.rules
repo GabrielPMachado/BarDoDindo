@@ -178,10 +178,14 @@ service cloud.firestore {
 
     /* ---------- primeiro acesso ---------- */
     // o primeiro administrador, a função Administrador e a marca de "configurado" são gravados juntos, uma única vez
+    // Se a função Administrador sobrou (ex.: registro apagado no console), só um administrador que já existe refaz o
+    // primeiro acesso: sem isso, qualquer conta logada virava Administrador enquanto meta/setup não existisse.
     function primeiroAcesso() {
       return logado()
         && !exists(caminho('meta', 'setup')) && existsAfter(caminho('meta', 'setup'))
-        && getAfter(caminho('usuarios', request.auth.uid)).data.funcaoId == 'admin';
+        && getAfter(caminho('usuarios', request.auth.uid)).data.funcaoId == 'admin'
+        && (!exists(caminho('funcoes', 'admin'))
+          || (exists(caminho('usuarios', request.auth.uid)) && get(caminho('usuarios', request.auth.uid)).data.funcaoId == 'admin'));
     }
     match /meta/setup {
       allow read: if true;
@@ -229,9 +233,16 @@ service cloud.firestore {
         && request.resource.data.atualizadoEm is string;
       allow delete: if sistema();
     }
-    // chaves de serviços (ex.: IA que lê as notas fiscais): só a equipe logada lê; só quem edita Configurações grava
+    // chaves de serviços: só quem usa cada uma lê; só quem edita Configurações grava.
+    // "ia" (Gemini): notas fiscais nas Compras e fotos/preenchimento dos Produtos. "email": avisar os chamados de suporte.
+    function usaIA() {
+      return podeEmAlgum(['produtos', 'fichas', 'compras', 'estoque', 'despesas'], 'criar')
+        || podeEmAlgum(['produtos', 'fichas', 'compras', 'estoque', 'despesas'], 'editar');
+    }
     match /segredos/{id} {
-      allow read: if daEquipe();
+      allow read: if pode('parametros', 'ver')
+        || (id == 'ia' && usaIA())
+        || (id == 'email' && podeColecao('chamados', 'criar'));
       allow write: if pode('parametros', 'editar');
     }
 

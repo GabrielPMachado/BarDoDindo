@@ -1,6 +1,6 @@
 /**
  * Leitura da nota fiscal por IA (Google Gemini, cota gratuita): a foto (ou o PDF) vai para a IA, que devolve
- * fornecedor, número, data e itens. A chave fica no banco (segredos/ia), legível só pela equipe logada.
+ * fornecedor, número, data e itens. A chave fica no banco (segredos/ia), legível só por quem usa a IA e por Configurações.
  */
 import { api } from './api';
 
