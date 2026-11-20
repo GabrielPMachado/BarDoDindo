@@ -2359,7 +2359,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
     [novos ? `${novos} PDF${novos > 1 ? 's' : ''} anexado${novos > 1 ? 's' : ''}` : '', removidos ? `${removidos} PDF${removidos > 1 ? 's' : ''} removido${removidos > 1 ? 's' : ''}` : '']
       .filter(Boolean).join(' · ');
 
-  /* CRM: chave da IA que lê as notas fiscais (Google Gemini, cota gratuita). Fica no banco, legível só pela equipe logada:
+  /* CRM: chave da IA que lê as notas fiscais (Google Gemini, cota gratuita). Fica no banco, legível só por quem usa a IA (Produtos, Compras, Estoque, Despesas) e por Configurações:
    * fora do código do site, que é público. Só quem edita Configurações troca a chave. */
   rota('GET', '/crm/ia/chave', async () => {
     await requireUsuario();
@@ -2379,7 +2379,7 @@ export function createBackend(kind: 'app' | 'crm', instancia: string = kind) {
   });
 
   /* CRM: endereço do Google Apps Script que manda o e-mail dos chamados de suporte (scripts/email-chamados.gs).
-   * Fica no banco, legível só pela equipe logada; os destinatários ficam no próprio script. */
+   * Fica no banco, legível só por quem abre chamados e por Configurações; os destinatários ficam no próprio script. */
   rota('GET', '/crm/email/chamados', async () => {
     await requireUsuario();
     return { url: (await getDoc(doc(db, 'segredos', 'email'))).data()?.url ?? '' };

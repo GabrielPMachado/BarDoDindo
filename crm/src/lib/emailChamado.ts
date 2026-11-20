@@ -1,7 +1,7 @@
 /**
  * E-mail de aviso quando um chamado de suporte é aberto. O site não tem servidor, então quem envia é um Google Apps Script
  * publicado na conta Google do bar (scripts/email-chamados.gs): o Cérebro monta o e-mail aqui e manda para o endereço do
- * script, que fica no banco (segredos/email), legível só pela equipe logada. Os destinatários ficam no próprio script.
+ * script, que fica no banco (segredos/email), legível só por quem abre chamados e por Configurações. Os destinatários ficam no próprio script.
  */
 import { api } from './api';
 import { dateBR } from './format';

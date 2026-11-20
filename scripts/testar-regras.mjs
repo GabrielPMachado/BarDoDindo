@@ -77,6 +77,26 @@ await negado('gravar preferências do CRM', () => setDoc(doc(db, 'preferencias',
 await negado('afilhado lê as opções das listas do CRM', () => getDoc(doc(db, 'opcoes', 'estoque__categoria')));
 await negado('afilhado acrescenta opção às listas do CRM', () => setDoc(doc(db, 'opcoes', 'estoque__categoria'), { valores: ['x'], atualizadoEm: 'x' }));
 await negado('refazer o primeiro acesso', () => setDoc(doc(db, 'meta/setup'), { feitoEm: 'x' }));
+{
+  // registro do primeiro acesso apagado (ex.: no console) com a função Administrador ainda lá:
+  // uma conta qualquer não pode refazer o primeiro acesso e virar Administrador
+  const EMU = 'http://127.0.0.1:8080/v1/projects/demo-bardodindo/databases/(default)/documents';
+  const dono = { Authorization: 'Bearer owner', 'Content-Type': 'application/json' };
+  await fetch(`${EMU}/funcoes/admin`, { method: 'PATCH', headers: dono, body: JSON.stringify({ fields: { nome: { stringValue: 'Presidência' }, sistema: { booleanValue: true } } }) });
+  await fetch(`${EMU}/meta/setup`, { method: 'DELETE', headers: dono });
+  try {
+    await negado('virar Administrador com o primeiro acesso apagado', () => {
+      const lote = writeBatch(db);
+      lote.set(doc(db, 'funcoes', 'admin'), { nome: 'Presidência', permissoes: {}, sistema: true });
+      lote.set(doc(db, 'usuarios', uid), { nome: 'Intruso', email: 'cliente2@teste.local', funcaoId: 'admin', status: 'Ativo' });
+      lote.set(doc(db, 'meta', 'setup'), { feitoEm: 'x' });
+      return lote.commit();
+    });
+  } finally {
+    await fetch(`${EMU}/meta/setup`, { method: 'PATCH', headers: dono, body: JSON.stringify({ fields: { feitoEm: { stringValue: 'x' } } }) });
+    await fetch(`${EMU}/funcoes/admin`, { method: 'DELETE', headers: dono });
+  }
+}
 await negado('alterar o contador de afilhados', () => updateDoc(doc(db, 'meta/contadores'), { clientes: increment(1) }));
 await negado('gravar no cardápio', () => setDoc(doc(db, 'cardapio/x'), { nome: 'x', preco: 0 }));
 await permitido('ver os itens para reservar (PS5, karaokê)', () => getDocs(collection(db, 'reservaveis')));
@@ -247,6 +267,7 @@ if (senhaModular) {
   await permitido('cadastrar mesa (Reservas tem "criar")', () => addDoc(collection(db, 'mesas'), { numero: 1 }));
   await negado('excluir mesa (Reservas não tem "excluir", mesmo com Atendimento total)', () => deleteDoc(doc(db, 'mesas', 'qualquer')));
   await negado('ver comandas (página nova: vale a de Lançar consumo, sem permissões)', () => getDocs(collection(db, 'comandas')));
+  await permitido('Entrada de notas lê a chave da IA (Compras com "criar")', () => getDoc(doc(db, 'segredos', 'ia')));
   await permitido('Entrada de notas lê o Estoque', () => getDocs(collection(db, 'estoque')));
   await permitido('Entrada de notas soma a quantidade no Estoque', () => updateDoc(doc(db, 'estoque', 'gin'), { quantidade: 3 }));
   await permitido('Resultado (DRE) lê as receitas', () => getDocs(collection(db, 'receitas')));
@@ -377,9 +398,9 @@ if (senhaAdministrativo) {
   await negado('ver as notas de compra (Estrutura)', () => getDocs(collection(db, 'compras')));
   await negado('ver o Patrimônio (Estrutura)', () => getDocs(collection(db, 'patrimonio')));
   await negado('ver os Arquivos da empresa (Financeiro)', () => getDocs(collection(db, 'arquivos')));
-  await permitido('ler a chave da IA (equipe logada)', () => getDoc(doc(db, 'segredos', 'ia')));
+  await negado('ler a chave da IA (sem Produtos, Compras, Estoque nem Despesas)', () => getDoc(doc(db, 'segredos', 'ia')));
   await negado('trocar a chave da IA (sem Configurações)', () => setDoc(doc(db, 'segredos', 'ia'), { chave: 'x' }));
-  await permitido('ler o endereço do e-mail dos chamados (equipe logada)', () => getDoc(doc(db, 'segredos', 'email')));
+  await negado('ler o endereço do e-mail dos chamados (sem abrir chamados)', () => getDoc(doc(db, 'segredos', 'email')));
   await negado('trocar o endereço do e-mail dos chamados (sem Configurações)', () => setDoc(doc(db, 'segredos', 'email'), { url: 'https://exemplo.com' }));
   await negado('anexar PDF a um contrato (Administrativo)', async () => {
     const ref = doc(collection(db, 'anexos'));
@@ -424,6 +445,7 @@ if (senhaCaixa) {
   if (senhaParametros) {
     console.log('— numeração própria da equipe (Parâmetros > Numeração) —');
     await signInWithEmailAndPassword(auth, 'parametros@teste.local', senhaParametros);
+    await permitido('Configurações lê a chave da IA e o e-mail dos chamados', async () => { await getDoc(doc(db, 'segredos', 'ia')); await getDoc(doc(db, 'segredos', 'email')); });
     await permitido('passar afilhado antigo da equipe para número negativo', () => updateDoc(doc(db, 'clientes', 'equipe-antiga'), { numero: -2 }));
     await negado('dar número positivo a afilhado da equipe', () => updateDoc(doc(db, 'clientes', 'equipe-antiga'), { numero: 5 }));
     const comum = (await getDocs(collection(db, 'clientes'))).docs.find((d) => d.data().origem !== 'Equipe');
