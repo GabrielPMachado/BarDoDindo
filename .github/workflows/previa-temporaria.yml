@@ -27,7 +27,7 @@ jobs:
       - run: npm --prefix crm ci
       - run: npm run build:all
       - id: deploy
-        uses: FirebaseExtended/action-hosting-deploy@v0
+        uses: FirebaseExtended/action-hosting-deploy@500ac625ca2dd40cbd15f7659af953801858032a # v0
         with:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BARDO_C0878 }}
           projectId: bardo-c0878
