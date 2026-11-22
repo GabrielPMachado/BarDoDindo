@@ -536,8 +536,8 @@ import { imagemCartao as desenharImagem } from '../shared/cartao';
     const btn = $('btn-cadastro');
     carregando(btn, true);
     try {
-      const { token } = await api('/app/cadastro', { nome, email, telefone, senha, cpf, nascimento, via, reserva, origem: 'Pré-cadastro', aceite: true });
-      const dados = await me(token);
+      await api('/app/cadastro', { nome, email, telefone, senha, cpf, nascimento, via, reserva, origem: 'Pré-cadastro', aceite: true });
+      const dados = await me();
       revelar(dados.cliente, true);
       $('form-cadastro').reset();
     } catch (err) {
@@ -573,8 +573,8 @@ import { imagemCartao as desenharImagem } from '../shared/cartao';
     const btn = $('btn-login');
     carregando(btn, true);
     try {
-      const { token } = await api('/app/login', { email: $('l-email').value.trim(), senha: $('l-senha').value });
-      const dados = await me(token);
+      await api('/app/login', { email: $('l-email').value.trim(), senha: $('l-senha').value });
+      const dados = await me();
       revelar(dados.cliente, false);
       $('form-login').reset();
     } catch (err) {
